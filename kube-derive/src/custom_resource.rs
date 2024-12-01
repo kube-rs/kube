@@ -3,13 +3,13 @@
 use darling::{
     ast::{self, NestedMeta},
     util::{self, path_to_string, IdentString},
-    FromDeriveInput, FromField, FromMeta,
+    FromAttributes, FromDeriveInput, FromField, FromMeta,
 };
 use proc_macro2::{Ident, Literal, Span, TokenStream};
 use quote::{ToTokens, TokenStreamExt as _};
 use syn::{
-    parse::Parser as _, parse_quote, spanned::Spanned, Attribute, Data, DeriveInput, Expr, Path, Type,
-    Visibility,
+    parse::Parser as _, parse_quote, spanned::Spanned, Attribute, Data, DataStruct, DeriveInput, Expr,
+    FieldsNamed, Path, Type, Visibility,
 };
 
 /// Values we can parse from #[kube(attrs)]
@@ -107,8 +107,6 @@ fn default_served_arg() -> bool {
 
 #[derive(Debug, FromMeta)]
 struct Crates {
-    #[darling(default = "Self::default_kube")]
-    kube: Path,
     #[darling(default = "Self::default_kube_core")]
     kube_core: Path,
     #[darling(default = "Self::default_k8s_openapi")]
@@ -134,10 +132,6 @@ impl Default for Crates {
 impl Crates {
     fn default_kube_core() -> Path {
         parse_quote! { ::kube::core } // by default must work well with people using facade crate
-    }
-
-    fn default_kube() -> Path {
-        parse_quote! { ::kube }
     }
 
     fn default_k8s_openapi() -> Path {
@@ -646,132 +640,122 @@ fn generate_hasspec(spec_ident: &Ident, root_ident: &Ident, kube_core: &Path) ->
 #[derive(FromField)]
 #[darling(attributes(cel_validate))]
 struct Rule {
-    ident: Option<Ident>,
-    ty: Type,
-    method: Option<Path>,
     #[darling(multiple, rename = "rule")]
     rules: Vec<Expr>,
 }
 
 #[derive(FromDeriveInput)]
 #[darling(attributes(cel_validate), supports(struct_named))]
-struct CELValidation {
+struct ValidateSchema {
     #[darling(default)]
     crates: Crates,
-    data: ast::Data<util::Ignored, Rule>,
+    ident: Ident,
+    #[darling(multiple, rename = "rule")]
+    rules: Vec<Expr>,
 }
 
-pub(crate) fn derive_cel_validate(input: TokenStream) -> TokenStream {
-    let ast: DeriveInput = match syn::parse2(input) {
-        Err(err) => return err.to_compile_error(),
-        Ok(di) => di,
-    };
-
-    let CELValidation {
-        crates: Crates {
-            kube_core, schemars, ..
-        },
-        data,
-        ..
-    } = match CELValidation::from_derive_input(&ast) {
-        Err(err) => return err.write_errors(),
-        Ok(attrs) => attrs,
-    };
-
-    let mut validations: TokenStream = TokenStream::new();
-
-    let fields = data.take_struct().map(|f| f.fields).unwrap_or_default();
-    for rule in fields.iter().filter(|r| !r.rules.is_empty()) {
-        let Rule {
-            rules,
-            ident,
-            ty,
-            method,
-        } = rule;
-        let rules: Vec<TokenStream> = rules.iter().map(|r| quote! {#r,}).collect();
-        let method = match method {
-            Some(method) => method.to_token_stream(),
-            None => match ident {
-                Some(ident) => IdentString::new(ident.clone()).to_token_stream(),
-                None => continue,
-            },
-        };
-
-        validations.append_all(quote! {
-            fn #method(gen: &mut #schemars::gen::SchemaGenerator) -> #schemars::schema::Schema {
-                use #kube_core::{Rule, Message, Reason};
-                #kube_core::validate(&mut gen.subschema_for::<#ty>(), [#(#rules)*].to_vec()).unwrap()
-            }
-        });
-    }
-
-    validations
-}
-
-#[derive(FromDeriveInput)]
-#[darling(attributes(cel_validate), supports(struct_named))]
-struct CELCompletion {
-    #[darling(default)]
-    crates: Crates,
-}
-
-pub(crate) fn cel_validate(_args: TokenStream, input: TokenStream) -> TokenStream {
+pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
     let mut ast: DeriveInput = match syn::parse2(input) {
         Err(err) => return err.to_compile_error(),
         Ok(di) => di,
     };
 
-    let CELCompletion {
-        crates: Crates { kube, .. },
-    } = match CELCompletion::from_derive_input(&ast) {
+    let ValidateSchema {
+        crates:
+            Crates {
+                kube_core,
+                schemars,
+                serde,
+                ..
+            },
+        ident,
+        rules,
+    } = match ValidateSchema::from_derive_input(&ast) {
         Err(err) => return err.write_errors(),
         Ok(attrs) => attrs,
     };
+
+    // Collect global structure validation rules
+    let struct_name = ident.to_string();
+    let struct_rules: Vec<TokenStream> = rules.iter().map(|r| quote! {#r,}).collect();
+
+    // Remove all non-serde, non-schemars attributes
+    // Has to happen on the original definition at all times, as we don't have #[derive] stanzes.
+    ast.attrs = ast
+        .attrs
+        .iter()
+        .filter(|attr| attr.path().is_ident("serde") || attr.path().is_ident("schemars"))
+        .cloned()
+        .collect();
 
     let struct_data = match ast.data {
         syn::Data::Struct(ref mut struct_data) => struct_data,
         _ => return quote! {},
     };
 
+    // Preserve all serde attributes, to allow #[serde(rename_all = "camelCase")] or similar
+    let struct_attrs: Vec<TokenStream> = ast.attrs.iter().map(|attr| quote! {#attr}).collect();
+    let mut property_modifications = vec![];
     if let syn::Fields::Named(fields) = &mut struct_data.fields {
         for field in &mut fields.named {
-            let Rule { rules, method, .. } = match Rule::from_field(field) {
-                Ok(rule) if rule.rules.is_empty() => continue,
+            let Rule { rules, .. } = match Rule::from_field(field) {
                 Ok(rule) => rule,
                 Err(err) => return err.write_errors(),
             };
 
-            // Remove original attributes
+            // Remove all non-serde, non-schemars attributes
+            // Has to happen on the original definition at all times, as we don't have #[derive] stanzes.
             field.attrs = field
                 .attrs
                 .iter()
-                .filter(|attr| !attr.path().is_ident("cel_validate"))
+                .filter(|attr| attr.path().is_ident("serde") || attr.path().is_ident("schemars"))
                 .cloned()
                 .collect();
 
-            let rules: Vec<TokenStream> = rules.iter().map(|r| quote! {rule = #r,}).collect();
-            let validator = field.ident.as_ref().map(|i| i.to_string()).unwrap_or_default();
-            let validator = method.as_ref().map(path_to_string).unwrap_or(validator);
-            let method = method.map(|m| quote! {method = #m,});
+            if rules.is_empty() {
+                continue;
+            }
 
-            // Prepare updated definition with shcemars injection
-            let new_serde_attr = quote! {
-                #[cel_validate(#method #(#rules)*)]
-                #[schemars(schema_with = #validator)]
-            };
+            let rules: Vec<TokenStream> = rules.iter().map(|r| quote! {#r,}).collect();
 
-            // Modify directly in tree
-            let parser = Attribute::parse_outer;
-            match parser.parse2(new_serde_attr) {
-                Ok(ref mut parsed) => field.attrs.append(parsed),
-                Err(e) => return e.to_compile_error(),
-            };
+            // We need to prepend derive macros, as they were consumed by this macro processing, being a derive by itself.
+            property_modifications.push(quote! {
+                {
+                    #[derive(#serde::Serialize, #schemars::JsonSchema)]
+                    #(#struct_attrs)*
+                    struct Validated {
+                        #field
+                    }
+
+                    let merge = &mut Validated::json_schema(gen);
+                    #kube_core::validate_property(merge, 0, [#(#rules)*].to_vec()).unwrap();
+                    #kube_core::merge_properties(s, merge);
+                }
+            });
         }
     }
 
     quote! {
-        #[derive(#kube::CELValidate)]
-        #ast
+        impl #schemars::JsonSchema for #ident {
+            fn is_referenceable() -> bool {
+                false
+            }
+
+            fn schema_name() -> String {
+                #struct_name.to_string() + "_kube_validation".into()
+            }
+
+            fn json_schema(gen: &mut #schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+                #[derive(#serde::Serialize, #schemars::JsonSchema)]
+                #ast
+
+                use #kube_core::{Rule, Message, Reason};
+                let s = &mut #ident::json_schema(gen);
+                #kube_core::validate(s, [#(#struct_rules)*].to_vec()).unwrap();
+                #(#property_modifications)*
+                s.clone()
+            }
+        }
     }
 }
 
@@ -904,19 +888,14 @@ mod tests {
     #[test]
     fn test_derive_validated() {
         let input = quote! {
-            #[derive(CustomResource, Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema, CELValidated)]
+            #[derive(CustomResource, ValidateSchema, Serialize, Deserialize, Debug, PartialEq, Clone)]
             #[kube(group = "clux.dev", version = "v1", kind = "Foo", namespaced)]
             struct FooSpec {
-                #[cel_validate(rule = "self != ''".into())]
+                #[cel_validate("self != ''".into())]
                 foo: String
             }
         };
         let input = syn::parse2(input).unwrap();
-        let validation = CELValidation::from_derive_input(&input).unwrap();
-        let data = validation.data.take_struct();
-        assert!(data.is_some());
-        let data = data.unwrap();
-        assert_eq!(data.len(), 1);
-        assert_eq!(data.fields[0].rules.len(), 1);
+        ValidateSchema::from_derive_input(&input).unwrap();
     }
 }

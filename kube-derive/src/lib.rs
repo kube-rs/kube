@@ -327,24 +327,21 @@ pub fn derive_custom_resource(input: proc_macro::TokenStream) -> proc_macro::Tok
     custom_resource::derive(proc_macro2::TokenStream::from(input)).into()
 }
 
-/// Generates a JsonSchema patch with a set of CEL expression validation rules applied on the CRD.
-///
-/// # Example
+/// Generates a JsonSchema implementation a set of CEL validation rules applied on the CRD.
 ///
 /// ```rust
-/// use kube::CELValidate;
+/// use kube::ValidateSchema;
 /// use kube::CustomResource;
 /// use serde::Deserialize;
 /// use serde::Serialize;
-/// use schemars::JsonSchema;
 /// use kube::core::crd::CustomResourceExt;
 ///
-/// #[derive(CustomResource, CELValidate, Serialize, Deserialize, Clone, Debug, JsonSchema)]
+/// #[derive(CustomResource, ValidateSchema, Serialize, Deserialize, Clone, Debug)]
 /// #[kube(group = "kube.rs", version = "v1", kind = "Struct")]
+/// #[cel_validate(rule = Rule::new("self == oldSelf"))]
 /// struct MyStruct {
 ///     #[serde(default = "default")]
-///     #[cel_validate(rule = Rule{rule: "self != ''".into(), message: Some("failure message".into()), ..Default::default()})]
-///     #[schemars(schema_with = "field")]
+///     #[cel_validate(rule = Rule::new("self != ''").message("failure message"))]
 ///     field: String,
 /// }
 ///
@@ -353,49 +350,14 @@ pub fn derive_custom_resource(input: proc_macro::TokenStream) -> proc_macro::Tok
 /// }
 ///
 /// assert!(serde_json::to_string(&Struct::crd()).unwrap().contains("x-kubernetes-validations"));
+/// assert!(serde_json::to_string(&Struct::crd()).unwrap().contains(r#""rule":"self == oldSelf""#));
 /// assert!(serde_json::to_string(&Struct::crd()).unwrap().contains(r#""rule":"self != ''""#));
 /// assert!(serde_json::to_string(&Struct::crd()).unwrap().contains(r#""message":"failure message""#));
 /// assert!(serde_json::to_string(&Struct::crd()).unwrap().contains(r#""default":"value""#));
 /// ```
-#[proc_macro_derive(CELValidate, attributes(cel_validate))]
-pub fn derive_validated(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    custom_resource::derive_cel_validate(input.into()).into()
-}
-
-/// Injects schemars overrides and the derive keyword for provided CEL rules via the [`CELValidate`].
-///
-/// ```rust
-/// use kube::cel_validate;
-/// use kube::CustomResource;
-/// use serde::Deserialize;
-/// use serde::Serialize;
-/// use schemars::JsonSchema;
-/// use kube::core::crd::CustomResourceExt;
-///
-/// #[cel_validate]
-/// #[derive(CustomResource, Serialize, Deserialize, Clone, Debug, JsonSchema)]
-/// #[kube(group = "kube.rs", version = "v1", kind = "Struct")]
-/// struct MyStruct {
-///     #[serde(default = "default")]
-///     #[cel_validate(rule = Rule{rule: "self != ''".into(), message: Some("failure message".into()), ..Default::default()})]
-///     field: String,
-/// }
-///
-/// fn default() -> String {
-///     "value".into()
-/// }
-///
-/// assert!(serde_json::to_string(&Struct::crd()).unwrap().contains("x-kubernetes-validations"));
-/// assert!(serde_json::to_string(&Struct::crd()).unwrap().contains(r#""rule":"self != ''""#));
-/// assert!(serde_json::to_string(&Struct::crd()).unwrap().contains(r#""message":"failure message""#));
-/// assert!(serde_json::to_string(&Struct::crd()).unwrap().contains(r#""default":"value""#));
-/// ```
-#[proc_macro_attribute]
-pub fn cel_validate(
-    args: proc_macro::TokenStream,
-    input: proc_macro::TokenStream,
-) -> proc_macro::TokenStream {
-    custom_resource::cel_validate(args.into(), input.into()).into()
+#[proc_macro_derive(ValidateSchema, attributes(cel_validate, schemars))]
+pub fn derive_schema_validation(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    custom_resource::derive_validated_schema(input.into()).into()
 }
 
 /// A custom derive for inheriting Resource impl for the type.
