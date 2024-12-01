@@ -6,11 +6,9 @@ use kube::{
         Api, ApiResource, DeleteParams, DynamicObject, GroupVersionKind, Patch, PatchParams, PostParams,
         WatchEvent, WatchParams,
     },
-    cel_validate,
     runtime::wait::{await_condition, conditions},
-    CELValidate, Client, CustomResource, CustomResourceExt,
+    Client, CustomResource, CustomResourceExt, ValidateSchema,
 };
-use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 // This example shows how the generated schema affects defaulting and validation.
@@ -20,9 +18,7 @@ use serde::{Deserialize, Serialize};
 // - https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#defaulting
 // - https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#defaulting-and-nullable
 
-#[derive(
-    CustomResource, CELValidate, Serialize, Deserialize, Default, Debug, PartialEq, Eq, Clone, JsonSchema,
-)]
+#[derive(CustomResource, ValidateSchema, Serialize, Deserialize, Default, Debug, PartialEq, Eq, Clone)]
 #[kube(
     group = "clux.dev",
     version = "v1",
@@ -31,6 +27,8 @@ use serde::{Deserialize, Serialize};
     derive = "PartialEq",
     derive = "Default"
 )]
+#[serde(rename_all = "camelCase")]
+#[cel_validate(rule = Rule::new("self.nonNullable == oldSelf.nonNullable"))]
 pub struct FooSpec {
     // Non-nullable without default is required.
     //
@@ -92,18 +90,16 @@ pub struct FooSpec {
     // Field with CEL validation
     #[serde(default = "default_legal")]
     #[cel_validate(
-        method = cel_validate,
-        rule = Rule{rule: "self != 'illegal'".into(), message: Some(Message::Expression("'string cannot be illegal'".into())), reason: Some(Reason::FieldValueForbidden), ..Default::default()},
-        rule = Rule{rule: "self != 'not legal'".into(), reason: Some(Reason::FieldValueInvalid), ..Default::default()}
+        rule = Rule::new("self != 'illegal'").message(Message::Expression("'string cannot be illegal'".into())).reason(Reason::FieldValueForbidden),
+        rule = Rule::new("self != 'not legal'").reason(Reason::FieldValueInvalid),
     )]
-    #[schemars(schema_with = "cel_validate")]
     cel_validated: Option<String>,
 
+    #[cel_validate(rule = Rule::new("self == oldSelf").message("is immutable"))]
     foo_sub_spec: Option<FooSubSpec>,
 }
 
-#[cel_validate]
-#[derive(Serialize, Deserialize, Default, Debug, PartialEq, Eq, Clone, JsonSchema)]
+#[derive(ValidateSchema, Serialize, Deserialize, Default, Debug, PartialEq, Eq, Clone)]
 pub struct FooSubSpec {
     #[cel_validate(rule = "self != 'not legal'".into())]
     field: String,
@@ -192,23 +188,23 @@ async fn main() -> Result<()> {
     // Test defaulting of `non_nullable_with_default` field
     let data = DynamicObject::new("baz", &api_resource).data(serde_json::json!({
         "spec": {
-            "non_nullable": "a required field",
+            "nonNullable": "a required field",
             // `non_nullable_with_default` field is missing
 
             // listable values to patch later to verify merge strategies
-            "default_listable": vec![2],
-            "set_listable": vec![2],
+            "defaultListable": vec![2],
+            "setListable": vec![2],
         }
     }));
     let val = dynapi.create(&PostParams::default(), &data).await?.data;
     println!("{:?}", val["spec"]);
     // Defaulting happened for non-nullable field
-    assert_eq!(val["spec"]["non_nullable_with_default"], default_value());
+    assert_eq!(val["spec"]["nonNullableWithDefault"], default_value());
 
     // Listables
-    assert_eq!(serde_json::to_string(&val["spec"]["default_listable"])?, "[2]");
-    assert_eq!(serde_json::to_string(&val["spec"]["set_listable"])?, "[2]");
-    assert_eq!(serde_json::to_string(&val["spec"]["cel_validated"])?, "\"legal\"");
+    assert_eq!(serde_json::to_string(&val["spec"]["defaultListable"])?, "[2]");
+    assert_eq!(serde_json::to_string(&val["spec"]["setListable"])?, "[2]");
+    assert_eq!(serde_json::to_string(&val["spec"]["celValidated"])?, "\"legal\"");
 
     // Missing required field (non-nullable without default) is an error
     let data = DynamicObject::new("qux", &api_resource).data(serde_json::json!({
@@ -222,7 +218,7 @@ async fn main() -> Result<()> {
             assert_eq!(err.reason, "Invalid");
             assert_eq!(err.status, "Failure");
             assert!(err.message.contains("clux.dev \"qux\" is invalid"));
-            assert!(err.message.contains("spec.non_nullable: Required value"));
+            assert!(err.message.contains("spec.nonNullable: Required value"));
         }
         _ => panic!(),
     }
@@ -233,8 +229,8 @@ async fn main() -> Result<()> {
         "apiVersion": "clux.dev/v1",
         "kind": "Foo",
         "spec": {
-            "default_listable": vec![3],
-            "set_listable": vec![3]
+            "defaultListable": vec![3],
+            "setListable": vec![3]
         }
     });
     let pres = foos.patch("baz", &ssapply, &Patch::Apply(patch)).await?;
@@ -247,7 +243,7 @@ async fn main() -> Result<()> {
         "apiVersion": "clux.dev/v1",
         "kind": "Foo",
         "spec": {
-            "cel_validated": Some("illegal")
+            "celValidated": Some("illegal")
         }
     });
     let cel_res = foos.patch("baz", &ssapply, &Patch::Apply(cel_patch)).await;
@@ -258,7 +254,7 @@ async fn main() -> Result<()> {
             assert_eq!(err.reason, "Invalid");
             assert_eq!(err.status, "Failure");
             assert!(err.message.contains("Foo.clux.dev \"baz\" is invalid"));
-            assert!(err.message.contains("spec.cel_validated: Forbidden"));
+            assert!(err.message.contains("spec.celValidated: Forbidden"));
             assert!(err.message.contains("string cannot be illegal"));
         }
         _ => panic!(),
@@ -269,7 +265,7 @@ async fn main() -> Result<()> {
         "apiVersion": "clux.dev/v1",
         "kind": "Foo",
         "spec": {
-            "cel_validated": Some("not legal")
+            "celValidated": Some("not legal")
         }
     });
     let cel_res = foos.patch("baz", &ssapply, &Patch::Apply(cel_patch)).await;
@@ -280,7 +276,7 @@ async fn main() -> Result<()> {
             assert_eq!(err.reason, "Invalid");
             assert_eq!(err.status, "Failure");
             assert!(err.message.contains("Foo.clux.dev \"baz\" is invalid"));
-            assert!(err.message.contains("spec.cel_validated: Invalid value"));
+            assert!(err.message.contains("spec.celValidated: Invalid value"));
             assert!(err.message.contains("failed rule: self != 'not legal'"));
         }
         _ => panic!(),
@@ -290,7 +286,7 @@ async fn main() -> Result<()> {
         "apiVersion": "clux.dev/v1",
         "kind": "Foo",
         "spec": {
-            "foo_sub_spec": {
+            "fooSubSpec": {
                 "field": Some("not legal"),
             }
         }
@@ -303,8 +299,44 @@ async fn main() -> Result<()> {
             assert_eq!(err.reason, "Invalid");
             assert_eq!(err.status, "Failure");
             assert!(err.message.contains("Foo.clux.dev \"baz\" is invalid"));
-            assert!(err.message.contains("spec.foo_sub_spec.field: Invalid value"));
+            assert!(err.message.contains("spec.fooSubSpec.field: Invalid value"));
             assert!(err.message.contains("failed rule: self != 'not legal'"));
+        }
+        _ => panic!(),
+    }
+
+    let cel_patch = serde_json::json!({
+        "apiVersion": "clux.dev/v1",
+        "kind": "Foo",
+        "spec": {
+            "fooSubSpec": {
+                "field": Some("legal"),
+            }
+        }
+    });
+    let cel_res = foos.patch("baz", &ssapply, &Patch::Apply(cel_patch)).await;
+    assert!(cel_res.is_ok());
+
+    let cel_patch = serde_json::json!({
+        "apiVersion": "clux.dev/v1",
+        "kind": "Foo",
+        "spec": {
+            "fooSubSpec": {
+                "field": Some("legal"),
+                "other": "different",
+            }
+        }
+    });
+    let cel_res = foos.patch("baz", &ssapply, &Patch::Apply(cel_patch)).await;
+    assert!(cel_res.is_err());
+    match cel_res.err() {
+        Some(kube::Error::Api(err)) => {
+            assert_eq!(err.code, 422);
+            assert_eq!(err.reason, "Invalid");
+            assert_eq!(err.status, "Failure");
+            assert!(err.message.contains("Foo.clux.dev \"baz\" is invalid"));
+            assert!(err.message.contains("spec.fooSubSpec: Invalid value"));
+            assert!(err.message.contains("Invalid value: \"object\": is immutable"));
         }
         _ => panic!(),
     }
@@ -314,7 +346,7 @@ async fn main() -> Result<()> {
         "apiVersion": "clux.dev/v1",
         "kind": "Foo",
         "spec": {
-            "cel_validated": Some("legal")
+            "celValidated": Some("legal")
         }
     });
     foos.patch("baz", &ssapply, &Patch::Apply(cel_patch_ok)).await?;

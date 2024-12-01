@@ -19,6 +19,7 @@ pub struct Rule {
     pub message: Option<Message>,
     /// fieldPath represents the field path returned when the validation fails.
     /// It must be a relative JSON path, scoped to the location of the field in the schema
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub field_path: Option<String>,
     /// reason is a machine-readable value providing more detail about why a field failed the validation.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -162,7 +163,7 @@ impl FromStr for Reason {
 }
 
 /// Validate takes schema and applies a set of validation rules to it. The rules are stored
-/// under the "x-kubernetes-validations".
+/// on the top level under the "x-kubernetes-validations".
 ///
 /// ```rust
 /// use schemars::schema::Schema;
@@ -175,7 +176,7 @@ impl FromStr for Reason {
 ///     field_path: Some("spec.host".into()),
 ///     ..Default::default()
 /// }];
-/// let schema = validate(&mut schema, rules)?;
+/// validate(&mut schema, rules)?;
 /// assert_eq!(
 ///     serde_json::to_string(&schema).unwrap(),
 ///     r#"{"x-kubernetes-validations":[{"fieldPath":"spec.host","message":"must be a URL with the host matching spec.host","rule":"self.spec.host == self.url.host"}]}"#,
@@ -184,16 +185,98 @@ impl FromStr for Reason {
 ///```
 #[cfg(feature = "schema")]
 #[cfg_attr(docsrs, doc(cfg(feature = "schema")))]
-pub fn validate(s: &mut Schema, rules: Vec<Rule>) -> Result<Schema, serde_json::Error> {
-    let rules = serde_json::to_value(rules)?;
+pub fn validate(s: &mut Schema, rules: Vec<Rule>) -> Result<(), serde_json::Error> {
     match s {
         Schema::Bool(_) => (),
         Schema::Object(schema_object) => {
             schema_object
                 .extensions
-                .insert("x-kubernetes-validations".into(), rules);
+                .insert("x-kubernetes-validations".into(), serde_json::to_value(rules)?);
+        }
+    };
+    Ok(())
+}
+
+/// Validate property mutates property under property_index of the schema
+/// with the provided set of validation rules.
+///
+/// ```rust
+/// use schemars::JsonSchema;
+/// use kube::core::{Rule, validate_property};
+///
+/// #[derive(JsonSchema)]
+/// struct MyStruct {
+///     field: Option<String>,
+/// }
+///
+/// let gen = &mut schemars::gen::SchemaSettings::openapi3().into_generator();
+/// let mut schema = MyStruct::json_schema(gen);
+/// let rules = vec![Rule::new("self != oldSelf")];
+/// validate_property(&mut schema, 0, rules)?;
+/// assert_eq!(
+///     serde_json::to_string(&schema).unwrap(),
+///     r#"{"type":"object","properties":{"field":{"type":"string","nullable":true,"x-kubernetes-validations":[{"rule":"self != oldSelf"}]}}}"#
+/// );
+/// # Ok::<(), serde_json::Error>(())
+///```
+#[cfg(feature = "schema")]
+#[cfg_attr(docsrs, doc(cfg(feature = "schema")))]
+pub fn validate_property(
+    s: &mut Schema,
+    property_index: usize,
+    rules: Vec<Rule>,
+) -> Result<(), serde_json::Error> {
+    match s {
+        Schema::Bool(_) => (),
+        Schema::Object(schema_object) => {
+            let obj = schema_object.object();
+            for (n, (_, schema)) in obj.properties.iter_mut().enumerate() {
+                if n == property_index {
+                    return validate(schema, rules);
+                }
+            }
         }
     };
 
-    Ok(s.clone())
+    Ok(())
+}
+
+/// Merge schema properties in order to pass overrides or extension properties from the other schema.
+///
+/// ```rust
+/// use schemars::JsonSchema;
+/// use kube::core::{Rule, merge_properties};
+///
+/// #[derive(JsonSchema)]
+/// struct MyStruct {
+///     a: Option<bool>,
+/// }
+///
+/// #[derive(JsonSchema)]
+/// struct MySecondStruct {
+///     a: bool,
+///     b: Option<bool>,
+/// }
+/// let gen = &mut schemars::gen::SchemaSettings::openapi3().into_generator();
+/// let mut first = MyStruct::json_schema(gen);
+/// let mut second = MySecondStruct::json_schema(gen);
+/// merge_properties(&mut first, &mut second);
+///
+/// assert_eq!(
+///     serde_json::to_string(&first).unwrap(),
+///     r#"{"type":"object","properties":{"a":{"type":"boolean"},"b":{"type":"boolean","nullable":true}}}"#
+/// );
+/// # Ok::<(), serde_json::Error>(())
+#[cfg(feature = "schema")]
+#[cfg_attr(docsrs, doc(cfg(feature = "schema")))]
+pub fn merge_properties(s: &mut Schema, merge: &mut Schema) {
+    match s {
+        schemars::schema::Schema::Bool(_) => (),
+        schemars::schema::Schema::Object(schema_object) => {
+            let obj = schema_object.object();
+            for (k, v) in &merge.clone().into_object().object().properties {
+                obj.properties.insert(k.clone(), v.clone());
+            }
+        }
+    }
 }
