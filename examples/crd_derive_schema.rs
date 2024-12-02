@@ -25,7 +25,8 @@ use serde::{Deserialize, Serialize};
     kind = "Foo",
     namespaced,
     derive = "PartialEq",
-    derive = "Default"
+    derive = "Default",
+    rule = Rule::new("self.metadata.name != 'forbidden'"),
 )]
 #[serde(rename_all = "camelCase")]
 #[cel_validate(rule = Rule::new("self.nonNullable == oldSelf.nonNullable"))]
@@ -222,6 +223,11 @@ async fn main() -> Result<()> {
         }
         _ => panic!(),
     }
+
+    // Resource level metadata validations check
+    let forbidden = Foo::new("forbidden", FooSpec { ..FooSpec::default() });
+    let res = foos.create(&PostParams::default(), &forbidden).await;
+    assert!(res.is_err());
 
     // Test the manually specified merge strategy
     let ssapply = PatchParams::apply("crd_derive_schema_example").force();
