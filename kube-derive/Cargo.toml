@@ -34,3 +34,4 @@ chrono.workspace = true
 trybuild.workspace = true
 assert-json-diff.workspace = true
 runtime-macros = { git = "https://github.com/tyrone-wu/runtime-macros.git", rev = "e31f4de52e078d41aba4792a7ea30139606c1362" }
+prettyplease.workspace = true
