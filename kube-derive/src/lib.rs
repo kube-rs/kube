@@ -337,7 +337,12 @@ pub fn derive_custom_resource(input: proc_macro::TokenStream) -> proc_macro::Tok
 /// use kube::core::crd::CustomResourceExt;
 ///
 /// #[derive(CustomResource, ValidateSchema, Serialize, Deserialize, Clone, Debug)]
-/// #[kube(group = "kube.rs", version = "v1", kind = "Struct")]
+/// #[kube(
+///     group = "kube.rs",
+///     version = "v1",
+///     kind = "Struct",
+///     rule = Rule::new("self.matadata.name == 'singleton'"),
+/// )]
 /// #[cel_validate(rule = Rule::new("self == oldSelf"))]
 /// struct MyStruct {
 ///     #[serde(default = "default")]
@@ -354,6 +359,7 @@ pub fn derive_custom_resource(input: proc_macro::TokenStream) -> proc_macro::Tok
 /// assert!(serde_json::to_string(&Struct::crd()).unwrap().contains(r#""rule":"self != ''""#));
 /// assert!(serde_json::to_string(&Struct::crd()).unwrap().contains(r#""message":"failure message""#));
 /// assert!(serde_json::to_string(&Struct::crd()).unwrap().contains(r#""default":"value""#));
+/// assert!(serde_json::to_string(&Struct::crd()).unwrap().contains(r#""rule":"self.matadata.name == 'singleton'""#));
 /// ```
 #[proc_macro_derive(ValidateSchema, attributes(cel_validate, schemars))]
 pub fn derive_schema_validation(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
