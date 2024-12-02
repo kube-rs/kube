@@ -699,12 +699,13 @@ pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
     let struct_name = ident.to_string();
     let struct_rules: Vec<TokenStream> = rules.iter().map(|r| quote! {#r,}).collect();
 
-    // Remove all non-serde, non-schemars attributes
+    // Remove all unknown attributes
     // Has to happen on the original definition at all times, as we don't have #[derive] stanzes.
+    let attribute_whitelist = ["serde", "schemars", "doc"];
     ast.attrs = ast
         .attrs
         .iter()
-        .filter(|attr| attr.path().is_ident("serde") || attr.path().is_ident("schemars"))
+        .filter(|attr| attribute_whitelist.iter().any(|i| attr.path().is_ident(i)))
         .cloned()
         .collect();
 
@@ -723,12 +724,12 @@ pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
                 Err(err) => return err.write_errors(),
             };
 
-            // Remove all non-serde, non-schemars attributes
+            // Remove all unknown attributes
             // Has to happen on the original definition at all times, as we don't have #[derive] stanzes.
             field.attrs = field
                 .attrs
                 .iter()
-                .filter(|attr| attr.path().is_ident("serde") || attr.path().is_ident("schemars"))
+                .filter(|attr| attribute_whitelist.iter().any(|i| attr.path().is_ident(i)))
                 .cloned()
                 .collect();
 
@@ -878,6 +879,9 @@ fn to_plural(word: &str) -> String {
 mod tests {
     use std::{env, fs};
 
+    use prettyplease::unparse;
+    use syn::parse::{Parse as _, Parser as _};
+
     use super::*;
 
     #[test]
@@ -914,12 +918,67 @@ mod tests {
         let input = quote! {
             #[derive(CustomResource, ValidateSchema, Serialize, Deserialize, Debug, PartialEq, Clone)]
             #[kube(group = "clux.dev", version = "v1", kind = "Foo", namespaced)]
+            #[cel_validate(rule = "self != ''".into())]
             struct FooSpec {
-                #[cel_validate("self != ''".into())]
+                #[cel_validate(rule = "self != ''".into())]
                 foo: String
             }
         };
         let input = syn::parse2(input).unwrap();
-        ValidateSchema::from_derive_input(&input).unwrap();
+        let v = ValidateSchema::from_derive_input(&input).unwrap();
+        assert_eq!(v.rules.len(), 1);
+    }
+
+    #[test]
+    fn test_derive_validated_full() {
+        let input = quote! {
+            #[derive(ValidateSchema)]
+            #[cel_validate(rule = "true".into())]
+            struct FooSpec {
+                #[cel_validate(rule = "true".into())]
+                foo: String
+            }
+        };
+
+        let expected = quote!{
+            impl ::schemars::JsonSchema for FooSpec {
+                fn is_referenceable() -> bool {
+                    false
+                }
+                fn schema_name() -> String {
+                    "FooSpec".to_string() + "_kube_validation".into()
+                }
+                fn json_schema(
+                    gen: &mut ::schemars::gen::SchemaGenerator,
+                ) -> schemars::schema::Schema {
+                    #[derive(::serde::Serialize, ::schemars::JsonSchema)]
+                    #[automatically_derived]
+                    #[allow(missing_docs)]
+                    struct FooSpec {
+                        foo: String,
+                    }
+                    use ::kube::core::{Rule, Message, Reason};
+                    let s = &mut FooSpec::json_schema(gen);
+                    ::kube::core::validate(s, ["true".into()].to_vec()).unwrap();
+                    {
+                        #[derive(::serde::Serialize, ::schemars::JsonSchema)]
+                        #[automatically_derived]
+                        #[allow(missing_docs)]
+                        struct Validated {
+                            foo: String,
+                        }
+                        let merge = &mut Validated::json_schema(gen);
+                        ::kube::core::validate_property(merge, 0, ["true".into()].to_vec()).unwrap();
+                        ::kube::core::merge_properties(s, merge);
+                    }
+                    s.clone()
+                }
+            }
+        };
+
+        let output = derive_validated_schema(input);
+        let output = unparse(&syn::File::parse.parse2(output).unwrap());
+        let expected = unparse(&syn::File::parse.parse2(expected).unwrap());
+        assert_eq!(output, expected);
     }
 }
