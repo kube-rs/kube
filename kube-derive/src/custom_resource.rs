@@ -940,7 +940,7 @@ mod tests {
             }
         };
 
-        let expected = quote!{
+        let expected = quote! {
             impl ::schemars::JsonSchema for FooSpec {
                 fn is_referenceable() -> bool {
                     false
