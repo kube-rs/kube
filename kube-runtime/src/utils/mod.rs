@@ -1,6 +1,7 @@
 //! Helpers for manipulating built-in streams
 
 mod backoff_reset_timer;
+mod backoff_resettable;
 pub(crate) mod delayed_init;
 mod event_decode;
 mod event_modify;
@@ -9,7 +10,8 @@ mod reflect;
 mod stream_backoff;
 mod watch_ext;
 
-pub use backoff_reset_timer::ResetTimerBackoff;
+pub use backoff_reset_timer::{ResetTimerBackoff, ResetTimerBackoffBuilder};
+pub use backoff_resettable::{ResettableBackoff, ResettableBackoffWrapper};
 pub use event_decode::EventDecode;
 pub use event_modify::EventModify;
 pub use predicate::{predicates, Predicate, PredicateFilter};

@@ -115,7 +115,7 @@ pub struct Cluster {
     /// `disable_compression` allows client to opt-out of response compression for all requests to the server.
     /// This is useful to speed up requests (specifically lists) when client-server network bandwidth is ample,
     /// by saving time on compression (server-side) and decompression (client-side):
-    /// https://github.com/kubernetes/kubernetes/issues/112296
+    /// <https://github.com/kubernetes/kubernetes/issues/112296>
     #[serde(rename = "disable-compression")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub disable_compression: Option<bool>,
@@ -550,7 +550,7 @@ impl AuthInfo {
 
 /// Connection information for auth plugins that have `provideClusterInfo` enabled.
 ///
-/// This is a copy of [`kube::config::Cluster`] with certificate_authority passed as bytes without the path.
+/// This is a copy of [`Cluster`] with certificate_authority passed as bytes without the path.
 /// Taken from [clientauthentication/types.go#Cluster](https://github.com/kubernetes/client-go/blob/477cb782cf024bc70b7239f0dca91e5774811950/pkg/apis/clientauthentication/types.go#L73-L129)
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 #[serde(rename_all = "kebab-case")]

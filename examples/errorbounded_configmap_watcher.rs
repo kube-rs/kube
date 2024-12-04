@@ -15,12 +15,14 @@ use tracing::*;
 #[resource(inherit = ConfigMap)]
 struct CaConfigMap {
     metadata: ObjectMeta,
+    #[allow(unused)]
     data: CaConfigMapData,
 }
 
 #[derive(Deserialize, Debug, Clone)]
 struct CaConfigMapData {
     #[serde(rename = "ca.crt")]
+    #[allow(unused)]
     ca_crt: String,
 }
 

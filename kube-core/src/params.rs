@@ -168,7 +168,7 @@ impl ListParams {
 
     /// Configure typed label selectors
     ///
-    /// Configure typed selectors from [`Selector`](crate::Selector) and [`Expression`](crate::Expression) lists.
+    /// Configure typed selectors from [`Selector`] and [`Expression`](crate::Expression) lists.
     ///
     /// ```
     /// use kube::core::{Expression, Selector, ParseExpressionError};
@@ -456,7 +456,7 @@ impl WatchParams {
 
     /// Configure typed label selectors
     ///
-    /// Configure typed selectors from [`Selector`](crate::Selector) and [`Expression`](crate::Expression) lists.
+    /// Configure typed selectors from [`Selector`] and [`Expression`](crate::Expression) lists.
     ///
     /// ```
     /// use kube::core::{Expression, Selector, ParseExpressionError};
