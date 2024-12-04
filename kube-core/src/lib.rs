@@ -25,6 +25,12 @@ pub use dynamic::{ApiResource, DynamicObject};
 pub mod crd;
 pub use crd::CustomResourceExt;
 
+pub mod cel;
+pub use cel::{Message, Reason, Rule};
+
+#[cfg(feature = "schema")]
+pub use cel::{merge_properties, validate, validate_property};
+
 pub mod gvk;
 pub use gvk::{GroupVersion, GroupVersionKind, GroupVersionResource};
 

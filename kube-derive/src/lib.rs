@@ -327,6 +327,45 @@ pub fn derive_custom_resource(input: proc_macro::TokenStream) -> proc_macro::Tok
     custom_resource::derive(proc_macro2::TokenStream::from(input)).into()
 }
 
+/// Generates a JsonSchema implementation a set of CEL validation rules applied on the CRD.
+///
+/// ```rust
+/// use kube::ValidateSchema;
+/// use kube::CustomResource;
+/// use serde::Deserialize;
+/// use serde::Serialize;
+/// use kube::core::crd::CustomResourceExt;
+///
+/// #[derive(CustomResource, ValidateSchema, Serialize, Deserialize, Clone, Debug)]
+/// #[kube(
+///     group = "kube.rs",
+///     version = "v1",
+///     kind = "Struct",
+///     rule = Rule::new("self.matadata.name == 'singleton'"),
+/// )]
+/// #[cel_validate(rule = Rule::new("self == oldSelf"))]
+/// struct MyStruct {
+///     #[serde(default = "default")]
+///     #[cel_validate(rule = Rule::new("self != ''").message("failure message"))]
+///     field: String,
+/// }
+///
+/// fn default() -> String {
+///     "value".into()
+/// }
+///
+/// assert!(serde_json::to_string(&Struct::crd()).unwrap().contains("x-kubernetes-validations"));
+/// assert!(serde_json::to_string(&Struct::crd()).unwrap().contains(r#""rule":"self == oldSelf""#));
+/// assert!(serde_json::to_string(&Struct::crd()).unwrap().contains(r#""rule":"self != ''""#));
+/// assert!(serde_json::to_string(&Struct::crd()).unwrap().contains(r#""message":"failure message""#));
+/// assert!(serde_json::to_string(&Struct::crd()).unwrap().contains(r#""default":"value""#));
+/// assert!(serde_json::to_string(&Struct::crd()).unwrap().contains(r#""rule":"self.matadata.name == 'singleton'""#));
+/// ```
+#[proc_macro_derive(ValidateSchema, attributes(cel_validate, schemars))]
+pub fn derive_schema_validation(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    custom_resource::derive_validated_schema(input.into()).into()
+}
+
 /// A custom derive for inheriting Resource impl for the type.
 ///
 /// This will generate a [`kube::Resource`] trait implementation,
