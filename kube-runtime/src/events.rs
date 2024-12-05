@@ -351,7 +351,10 @@ impl Recorder {
 
 #[cfg(test)]
 mod test {
-    use k8s_openapi::api::{core::v1::Service, events::v1::Event as K8sEvent, rbac::v1::ClusterRole};
+    use k8s_openapi::api::{
+        core::v1::{ComponentStatus, Service},
+        events::v1::Event as K8sEvent,
+    };
     use kube::{Api, Client, Resource};
 
     use super::{Event, EventType, Recorder};
@@ -393,8 +396,8 @@ mod test {
     async fn event_recorder_attaches_events_without_namespace() -> Result<(), Box<dyn std::error::Error>> {
         let client = Client::try_default().await?;
 
-        let svcs: Api<ClusterRole> = Api::all(client.clone());
-        let s = svcs.get("system:basic-user").await?; // always get this default ClusterRole
+        let component_status_api: Api<ComponentStatus> = Api::all(client.clone());
+        let s = component_status_api.get("scheduler").await?;
         let recorder = Recorder::new(client.clone(), "kube".into());
         recorder
             .publish(
@@ -408,7 +411,7 @@ mod test {
                 &s.object_ref(&()),
             )
             .await?;
-        let events: Api<K8sEvent> = Api::namespaced(client, "kube-system");
+        let events: Api<K8sEvent> = Api::namespaced(client, "default");
 
         let event_list = events.list(&Default::default()).await?;
         let found_event = event_list
