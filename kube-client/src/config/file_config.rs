@@ -996,4 +996,21 @@ users:
             json!({"audience": "foo", "other": "bar"})
         );
     }
+
+    #[tokio::test]
+    async fn parse_kubeconfig_encodings() {
+        let files = vec![
+            "kubeconfig_utf8.yaml",
+            "kubeconfig_utf16le.yaml",
+            "kubeconfig_utf16be.yaml",
+        ];
+
+        for file_name in files {
+            let path = PathBuf::from(format!("{}/src/config/test_data/{}", env!("CARGO_MANIFEST_DIR"), file_name));
+            let cfg = Kubeconfig::read_from(path).unwrap();
+            assert_eq!(cfg.clusters[0].name, "k3d-promstack");
+            assert_eq!(cfg.contexts[0].name, "k3d-promstack");
+            assert_eq!(cfg.auth_infos[0].name, "admin@k3d-k3s-default");
+        }
+    }
 }
