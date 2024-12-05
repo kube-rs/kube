@@ -74,7 +74,9 @@ pub enum EventType {
     Warning,
 }
 
-/// ObjectReference with Hash and Eq implementations
+/// [`ObjectReference`] with Hash and Eq implementations
+///
+/// [`ObjectReference`]: k8s_openapi::api::core::v1::ObjectReference
 #[derive(Clone, Debug, PartialEq)]
 pub struct Reference(ObjectReference);
 
@@ -265,7 +267,7 @@ impl Recorder {
             metadata: ObjectMeta {
                 namespace: reference.namespace.clone(),
                 name: Some(format!(
-                    "{}.{}",
+                    "{}.{:x}",
                     reference.name.as_ref().unwrap_or(&self.reporter.controller),
                     now.timestamp_nanos_opt().unwrap_or_else(|| now.timestamp())
                 )),
