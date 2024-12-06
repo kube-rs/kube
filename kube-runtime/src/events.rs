@@ -180,6 +180,8 @@ impl From<&str> for Reporter {
 ///     instance: std::env::var("CONTROLLER_POD_NAME").ok(),
 /// };
 ///
+/// let recorder = Recorder::new(client, reporter);
+///
 /// // references can be made manually using `ObjectMeta` and `ApiResource`/`Resource` info
 /// let reference = ObjectReference {
 ///     // [...]
@@ -187,15 +189,17 @@ impl From<&str> for Reporter {
 /// };
 /// // or for k8s-openapi / kube-derive types, use Resource::object_ref:
 /// // let reference = myobject.object_ref();
-///
-/// let recorder = Recorder::new(client, reporter, reference);
-/// recorder.publish(Event {
-///     action: "Scheduling".into(),
-///     reason: "Pulling".into(),
-///     note: Some("Pulling image `nginx`".into()),
-///     type_: EventType::Normal,
-///     secondary: None,
-/// }).await?;
+/// recorder
+///     .publish(
+///         Event {
+///             action: "Scheduling".into(),
+///             reason: "Pulling".into(),
+///             note: Some("Pulling image `nginx`".into()),
+///             type_: EventType::Normal,
+///             secondary: None,
+///         },
+///         &reference,
+///     ).await?;
 /// # Ok(())
 /// # }
 /// ```
