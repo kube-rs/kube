@@ -1,6 +1,9 @@
 //! Publishes events for objects for kubernetes >= 1.19
-use std::hash::{Hash, Hasher};
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::HashMap,
+    hash::{Hash, Hasher},
+    sync::Arc,
+};
 
 use k8s_openapi::{
     api::{
@@ -10,10 +13,9 @@ use k8s_openapi::{
     apimachinery::pkg::apis::meta::v1::{MicroTime, ObjectMeta},
     chrono::{Duration, Utc},
 };
-use kube_client::ResourceExt;
 use kube_client::{
     api::{Api, Patch, PatchParams, PostParams},
-    Client,
+    Client, ResourceExt,
 };
 use tokio::sync::RwLock;
 
