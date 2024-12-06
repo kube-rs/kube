@@ -392,6 +392,26 @@ mod test {
             .unwrap();
         assert_eq!(found_event.note.unwrap(), "Sending kubernetes to detention");
 
+        recorder
+            .publish(
+                Event {
+                    type_: EventType::Normal,
+                    reason: "VeryCoolService".into(),
+                    note: Some("Sending kubernetes to detention twice".into()),
+                    action: "Test event - plz ignore".into(),
+                    secondary: None,
+                },
+                &s.object_ref(&()),
+            )
+            .await?;
+
+        let event_list = events.list(&Default::default()).await?;
+        let found_event = event_list
+            .into_iter()
+            .find(|e| std::matches!(e.reason.as_deref(), Some("VeryCoolService")))
+            .unwrap();
+        assert!(found_event.series.is_some());
+
         Ok(())
     }
 
@@ -427,6 +447,25 @@ mod test {
             "Sending kubernetes to detention without namespace"
         );
 
+        recorder
+            .publish(
+                Event {
+                    type_: EventType::Normal,
+                    reason: "VeryCoolServiceNoNamespace".into(),
+                    note: Some("Sending kubernetes to detention without namespace twice".into()),
+                    action: "Test event - plz ignore".into(),
+                    secondary: None,
+                },
+                &s.object_ref(&()),
+            )
+            .await?;
+
+        let event_list = events.list(&Default::default()).await?;
+        let found_event = event_list
+            .into_iter()
+            .find(|e| std::matches!(e.reason.as_deref(), Some("VeryCoolServiceNoNamespace")))
+            .unwrap();
+        assert!(found_event.series.is_some());
         Ok(())
     }
 }
