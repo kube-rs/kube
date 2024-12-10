@@ -94,7 +94,7 @@ impl Hash for Reference {
     }
 }
 
-/// Isomorphic key for caching similar events
+/// Cache key for event deduplication
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 struct EventKey {
     pub event_type: EventType,
