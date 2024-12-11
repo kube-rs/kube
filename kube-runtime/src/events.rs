@@ -306,7 +306,7 @@ impl Recorder {
     /// # Errors
     ///
     /// Returns an [`Error`](`kube_client::Error`) if the event is rejected by Kubernetes.
-    pub async fn publish(&self, ev: Event, reference: &ObjectReference) -> Result<(), kube_client::Error> {
+    pub async fn publish(&self, ev: &Event, reference: &ObjectReference) -> Result<(), kube_client::Error> {
         let now = Utc::now();
 
         // gc past events older than now + CACHE_TTL
@@ -357,7 +357,7 @@ impl Recorder {
 
 #[cfg(test)]
 mod test {
-    use std::{collections::HashMap, sync::Arc};
+    use super::{Event, EventKey, EventType, Recorder, Reference, Reporter};
 
     use k8s_openapi::{
         api::{
@@ -368,10 +368,6 @@ mod test {
         chrono::{Duration, Utc},
     };
     use kube::{Api, Client, Resource};
-    use kube_client::api::ObjectMeta;
-    use tokio::sync::RwLock;
-
-    use super::{Event, EventKey, EventType, Recorder, Reference, Reporter};
 
     #[tokio::test]
     #[ignore = "needs cluster (creates an event for the default kubernetes service)"]
@@ -383,7 +379,7 @@ mod test {
         let recorder = Recorder::new(client.clone(), "kube".into());
         recorder
             .publish(
-                Event {
+                &Event {
                     type_: EventType::Normal,
                     reason: "VeryCoolService".into(),
                     note: Some("Sending kubernetes to detention".into()),
@@ -404,7 +400,7 @@ mod test {
 
         recorder
             .publish(
-                Event {
+                &Event {
                     type_: EventType::Normal,
                     reason: "VeryCoolService".into(),
                     note: Some("Sending kubernetes to detention twice".into()),
@@ -435,7 +431,7 @@ mod test {
         let recorder = Recorder::new(client.clone(), "kube".into());
         recorder
             .publish(
-                Event {
+                &Event {
                     type_: EventType::Normal,
                     reason: "VeryCoolServiceNoNamespace".into(),
                     note: Some("Sending kubernetes to detention without namespace".into()),
@@ -459,7 +455,7 @@ mod test {
 
         recorder
             .publish(
-                Event {
+                &Event {
                     type_: EventType::Normal,
                     reason: "VeryCoolServiceNoNamespace".into(),
                     note: Some("Sending kubernetes to detention without namespace twice".into()),
@@ -506,47 +502,22 @@ mod test {
             related: None,
         };
 
+        let reporter = Reporter {
+            controller: "kube".into(),
+            instance: None,
+        };
+        let recorder = Recorder::new(client.clone(), reporter);
+
+        recorder.publish(&ev, &s.object_ref(&())).await?;
         let now = Utc::now();
         let past = now - Duration::minutes(10);
-        let event = K8sEvent {
-            action: Some(ev.action.clone()),
-            reason: Some(ev.reason.clone()),
-            event_time: Some(MicroTime(past)),
-            regarding: Some(reference.clone()),
-            note: ev.note.clone().map(Into::into),
-            metadata: ObjectMeta {
-                namespace: reference.namespace.clone(),
-                name: Some(format!(
-                    "{}.{:x}",
-                    reference.name.as_ref().unwrap_or(&reporter.controller),
-                    past.timestamp_nanos_opt().unwrap_or_else(|| past.timestamp())
-                )),
-                ..Default::default()
-            },
-            reporting_controller: Some(reporter.controller.clone()),
-            reporting_instance: Some(
-                reporter
-                    .instance
-                    .clone()
-                    .unwrap_or_else(|| reporter.controller.clone()),
-            ),
-            type_: Some("Normal".into()),
-            ..Default::default()
-        };
+        recorder.cache.write().await.entry(key).and_modify(|e| {
+            e.event_time = Some(MicroTime(past));
+        });
 
-        let cache = Arc::new(RwLock::new(HashMap::new()));
+        recorder.publish(&ev, &s.object_ref(&())).await?;
 
-        cache.write().await.insert(key.clone(), event.clone());
-
-        let recorder = Recorder {
-            client: client.clone(),
-            reporter: reporter.controller.into(),
-            cache,
-        };
-
-        recorder.publish(ev, &s.object_ref(&())).await?;
         let events: Api<K8sEvent> = Api::namespaced(client, "default");
-
         let event_list = events.list(&Default::default()).await?;
         let found_event = event_list
             .into_iter()
