@@ -1,4 +1,4 @@
-//! Delays and deduplicates [`Stream`](futures::stream::Stream) items
+//! Delays and deduplicates [`Stream`] items
 
 use futures::{stream::Fuse, Stream, StreamExt};
 use hashbrown::{hash_map::RawEntryMut, HashMap};

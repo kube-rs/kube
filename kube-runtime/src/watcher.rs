@@ -2,9 +2,9 @@
 //!
 //! See [`watcher`] for the primary entry point.
 
-use crate::utils::ResetTimerBackoff;
+use crate::utils::ResetTimerBackoffBuilder;
 use async_trait::async_trait;
-use backoff::{backoff::Backoff, ExponentialBackoff};
+use backon::BackoffBuilder;
 use educe::Educe;
 use futures::{stream::BoxStream, Stream, StreamExt};
 use kube_client::{
@@ -17,6 +17,9 @@ use serde::de::DeserializeOwned;
 use std::{clone::Clone, collections::VecDeque, fmt::Debug, future, time::Duration};
 use thiserror::Error;
 use tracing::{debug, error, warn};
+
+#[cfg(doc)] use crate::WatchStreamExt;
+#[cfg(doc)] use backon::Backoff;
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -43,26 +46,27 @@ pub enum Event<K> {
     /// NOTE: This should not be used for managing persistent state elsewhere, since
     /// events may be lost if the watcher is unavailable. Use Finalizers instead.
     Delete(K),
+
     /// The watch stream was restarted.
     ///
-    /// A series of `InitApply` events are expected to follow until all matching objects
+    /// A series of [`InitApply`](Event::InitApply) events will follow until all matching objects
     /// have been listed. This event can be used to prepare a buffer for `InitApply` events.
     Init,
-    /// Received an object during `Init`.
+    /// Received an object during [`Init`](Event::Init).
     ///
-    /// Objects returned here are either from the initial stream using the `StreamingList` strategy,
-    /// or from pages using the `ListWatch` strategy.
+    /// Objects returned here are either from the initial stream using the [`InitialListStrategy::StreamingList`] strategy,
+    /// or from pages using the [`InitialListStrategy::ListWatch`] strategy.
     ///
     /// These events can be passed up if having a complete set of objects is not a concern.
-    /// If you need to wait for a complete set, please buffer these events until an `InitDone`.
+    /// If you need to wait for a complete set, please buffer these events until an [`InitDone`](Event::InitDone).
     InitApply(K),
     /// The initialisation is complete.
     ///
     /// This can be used as a signal to replace buffered store contents atomically.
-    /// No more `InitApply` events will happen until the next `Init` event.
+    /// No more [`InitApply`](Event::InitApply) events will happen until the next [`Init`](Event::Init) event.
     ///
-    /// Any objects that were previously [`Applied`](Event::Applied) but are not listed in any of
-    /// the `InitApply` events should be assumed to have been [`Deleted`](Event::Deleted).
+    /// Any objects that were previously [`Apply`ed](Event::Apply) but are not listed in any of
+    /// the [`InitApply`](Event::InitApply) events should be assumed to have been [`Delete`d](Event::Delete).
     InitDone,
 }
 
@@ -339,7 +343,7 @@ impl Config {
 
     /// Configure typed label selectors
     ///
-    /// Configure typed selectors from [`Selector`](kube_client::core::Selector) and [`Expression`](kube_client::core::Expression) lists.
+    /// Configure typed selectors from [`Selector`] and [`Expression`](kube_client::core::Expression) lists.
     ///
     /// ```
     /// use kube_runtime::watcher::Config;
@@ -748,7 +752,7 @@ where
 ///
 /// The stream will attempt to be recovered on the next poll after an [`Err`] is returned.
 /// This will normally happen immediately, but you can use [`StreamBackoff`](crate::utils::StreamBackoff)
-/// to introduce an artificial delay. [`default_backoff`] returns a suitable default set of parameters.
+/// to introduce an artificial delay. [`WatchStreamExt::default_backoff`] returns a suitable default set of parameters.
 ///
 /// If the watch connection is interrupted, then `watcher` will attempt to restart the watch using the last
 /// [resource version](https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes)
@@ -811,7 +815,7 @@ pub fn watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
 ///
 /// The stream will attempt to be recovered on the next poll after an [`Err`] is returned.
 /// This will normally happen immediately, but you can use [`StreamBackoff`](crate::utils::StreamBackoff)
-/// to introduce an artificial delay. [`default_backoff`] returns a suitable default set of parameters.
+/// to introduce an artificial delay. [`WatchStreamExt::default_backoff`] returns a suitable default set of parameters.
 ///
 /// If the watch connection is interrupted, then `watcher` will attempt to restart the watch using the last
 /// [resource version](https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes)
@@ -890,32 +894,41 @@ pub fn watch_object<K: Resource + Clone + DeserializeOwned + Debug + Send + 'sta
 /// and should not be considered stable.
 ///
 /// This struct implements [`Backoff`] and is the default strategy used
-/// when calling `WatchStreamExt::default_backoff`. If you need to create
-/// this manually then [`DefaultBackoff::default`] can be used.
-pub struct DefaultBackoff(Strategy);
-type Strategy = ResetTimerBackoff<ExponentialBackoff>;
+/// when calling `WatchStreamExt::default_backoff`.
+#[derive(Debug, Clone, Default)]
+pub struct DefaultBackoffBuilder;
 
-impl Default for DefaultBackoff {
-    fn default() -> Self {
-        Self(ResetTimerBackoff::new(
-            backoff::ExponentialBackoffBuilder::new()
-                .with_initial_interval(Duration::from_millis(800))
-                .with_max_interval(Duration::from_secs(30))
-                .with_randomization_factor(1.0)
-                .with_multiplier(2.0)
-                .with_max_elapsed_time(None)
-                .build(),
-            Duration::from_secs(120),
-        ))
+/// See [`DefaultBackoffBuilder`].
+#[derive(Debug)]
+pub struct DefaultBackoff(<Strategy as BackoffBuilder>::Backoff);
+type Strategy = ResetTimerBackoffBuilder<backon::ExponentialBuilder>;
+
+impl BackoffBuilder for DefaultBackoffBuilder {
+    type Backoff = DefaultBackoff;
+
+    fn build(self) -> Self::Backoff {
+        DefaultBackoff(
+            ResetTimerBackoffBuilder::new(
+                backon::ExponentialBuilder::default()
+                    .with_min_delay(Duration::from_millis(800))
+                    .with_max_delay(Duration::from_secs(30))
+                    // .with_jitter() isn't quite a 1:1 match to randomization factor, it always *adds* 0..min_delay, vs multiplying
+                    // the final delay by +-factor
+                    .with_jitter()
+                    // .with_randomization_factor(1.0)
+                    .with_factor(2.0)
+                    .without_max_times(),
+                Duration::from_secs(120),
+            )
+            .build(),
+        )
     }
 }
 
-impl Backoff for DefaultBackoff {
-    fn next_backoff(&mut self) -> Option<Duration> {
-        self.0.next_backoff()
-    }
+impl Iterator for DefaultBackoff {
+    type Item = Duration;
 
-    fn reset(&mut self) {
-        self.0.reset()
+    fn next(&mut self) -> Option<Duration> {
+        self.0.next()
     }
 }

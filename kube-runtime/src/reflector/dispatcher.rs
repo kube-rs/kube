@@ -14,6 +14,8 @@ use async_broadcast::{InactiveReceiver, Receiver, Sender};
 
 use super::Lookup;
 
+#[cfg(doc)] pub use super::store::Writer;
+
 #[derive(Educe)]
 #[educe(Debug(bound("K: Debug, K::DynamicType: Debug")), Clone)]
 // A helper type that holds a broadcast transmitter and a broadcast receiver,
@@ -74,9 +76,9 @@ where
 
 /// A handle to a shared stream reader
 ///
-/// [`ReflectHandle`]s are created by calling [`subscribe()`] on a [`Writer`],
-/// or by calling `clone()` on an already existing [`ReflectHandle`]. Each
-/// shared stream reader should be polled independently and driven to readiness
+/// [`ReflectHandle`]s are created by calling [`Writer::subscribe`],
+/// or by calling [`clone`](Clone::clone) on an already existing [`ReflectHandle`].
+/// Each shared stream reader should be polled independently and driven to readiness
 /// to avoid deadlocks. When the [`Writer`]'s buffer is filled, backpressure
 /// will be applied on the root stream side.
 ///
@@ -84,8 +86,6 @@ where
 /// subscribed to the stream will also terminate after all events yielded by
 /// the root stream have been observed. This means [`ReflectHandle`] streams
 /// can still be polled after the root stream has been dropped.
-///
-/// [`Writer`]: crate::reflector::Writer
 #[pin_project]
 pub struct ReflectHandle<K>
 where
