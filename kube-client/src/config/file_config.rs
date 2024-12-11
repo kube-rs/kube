@@ -1006,7 +1006,11 @@ users:
         ];
 
         for file_name in files {
-            let path = PathBuf::from(format!("{}/src/config/test_data/{}", env!("CARGO_MANIFEST_DIR"), file_name));
+            let path = PathBuf::from(format!(
+                "{}/src/config/test_data/{}",
+                env!("CARGO_MANIFEST_DIR"),
+                file_name
+            ));
             let cfg = Kubeconfig::read_from(path).unwrap();
             assert_eq!(cfg.clusters[0].name, "k3d-promstack");
             assert_eq!(cfg.contexts[0].name, "k3d-promstack");
