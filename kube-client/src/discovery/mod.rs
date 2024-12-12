@@ -45,7 +45,7 @@ impl DiscoveryMode {
 /// To make use of discovered apis, extract one or more [`ApiGroup`]s from it,
 /// or resolve a precise one using [`Discovery::resolve_gvk`](crate::discovery::Discovery::resolve_gvk).
 ///
-/// If caching of results is __not required__, then a simpler [`oneshot`](crate::discovery::oneshot) discovery system can be used.
+/// If caching of results is __not required__, then a simpler [`oneshot`] discovery system can be used.
 ///
 /// [`ApiGroup`]: crate::discovery::ApiGroup
 #[cfg_attr(docsrs, doc(cfg(feature = "client")))]
