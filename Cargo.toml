@@ -48,7 +48,7 @@ form_urlencoded = "1.2.0"
 futures = { version = "0.3.17", default-features = false }
 hashbrown = "0.15.0"
 home = "0.5.4"
-hostname = "0.3"
+hostname = "0.4"
 http = "1.1.0"
 http-body = "1.0.1"
 http-body-util = "0.1.2"
