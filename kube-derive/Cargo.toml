@@ -19,6 +19,7 @@ proc-macro2.workspace = true
 quote.workspace = true
 syn = { workspace = true, features = ["extra-traits"] }
 serde_json.workspace = true
+k8s-openapi = { workspace = true, features = ["latest"] }
 darling.workspace = true
 
 [lib]
