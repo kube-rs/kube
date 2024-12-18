@@ -7,7 +7,7 @@ use kube::{
         WatchEvent, WatchParams,
     },
     runtime::wait::{await_condition, conditions},
-    Client, CustomResource, CustomResourceExt, CELSchema,
+    CELSchema, Client, CustomResource, CustomResourceExt,
 };
 use serde::{Deserialize, Serialize};
 

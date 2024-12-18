@@ -3,8 +3,8 @@
 extern crate proc_macro;
 #[macro_use] extern crate quote;
 
-mod custom_resource;
 mod cel_schema;
+mod custom_resource;
 mod resource;
 
 /// A custom derive for kubernetes custom resource definitions.
