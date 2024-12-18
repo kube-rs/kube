@@ -4,6 +4,7 @@ extern crate proc_macro;
 #[macro_use] extern crate quote;
 
 mod custom_resource;
+mod cel_schema;
 mod resource;
 
 /// A custom derive for kubernetes custom resource definitions.
@@ -363,7 +364,7 @@ pub fn derive_custom_resource(input: proc_macro::TokenStream) -> proc_macro::Tok
 /// ```
 #[proc_macro_derive(CELSchema, attributes(cel_validate, schemars))]
 pub fn derive_schema_validation(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    custom_resource::derive_validated_schema(input.into()).into()
+    cel_schema::derive_validated_schema(input.into()).into()
 }
 
 /// A custom derive for inheriting Resource impl for the type.
