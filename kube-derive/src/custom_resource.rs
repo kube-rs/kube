@@ -161,7 +161,6 @@ enum SchemaMode {
     Disabled,
     Manual,
     Derived,
-    Validated,
 }
 
 impl SchemaMode {
@@ -170,16 +169,6 @@ impl SchemaMode {
             SchemaMode::Disabled => false,
             SchemaMode::Manual => false,
             SchemaMode::Derived => true,
-            SchemaMode::Validated => true,
-        }
-    }
-
-    fn validated(self) -> bool {
-        match self {
-            SchemaMode::Disabled => false,
-            SchemaMode::Manual => false,
-            SchemaMode::Derived => false,
-            SchemaMode::Validated => true,
         }
     }
 
@@ -188,7 +177,6 @@ impl SchemaMode {
             SchemaMode::Disabled => false,
             SchemaMode::Manual => true,
             SchemaMode::Derived => true,
-            SchemaMode::Validated => true,
         }
     }
 }
@@ -320,16 +308,13 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
     }
 
     // Enable schema generation by default as in v1 it is mandatory.
-    let schema_mode = schema_mode.unwrap_or(match rules.is_empty() {
-        true => SchemaMode::Derived,
-        false => SchemaMode::Validated,
-    });
+    let schema_mode = schema_mode.unwrap_or(SchemaMode::Derived);
     // We exclude fields `apiVersion`, `kind`, and `metadata` from our schema because
     // these are validated by the API server implicitly. Also, we can't generate the
     // schema for `metadata` (`ObjectMeta`) because it doesn't implement `JsonSchema`.
     let schemars_skip = schema_mode.derive().then_some(quote! { #[schemars(skip)] });
-    if schema_mode.validated() {
-        derive_paths.push(syn::parse_quote! { #kube::ValidateSchema });
+    if schema_mode.derive() && !rules.is_empty() {
+        derive_paths.push(syn::parse_quote! { #kube::CELSchema });
     } else if schema_mode.derive() {
         derive_paths.push(syn::parse_quote! { #schemars::JsonSchema });
     }
@@ -666,7 +651,7 @@ struct Rule {
 
 #[derive(FromDeriveInput)]
 #[darling(attributes(cel_validate), supports(struct_named))]
-struct ValidateSchema {
+struct CELSchema {
     #[darling(default)]
     crates: Crates,
     ident: Ident,
@@ -680,7 +665,7 @@ pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
         Ok(di) => di,
     };
 
-    let ValidateSchema {
+    let CELSchema {
         crates:
             Crates {
                 kube_core,
@@ -690,7 +675,7 @@ pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
             },
         ident,
         rules,
-    } = match ValidateSchema::from_derive_input(&ast) {
+    } = match CELSchema::from_derive_input(&ast) {
         Err(err) => return err.write_errors(),
         Ok(attrs) => attrs,
     };
@@ -916,7 +901,7 @@ mod tests {
     #[test]
     fn test_derive_validated() {
         let input = quote! {
-            #[derive(CustomResource, ValidateSchema, Serialize, Deserialize, Debug, PartialEq, Clone)]
+            #[derive(CustomResource, CELSchema, Serialize, Deserialize, Debug, PartialEq, Clone)]
             #[kube(group = "clux.dev", version = "v1", kind = "Foo", namespaced)]
             #[cel_validate(rule = "self != ''".into())]
             struct FooSpec {
@@ -925,14 +910,14 @@ mod tests {
             }
         };
         let input = syn::parse2(input).unwrap();
-        let v = ValidateSchema::from_derive_input(&input).unwrap();
+        let v = CELSchema::from_derive_input(&input).unwrap();
         assert_eq!(v.rules.len(), 1);
     }
 
     #[test]
     fn test_derive_validated_full() {
         let input = quote! {
-            #[derive(ValidateSchema)]
+            #[derive(CELSchema)]
             #[cel_validate(rule = "true".into())]
             struct FooSpec {
                 #[cel_validate(rule = "true".into())]

@@ -330,13 +330,13 @@ pub fn derive_custom_resource(input: proc_macro::TokenStream) -> proc_macro::Tok
 /// Generates a JsonSchema implementation a set of CEL validation rules applied on the CRD.
 ///
 /// ```rust
-/// use kube::ValidateSchema;
+/// use kube::CELSchema;
 /// use kube::CustomResource;
 /// use serde::Deserialize;
 /// use serde::Serialize;
 /// use kube::core::crd::CustomResourceExt;
 ///
-/// #[derive(CustomResource, ValidateSchema, Serialize, Deserialize, Clone, Debug)]
+/// #[derive(CustomResource, CELSchema, Serialize, Deserialize, Clone, Debug)]
 /// #[kube(
 ///     group = "kube.rs",
 ///     version = "v1",
@@ -361,7 +361,7 @@ pub fn derive_custom_resource(input: proc_macro::TokenStream) -> proc_macro::Tok
 /// assert!(serde_json::to_string(&Struct::crd()).unwrap().contains(r#""default":"value""#));
 /// assert!(serde_json::to_string(&Struct::crd()).unwrap().contains(r#""rule":"self.matadata.name == 'singleton'""#));
 /// ```
-#[proc_macro_derive(ValidateSchema, attributes(cel_validate, schemars))]
+#[proc_macro_derive(CELSchema, attributes(cel_validate, schemars))]
 pub fn derive_schema_validation(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     custom_resource::derive_validated_schema(input.into()).into()
 }

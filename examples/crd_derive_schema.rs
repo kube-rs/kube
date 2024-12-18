@@ -7,7 +7,7 @@ use kube::{
         WatchEvent, WatchParams,
     },
     runtime::wait::{await_condition, conditions},
-    Client, CustomResource, CustomResourceExt, ValidateSchema,
+    Client, CustomResource, CustomResourceExt, CELSchema,
 };
 use serde::{Deserialize, Serialize};
 
@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 // - https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#defaulting
 // - https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#defaulting-and-nullable
 
-#[derive(CustomResource, ValidateSchema, Serialize, Deserialize, Default, Debug, PartialEq, Eq, Clone)]
+#[derive(CustomResource, CELSchema, Serialize, Deserialize, Default, Debug, PartialEq, Eq, Clone)]
 #[kube(
     group = "clux.dev",
     version = "v1",
@@ -100,7 +100,7 @@ pub struct FooSpec {
     foo_sub_spec: Option<FooSubSpec>,
 }
 
-#[derive(ValidateSchema, Serialize, Deserialize, Default, Debug, PartialEq, Eq, Clone)]
+#[derive(CELSchema, Serialize, Deserialize, Default, Debug, PartialEq, Eq, Clone)]
 pub struct FooSubSpec {
     #[cel_validate(rule = "self != 'not legal'".into())]
     field: String,
