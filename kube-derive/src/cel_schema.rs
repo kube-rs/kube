@@ -77,7 +77,7 @@ pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
     // Remove all unknown attributes from the original structure copy
     // Has to happen on the original definition at all times, as we don't have #[derive] stanzes.
     let attribute_whitelist = ["serde", "schemars", "doc"];
-    ast.attrs = remove_attributes(&ast.attrs, attribute_whitelist.to_vec());
+    ast.attrs = remove_attributes(&ast.attrs, &attribute_whitelist);
 
     let struct_data = match ast.data {
         syn::Data::Struct(ref mut struct_data) => struct_data,
@@ -96,7 +96,7 @@ pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
 
             // Remove all unknown attributes from each field
             // Has to happen on the original definition at all times, as we don't have #[derive] stanzes.
-            field.attrs = remove_attributes(&field.attrs, attribute_whitelist.to_vec());
+            field.attrs = remove_attributes(&field.attrs, &attribute_whitelist);
 
             if rules.is_empty() {
                 continue;
@@ -116,7 +116,7 @@ pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
                     }
 
                     let merge = &mut Validated::json_schema(gen);
-                    #kube_core::validate_property(merge, 0, [#(#rules)*].to_vec()).unwrap();
+                    #kube_core::validate_property(merge, 0, &[#(#rules)*]).unwrap();
                     #kube_core::merge_properties(s, merge);
                 }
             });
@@ -141,7 +141,7 @@ pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
 
                 use #kube_core::{Rule, Message, Reason};
                 let s = &mut #ident::json_schema(gen);
-                #kube_core::validate(s, [#(#struct_rules)*].to_vec()).unwrap();
+                #kube_core::validate(s, &[#(#struct_rules)*]).unwrap();
                 #(#property_modifications)*
                 s.clone()
             }
@@ -150,7 +150,7 @@ pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
 }
 
 // Remove all unknown attributes from the list
-fn remove_attributes(attrs: &Vec<Attribute>, witelist: Vec<&str>) -> Vec<Attribute> {
+fn remove_attributes(attrs: &[Attribute], witelist: &[&str]) -> Vec<Attribute> {
     attrs
         .iter()
         .filter(|attr| witelist.iter().any(|i| attr.path().is_ident(i)))
@@ -176,8 +176,6 @@ fn test_derive_validated() {
 
 #[cfg(test)]
 mod tests {
-    use std::{env, fs};
-
     use prettyplease::unparse;
     use syn::parse::{Parse as _, Parser as _};
 
@@ -212,7 +210,7 @@ mod tests {
                     }
                     use ::kube::core::{Rule, Message, Reason};
                     let s = &mut FooSpec::json_schema(gen);
-                    ::kube::core::validate(s, ["true".into()].to_vec()).unwrap();
+                    ::kube::core::validate(s, &["true".into()]).unwrap();
                     {
                         #[derive(::serde::Serialize, ::schemars::JsonSchema)]
                         #[automatically_derived]
@@ -221,7 +219,7 @@ mod tests {
                             foo: String,
                         }
                         let merge = &mut Validated::json_schema(gen);
-                        ::kube::core::validate_property(merge, 0, ["true".into()].to_vec()).unwrap();
+                        ::kube::core::validate_property(merge, 0, &["true".into()]).unwrap();
                         ::kube::core::merge_properties(s, merge);
                     }
                     s.clone()

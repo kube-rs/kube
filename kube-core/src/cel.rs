@@ -170,7 +170,7 @@ impl FromStr for Reason {
 /// use kube::core::{Rule, Reason, Message, validate};
 ///
 /// let mut schema = Schema::Object(Default::default());
-/// let rules = vec![Rule{
+/// let rules = &[Rule{
 ///     rule: "self.spec.host == self.url.host".into(),
 ///     message: Some("must be a URL with the host matching spec.host".into()),
 ///     field_path: Some("spec.host".into()),
@@ -185,7 +185,7 @@ impl FromStr for Reason {
 ///```
 #[cfg(feature = "schema")]
 #[cfg_attr(docsrs, doc(cfg(feature = "schema")))]
-pub fn validate(s: &mut Schema, rules: Vec<Rule>) -> Result<(), serde_json::Error> {
+pub fn validate(s: &mut Schema, rules: &[Rule]) -> Result<(), serde_json::Error> {
     match s {
         Schema::Bool(_) => (),
         Schema::Object(schema_object) => {
@@ -211,7 +211,7 @@ pub fn validate(s: &mut Schema, rules: Vec<Rule>) -> Result<(), serde_json::Erro
 ///
 /// let gen = &mut schemars::gen::SchemaSettings::openapi3().into_generator();
 /// let mut schema = MyStruct::json_schema(gen);
-/// let rules = vec![Rule::new("self != oldSelf")];
+/// let rules = &[Rule::new("self != oldSelf")];
 /// validate_property(&mut schema, 0, rules)?;
 /// assert_eq!(
 ///     serde_json::to_string(&schema).unwrap(),
@@ -224,7 +224,7 @@ pub fn validate(s: &mut Schema, rules: Vec<Rule>) -> Result<(), serde_json::Erro
 pub fn validate_property(
     s: &mut Schema,
     property_index: usize,
-    rules: Vec<Rule>,
+    rules: &[Rule],
 ) -> Result<(), serde_json::Error> {
     match s {
         Schema::Bool(_) => (),
