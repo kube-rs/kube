@@ -1,7 +1,6 @@
-
 use darling::{FromDeriveInput, FromField, FromMeta};
 use proc_macro2::TokenStream;
-use syn::{parse_quote, DeriveInput, Expr, Ident, Path};
+use syn::{parse_quote, Attribute, DeriveInput, Expr, Ident, Path};
 
 #[derive(FromField)]
 #[darling(attributes(cel_validate))]
@@ -78,12 +77,7 @@ pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
     // Remove all unknown attributes from the original structure copy
     // Has to happen on the original definition at all times, as we don't have #[derive] stanzes.
     let attribute_whitelist = ["serde", "schemars", "doc"];
-    ast.attrs = ast
-        .attrs
-        .iter()
-        .filter(|attr| attribute_whitelist.iter().any(|i| attr.path().is_ident(i)))
-        .cloned()
-        .collect();
+    ast.attrs = remove_attributes(&ast.attrs, attribute_whitelist.to_vec());
 
     let struct_data = match ast.data {
         syn::Data::Struct(ref mut struct_data) => struct_data,
@@ -102,12 +96,7 @@ pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
 
             // Remove all unknown attributes from each field
             // Has to happen on the original definition at all times, as we don't have #[derive] stanzes.
-            field.attrs = field
-                .attrs
-                .iter()
-                .filter(|attr| attribute_whitelist.iter().any(|i| attr.path().is_ident(i)))
-                .cloned()
-                .collect();
+            field.attrs = remove_attributes(&field.attrs, attribute_whitelist.to_vec());
 
             if rules.is_empty() {
                 continue;
@@ -158,6 +147,15 @@ pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
             }
         }
     }
+}
+
+// Remove all unknown attributes from the list
+fn remove_attributes(attrs: &Vec<Attribute>, witelist: Vec<&str>) -> Vec<Attribute> {
+    attrs
+        .iter()
+        .filter(|attr| witelist.iter().any(|i| attr.path().is_ident(i)))
+        .cloned()
+        .collect()
 }
 
 #[test]
