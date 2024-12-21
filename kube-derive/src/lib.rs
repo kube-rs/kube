@@ -162,7 +162,8 @@ mod resource;
 /// Sets the `served` property to `true` or `false`.
 ///
 /// ## `#[kube(rule = Rule::new("self == oldSelf").message("field is immutable"))]`
-/// Sets the CEL validation rules on the generated top level structure.
+/// Inject a top level CEL validation rule for the top level generated struct.
+/// This attribute is for resources deriving [`CELSchema`] instead of [`schemars::JsonSchema`].
 ///
 /// ## Example with all properties
 ///
