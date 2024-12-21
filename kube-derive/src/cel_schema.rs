@@ -1,3 +1,4 @@
+
 use darling::{FromDeriveInput, FromField, FromMeta};
 use proc_macro2::TokenStream;
 use syn::{parse_quote, DeriveInput, Expr, Ident, Path};
@@ -74,7 +75,7 @@ pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
     let struct_name = ident.to_string();
     let struct_rules: Vec<TokenStream> = rules.iter().map(|r| quote! {#r,}).collect();
 
-    // Remove all unknown attributes
+    // Remove all unknown attributes from the original structure copy
     // Has to happen on the original definition at all times, as we don't have #[derive] stanzes.
     let attribute_whitelist = ["serde", "schemars", "doc"];
     ast.attrs = ast
@@ -99,7 +100,7 @@ pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
                 Err(err) => return err.write_errors(),
             };
 
-            // Remove all unknown attributes
+            // Remove all unknown attributes from each field
             // Has to happen on the original definition at all times, as we don't have #[derive] stanzes.
             field.attrs = field
                 .attrs

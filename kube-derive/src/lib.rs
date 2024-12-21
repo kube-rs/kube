@@ -161,6 +161,9 @@ mod resource;
 /// ## `#[kube(served = true)]`
 /// Sets the `served` property to `true` or `false`.
 ///
+/// ## `#[kube(rule = Rule::new("self == oldSelf").message("field is immutable"))]`
+/// Sets the CEL validation rules on the generated top level structure.
+///
 /// ## Example with all properties
 ///
 /// ```rust
