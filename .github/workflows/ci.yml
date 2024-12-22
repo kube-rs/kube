@@ -242,7 +242,7 @@ jobs:
 
       - uses: nolar/setup-k3d-k3s@v1
         with:
-          version: "${{ env.K3S.MAX }}"
+          version: latest
           # k3d-kube
           k3d-name: kube
           # Used to avoid rate limits when fetching the releases from k3s repo.
