@@ -134,9 +134,7 @@ jobs:
       fail-fast: false
       matrix:
         # Run these tests against older clusters as well
-        k8s:
-        - "${{ env.K3S_MIN }}"
-        - "${{ env.K3S_MAX }}"
+        k8s: ["${{env.K3S_MIN}}", "${{env.K3S_MAX}}"]
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
