@@ -10,9 +10,6 @@ on:
       - "**.toml"
       - "**.yml"
 
-env:
-  RUST_BACKTRACE: 1
-
 jobs:
   tarpaulin-codecov:
     runs-on: ubuntu-latest
