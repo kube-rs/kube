@@ -133,7 +133,7 @@ jobs:
       matrix:
         # Run these tests against older clusters as well
         k8s:
-        - "1.27" # MK8SV
+        - "v1.28" # MK8SV
         - "latest"
     steps:
       - uses: actions/checkout@v4
@@ -200,7 +200,7 @@ jobs:
 
       - uses: nolar/setup-k3d-k3s@v1
         with:
-          version: "1.27" # MK8SV
+          version: "v1.28" # MK8SV
           # k3d-kube
           k3d-name: kube
           # Used to avoid rate limits when fetching the releases from k3s repo.

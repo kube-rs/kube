@@ -122,8 +122,8 @@ bump-k8s:
   min_feat="${earliest::-2}${earliest:3}"
   min_dots="${min_feat/_/.}"
   echo "Setting MK8SV to $min_dots using feature $min_feat"
-  # workflow pins for k3s
-  sd '^.+K3S_MIN\: .*$' "  K3S_MIN: \"${min_dots}\"" .github/workflows/*.yml
+  # workflow pins for k3s (any line with key/array suffixed by # MK8SV)
+  sd "(.*)([\:\-]{1}) .* # MK8SV$" "\$1\$2 \"${min_dots}\" # MK8SV" .github/workflows/*.yml
   # bump mk8sv badge
   badge="[![Tested against Kubernetes ${min_dots} and above](https://img.shields.io/badge/MK8SV-${min_dots}-326ce5.svg)](https://kube.rs/kubernetes-version)"
   sd "^.+badge/MK8SV.+$" "${badge}" README.md
