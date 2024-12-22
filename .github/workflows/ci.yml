@@ -4,6 +4,8 @@ on:
 
 env:
   RUST_BACKTRACE: 1
+  K3S_MAX: "latest"
+  K3S_MIN: "v1.28"
 
 # Spend CI time only on latest ref: https://docs.github.com/en/actions/using-jobs/using-concurrency
 concurrency:
@@ -132,7 +134,9 @@ jobs:
       fail-fast: false
       matrix:
         # Run these tests against older clusters as well
-        k8s: [v1.27, v1.31]
+        k8s:
+        - "${{ env.K3S_MIN }}"
+        - "${{ env.K3S_MAX }}"
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -198,7 +202,7 @@ jobs:
 
       - uses: nolar/setup-k3d-k3s@v1
         with:
-          version: v1.27
+          version: "${{ env.K3S_MIN }}"
           # k3d-kube
           k3d-name: kube
           # Used to avoid rate limits when fetching the releases from k3s repo.
@@ -240,7 +244,7 @@ jobs:
 
       - uses: nolar/setup-k3d-k3s@v1
         with:
-          version: latest
+          version: "${{ env.K3S.MAX }}"
           # k3d-kube
           k3d-name: kube
           # Used to avoid rate limits when fetching the releases from k3s repo.

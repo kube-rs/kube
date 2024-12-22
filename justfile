@@ -113,16 +113,18 @@ bump-msrv msrv:
   sd "^.+badge/MSRV.+$" "${badge}" README.md
   sd "rust:.*-bullseye" "rust:{{msrv}}-bullseye" .devcontainer/Dockerfile
 
-# Increment the Kubernetes feature version from k8s-openapi for tests; "just bump-k8s"
+# Sets the Kubernetes feature version from latest k8s-openapi.
 bump-k8s:
   #!/usr/bin/env bash
-  latest=$(cargo tree --format "{f}" -i k8s-openapi | head -n 1 | choose -f ',' 1)
-  # bumping supported version also bumps our mk8sv
-  mk8svnew=${latest::-2}$((${latest:3} - 5))
-  mk8svold=${latest::-2}$((${latest:3} - 6))
-  fastmod -m -d e2e -e toml "$mk8svold" "$mk8svnew"
-  fastmod -m -d .github/workflows -e yml "${mk8svold/_/\.}" "${mk8svnew/_/.}"
+  earliest=$(cargo info k8s-openapi --color=never 2> /dev/null |grep earliest | awk -F'[][]' '{print $2}')
+  latest=$(cargo info k8s-openapi --color=never 2> /dev/null |grep latest | awk -F'[][]' '{print $2}')
+  # pin mk8sv to k8s-openapi earliest
+  min_feat="${earliest::-2}${earliest:3}"
+  min_dots="${min_feat/_/.}"
+  echo "Setting MK8SV to $min_dots using feature $min_feat"
+  # workflow pins for k3s
+  sd '^.+K3S_MIN\: .*$' "  K3S_MIN: \"${min_dots}\"" .github/workflows/*.yml
   # bump mk8sv badge
-  badge="[![Tested against Kubernetes ${mk8svnew} and above](https://img.shields.io/badge/MK8SV-${mk8svnew}-326ce5.svg)](https://kube.rs/kubernetes-version)"
+  badge="[![Tested against Kubernetes ${min_dots} and above](https://img.shields.io/badge/MK8SV-${min_dots}-326ce5.svg)](https://kube.rs/kubernetes-version)"
   sd "^.+badge/MK8SV.+$" "${badge}" README.md
   echo "remember to bump kubernetes-version.md in kube-rs/website"

@@ -10,6 +10,11 @@ on:
       - "**.toml"
       - "**.yml"
 
+env:
+  RUST_BACKTRACE: 1
+  K3S_MAX: "latest"
+  K3S_MIN: "v1.28"
+
 jobs:
   tarpaulin-codecov:
     runs-on: ubuntu-latest
@@ -26,7 +31,7 @@ jobs:
           tool: cargo-tarpaulin@0.28.0
       - uses: nolar/setup-k3d-k3s@v1
         with:
-          version: v1.27
+          version: "${{ env.K3S_MIN }}"
           # k3d-kube
           k3d-name: kube
           # Used to avoid rate limits when fetching the releases from k3s repo.
