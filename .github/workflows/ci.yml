@@ -132,7 +132,7 @@ jobs:
       fail-fast: false
       matrix:
         # Run these tests against older clusters as well
-        k8s: [v1.26, v1.30]
+        k8s: [v1.27, v1.31]
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -198,7 +198,7 @@ jobs:
 
       - uses: nolar/setup-k3d-k3s@v1
         with:
-          version: v1.26
+          version: v1.27
           # k3d-kube
           k3d-name: kube
           # Used to avoid rate limits when fetching the releases from k3s repo.

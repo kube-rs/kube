@@ -2,7 +2,7 @@
 
 [![Crates.io](https://img.shields.io/crates/v/kube.svg)](https://crates.io/crates/kube)
 [![Rust 1.77](https://img.shields.io/badge/MSRV-1.77-dea584.svg)](https://github.com/rust-lang/rust/releases/tag/1.77.2)
-[![Tested against Kubernetes v1_26 and above](https://img.shields.io/badge/MK8SV-v1_26-326ce5.svg)](https://kube.rs/kubernetes-version)
+[![Tested against Kubernetes v1_27 and above](https://img.shields.io/badge/MK8SV-v1_27-326ce5.svg)](https://kube.rs/kubernetes-version)
 [![Best Practices](https://bestpractices.coreinfrastructure.org/projects/5413/badge)](https://bestpractices.coreinfrastructure.org/projects/5413)
 [![Discord chat](https://img.shields.io/discord/500028886025895936.svg?logo=discord&style=plastic)](https://discord.gg/tokio)
 
