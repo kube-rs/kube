@@ -7,8 +7,31 @@ UNRELEASED
 ===================
  * see https://github.com/kube-rs/kube/compare/0.98.0...main
 
-0.98.0 / 2024-12-23
+[0.98.0](https://github.com/kube-rs/kube/releases/tag/0.98.0) / 2024-12-23
 ===================
+<!-- Release notes generated using configuration in .github/release.yml at 0.98.0 -->
+
+## Highlights
+
+- [Kubernetes `v1_32`](https://kubernetes.io/blog/2024/12/11/kubernetes-v1-32-release/) support via `k8s-openapi` [0.24](https://github.com/Arnavion/k8s-openapi/releases/tag/v0.24.0)
+  * Please [upgrade k8s-openapi along with kube](https://kube.rs/upgrading/) to avoid conflicts.
+  * New minimum versions: [MSRV](https://kube.rs/rust-version/) 1.81.0, [MK8SV](https://kube.rs/kubernetes-version/): 1.28
+- `kube-derive` additions:
+  * A [`CELSchema`](https://docs.rs/kube/latest/kube/derive.CELSchema.html) derive macro wrapper around [`JsonSchema`](https://docs.rs/schemars/latest/schemars/trait.JsonSchema.html) for injecting [cel validations](https://kubernetes.io/docs/reference/using-api/cel/) into the schema [#1649](https://github.com/kube-rs/kube/pull/1649)
+  * Allow overriding `served` and `storage` booleans for [multiple versions](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definition-versioning/#specify-multiple-versions) of [`CustomResource`](https://docs.rs/kube/latest/kube/derive.CustomResource.html) derives: [#1644](https://github.com/kube-rs/kube/pull/1644)
+- `kube-runtime` event [`Recorder`](https://docs.rs/kube/latest/kube/runtime/events/struct.Recorder.html) now aggregates repeat events [#1655](https://github.com/kube-rs/kube/pull/1655) (some breaking changes, see [controller-rs#116](https://github.com/kube-rs/controller-rs/pull/116))
+- `kube-client` UTF-16 edge case handling for windows [#1654](https://github.com/kube-rs/kube/pull/1654)
+
+## What's Changed
+### Added
+* Add `storage` and `served` argument to derive macro by @Techassi in https://github.com/kube-rs/kube/pull/1644
+* Implement  `derive(CELSchema)` macro for generating cel validation on CRDs by @Danil-Grigorev in https://github.com/kube-rs/kube/pull/1649
+### Changed
+* Add series implementation for `runtime` event recorder by @pando85 in https://github.com/kube-rs/kube/pull/1655
+* Bump `k8s-openapi` for Kubernetes `v1_32` support and MSRV by @clux in https://github.com/kube-rs/kube/pull/1671
+* Update tokio-tungstenite requirement from 0.24.0 to 0.25.0 by @dependabot in https://github.com/kube-rs/kube/pull/1666
+### Fixed
+* Add support for UTF-16 encoded kubeconfig files by @goenning in https://github.com/kube-rs/kube/pull/1654
 
 [0.97.0](https://github.com/kube-rs/kube/releases/tag/0.97.0) / 2024-11-20
 ===================
