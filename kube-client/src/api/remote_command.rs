@@ -350,7 +350,7 @@ where
                         let mut vec = Vec::with_capacity(new_size.len() + 1);
                         vec.push(RESIZE_CHANNEL);
                         vec.extend_from_slice(&new_size[..]);
-                        server_send.send(ws::Message::Binary(vec)).await.map_err(Error::SendTerminalSize)?;
+                        server_send.send(ws::Message::Binary(vec.into())).await.map_err(Error::SendTerminalSize)?;
                     },
                     None => {
                         have_terminal_size_rx = false;
@@ -379,9 +379,9 @@ async fn filter_message(wsm: Result<ws::Message, ws::Error>) -> Option<Result<Me
         // The protocol only sends binary frames.
         // Message of size 1 (only channel number) is sent on connection.
         Ok(ws::Message::Binary(bin)) if bin.len() > 1 => match bin[0] {
-            STDOUT_CHANNEL => Some(Ok(Message::Stdout(bin))),
-            STDERR_CHANNEL => Some(Ok(Message::Stderr(bin))),
-            STATUS_CHANNEL => Some(Ok(Message::Status(bin))),
+            STDOUT_CHANNEL => Some(Ok(Message::Stdout(bin.into()))),
+            STDERR_CHANNEL => Some(Ok(Message::Stderr(bin.into()))),
+            STATUS_CHANNEL => Some(Ok(Message::Status(bin.into()))),
             // We don't receive messages to stdin and resize channels.
             _ => None,
         },
