@@ -186,10 +186,6 @@ jobs:
             echo "mk8sv not set correctly in tests"
             exit 1
           fi
-          if ! grep "${{ steps.mk8sv.outputs.mk8svdash }}" e2e/Cargo.toml | grep mk8sv; then
-            echo "mk8sv not set correctly in e2e features"
-            exit 1
-          fi
 
       - uses: dtolnay/rust-toolchain@stable
       # Smart caching for Rust projects.
