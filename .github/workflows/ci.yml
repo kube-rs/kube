@@ -132,7 +132,9 @@ jobs:
       fail-fast: false
       matrix:
         # Run these tests against older clusters as well
-        k8s: [v1.26, v1.30]
+        k8s:
+        - "v1.28" # MK8SV
+        - "latest"
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -184,10 +186,6 @@ jobs:
             echo "mk8sv not set correctly in tests"
             exit 1
           fi
-          if ! grep "${{ steps.mk8sv.outputs.mk8svdash }}" e2e/Cargo.toml | grep mk8sv; then
-            echo "mk8sv not set correctly in e2e features"
-            exit 1
-          fi
 
       - uses: dtolnay/rust-toolchain@stable
       # Smart caching for Rust projects.
@@ -198,7 +196,7 @@ jobs:
 
       - uses: nolar/setup-k3d-k3s@v1
         with:
-          version: v1.26
+          version: "v1.28" # MK8SV
           # k3d-kube
           k3d-name: kube
           # Used to avoid rate limits when fetching the releases from k3s repo.
