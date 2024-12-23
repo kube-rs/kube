@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 #![recursion_limit = "256"]
 
 use assert_json_diff::assert_json_eq;

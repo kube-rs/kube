@@ -88,8 +88,7 @@ pub struct Client {
 impl Client {
     /// Create a [`Client`] using a custom `Service` stack.
     ///
-    /// [`ConfigExt`](crate::client::ConfigExt) provides extensions for
-    /// building a custom stack.
+    /// [`ConfigExt`] provides extensions for building a custom stack.
     ///
     /// To create with the default stack with a [`Config`], use
     /// [`Client::try_from`].

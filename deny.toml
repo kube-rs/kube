@@ -12,9 +12,7 @@ db-urls = ["https://github.com/rustsec/advisory-db"]
 # remove them when we have to
 yanked = "warn"
 
-ignore = [
-    "RUSTSEC-2024-0384", # instant dep via unmaintained backoff dep
-]
+ignore = []
 
 [licenses]
 # See https://spdx.org/licenses/ for list of possible licenses
