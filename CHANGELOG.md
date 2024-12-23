@@ -5,7 +5,10 @@
 <!-- next-header -->
 UNRELEASED
 ===================
- * see https://github.com/kube-rs/kube/compare/0.97.0...main
+ * see https://github.com/kube-rs/kube/compare/0.98.0...main
+
+0.98.0 / 2024-12-23
+===================
 
 [0.97.0](https://github.com/kube-rs/kube/releases/tag/0.97.0) / 2024-11-20
 ===================
@@ -14,22 +17,22 @@ UNRELEASED
 ## Highlights
 
 - [`CustomResource`](https://docs.rs/kube/latest/kube/derive.CustomResource.html) derive added features for crd yaml output:
-  * selectable fields #1605 + #1610
-  * annotations and labels #1631
+  * selectable fields [#1605](https://github.com/kube-rs/kube/issues/1605) + [#1610](https://github.com/kube-rs/kube/issues/1610)
+  * annotations and labels [#1631](https://github.com/kube-rs/kube/issues/1631)
 - Configuration edge cases:
-  * Avoid double installations of `aws-lc-rs` (rustls crypto) provider #1617
-  * Kubeconfig fix for `null` user; #1608
-  * Default runtime watcher backoff alignment with `client-go` #1603
+  * Avoid double installations of `aws-lc-rs` (rustls crypto) provider [#1617](https://github.com/kube-rs/kube/issues/1617)
+  * Kubeconfig fix for `null` user; [#1608](https://github.com/kube-rs/kube/issues/1608)
+  * Default runtime watcher backoff alignment with `client-go` [#1603](https://github.com/kube-rs/kube/issues/1603)
 - Feature use:
-  *  Client proxy feature-set misuse prevention #1626
-  * Allow disabling `gzip` via `Config` #1627
+  *  Client proxy feature-set misuse prevention [#1626](https://github.com/kube-rs/kube/issues/1626)
+  * Allow disabling `gzip` via `Config` [#1627](https://github.com/kube-rs/kube/issues/1627)
 - Depedency minors: `thiserror`, `hashbrown`, `jsonptr`, `json-patch`. Killed `lazy_static` / `once_cell`
 
 ## What's Changed
 ### Added
 * Feature: Allow to pass selectableFields for CRD definition by @Danil-Grigorev in https://github.com/kube-rs/kube/pull/1605
 * add support for CRD annotations and labels in kube-derive by @verokarhu in https://github.com/kube-rs/kube/pull/1631
-* Feature: Add config setting to disable gzip compression #1627 by @markdingram in https://github.com/kube-rs/kube/pull/1628
+* Feature: Add config setting to disable gzip compression [#1627](https://github.com/kube-rs/kube/issues/1627) by @markdingram in https://github.com/kube-rs/kube/pull/1628
 ### Changed
 * upgrade to hashbrown 0.15.0 by @rorosen in https://github.com/kube-rs/kube/pull/1599
 * update jsonptr + json-patch by @aviramha in https://github.com/kube-rs/kube/pull/1600
