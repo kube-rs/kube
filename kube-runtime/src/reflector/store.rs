@@ -258,7 +258,7 @@ where
                     key.extra.remaining_lookups = Some(lookups - 1);
                     store.insert(key, obj.clone());
                 }
-            };
+            }
 
             obj
         })
