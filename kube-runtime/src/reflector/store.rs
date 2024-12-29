@@ -254,6 +254,9 @@ where
             .cloned()
     }
 
+    /// Return the cached object for `key`, removing it after its last pending lookup.
+    ///
+    /// Earlier lookups decrement the pending lookup count and leave the object in the cache.
     #[must_use]
     pub fn remove(&self, key: &ObjectRef<K>) -> Option<Arc<K>> {
         let mut store = self.store.write();
@@ -264,7 +267,7 @@ where
                     key.extra.remaining_lookups = Some(lookups - 1);
                     store.insert(key, obj.clone());
                 }
-            };
+            }
 
             obj
         })

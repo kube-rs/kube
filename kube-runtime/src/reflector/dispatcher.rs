@@ -156,6 +156,7 @@ where
 pub(crate) mod test {
     use crate::{
         WatchStreamExt,
+        reflector::ObjectRef,
         watcher::{Error, Event},
     };
     use std::{pin::pin, sync::Arc, task::Poll};
@@ -242,7 +243,7 @@ pub(crate) mod test {
         let foo = Arc::new(foo);
         let _bar = Arc::new(bar);
 
-        let (_, writer) = reflector::store_shared(10);
+        let (reader, writer) = reflector::store_shared(10);
         let mut subscriber = pin!(writer.subscribe().unwrap());
         let mut other_subscriber = pin!(writer.subscribe().unwrap());
         let mut reflect = pin!(st.reflect_shared(writer));
@@ -252,8 +253,11 @@ pub(crate) mod test {
             poll!(reflect.next()),
             Poll::Ready(Some(Ok(Event::Delete(_))))
         ));
+        assert_eq!(reader.get(&ObjectRef::from_obj(&foo)), Some(foo.clone()));
         assert_eq!(poll!(subscriber.next()), Poll::Ready(Some(foo.clone())));
+        assert_eq!(reader.get(&ObjectRef::from_obj(&foo)), Some(foo.clone()));
         assert_eq!(poll!(other_subscriber.next()), Poll::Ready(Some(foo.clone())));
+        assert_eq!(reader.get(&ObjectRef::from_obj(&foo)), None);
 
         assert!(matches!(
             poll!(reflect.next()),
