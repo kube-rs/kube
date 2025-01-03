@@ -2,9 +2,10 @@
 //!
 //! See [`watcher`] for the primary entry point.
 
-use crate::utils::ResetTimerBackoff;
+use crate::utils::{Backoff, ResetTimerBackoff};
+
 use async_trait::async_trait;
-use backoff::{backoff::Backoff, ExponentialBackoff};
+use backon::BackoffBuilder;
 use educe::Educe;
 use futures::{stream::BoxStream, Stream, StreamExt};
 use kube_client::{
@@ -497,11 +498,14 @@ where
 {
     match state {
         State::Empty => match wc.initial_list_strategy {
-            InitialListStrategy::ListWatch => (Some(Ok(Event::Init)), State::InitPage {
-                continue_token: None,
-                objects: VecDeque::default(),
-                last_bookmark: None,
-            }),
+            InitialListStrategy::ListWatch => (
+                Some(Ok(Event::Init)),
+                State::InitPage {
+                    continue_token: None,
+                    objects: VecDeque::default(),
+                    last_bookmark: None,
+                },
+            ),
             InitialListStrategy::StreamingList => match api.watch(&wc.to_watch_params(), "0").await {
                 Ok(stream) => (None, State::InitialWatch { stream }),
                 Err(err) => {
@@ -520,11 +524,14 @@ where
             last_bookmark,
         } => {
             if let Some(next) = objects.pop_front() {
-                return (Some(Ok(Event::InitApply(next))), State::InitPage {
-                    continue_token,
-                    objects,
-                    last_bookmark,
-                });
+                return (
+                    Some(Ok(Event::InitApply(next))),
+                    State::InitPage {
+                        continue_token,
+                        objects,
+                        last_bookmark,
+                    },
+                );
             }
             // check if we need to perform more pages
             if continue_token.is_none() {
@@ -544,11 +551,14 @@ where
                     }
                     // Buffer page here, causing us to return to this enum branch (State::InitPage)
                     // until the objects buffer has drained
-                    (None, State::InitPage {
-                        continue_token,
-                        objects: list.items.into_iter().collect(),
-                        last_bookmark,
-                    })
+                    (
+                        None,
+                        State::InitPage {
+                            continue_token,
+                            objects: list.items.into_iter().collect(),
+                            last_bookmark,
+                        },
+                    )
                 }
                 Err(err) => {
                     if std::matches!(err, ClientErr::Api(ErrorResponse { code: 403, .. })) {
@@ -574,10 +584,13 @@ where
                 Some(Ok(WatchEvent::Bookmark(bm))) => {
                     let marks_initial_end = bm.metadata.annotations.contains_key("k8s.io/initial-events-end");
                     if marks_initial_end {
-                        (Some(Ok(Event::InitDone)), State::Watching {
-                            resource_version: bm.metadata.resource_version,
-                            stream,
-                        })
+                        (
+                            Some(Ok(Event::InitDone)),
+                            State::Watching {
+                                resource_version: bm.metadata.resource_version,
+                                stream,
+                            },
+                        )
                     } else {
                         (None, State::InitialWatch { stream })
                     }
@@ -609,19 +622,23 @@ where
         }
         State::InitListed { resource_version } => {
             match api.watch(&wc.to_watch_params(), &resource_version).await {
-                Ok(stream) => (None, State::Watching {
-                    resource_version,
-                    stream,
-                }),
+                Ok(stream) => (
+                    None,
+                    State::Watching {
+                        resource_version,
+                        stream,
+                    },
+                ),
                 Err(err) => {
                     if std::matches!(err, ClientErr::Api(ErrorResponse { code: 403, .. })) {
                         warn!("watch initlist error with 403: {err:?}");
                     } else {
                         debug!("watch initlist error: {err:?}");
                     }
-                    (Some(Err(Error::WatchStartFailed(err))), State::InitListed {
-                        resource_version,
-                    })
+                    (
+                        Some(Err(Error::WatchStartFailed(err))),
+                        State::InitListed { resource_version },
+                    )
                 }
             }
         }
@@ -634,10 +651,13 @@ where
                 if resource_version.is_empty() {
                     (Some(Err(Error::NoResourceVersion)), State::default())
                 } else {
-                    (Some(Ok(Event::Apply(obj))), State::Watching {
-                        resource_version,
-                        stream,
-                    })
+                    (
+                        Some(Ok(Event::Apply(obj))),
+                        State::Watching {
+                            resource_version,
+                            stream,
+                        },
+                    )
                 }
             }
             Some(Ok(WatchEvent::Deleted(obj))) => {
@@ -645,16 +665,22 @@ where
                 if resource_version.is_empty() {
                     (Some(Err(Error::NoResourceVersion)), State::default())
                 } else {
-                    (Some(Ok(Event::Delete(obj))), State::Watching {
-                        resource_version,
-                        stream,
-                    })
+                    (
+                        Some(Ok(Event::Delete(obj))),
+                        State::Watching {
+                            resource_version,
+                            stream,
+                        },
+                    )
                 }
             }
-            Some(Ok(WatchEvent::Bookmark(bm))) => (None, State::Watching {
-                resource_version: bm.metadata.resource_version,
-                stream,
-            }),
+            Some(Ok(WatchEvent::Bookmark(bm))) => (
+                None,
+                State::Watching {
+                    resource_version: bm.metadata.resource_version,
+                    stream,
+                },
+            ),
             Some(Ok(WatchEvent::Error(err))) => {
                 // HTTP GONE, means we have desynced and need to start over and re-list :(
                 let new_state = if err.code == 410 {
@@ -678,10 +704,13 @@ where
                 } else {
                     debug!("watcher error: {err:?}");
                 }
-                (Some(Err(Error::WatchFailed(err))), State::Watching {
-                    resource_version,
-                    stream,
-                })
+                (
+                    Some(Err(Error::WatchFailed(err))),
+                    State::Watching {
+                        resource_version,
+                        stream,
+                    },
+                )
             }
             None => (None, State::InitListed { resource_version }),
         },
@@ -882,6 +911,52 @@ pub fn watch_object<K: Resource + Clone + DeserializeOwned + Debug + Send + 'sta
         })
 }
 
+struct ExponentialBackoff {
+    inner: backon::ExponentialBackoff,
+    min_delay: Duration,
+    max_delay: Duration,
+    factor: f32,
+    enable_jitter: bool,
+}
+
+impl ExponentialBackoff {
+    fn new(min_delay: Duration, max_delay: Duration, factor: f32, enable_jitter: bool) -> Self {
+        Self {
+            inner: backon::ExponentialBuilder::default()
+                .with_min_delay(min_delay)
+                .with_max_delay(max_delay)
+                .with_factor(factor)
+                .with_jitter()
+                .build(),
+            min_delay,
+            max_delay,
+            factor,
+            enable_jitter,
+        }
+    }
+}
+
+impl Backoff for ExponentialBackoff {
+    fn reset(&mut self) {
+        let mut builder = backon::ExponentialBuilder::default()
+            .with_min_delay(self.min_delay)
+            .with_max_delay(self.max_delay)
+            .with_factor(self.factor);
+        if self.enable_jitter {
+            builder = builder.with_jitter();
+        }
+        self.inner = builder.build();
+    }
+}
+
+impl Iterator for ExponentialBackoff {
+    type Item = Duration;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+
 /// Default watcher backoff inspired by Kubernetes' client-go.
 ///
 /// The parameters currently optimize for being kind to struggling apiservers.
@@ -898,24 +973,22 @@ type Strategy = ResetTimerBackoff<ExponentialBackoff>;
 impl Default for DefaultBackoff {
     fn default() -> Self {
         Self(ResetTimerBackoff::new(
-            backoff::ExponentialBackoffBuilder::new()
-                .with_initial_interval(Duration::from_millis(800))
-                .with_max_interval(Duration::from_secs(30))
-                .with_randomization_factor(1.0)
-                .with_multiplier(2.0)
-                .with_max_elapsed_time(None)
-                .build(),
+            ExponentialBackoff::new(Duration::from_millis(800), Duration::from_secs(30), 2.0, true),
             Duration::from_secs(120),
         ))
     }
 }
 
-impl Backoff for DefaultBackoff {
-    fn next_backoff(&mut self) -> Option<Duration> {
-        self.0.next_backoff()
-    }
+impl Iterator for DefaultBackoff {
+    type Item = Duration;
 
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.next()
+    }
+}
+
+impl Backoff for DefaultBackoff {
     fn reset(&mut self) {
-        self.0.reset()
+        self.0.reset();
     }
 }
