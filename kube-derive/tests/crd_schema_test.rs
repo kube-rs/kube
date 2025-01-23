@@ -2,13 +2,14 @@
 
 use assert_json_diff::assert_json_eq;
 use chrono::{DateTime, Utc};
+use kube::CELSchema;
 use kube_derive::CustomResource;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
 // See `crd_derive_schema` example for how the schema generated from this struct affects defaulting and validation.
-#[derive(CustomResource, Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+#[derive(CustomResource, Serialize, Deserialize, Debug, PartialEq, Clone, CELSchema)]
 #[kube(
     group = "clux.dev",
     version = "v1",
@@ -26,8 +27,10 @@ use std::collections::{HashMap, HashSet};
     annotation("clux.dev", "cluxingv1"),
     annotation("clux.dev/firewall", "enabled"),
     label("clux.dev", "cluxingv1"),
-    label("clux.dev/persistence", "disabled")
+    label("clux.dev/persistence", "disabled"),
+    rule = Rule::new("self.metadata.name == 'singleton'"),
 )]
+#[cel_validate(rule = Rule::new("has(self.nonNullable)"))]
 #[serde(rename_all = "camelCase")]
 struct FooSpec {
     non_nullable: String,
@@ -50,6 +53,7 @@ struct FooSpec {
     timestamp: DateTime<Utc>,
 
     /// This is a complex enum with a description
+    #[cel_validate(rule = Rule::new("!has(self.variantOne) || self.variantOne.int > 22"))]
     complex_enum: ComplexEnum,
 
     /// This is a untagged enum with a description
@@ -303,6 +307,9 @@ fn test_crd_schema_matches_expected() {
                                                         "required": ["variantThree"]
                                                     }
                                                 ],
+                                                "x-kubernetes-validations": [{
+                                                    "rule": "!has(self.variantOne) || self.variantOne.int > 22",
+                                                }],
                                                 "description": "This is a complex enum with a description"
                                             },
                                             "untaggedEnumPerson": {
@@ -347,13 +354,19 @@ fn test_crd_schema_matches_expected() {
                                             "timestamp",
                                             "untaggedEnumPerson"
                                         ],
+                                        "x-kubernetes-validations": [{
+                                            "rule": "has(self.nonNullable)",
+                                        }],
                                         "type": "object"
                                     }
                                 },
                                 "required": [
                                     "spec"
                                 ],
-                                "title": "Foo",
+                                "x-kubernetes-validations": [{
+                                    "rule": "self.metadata.name == 'singleton'",
+                                }],
+                                "title": "Foo_kube_validation",
                                 "type": "object"
                             }
                         },

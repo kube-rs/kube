@@ -7,9 +7,8 @@ use kube::{
         WatchEvent, WatchParams,
     },
     runtime::wait::{await_condition, conditions},
-    Client, CustomResource, CustomResourceExt,
+    CELSchema, Client, CustomResource, CustomResourceExt,
 };
-use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 // This example shows how the generated schema affects defaulting and validation.
@@ -19,15 +18,18 @@ use serde::{Deserialize, Serialize};
 // - https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#defaulting
 // - https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#defaulting-and-nullable
 
-#[derive(CustomResource, Serialize, Deserialize, Default, Debug, PartialEq, Eq, Clone, JsonSchema)]
+#[derive(CustomResource, CELSchema, Serialize, Deserialize, Default, Debug, PartialEq, Eq, Clone)]
 #[kube(
     group = "clux.dev",
     version = "v1",
     kind = "Foo",
     namespaced,
     derive = "PartialEq",
-    derive = "Default"
+    derive = "Default",
+    rule = Rule::new("self.metadata.name != 'forbidden'"),
 )]
+#[serde(rename_all = "camelCase")]
+#[cel_validate(rule = Rule::new("self.nonNullable == oldSelf.nonNullable"))]
 pub struct FooSpec {
     // Non-nullable without default is required.
     //
@@ -85,11 +87,27 @@ pub struct FooSpec {
     #[serde(default)]
     #[schemars(schema_with = "set_listable_schema")]
     set_listable: Vec<u32>,
+
     // Field with CEL validation
-    #[serde(default)]
-    #[schemars(schema_with = "cel_validations")]
+    #[serde(default = "default_legal")]
+    #[cel_validate(
+        rule = Rule::new("self != 'illegal'").message(Message::Expression("'string cannot be illegal'".into())).reason(Reason::FieldValueForbidden),
+        rule = Rule::new("self != 'not legal'").reason(Reason::FieldValueInvalid),
+    )]
     cel_validated: Option<String>,
+
+    #[cel_validate(rule = Rule::new("self == oldSelf").message("is immutable"))]
+    foo_sub_spec: Option<FooSubSpec>,
 }
+
+#[derive(CELSchema, Serialize, Deserialize, Default, Debug, PartialEq, Eq, Clone)]
+pub struct FooSubSpec {
+    #[cel_validate(rule = "self != 'not legal'".into())]
+    field: String,
+
+    other: Option<String>,
+}
+
 // https://kubernetes.io/docs/reference/using-api/server-side-apply/#merge-strategy
 fn set_listable_schema(_: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
     serde_json::from_value(serde_json::json!({
@@ -104,20 +122,12 @@ fn set_listable_schema(_: &mut schemars::gen::SchemaGenerator) -> schemars::sche
     .unwrap()
 }
 
-// https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#validation-rules
-fn cel_validations(_: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
-    serde_json::from_value(serde_json::json!({
-        "type": "string",
-        "x-kubernetes-validations": [{
-            "rule": "self != 'illegal'",
-            "message": "string cannot be illegal"
-        }]
-    }))
-    .unwrap()
-}
-
 fn default_value() -> String {
     "default_value".into()
+}
+
+fn default_legal() -> Option<String> {
+    Some("legal".into())
 }
 
 fn default_nullable() -> Option<String> {
@@ -160,6 +170,7 @@ async fn main() -> Result<()> {
         default_listable: Default::default(),
         set_listable: Default::default(),
         cel_validated: Default::default(),
+        foo_sub_spec: Default::default(),
     });
 
     // Set up dynamic resource to test using raw values.
@@ -178,22 +189,23 @@ async fn main() -> Result<()> {
     // Test defaulting of `non_nullable_with_default` field
     let data = DynamicObject::new("baz", &api_resource).data(serde_json::json!({
         "spec": {
-            "non_nullable": "a required field",
+            "nonNullable": "a required field",
             // `non_nullable_with_default` field is missing
 
             // listable values to patch later to verify merge strategies
-            "default_listable": vec![2],
-            "set_listable": vec![2],
+            "defaultListable": vec![2],
+            "setListable": vec![2],
         }
     }));
     let val = dynapi.create(&PostParams::default(), &data).await?.data;
     println!("{:?}", val["spec"]);
     // Defaulting happened for non-nullable field
-    assert_eq!(val["spec"]["non_nullable_with_default"], default_value());
+    assert_eq!(val["spec"]["nonNullableWithDefault"], default_value());
 
     // Listables
-    assert_eq!(serde_json::to_string(&val["spec"]["default_listable"])?, "[2]");
-    assert_eq!(serde_json::to_string(&val["spec"]["set_listable"])?, "[2]");
+    assert_eq!(serde_json::to_string(&val["spec"]["defaultListable"])?, "[2]");
+    assert_eq!(serde_json::to_string(&val["spec"]["setListable"])?, "[2]");
+    assert_eq!(serde_json::to_string(&val["spec"]["celValidated"])?, "\"legal\"");
 
     // Missing required field (non-nullable without default) is an error
     let data = DynamicObject::new("qux", &api_resource).data(serde_json::json!({
@@ -207,10 +219,15 @@ async fn main() -> Result<()> {
             assert_eq!(err.reason, "Invalid");
             assert_eq!(err.status, "Failure");
             assert!(err.message.contains("clux.dev \"qux\" is invalid"));
-            assert!(err.message.contains("spec.non_nullable: Required value"));
+            assert!(err.message.contains("spec.nonNullable: Required value"));
         }
         _ => panic!(),
     }
+
+    // Resource level metadata validations check
+    let forbidden = Foo::new("forbidden", FooSpec { ..FooSpec::default() });
+    let res = foos.create(&PostParams::default(), &forbidden).await;
+    assert!(res.is_err());
 
     // Test the manually specified merge strategy
     let ssapply = PatchParams::apply("crd_derive_schema_example").force();
@@ -218,8 +235,8 @@ async fn main() -> Result<()> {
         "apiVersion": "clux.dev/v1",
         "kind": "Foo",
         "spec": {
-            "default_listable": vec![3],
-            "set_listable": vec![3]
+            "defaultListable": vec![3],
+            "setListable": vec![3]
         }
     });
     let pres = foos.patch("baz", &ssapply, &Patch::Apply(patch)).await?;
@@ -232,7 +249,7 @@ async fn main() -> Result<()> {
         "apiVersion": "clux.dev/v1",
         "kind": "Foo",
         "spec": {
-            "cel_validated": Some("illegal")
+            "celValidated": Some("illegal")
         }
     });
     let cel_res = foos.patch("baz", &ssapply, &Patch::Apply(cel_patch)).await;
@@ -243,17 +260,99 @@ async fn main() -> Result<()> {
             assert_eq!(err.reason, "Invalid");
             assert_eq!(err.status, "Failure");
             assert!(err.message.contains("Foo.clux.dev \"baz\" is invalid"));
-            assert!(err.message.contains("spec.cel_validated: Invalid value"));
+            assert!(err.message.contains("spec.celValidated: Forbidden"));
             assert!(err.message.contains("string cannot be illegal"));
         }
         _ => panic!(),
     }
+
+    // cel validation triggers:
+    let cel_patch = serde_json::json!({
+        "apiVersion": "clux.dev/v1",
+        "kind": "Foo",
+        "spec": {
+            "celValidated": Some("not legal")
+        }
+    });
+    let cel_res = foos.patch("baz", &ssapply, &Patch::Apply(cel_patch)).await;
+    assert!(cel_res.is_err());
+    match cel_res.err() {
+        Some(kube::Error::Api(err)) => {
+            assert_eq!(err.code, 422);
+            assert_eq!(err.reason, "Invalid");
+            assert_eq!(err.status, "Failure");
+            assert!(err.message.contains("Foo.clux.dev \"baz\" is invalid"));
+            assert!(err.message.contains("spec.celValidated: Invalid value"));
+            assert!(err.message.contains("failed rule: self != 'not legal'"));
+        }
+        _ => panic!(),
+    }
+
+    let cel_patch = serde_json::json!({
+        "apiVersion": "clux.dev/v1",
+        "kind": "Foo",
+        "spec": {
+            "fooSubSpec": {
+                "field": Some("not legal"),
+            }
+        }
+    });
+    let cel_res = foos.patch("baz", &ssapply, &Patch::Apply(cel_patch)).await;
+    assert!(cel_res.is_err());
+    match cel_res.err() {
+        Some(kube::Error::Api(err)) => {
+            assert_eq!(err.code, 422);
+            assert_eq!(err.reason, "Invalid");
+            assert_eq!(err.status, "Failure");
+            assert!(err.message.contains("Foo.clux.dev \"baz\" is invalid"));
+            assert!(err.message.contains("spec.fooSubSpec.field: Invalid value"));
+            assert!(err.message.contains("failed rule: self != 'not legal'"));
+        }
+        _ => panic!(),
+    }
+
+    let cel_patch = serde_json::json!({
+        "apiVersion": "clux.dev/v1",
+        "kind": "Foo",
+        "spec": {
+            "fooSubSpec": {
+                "field": Some("legal"),
+            }
+        }
+    });
+    let cel_res = foos.patch("baz", &ssapply, &Patch::Apply(cel_patch)).await;
+    assert!(cel_res.is_ok());
+
+    let cel_patch = serde_json::json!({
+        "apiVersion": "clux.dev/v1",
+        "kind": "Foo",
+        "spec": {
+            "fooSubSpec": {
+                "field": Some("legal"),
+                "other": "different",
+            }
+        }
+    });
+    let cel_res = foos.patch("baz", &ssapply, &Patch::Apply(cel_patch)).await;
+    assert!(cel_res.is_err());
+    match cel_res.err() {
+        Some(kube::Error::Api(err)) => {
+            assert_eq!(err.code, 422);
+            assert_eq!(err.reason, "Invalid");
+            assert_eq!(err.status, "Failure");
+            assert!(err.message.contains("Foo.clux.dev \"baz\" is invalid"));
+            assert!(err.message.contains("spec.fooSubSpec: Invalid value"));
+            assert!(err.message.contains("Invalid value: \"object\": is immutable"));
+        }
+        _ => panic!(),
+    }
+
     // cel validation happy:
     let cel_patch_ok = serde_json::json!({
         "apiVersion": "clux.dev/v1",
         "kind": "Foo",
         "spec": {
-            "cel_validated": Some("legal")
+            "celValidated": Some("legal")
         }
     });
     foos.patch("baz", &ssapply, &Patch::Apply(cel_patch_ok)).await?;

@@ -30,7 +30,7 @@ rust.unsafe_code = "forbid"
 
 [dependencies]
 futures = { workspace = true, features = ["async-await"] }
-kube-client = { path = "../kube-client", version = "=0.97.0", default-features = false, features = ["jsonpatch", "client"] }
+kube-client = { path = "../kube-client", version = "=0.98.0", default-features = false, features = ["jsonpatch", "client"] }
 educe = { workspace = true, features = ["Clone", "Debug", "Hash", "PartialEq"] }
 serde.workspace = true
 ahash.workspace = true
@@ -49,6 +49,7 @@ hashbrown.workspace = true
 k8s-openapi.workspace = true
 async-broadcast.workspace = true
 async-stream.workspace = true
+hostname.workspace = true
 
 [dev-dependencies]
 kube = { path = "../kube", features = ["derive", "client", "runtime"], version = "<1.0.0, >=0.60.0" }

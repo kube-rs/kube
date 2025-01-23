@@ -1,6 +1,6 @@
 use std::{
     collections::HashMap,
-    fs,
+    fs, io,
     path::{Path, PathBuf},
 };
 
@@ -351,8 +351,8 @@ const KUBECONFIG: &str = "KUBECONFIG";
 impl Kubeconfig {
     /// Read a Config from an arbitrary location
     pub fn read_from<P: AsRef<Path>>(path: P) -> Result<Kubeconfig, KubeconfigError> {
-        let data = fs::read_to_string(&path)
-            .map_err(|source| KubeconfigError::ReadConfig(source, path.as_ref().into()))?;
+        let data =
+            read_path(&path).map_err(|source| KubeconfigError::ReadConfig(source, path.as_ref().into()))?;
 
         // Remap all files we read to absolute paths.
         let mut merged_docs = None;
@@ -495,6 +495,33 @@ where
             .filter(|x| !existing.contains(f(x)))
             .collect::<Vec<_>>()
     });
+}
+
+fn read_path<P: AsRef<Path>>(path: P) -> io::Result<String> {
+    let bytes = fs::read(&path)?;
+    match bytes.as_slice() {
+        [0xFF, 0xFE, ..] => {
+            let utf16_data: Vec<u16> = bytes[2..]
+                .chunks(2)
+                .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
+                .collect();
+            String::from_utf16(&utf16_data)
+                .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Invalid UTF-16 LE"))
+        }
+        [0xFE, 0xFF, ..] => {
+            let utf16_data: Vec<u16> = bytes[2..]
+                .chunks(2)
+                .map(|chunk| u16::from_be_bytes([chunk[0], chunk[1]]))
+                .collect();
+            String::from_utf16(&utf16_data)
+                .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Invalid UTF-16 BE"))
+        }
+        [0xEF, 0xBB, 0xBF, ..] => String::from_utf8(bytes[3..].to_vec())
+            .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Invalid UTF-8 BOM")),
+        _ => {
+            String::from_utf8(bytes).map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Invalid UTF-8"))
+        }
+    }
 }
 
 fn to_absolute(dir: &Path, file: &str) -> Option<String> {
@@ -968,5 +995,26 @@ users:
             cluster.config.unwrap(),
             json!({"audience": "foo", "other": "bar"})
         );
+    }
+
+    #[tokio::test]
+    async fn parse_kubeconfig_encodings() {
+        let files = vec![
+            "kubeconfig_utf8.yaml",
+            "kubeconfig_utf16le.yaml",
+            "kubeconfig_utf16be.yaml",
+        ];
+
+        for file_name in files {
+            let path = PathBuf::from(format!(
+                "{}/src/config/test_data/{}",
+                env!("CARGO_MANIFEST_DIR"),
+                file_name
+            ));
+            let cfg = Kubeconfig::read_from(path).unwrap();
+            assert_eq!(cfg.clusters[0].name, "k3d-promstack");
+            assert_eq!(cfg.contexts[0].name, "k3d-promstack");
+            assert_eq!(cfg.auth_infos[0].name, "admin@k3d-k3s-default");
+        }
     }
 }
