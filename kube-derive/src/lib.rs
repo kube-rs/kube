@@ -133,7 +133,7 @@ mod resource;
 ///
 /// Allow customizing the scale struct for the [scale subresource](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#subresources).
 ///
-/// ```no_run
+/// ```ignore
 /// #[kube(scale(
 ///     specReplicasPath = ".spec.replicas",
 ///     statusReplicaPath = ".status.replicas",
