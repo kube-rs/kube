@@ -2,9 +2,9 @@
 #![allow(clippy::manual_unwrap_or_default)]
 
 use darling::{FromDeriveInput, FromMeta};
-use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceSubresourceScale;
 use proc_macro2::{Ident, Literal, Span, TokenStream};
 use quote::{ToTokens, TokenStreamExt};
+use serde::Deserialize;
 use syn::{parse_quote, Data, DeriveInput, Path, Visibility};
 
 /// Values we can parse from #[kube(attrs)]
@@ -191,10 +191,15 @@ impl FromMeta for SchemaMode {
     }
 }
 
-/// A new-type wrapper around [`CustomResourceSubresourceScale`] to support parsing from the
-/// `#[kube]` attribute.
-#[derive(Debug)]
-struct Scale(CustomResourceSubresourceScale);
+/// This struct mirrors the fields of `k8s_openapi::CustomResourceSubresourceScale` to support
+/// parsing from the `#[kube]` attribute.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Scale {
+    pub(crate) label_selector_path: Option<String>,
+    pub(crate) spec_replicas_path: String,
+    pub(crate) status_replicas_path: String,
+}
 
 // This custom FromMeta implementation is needed for two reasons:
 //
@@ -207,8 +212,7 @@ impl FromMeta for Scale {
     /// This is implemented for backwards-compatibility. It allows that the scale subresource can
     /// be deserialized from a JSON string.
     fn from_string(value: &str) -> darling::Result<Self> {
-        let scale = serde_json::from_str(value).map_err(|err| darling::Error::custom(err))?;
-        Ok(Self(scale))
+        serde_json::from_str(value).map_err(|err| darling::Error::custom(err))
     }
 
     fn from_list(items: &[darling::ast::NestedMeta]) -> darling::Result<Self> {
@@ -260,11 +264,11 @@ impl FromMeta for Scale {
             errors.push(darling::Error::missing_field("status_replicas_path"));
         }
 
-        errors.finish_with(Self(CustomResourceSubresourceScale {
+        errors.finish_with(Self {
             label_selector_path: label_selector_path.1.unwrap(),
             spec_replicas_path: spec_replicas_path.1.unwrap(),
             status_replicas_path: status_replicas_path.1.unwrap(),
-        }))
+        })
     }
 }
 
@@ -275,12 +279,11 @@ impl Scale {
         };
 
         let label_selector_path = self
-            .0
             .label_selector_path
             .as_ref()
             .map_or_else(|| quote! { None }, |p| quote! { #p.into() });
-        let spec_replicas_path = &self.0.spec_replicas_path;
-        let status_replicas_path = &self.0.status_replicas_path;
+        let spec_replicas_path = &self.spec_replicas_path;
+        let status_replicas_path = &self.status_replicas_path;
 
         quote! {
             #apiext::CustomResourceSubresourceScale {
