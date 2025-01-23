@@ -212,14 +212,13 @@ struct Scale {
 //
 // - To enable backwards-compatibility. Up to version 0.97.0 it was only possible to set scale
 //   subresource values as a JSON string.
-// - k8s_openapi types don't support being parsed directly from attributes using darling. This
-//   would require an upstream change, which is highly unlikely to occur. The from_list impl uses
+// - To be able to declare the scale sub-resource as a list of typed fields. The from_list impl uses
 //   the derived implementation as inspiration.
 impl FromMeta for Scale {
     /// This is implemented for backwards-compatibility. It allows that the scale subresource can
     /// be deserialized from a JSON string.
     fn from_string(value: &str) -> darling::Result<Self> {
-        serde_json::from_str(value).map_err(|err| darling::Error::custom(err))
+        serde_json::from_str(value).map_err(darling::Error::custom)
     }
 
     fn from_list(items: &[darling::ast::NestedMeta]) -> darling::Result<Self> {
