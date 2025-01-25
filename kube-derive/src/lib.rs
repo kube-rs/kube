@@ -132,6 +132,8 @@ mod resource;
 /// ## `#[kube(scale(...))]`
 ///
 /// Allow customizing the scale struct for the [scale subresource](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#subresources).
+/// It should be noted, that the status subresource must also be enabled to use the scale subresource. This is because
+/// the `statusReplicasPath` only accepts JSONPaths under `.status`.
 ///
 /// ```ignore
 /// #[kube(scale(

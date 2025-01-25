@@ -235,30 +235,41 @@ impl FromMeta for Scale {
 
                     match name.as_str() {
                         "label_selector_path" => {
-                            let path = errors.handle(darling::FromMeta::from_meta(meta));
-                            label_selector_path = (true, Some(path))
+                            if !label_selector_path.0 {
+                                let path = errors.handle(darling::FromMeta::from_meta(meta));
+                                label_selector_path = (true, Some(path))
+                            } else {
+                                errors.push(
+                                    darling::Error::duplicate_field("label_selector_path").with_span(&meta),
+                                );
+                            }
                         }
                         "spec_replicas_path" => {
-                            let path = errors.handle(darling::FromMeta::from_meta(meta));
-                            spec_replicas_path = (true, path)
+                            if !spec_replicas_path.0 {
+                                let path = errors.handle(darling::FromMeta::from_meta(meta));
+                                spec_replicas_path = (true, path)
+                            } else {
+                                errors.push(
+                                    darling::Error::duplicate_field("spec_replicas_path").with_span(&meta),
+                                );
+                            }
                         }
                         "status_replicas_path" => {
-                            let path = errors.handle(darling::FromMeta::from_meta(meta));
-                            status_replicas_path = (true, path)
+                            if !status_replicas_path.0 {
+                                let path = errors.handle(darling::FromMeta::from_meta(meta));
+                                status_replicas_path = (true, path)
+                            } else {
+                                errors.push(
+                                    darling::Error::duplicate_field("status_replicas_path").with_span(&meta),
+                                );
+                            }
                         }
-                        other => return Err(darling::Error::unknown_field(other)),
+                        other => errors.push(darling::Error::unknown_field(other)),
                     }
                 }
                 darling::ast::NestedMeta::Lit(lit) => {
                     errors.push(darling::Error::unsupported_format("literal").with_span(&lit.span()))
                 }
-            }
-        }
-
-        if !label_selector_path.0 {
-            match <Option<String> as darling::FromMeta>::from_none() {
-                Some(fallback) => label_selector_path.1 = Some(fallback),
-                None => errors.push(darling::Error::missing_field("spec_replicas_path")),
             }
         }
 
@@ -270,8 +281,10 @@ impl FromMeta for Scale {
             errors.push(darling::Error::missing_field("status_replicas_path"));
         }
 
-        errors.finish_with(Self {
-            label_selector_path: label_selector_path.1.unwrap(),
+        errors.finish()?;
+
+        Ok(Self {
+            label_selector_path: label_selector_path.1.unwrap_or_default(),
             spec_replicas_path: spec_replicas_path.1.unwrap(),
             status_replicas_path: status_replicas_path.1.unwrap(),
         })
@@ -287,7 +300,7 @@ impl Scale {
         let label_selector_path = self
             .label_selector_path
             .as_ref()
-            .map_or_else(|| quote! { None }, |p| quote! { #p.into() });
+            .map_or_else(|| quote! { None }, |p| quote! { Some(#p.into()) });
         let spec_replicas_path = &self.spec_replicas_path;
         let status_replicas_path = &self.status_replicas_path;
 
