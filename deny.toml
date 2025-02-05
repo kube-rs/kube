@@ -97,3 +97,17 @@ name = "thiserror-impl"
 name = "security-framework"
 [[bans.skip]]
 name = "core-foundation"
+
+# currently tungstenite hasn't upgraded rand to 0.9 yet, all these are related
+[[bans.skip]]
+name = "rand"
+[[bans.skip]]
+name = "rand_core"
+[[bans.skip]]
+name = "rand_chacha"
+[[bans.skip]]
+name = "getrandom"
+[[bans.skip]]
+name = "wasi"
+[[bans.skip]]
+name = "zerocopy"
