@@ -12,7 +12,8 @@ use crate::watcher;
 use async_stream::stream;
 use futures::{Stream, StreamExt};
 use std::hash::Hash;
-#[cfg(feature = "unstable-runtime-subscribe")] pub use store::store_shared;
+#[cfg(feature = "unstable-runtime-subscribe")]
+pub use store::store_shared;
 pub use store::{store, Store};
 
 /// Cache objects from a [`watcher()`] stream into a local [`Store`]
@@ -256,7 +257,7 @@ mod tests {
 
     #[tokio::test]
     async fn reflector_store_should_not_contain_duplicates() {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let item_dist = Uniform::new(0_u8, 100);
         let deleted_dist = Bernoulli::new(0.40).unwrap();
         let store_w = store::Writer::default();
