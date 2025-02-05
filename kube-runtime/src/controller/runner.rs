@@ -121,8 +121,8 @@ where
                     Poll::Pending | Poll::Ready(None) => break Poll::Pending,
                     // The above future never returns Poll::Ready(Some(_)).
                     _ => unreachable!(),
-                };
-            };
+                }
+            }
 
             // Try to take a new message that isn't already being processed
             // leave the already-processing ones in the queue, so that we can take them once
