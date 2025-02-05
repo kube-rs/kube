@@ -345,7 +345,7 @@ impl Recorder {
                 .await?;
         } else {
             events.create(&PostParams::default(), &event).await?;
-        };
+        }
 
         {
             let mut cache = self.cache.write().await;
