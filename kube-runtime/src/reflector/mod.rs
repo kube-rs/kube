@@ -141,7 +141,7 @@ mod tests {
     use futures::{stream, StreamExt, TryStreamExt};
     use k8s_openapi::{api::core::v1::ConfigMap, apimachinery::pkg::apis::meta::v1::ObjectMeta};
     use rand::{
-        distributions::{Bernoulli, Uniform},
+        distr::{Bernoulli, Uniform},
         Rng,
     };
     use std::collections::{BTreeMap, HashMap};
@@ -257,7 +257,7 @@ mod tests {
     #[tokio::test]
     async fn reflector_store_should_not_contain_duplicates() {
         let mut rng = rand::rng();
-        let item_dist = Uniform::new(0_u8, 100);
+        let item_dist = Uniform::new(0_u8, 100).unwrap();
         let deleted_dist = Bernoulli::new(0.40).unwrap();
         let store_w = store::Writer::default();
         let store = store_w.as_reader();
