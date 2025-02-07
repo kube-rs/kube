@@ -13,7 +13,7 @@ categories = ["web-programming::http-client", "network-programming", "api-bindin
 
 [features]
 default = ["client"]
-rustls-tls = ["rustls", "rustls-pemfile", "hyper-rustls", "hyper-http-proxy?/rustls-tls-native-roots"]
+rustls-tls = ["rustls", "hyper-rustls", "hyper-http-proxy?/rustls-tls-native-roots"]
 webpki-roots = ["hyper-rustls/webpki-roots"]
 aws-lc-rs = ["rustls?/aws-lc-rs"]
 openssl-tls = ["openssl", "hyper-openssl"]
@@ -57,7 +57,6 @@ futures = { workspace = true, optional = true, features = ["std"] }
 pem = { workspace = true, optional = true }
 openssl = { workspace = true, optional = true }
 rustls = { workspace = true, optional = true }
-rustls-pemfile = { workspace = true, optional = true }
 bytes = { workspace = true, optional = true }
 tokio = { workspace = true, features = ["time", "signal", "sync"], optional = true }
 kube-core = { path = "../kube-core", version = "=0.98.0" }
