@@ -17,7 +17,7 @@ rustls-tls = ["rustls", "hyper-rustls", "hyper-http-proxy?/rustls-tls-native-roo
 webpki-roots = ["hyper-rustls/webpki-roots"]
 aws-lc-rs = ["rustls?/aws-lc-rs"]
 openssl-tls = ["openssl", "hyper-openssl"]
-ws = ["client", "tokio-tungstenite", "rand", "kube-core/ws", "tokio/macros"]
+ws = ["client", "tokio-tungstenite", "kube-core/ws", "tokio/macros"]
 kubelet-debug = ["ws", "kube-core/kubelet-debug"]
 oauth = ["client", "tame-oauth"]
 oidc = ["client", "form_urlencoded"]
@@ -72,7 +72,6 @@ tower = { workspace = true, features = ["buffer", "filter", "util"], optional = 
 tower-http = { workspace = true, features = ["auth", "map-response-body", "trace"], optional = true }
 hyper-timeout = { workspace = true, optional = true }
 tame-oauth = { workspace = true, features = ["gcp"], optional = true }
-rand = { workspace = true, optional = true }
 secrecy = { workspace = true }
 tracing = { workspace = true, features = ["log"], optional = true }
 hyper-openssl = { workspace = true, features = ["client-legacy"], optional = true }
