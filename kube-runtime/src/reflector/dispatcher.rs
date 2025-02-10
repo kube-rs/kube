@@ -6,13 +6,18 @@ use std::{fmt::Debug, sync::Arc};
 
 use educe::Educe;
 use futures::Stream;
+use kube_client::{api::DynamicObject, Resource};
 use pin_project::pin_project;
+use serde::de::DeserializeOwned;
 use std::task::ready;
 
-use crate::reflector::{ObjectRef, Store};
+use crate::{
+    reflector::{ObjectRef, Store},
+    watcher::{self, Event},
+};
 use async_broadcast::{InactiveReceiver, Receiver, Sender};
 
-use super::Lookup;
+use super::{store::Writer, Lookup};
 
 #[derive(Educe)]
 #[educe(Debug(bound("K: Debug, K::DynamicType: Debug")), Clone)]
@@ -72,6 +77,59 @@ where
     }
 }
 
+#[derive(Clone)]
+// A helper type that holds a broadcast transmitter and a broadcast receiver,
+// used to fan-out events from a root stream to multiple listeners.
+pub(crate) struct TypedDispatcher {
+    dispatch_tx: Sender<Event<DynamicObject>>,
+    // An inactive reader that prevents the channel from closing until the
+    // writer is dropped.
+    _dispatch_rx: InactiveReceiver<Event<DynamicObject>>,
+}
+
+impl TypedDispatcher {
+    /// Creates and returns a new self that wraps a broadcast sender and an
+    /// inactive broadcast receiver
+    ///
+    /// A buffer size is required to create the underlying broadcast channel.
+    /// Messages will be buffered until all active readers have received a copy
+    /// of the message. When the channel is full, senders will apply
+    /// backpressure by waiting for space to free up.
+    //
+    // N.B messages are eagerly broadcasted, meaning no active receivers are
+    // required for a message to be broadcasted.
+    pub(crate) fn new(buf_size: usize) -> TypedDispatcher {
+        // Create a broadcast (tx, rx) pair
+        let (mut dispatch_tx, dispatch_rx) = async_broadcast::broadcast(buf_size);
+        // The tx half will not wait for any receivers to be active before
+        // broadcasting events. If no receivers are active, events will be
+        // buffered.
+        dispatch_tx.set_await_active(false);
+        Self {
+            dispatch_tx,
+            _dispatch_rx: dispatch_rx.deactivate(),
+        }
+    }
+
+    // Calls broadcast on the channel. Will return when the channel has enough
+    // space to send an event.
+    pub(crate) async fn broadcast(&mut self, evt: Event<DynamicObject>) {
+        let _ = self.dispatch_tx.broadcast_direct(evt).await;
+    }
+
+    // Creates a `TypedReflectHandle` by creating a receiver from the tx half.
+    // N.B: the new receiver will be fast-forwarded to the _latest_ event.
+    // The receiver won't have access to any events that are currently waiting
+    // to be acked by listeners.
+    pub(crate) fn subscribe<K>(&self) -> TypedReflectHandle<K>
+    where
+        K: Resource + DeserializeOwned + Clone,
+        K::DynamicType: Eq + std::hash::Hash + Clone + Default,
+    {
+        TypedReflectHandle::new(self.dispatch_tx.new_receiver())
+    }
+}
+
 /// A handle to a shared stream reader
 ///
 /// [`ReflectHandle`]s are created by calling [`subscribe()`] on a [`Writer`],
@@ -125,7 +183,7 @@ where
 impl<K> Stream for ReflectHandle<K>
 where
     K: Lookup + Clone,
-    K::DynamicType: Eq + std::hash::Hash + Clone + Default,
+    K::DynamicType: Eq + std::hash::Hash + Clone,
 {
     type Item = Arc<K>;
 
@@ -136,6 +194,87 @@ where
                 .reader
                 .get(&obj_ref)
                 .map_or(Poll::Pending, |obj| Poll::Ready(Some(obj))),
+            None => Poll::Ready(None),
+        }
+    }
+}
+
+/// A handle to a shared dynamic object stream
+///
+/// [`TypedReflectHandle`]s are created by calling [`subscribe()`] on a [`TypedDispatcher`],
+/// Each shared stream reader should be polled independently and driven to readiness
+/// to avoid deadlocks. When the [`TypedDispatcher`]'s buffer is filled, backpressure
+/// will be applied on the root stream side.
+///
+/// When the root stream is dropped, or it ends, all [`TypedReflectHandle`]s
+/// subscribed to the shared stream will also terminate after all events yielded by
+/// the root stream have been observed. This means [`TypedReflectHandle`] streams
+/// can still be polled after the root stream has been dropped.
+#[pin_project]
+pub struct TypedReflectHandle<K>
+where
+    K: Lookup + Clone + 'static,
+    K::DynamicType: Eq + std::hash::Hash + Clone,
+    K: DeserializeOwned,
+{
+    #[pin]
+    rx: Receiver<Event<DynamicObject>>,
+    store: Writer<K>,
+}
+
+impl<K> TypedReflectHandle<K>
+where
+    K: Lookup + Clone + 'static,
+    K::DynamicType: Eq + std::hash::Hash + Clone + Default,
+    K: DeserializeOwned,
+{
+    pub(super) fn new(rx: Receiver<Event<DynamicObject>>) -> TypedReflectHandle<K> {
+        Self {
+            rx,
+            // Initialize a ready store by default
+            store: {
+                let mut store: Writer<K> = Default::default();
+                store.apply_shared_watcher_event(&watcher::Event::InitDone);
+                store
+            },
+        }
+    }
+
+    pub fn reader(&self) -> Store<K> {
+        self.store.as_reader()
+    }
+}
+
+impl<K> Stream for TypedReflectHandle<K>
+where
+    K: Resource + Clone + 'static,
+    K::DynamicType: Eq + std::hash::Hash + Clone + Default,
+    K: DeserializeOwned,
+{
+    type Item = Option<Arc<K>>;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let mut this = self.project();
+        match ready!(this.rx.as_mut().poll_next(cx)) {
+            Some(event) => {
+                let obj = match event {
+                    Event::InitApply(obj) | Event::Apply(obj)
+                        if obj.gvk() == Some(K::gvk(&Default::default())) =>
+                    {
+                        obj.try_parse::<K>().ok().map(Arc::new).inspect(|o| {
+                            this.store.apply_shared_watcher_event(&Event::Apply(o.clone()));
+                        })
+                    }
+                    Event::Delete(obj) if obj.gvk() == Some(K::gvk(&Default::default())) => {
+                        obj.try_parse::<K>().ok().map(Arc::new).inspect(|o| {
+                            this.store.apply_shared_watcher_event(&Event::Delete(o.clone()));
+                        })
+                    }
+                    _ => None,
+                };
+
+                Poll::Ready(Some(obj))
+            }
             None => Poll::Ready(None),
         }
     }

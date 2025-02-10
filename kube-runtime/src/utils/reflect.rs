@@ -2,53 +2,44 @@ use core::{
     pin::Pin,
     task::{Context, Poll},
 };
-use std::marker::PhantomData;
 
 use futures::{Stream, TryStream};
 use pin_project::pin_project;
 
 use crate::{
-    reflector::store::CacheWriter,
+    reflector::store::Writer,
     watcher::{Error, Event},
 };
 use kube_client::Resource;
 
 /// Stream returned by the [`reflect`](super::WatchStreamExt::reflect) method
 #[pin_project]
-pub struct Reflect<St, K, W>
+pub struct Reflect<St, K>
 where
     K: Resource + Clone + 'static,
     K::DynamicType: Eq + std::hash::Hash + Clone,
-    W: CacheWriter<K>,
 {
     #[pin]
     stream: St,
-    writer: W,
-    _phantom: PhantomData<K>,
+    writer: Writer<K>,
 }
 
-impl<St, K, W> Reflect<St, K, W>
+impl<St, K> Reflect<St, K>
 where
     St: TryStream<Ok = Event<K>>,
     K: Resource + Clone,
     K::DynamicType: Eq + std::hash::Hash + Clone,
-    W: CacheWriter<K>,
 {
-    pub(super) fn new(stream: St, writer: W) -> Reflect<St, K, W> {
-        Self {
-            stream,
-            writer,
-            _phantom: Default::default(),
-        }
+    pub(super) fn new(stream: St, writer: Writer<K>) -> Reflect<St, K> {
+        Self { stream, writer }
     }
 }
 
-impl<St, K, W> Stream for Reflect<St, K, W>
+impl<St, K> Stream for Reflect<St, K>
 where
     K: Resource + Clone,
     K::DynamicType: Eq + std::hash::Hash + Clone,
     St: Stream<Item = Result<Event<K>, Error>>,
-    W: CacheWriter<K>,
 {
     type Item = Result<Event<K>, Error>;
 

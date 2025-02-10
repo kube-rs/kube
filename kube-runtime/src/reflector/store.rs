@@ -13,12 +13,6 @@ use thiserror::Error;
 
 type Cache<K> = Arc<RwLock<AHashMap<ObjectRef<K>, Arc<K>>>>;
 
-/// A writable `CacheWriter` trait
-pub trait CacheWriter<K> {
-    /// Applies a single watcher event to the store
-    fn apply_watcher_event(&mut self, event: &watcher::Event<K>);
-}
-
 /// A writable Store handle
 ///
 /// This is exclusive since it's not safe to share a single `Store` between multiple reflectors.
@@ -104,6 +98,67 @@ where
             .map(|dispatcher| dispatcher.subscribe(self.as_reader()))
     }
 
+    /// Applies a single watcher event to the store
+    pub(crate) fn apply_watcher_event(&mut self, event: &watcher::Event<K>) {
+        match event {
+            watcher::Event::Apply(obj) => {
+                let obj = Arc::new(obj.clone());
+                self.apply_shared_watcher_event(&watcher::Event::Apply(obj));
+            }
+            watcher::Event::Delete(obj) => {
+                let obj = Arc::new(obj.clone());
+                self.apply_shared_watcher_event(&watcher::Event::Delete(obj));
+            }
+            watcher::Event::InitApply(obj) => {
+                let obj = Arc::new(obj.clone());
+                self.apply_shared_watcher_event(&watcher::Event::InitApply(obj));
+            }
+            watcher::Event::Init => {
+                self.apply_shared_watcher_event(&watcher::Event::Init);
+            }
+            watcher::Event::InitDone => {
+                self.apply_shared_watcher_event(&watcher::Event::InitDone);
+            }
+        }
+    }
+
+    /// Applies a single shared watcher event to the store
+    pub(crate) fn apply_shared_watcher_event(&mut self, event: &watcher::Event<Arc<K>>) {
+        match event {
+            watcher::Event::Apply(obj) => {
+                let key = obj.to_object_ref(self.dyntype.clone());
+                self.store.write().insert(key, obj.clone());
+            }
+            watcher::Event::Delete(obj) => {
+                let key = obj.to_object_ref(self.dyntype.clone());
+                self.store.write().remove(&key);
+            }
+            watcher::Event::Init => {
+                self.buffer = AHashMap::new();
+            }
+            watcher::Event::InitApply(obj) => {
+                let key = obj.to_object_ref(self.dyntype.clone());
+                self.buffer.insert(key, obj.clone());
+            }
+            watcher::Event::InitDone => {
+                let mut store = self.store.write();
+
+                // Swap the buffer into the store
+                std::mem::swap(&mut *store, &mut self.buffer);
+
+                // Clear the buffer
+                // This is preferred over self.buffer.clear(), as clear() will keep the allocated memory for reuse.
+                // This way, the old buffer is dropped.
+                self.buffer = AHashMap::new();
+
+                // Mark as ready after the Restart, "releasing" any calls to Store::wait_until_ready()
+                if let Some(ready_tx) = self.ready_tx.take() {
+                    ready_tx.init(())
+                }
+            }
+        }
+    }
+
     /// Broadcast an event to any downstream listeners subscribed on the store
     pub(crate) async fn dispatch_event(&mut self, event: &watcher::Event<K>) {
         if let Some(ref mut dispatcher) = self.dispatcher {
@@ -127,50 +182,6 @@ where
                 }
 
                 _ => {}
-            }
-        }
-    }
-}
-
-impl <K: 'static + Lookup + Clone> CacheWriter<K> for Writer<K>
-where
-    K::DynamicType: Eq + Hash + Clone,
-    {
-    /// Applies a single watcher event to the store
-    fn apply_watcher_event(&mut self, event: &watcher::Event<K>) {
-        match event {
-            watcher::Event::Apply(obj) => {
-                let key = obj.to_object_ref(self.dyntype.clone());
-                let obj = Arc::new(obj.clone());
-                self.store.write().insert(key, obj);
-            }
-            watcher::Event::Delete(obj) => {
-                let key = obj.to_object_ref(self.dyntype.clone());
-                self.store.write().remove(&key);
-            }
-            watcher::Event::Init => {
-                self.buffer = AHashMap::new();
-            }
-            watcher::Event::InitApply(obj) => {
-                let key = obj.to_object_ref(self.dyntype.clone());
-                let obj = Arc::new(obj.clone());
-                self.buffer.insert(key, obj);
-            }
-            watcher::Event::InitDone => {
-                let mut store = self.store.write();
-
-                // Swap the buffer into the store
-                std::mem::swap(&mut *store, &mut self.buffer);
-
-                // Clear the buffer
-                // This is preferred over self.buffer.clear(), as clear() will keep the allocated memory for reuse.
-                // This way, the old buffer is dropped.
-                self.buffer = AHashMap::new();
-
-                // Mark as ready after the Restart, "releasing" any calls to Store::wait_until_ready()
-                if let Some(ready_tx) = self.ready_tx.take() {
-                    ready_tx.init(())
-                }
             }
         }
     }
@@ -320,7 +331,10 @@ where
 #[cfg(test)]
 mod tests {
     use super::{store, Writer};
-    use crate::{reflector::{store::CacheWriter as _, ObjectRef}, watcher};
+    use crate::{
+        reflector::{store::CacheWriter as _, ObjectRef},
+        watcher,
+    };
     use k8s_openapi::api::core::v1::ConfigMap;
     use kube_client::api::ObjectMeta;
 

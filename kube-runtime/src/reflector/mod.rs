@@ -2,6 +2,8 @@
 
 mod dispatcher;
 mod object_ref;
+#[cfg(feature = "unstable-runtime-subscribe")]
+pub mod multi_dispatcher;
 pub mod store;
 
 pub use self::{
@@ -11,7 +13,9 @@ pub use self::{
 use crate::watcher;
 use async_stream::stream;
 use futures::{Stream, StreamExt};
-use store::CacheWriter as _;
+use kube_client::api::DynamicObject;
+#[cfg(feature = "unstable-runtime-subscribe")]
+use multi_dispatcher::MultiDispatcher;
 use std::hash::Hash;
 #[cfg(feature = "unstable-runtime-subscribe")] pub use store::store_shared;
 pub use store::{store, Store};
@@ -127,6 +131,26 @@ where
                 Ok(ev) => {
                     writer.apply_watcher_event(&ev);
                     writer.dispatch_event(&ev).await;
+                    yield Ok(ev);
+                },
+                Err(ev) => yield Err(ev)
+            }
+        }
+    }
+}
+
+// broadcaster uses a common stream of DynamicObject events to distribute to any subscribed typed watcher.
+#[cfg(feature = "unstable-runtime-subscribe")]
+pub fn broadcaster<W>(mut writer: MultiDispatcher, stream: W) -> impl Stream<Item = W::Item>
+where
+    W: Stream<Item = watcher::Result<watcher::Event<DynamicObject>>>,
+{
+    let mut stream = Box::pin(stream);
+    stream! {
+        while let Some(event) = stream.next().await {
+            match event {
+                Ok(ev) => {
+                    writer.broadcast_event(&ev).await;
                     yield Ok(ev);
                 },
                 Err(ev) => yield Err(ev)

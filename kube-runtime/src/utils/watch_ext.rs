@@ -1,5 +1,4 @@
 use crate::{
-    reflector::store::CacheWriter,
     utils::{
         event_decode::EventDecode,
         event_modify::EventModify,
@@ -11,9 +10,13 @@ use crate::{
 use kube_client::Resource;
 
 #[cfg(feature = "unstable-runtime-subscribe")]
-use crate::reflector::store::Writer;
-
-use crate::utils::{Backoff, Reflect};
+use crate::reflector::multi_dispatcher::MultiDispatcher;
+use crate::{
+    reflector::store::Writer,
+    utils::{Backoff, Reflect},
+};
+#[cfg(feature = "unstable-runtime-subscribe")]
+use kube_client::api::DynamicObject;
 
 use crate::watcher::DefaultBackoff;
 use futures::{Stream, TryStream};
@@ -175,7 +178,7 @@ pub trait WatchStreamExt: Stream {
     /// ```
     ///
     /// [`Store`]: crate::reflector::Store
-    fn reflect<K>(self, writer: impl CacheWriter<K>) -> Reflect<Self, K, impl CacheWriter<K>>
+    fn reflect<K>(self, writer: Writer<K>) -> Reflect<Self, K>
     where
         Self: Stream<Item = watcher::Result<watcher::Event<K>>> + Sized,
         K: Resource + Clone + 'static,
@@ -271,6 +274,14 @@ pub trait WatchStreamExt: Stream {
         K::DynamicType: Eq + std::hash::Hash + Clone,
     {
         crate::reflector(writer, self)
+    }
+
+    #[cfg(feature = "unstable-runtime-subscribe")]
+    fn broadcast_shared(self, writer: MultiDispatcher) -> impl Stream<Item = Self::Item>
+    where
+        Self: Stream<Item = watcher::Result<watcher::Event<DynamicObject>>> + Sized,
+    {
+        crate::broadcaster(writer, self)
     }
 }
 
