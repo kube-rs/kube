@@ -206,7 +206,7 @@ impl Client {
             http::header::SEC_WEBSOCKET_VERSION,
             HeaderValue::from_static("13"),
         );
-        let key = upgrade::sec_websocket_key();
+        let key = tokio_tungstenite::tungstenite::handshake::client::generate_key();
         parts.headers.insert(
             http::header::SEC_WEBSOCKET_KEY,
             key.parse().expect("valid header value"),
