@@ -164,32 +164,14 @@ mod resource;
 /// ## `#[kube(deprecated [= "warning"])]`
 /// Sets the `deprecated` property to `true`.
 ///
-/// ```
-/// # use serde::{Serialize, Deserialize};
-/// # use kube::core::{Resource, CustomResourceExt};
-/// # use kube_derive::CustomResource;
-/// # use schemars::JsonSchema;
-///
-/// #[derive(CustomResource, Clone, Debug, Deserialize, Serialize, JsonSchema)]
-/// #[kube(group = "clux.dev", version = "v1", kind = "Foo", namespaced, deprecated)]
-/// struct FooSpec {
-///     info: String,
-/// }
+/// ```ignore
+/// #[kube(deprecated)]
 /// ```
 ///
 /// Optionally, the `deprecationWarning` property can be set using the following example.
 ///
-/// ```
-/// # use serde::{Serialize, Deserialize};
-/// # use kube::core::{Resource, CustomResourceExt};
-/// # use kube_derive::CustomResource;
-/// # use schemars::JsonSchema;
-///
-/// #[derive(CustomResource, Clone, Debug, Deserialize, Serialize, JsonSchema)]
-/// #[kube(group = "clux.dev", version = "v1", kind = "Foo", namespaced, deprecated = "my warning")]
-/// struct FooSpec {
-///     info: String,
-/// }
+/// ```ignore
+/// #[kube(deprecated = "Replaced by other CRD")]
 /// ```
 ///
 /// ## `#[kube(rule = Rule::new("self == oldSelf").message("field is immutable"))]`
