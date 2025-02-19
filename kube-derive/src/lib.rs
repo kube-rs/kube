@@ -168,7 +168,7 @@ mod resource;
 /// #[kube(deprecated)]
 /// ```
 ///
-/// Optionally, the `deprecationWarning` property can be set using the following example.
+/// Aditionally, you can provide a `deprecationWarning` using the following example.
 ///
 /// ```ignore
 /// #[kube(deprecated = "Replaced by other CRD")]
