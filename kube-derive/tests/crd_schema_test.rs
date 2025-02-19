@@ -23,6 +23,7 @@ use std::collections::{HashMap, HashSet};
     shortname = "f",
     served = false,
     storage = false,
+    deprecated = "my warning",
     selectable = ".spec.nonNullable",
     selectable = ".spec.nullable",
     annotation("clux.dev", "cluxingv1"),
@@ -239,6 +240,8 @@ fn test_crd_schema_matches_expected() {
                         "name": "v1",
                         "served": false,
                         "storage": false,
+                        "deprecated": true,
+                        "deprecationWarning": "my warning",
                         "additionalPrinterColumns": [],
                         "selectableFields": [{
                             "jsonPath": ".spec.nonNullable"

@@ -175,6 +175,19 @@ mod resource;
 /// ## `#[kube(served = true)]`
 /// Sets the `served` property to `true` or `false`.
 ///
+/// ## `#[kube(deprecated [= "warning"])]`
+/// Sets the `deprecated` property to `true`.
+///
+/// ```ignore
+/// #[kube(deprecated)]
+/// ```
+///
+/// Aditionally, you can provide a `deprecationWarning` using the following example.
+///
+/// ```ignore
+/// #[kube(deprecated = "Replaced by other CRD")]
+/// ```
+///
 /// ## `#[kube(rule = Rule::new("self == oldSelf").message("field is immutable"))]`
 /// Inject a top level CEL validation rule for the top level generated struct.
 /// This attribute is for resources deriving [`CELSchema`] instead of [`schemars::JsonSchema`].
