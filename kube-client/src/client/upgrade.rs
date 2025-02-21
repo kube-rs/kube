@@ -1,11 +1,85 @@
-use http::{self, Response, StatusCode};
+use http::{self, HeaderValue, Response, StatusCode};
 use thiserror::Error;
 use tokio_tungstenite::tungstenite as ws;
 
-use crate::client::Body;
+use crate::{client::Body, Error, Result};
 
-// Binary subprotocol v4. See `Client::connect`.
-pub const WS_PROTOCOL: &str = "v4.channel.k8s.io";
+#[derive(Debug)]
+pub enum StreamProtocol {
+    /// Binary subprotocol v4. See `Client::connect`.
+    V4,
+
+    /// Binary subprotocol v5. See `Client::connect`.
+    /// v5 supports CLOSE signals.
+    /// https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/apimachinery/pkg/util/remotecommand/constants.go#L52C26-L52C43
+    V5,
+}
+
+impl StreamProtocol {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::V4 => "v4.channel.k8s.io",
+            Self::V5 => "v5.channel.k8s.io",
+        }
+    }
+
+    fn as_bytes(&self) -> &'static [u8] {
+        self.as_str().as_bytes()
+    }
+
+    pub fn supports_stream_close(&self) -> bool {
+        match self {
+            Self::V4 => false,
+            Self::V5 => true,
+        }
+    }
+
+    /// Add HTTP header SEC_WEBSOCKET_PROTOCOL with a list of supported protocol.
+    pub fn add_to_headers(headers: &mut http::HeaderMap) -> Result<()> {
+        // Protocols we support in our preferred order.
+        let supported_protocols = [
+            // v5 supports CLOSE signals.
+            Self::V5.as_str(),
+            // Use the binary subprotocol v4, to get JSON `Status` object in `error` channel (3).
+            // There's no official documentation about this protocol, but it's described in
+            // [`k8s.io/apiserver/pkg/util/wsstream/conn.go`](https://git.io/JLQED).
+            // There's a comment about v4 and `Status` object in
+            // [`kublet/cri/streaming/remotecommand/httpstream.go`](https://git.io/JLQEh).
+            Self::V4.as_str(),
+        ];
+
+        let header_value_string = supported_protocols.join(", ");
+
+        // Note: Multiple headers does not work. Only a single CSV works.
+        headers.insert(
+            http::header::SEC_WEBSOCKET_PROTOCOL,
+            HeaderValue::from_str(&header_value_string).map_err(|e| Error::HttpError(e.into()))?,
+        );
+
+        Ok(())
+    }
+
+    /// Return the subprotocol of an HTTP response.
+    fn get_from_response<B>(res: &Response<B>) -> Option<Self> {
+        let headers = res.headers();
+
+        match headers
+            .get(http::header::SEC_WEBSOCKET_PROTOCOL)
+            .map(|h| h.as_bytes())
+        {
+            Some(protocol) => {
+                if protocol == Self::V4.as_bytes() {
+                    Some(Self::V4)
+                } else if protocol == Self::V5.as_bytes() {
+                    Some(Self::V5)
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
+    }
+}
 
 /// Possible errors from upgrading to a WebSocket connection
 #[cfg(feature = "ws")]
@@ -42,7 +116,7 @@ pub enum UpgradeConnectionError {
 
 // Verify upgrade response according to RFC6455.
 // Based on `tungstenite` and added subprotocol verification.
-pub fn verify_response(res: &Response<Body>, key: &str) -> Result<(), UpgradeConnectionError> {
+pub fn verify_response(res: &Response<Body>, key: &str) -> Result<StreamProtocol, UpgradeConnectionError> {
     if res.status() != StatusCode::SWITCHING_PROTOCOLS {
         return Err(UpgradeConnectionError::ProtocolSwitch(res.status()));
     }
@@ -75,14 +149,11 @@ pub fn verify_response(res: &Response<Body>, key: &str) -> Result<(), UpgradeCon
         return Err(UpgradeConnectionError::SecWebSocketAcceptKeyMismatch);
     }
 
-    // Make sure that the server returned the correct subprotocol.
-    if !headers
-        .get(http::header::SEC_WEBSOCKET_PROTOCOL)
-        .map(|h| h == WS_PROTOCOL)
-        .unwrap_or(false)
-    {
-        return Err(UpgradeConnectionError::SecWebSocketProtocolMismatch);
-    }
+    // Make sure that the server returned an expected subprotocol.
+    let protocol = match StreamProtocol::get_from_response(res) {
+        Some(p) => p,
+        None => return Err(UpgradeConnectionError::SecWebSocketProtocolMismatch),
+    };
 
-    Ok(())
+    Ok(protocol)
 }

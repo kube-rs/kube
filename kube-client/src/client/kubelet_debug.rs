@@ -69,8 +69,8 @@ impl Client {
         let mut req =
             Request::kubelet_node_portforward(kubelet_params, ports).map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("kubelet_node_portforward");
-        let stream = self.connect(req).await?;
-        Ok(Portforwarder::new(stream, ports))
+        let connection = self.connect(req).await?;
+        Ok(Portforwarder::new(connection.into_stream(), ports))
     }
 
     /// Stream logs directly from node
