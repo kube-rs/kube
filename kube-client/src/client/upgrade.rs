@@ -18,8 +18,8 @@ pub enum StreamProtocol {
 impl StreamProtocol {
     pub fn as_str(&self) -> &'static str {
         match self {
-            StreamProtocol::V4 => "v4.channel.k8s.io",
-            StreamProtocol::V5 => "v5.channel.k8s.io"
+            Self::V4 => "v4.channel.k8s.io",
+            Self::V5 => "v5.channel.k8s.io",
         }
     }
 
@@ -29,23 +29,23 @@ impl StreamProtocol {
 
     pub fn supports_stream_close(&self) -> bool {
         match self {
-            StreamProtocol::V4 => false,
-            StreamProtocol::V5 => true
+            Self::V4 => false,
+            Self::V5 => true,
         }
     }
 
     /// Add HTTP header SEC_WEBSOCKET_PROTOCOL with a list of supported protocol.
     pub fn add_to_headers(headers: &mut http::HeaderMap) -> Result<()> {
         // Protocols we support in our preferred order.
-        let supported_protocols = vec![
+        let supported_protocols = [
             // v5 supports CLOSE signals.
-            StreamProtocol::V5.as_str(),
+            Self::V5.as_str(),
             // Use the binary subprotocol v4, to get JSON `Status` object in `error` channel (3).
             // There's no official documentation about this protocol, but it's described in
             // [`k8s.io/apiserver/pkg/util/wsstream/conn.go`](https://git.io/JLQED).
             // There's a comment about v4 and `Status` object in
             // [`kublet/cri/streaming/remotecommand/httpstream.go`](https://git.io/JLQEh).
-            StreamProtocol::V4.as_str(),
+            Self::V4.as_str(),
         ];
 
         let header_value_string = supported_protocols.join(", ");
@@ -65,16 +65,19 @@ impl StreamProtocol {
 
         match headers
             .get(http::header::SEC_WEBSOCKET_PROTOCOL)
-            .map(|h| h.as_bytes()) {
-                Some(protocol) => if protocol == StreamProtocol::V4.as_bytes() {
-                    Some(StreamProtocol::V4)
-                } else if protocol == StreamProtocol::V5.as_bytes() {
-                    Some(StreamProtocol::V5)
+            .map(|h| h.as_bytes())
+        {
+            Some(protocol) => {
+                if protocol == Self::V4.as_bytes() {
+                    Some(Self::V4)
+                } else if protocol == Self::V5.as_bytes() {
+                    Some(Self::V5)
                 } else {
                     None
-                },
-                _ => None,
+                }
             }
+            _ => None,
+        }
     }
 }
 
@@ -149,7 +152,7 @@ pub fn verify_response(res: &Response<Body>, key: &str) -> Result<StreamProtocol
     // Make sure that the server returned an expected subprotocol.
     let protocol = match StreamProtocol::get_from_response(res) {
         Some(p) => p,
-        None => return Err(UpgradeConnectionError::SecWebSocketProtocolMismatch)
+        None => return Err(UpgradeConnectionError::SecWebSocketProtocolMismatch),
     };
 
     Ok(protocol)

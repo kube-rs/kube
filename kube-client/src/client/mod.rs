@@ -213,10 +213,7 @@ impl Client {
     /// Make WebSocket connection.
     #[cfg(feature = "ws")]
     #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
-    pub async fn connect(
-        &self,
-        request: Request<Vec<u8>>,
-    ) -> Result<Connection> {
+    pub async fn connect(&self, request: Request<Vec<u8>>) -> Result<Connection> {
         use http::header::HeaderValue;
         let (mut parts, body) = request.into_parts();
         parts
@@ -241,11 +238,13 @@ impl Client {
         match hyper::upgrade::on(res).await {
             Ok(upgraded) => Ok(Connection {
                 stream: WebSocketStream::from_raw_socket(
-                TokioIo::new(upgraded),
-                ws::protocol::Role::Client,
-                None,
-            )
-            .await, protocol}),
+                    TokioIo::new(upgraded),
+                    ws::protocol::Role::Client,
+                    None,
+                )
+                .await,
+                protocol,
+            }),
 
             Err(e) => Err(Error::UpgradeConnection(
                 UpgradeConnectionError::GetPendingUpgrade(e),

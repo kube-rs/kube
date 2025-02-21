@@ -111,8 +111,7 @@ pub struct AttachedProcess {
 }
 
 impl AttachedProcess {
-    pub(crate) fn new(connection: Connection, ap: &AttachParams) -> Self
-    {
+    pub(crate) fn new(connection: Connection, ap: &AttachParams) -> Self {
         // To simplify the implementation, always create a pipe for stdin.
         // The caller does not have access to it unless they had requested.
         let (stdin_writer, stdin_reader) = tokio::io::duplex(ap.max_stdin_buf_size.unwrap_or(MAX_BUF_SIZE));
@@ -274,8 +273,7 @@ async fn start_message_loop(
     mut stderr: Option<impl AsyncWrite + Unpin>,
     status_tx: StatusSender,
     mut terminal_size_rx: Option<TerminalSizeReceiver>,
-) -> Result<(), Error>
-{
+) -> Result<(), Error> {
     let supports_stream_close = connection.supports_stream_close();
     let stream = connection.into_stream();
     let mut stdin_stream = tokio_util::io::ReaderStream::new(stdin);
