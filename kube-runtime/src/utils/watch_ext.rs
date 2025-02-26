@@ -17,6 +17,10 @@ use crate::{
 };
 #[cfg(feature = "unstable-runtime-subscribe")]
 use kube_client::api::DynamicObject;
+#[cfg(feature = "unstable-runtime-subscribe")]
+use std::sync::Arc;
+#[cfg(feature = "unstable-runtime-subscribe")]
+use tokio::sync::Mutex;
 
 use crate::watcher::DefaultBackoff;
 use futures::{Stream, TryStream};
@@ -274,14 +278,6 @@ pub trait WatchStreamExt: Stream {
         K::DynamicType: Eq + std::hash::Hash + Clone,
     {
         crate::reflector(writer, self)
-    }
-
-    #[cfg(feature = "unstable-runtime-subscribe")]
-    fn broadcast_shared(self, writer: MultiDispatcher) -> impl Stream<Item = Self::Item>
-    where
-        Self: Stream<Item = watcher::Result<watcher::Event<DynamicObject>>> + Sized,
-    {
-        crate::broadcaster(writer, self)
     }
 }
 

@@ -1,9 +1,14 @@
 //! Caches objects in memory
 
 mod dispatcher;
-#[cfg(feature = "unstable-runtime-subscribe")] pub mod multi_dispatcher;
+#[cfg(feature = "unstable-runtime-subscribe")]
+pub mod multi_dispatcher;
 mod object_ref;
 pub mod store;
+#[cfg(feature = "unstable-runtime-subscribe")]
+use std::sync::Arc;
+#[cfg(feature = "unstable-runtime-subscribe")]
+use tokio::sync::Mutex;
 
 pub use self::{
     dispatcher::ReflectHandle,
@@ -11,14 +16,26 @@ pub use self::{
 };
 use crate::watcher;
 use async_stream::stream;
+#[cfg(feature = "unstable-runtime-subscribe")]
+use futures::stream::SelectAll;
 use futures::{Stream, StreamExt};
 #[cfg(feature = "unstable-runtime-subscribe")]
 use kube_client::api::DynamicObject;
 #[cfg(feature = "unstable-runtime-subscribe")]
 use multi_dispatcher::MultiDispatcher;
 use std::hash::Hash;
-#[cfg(feature = "unstable-runtime-subscribe")] pub use store::store_shared;
+#[cfg(feature = "unstable-runtime-subscribe")]
+use std::pin::Pin;
+#[cfg(feature = "unstable-runtime-subscribe")]
+pub use store::store_shared;
 pub use store::{store, Store};
+
+#[cfg(feature = "unstable-runtime-subscribe")]
+/// Type for a shared stream of dynamic objects, which can be provided to [`broadcaster`]
+/// wrapped as [`Arc<Mutex<DynamicStream>>`], this type can be stored in context and provided
+/// to controllers, which can arbitrary modify existing event streams at runtime.
+pub type DynamicStream =
+    SelectAll<Pin<Box<dyn Stream<Item = Result<watcher::Event<DynamicObject>, watcher::Error>> + Send>>>;
 
 /// Cache objects from a [`watcher()`] stream into a local [`Store`]
 ///
@@ -141,13 +158,12 @@ where
 
 // broadcaster uses a common stream of DynamicObject events to distribute to any subscribed typed watcher.
 #[cfg(feature = "unstable-runtime-subscribe")]
-pub fn broadcaster<W>(mut writer: MultiDispatcher, stream: W) -> impl Stream<Item = W::Item>
+pub fn broadcaster<W>(mut writer: MultiDispatcher, stream: Arc<Mutex<W>>) -> impl Stream<Item = W::Item>
 where
-    W: Stream<Item = watcher::Result<watcher::Event<DynamicObject>>>,
+    W: Stream<Item = watcher::Result<watcher::Event<DynamicObject>>> + Unpin,
 {
-    let mut stream = Box::pin(stream);
     stream! {
-        while let Some(event) = stream.next().await {
+        while let Some(event) = stream.lock().await.next().await {
             match event {
                 Ok(ev) => {
                     writer.broadcast_event(&ev).await;

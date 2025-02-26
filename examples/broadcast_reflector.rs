@@ -1,4 +1,4 @@
-use futures::{future, stream, StreamExt};
+use futures::{future, pin_mut, stream, StreamExt};
 use k8s_openapi::api::{
     apps::v1::Deployment,
     core::v1::{ConfigMap, Secret},
@@ -6,13 +6,13 @@ use k8s_openapi::api::{
 use kube::{
     api::ApiResource,
     runtime::{
-        controller::Action, reflector::multi_dispatcher::MultiDispatcher, watcher, Controller,
-        WatchStreamExt as _,
+        broadcaster, controller::Action, reflector::multi_dispatcher::MultiDispatcher, watcher, Controller,
     },
     Api, Client, ResourceExt,
 };
-use std::{fmt::Debug, sync::Arc, time::Duration};
+use std::{fmt::Debug, pin::pin, sync::Arc, time::Duration};
 use thiserror::Error;
+use tokio::sync::Mutex;
 use tracing::*;
 
 #[derive(Debug, Error)]
@@ -42,8 +42,10 @@ async fn main() -> anyhow::Result<()> {
     let writer = MultiDispatcher::new(128);
 
     // multireflector stream
-    let mut combo_stream = stream::select_all(vec![]);
-    combo_stream.push(
+    let combo_stream = Arc::new(Mutex::new(stream::select_all(vec![])));
+    let watcher = broadcaster(writer.clone(), combo_stream.clone());
+
+    combo_stream.lock().await.push(
         watcher::watcher(
             Api::all_with(client.clone(), &ApiResource::erase::<Deployment>(&())),
             Default::default(),
@@ -52,7 +54,7 @@ async fn main() -> anyhow::Result<()> {
     );
 
     // watching config maps, but ignoring in the final configuration
-    combo_stream.push(
+    combo_stream.lock().await.push(
         watcher::watcher(
             Api::all_with(client.clone(), &ApiResource::erase::<ConfigMap>(&())),
             Default::default(),
@@ -61,22 +63,20 @@ async fn main() -> anyhow::Result<()> {
     );
 
     // Combine duplicate type streams with narrowed down selection
-    combo_stream.push(
+    combo_stream.lock().await.push(
         watcher::watcher(
             Api::default_namespaced_with(client.clone(), &ApiResource::erase::<Secret>(&())),
             Default::default(),
         )
         .boxed(),
     );
-    combo_stream.push(
+    combo_stream.lock().await.push(
         watcher::watcher(
             Api::namespaced_with(client.clone(), "kube-system", &ApiResource::erase::<Secret>(&())),
             Default::default(),
         )
         .boxed(),
     );
-
-    let watcher = combo_stream.broadcast_shared(writer.clone());
 
     let (sub, reader) = writer.subscribe::<Deployment>();
     let deploy = Controller::for_shared_stream(sub, reader)
