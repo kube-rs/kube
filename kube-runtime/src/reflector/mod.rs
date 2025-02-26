@@ -1,9 +1,9 @@
 //! Caches objects in memory
 
 mod dispatcher;
-mod object_ref;
 #[cfg(feature = "unstable-runtime-subscribe")]
 pub mod multi_dispatcher;
+mod object_ref;
 pub mod store;
 
 pub use self::{
@@ -13,11 +13,13 @@ pub use self::{
 use crate::watcher;
 use async_stream::stream;
 use futures::{Stream, StreamExt};
+#[cfg(feature = "unstable-runtime-subscribe")]
 use kube_client::api::DynamicObject;
 #[cfg(feature = "unstable-runtime-subscribe")]
 use multi_dispatcher::MultiDispatcher;
 use std::hash::Hash;
-#[cfg(feature = "unstable-runtime-subscribe")] pub use store::store_shared;
+#[cfg(feature = "unstable-runtime-subscribe")]
+pub use store::store_shared;
 pub use store::{store, Store};
 
 /// Cache objects from a [`watcher()`] stream into a local [`Store`]

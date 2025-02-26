@@ -332,7 +332,7 @@ where
 mod tests {
     use super::{store, Writer};
     use crate::{
-        reflector::{store::CacheWriter as _, ObjectRef},
+        reflector::ObjectRef,
         watcher,
     };
     use k8s_openapi::api::core::v1::ConfigMap;

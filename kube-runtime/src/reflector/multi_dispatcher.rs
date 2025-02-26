@@ -9,12 +9,12 @@ use serde::de::DeserializeOwned;
 use crate::watcher;
 
 use super::{
-    dispatcher::{TypedDispatcher, TypedReflectHandle}, Store,
+    dispatcher::{DynamicDispatcher, TypedReflectHandle}, Store,
 };
 
 #[derive(Clone)]
 pub struct MultiDispatcher {
-    dispatcher: TypedDispatcher,
+    dispatcher: DynamicDispatcher,
 }
 
 impl MultiDispatcher {
@@ -22,7 +22,7 @@ impl MultiDispatcher {
     pub fn new(buf_size: usize) -> Self {
         Self {
             // store: Default::default(),
-            dispatcher: TypedDispatcher::new(buf_size),
+            dispatcher: DynamicDispatcher::new(buf_size),
         }
     }
 

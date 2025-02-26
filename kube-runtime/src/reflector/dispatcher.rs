@@ -6,18 +6,21 @@ use std::{fmt::Debug, sync::Arc};
 
 use educe::Educe;
 use futures::Stream;
+#[cfg(feature = "unstable-runtime-subscribe")]
 use kube_client::{api::DynamicObject, Resource};
 use pin_project::pin_project;
+#[cfg(feature = "unstable-runtime-subscribe")]
 use serde::de::DeserializeOwned;
 use std::task::ready;
 
-use crate::{
-    reflector::{ObjectRef, Store},
-    watcher::{self, Event},
-};
+use crate::reflector::{ObjectRef, Store};
+#[cfg(feature = "unstable-runtime-subscribe")]
+use crate::watcher::Event;
 use async_broadcast::{InactiveReceiver, Receiver, Sender};
 
-use super::{store::Writer, Lookup};
+#[cfg(feature = "unstable-runtime-subscribe")]
+use super::store::Writer;
+use super::Lookup;
 
 #[derive(Educe)]
 #[educe(Debug(bound("K: Debug, K::DynamicType: Debug")), Clone)]
@@ -77,17 +80,19 @@ where
     }
 }
 
-#[derive(Clone)]
 // A helper type that holds a broadcast transmitter and a broadcast receiver,
 // used to fan-out events from a root stream to multiple listeners.
-pub(crate) struct TypedDispatcher {
+#[cfg(feature = "unstable-runtime-subscribe")]
+#[derive(Clone)]
+pub(crate) struct DynamicDispatcher {
     dispatch_tx: Sender<Event<DynamicObject>>,
     // An inactive reader that prevents the channel from closing until the
     // writer is dropped.
     _dispatch_rx: InactiveReceiver<Event<DynamicObject>>,
 }
 
-impl TypedDispatcher {
+#[cfg(feature = "unstable-runtime-subscribe")]
+impl DynamicDispatcher {
     /// Creates and returns a new self that wraps a broadcast sender and an
     /// inactive broadcast receiver
     ///
@@ -98,7 +103,7 @@ impl TypedDispatcher {
     //
     // N.B messages are eagerly broadcasted, meaning no active receivers are
     // required for a message to be broadcasted.
-    pub(crate) fn new(buf_size: usize) -> TypedDispatcher {
+    pub(crate) fn new(buf_size: usize) -> DynamicDispatcher {
         // Create a broadcast (tx, rx) pair
         let (mut dispatch_tx, dispatch_rx) = async_broadcast::broadcast(buf_size);
         // The tx half will not wait for any receivers to be active before
@@ -210,6 +215,7 @@ where
 /// subscribed to the shared stream will also terminate after all events yielded by
 /// the root stream have been observed. This means [`TypedReflectHandle`] streams
 /// can still be polled after the root stream has been dropped.
+#[cfg(feature = "unstable-runtime-subscribe")]
 #[pin_project]
 pub struct TypedReflectHandle<K>
 where
@@ -222,6 +228,7 @@ where
     store: Writer<K>,
 }
 
+#[cfg(feature = "unstable-runtime-subscribe")]
 impl<K> TypedReflectHandle<K>
 where
     K: Lookup + Clone + 'static,
@@ -234,7 +241,7 @@ where
             // Initialize a ready store by default
             store: {
                 let mut store: Writer<K> = Default::default();
-                store.apply_shared_watcher_event(&watcher::Event::InitDone);
+                store.apply_shared_watcher_event(&Event::InitDone);
                 store
             },
         }
@@ -245,6 +252,7 @@ where
     }
 }
 
+#[cfg(feature = "unstable-runtime-subscribe")]
 impl<K> Stream for TypedReflectHandle<K>
 where
     K: Resource + Clone + 'static,
