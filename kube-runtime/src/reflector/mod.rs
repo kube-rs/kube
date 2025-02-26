@@ -1,8 +1,7 @@
 //! Caches objects in memory
 
 mod dispatcher;
-#[cfg(feature = "unstable-runtime-subscribe")]
-pub mod multi_dispatcher;
+#[cfg(feature = "unstable-runtime-subscribe")] pub mod multi_dispatcher;
 mod object_ref;
 pub mod store;
 
@@ -18,8 +17,7 @@ use kube_client::api::DynamicObject;
 #[cfg(feature = "unstable-runtime-subscribe")]
 use multi_dispatcher::MultiDispatcher;
 use std::hash::Hash;
-#[cfg(feature = "unstable-runtime-subscribe")]
-pub use store::store_shared;
+#[cfg(feature = "unstable-runtime-subscribe")] pub use store::store_shared;
 pub use store::{store, Store};
 
 /// Cache objects from a [`watcher()`] stream into a local [`Store`]

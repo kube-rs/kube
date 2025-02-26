@@ -4,7 +4,8 @@
 pub use crate::discovery::ApiResource;
 use crate::{
     metadata::TypeMeta,
-    resource::{DynamicResourceScope, Resource}, GroupVersionKind,
+    resource::{DynamicResourceScope, Resource},
+    GroupVersionKind,
 };
 
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;

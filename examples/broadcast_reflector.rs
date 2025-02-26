@@ -5,7 +5,10 @@ use k8s_openapi::api::{
 };
 use kube::{
     api::ApiResource,
-    runtime::{controller::Action, reflector::multi_dispatcher::MultiDispatcher, watcher, Controller, WatchStreamExt as _},
+    runtime::{
+        controller::Action, reflector::multi_dispatcher::MultiDispatcher, watcher, Controller,
+        WatchStreamExt as _,
+    },
     Api, Client, ResourceExt,
 };
 use std::{fmt::Debug, sync::Arc, time::Duration};

@@ -9,17 +9,14 @@ use futures::Stream;
 #[cfg(feature = "unstable-runtime-subscribe")]
 use kube_client::{api::DynamicObject, Resource};
 use pin_project::pin_project;
-#[cfg(feature = "unstable-runtime-subscribe")]
-use serde::de::DeserializeOwned;
+#[cfg(feature = "unstable-runtime-subscribe")] use serde::de::DeserializeOwned;
 use std::task::ready;
 
 use crate::reflector::{ObjectRef, Store};
-#[cfg(feature = "unstable-runtime-subscribe")]
-use crate::watcher::Event;
+#[cfg(feature = "unstable-runtime-subscribe")] use crate::watcher::Event;
 use async_broadcast::{InactiveReceiver, Receiver, Sender};
 
-#[cfg(feature = "unstable-runtime-subscribe")]
-use super::store::Writer;
+#[cfg(feature = "unstable-runtime-subscribe")] use super::store::Writer;
 use super::Lookup;
 
 #[derive(Educe)]

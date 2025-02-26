@@ -1,15 +1,13 @@
 use std::hash::Hash;
 
-use kube_client::{
-    api::DynamicObject,
-    Resource,
-};
+use kube_client::{api::DynamicObject, Resource};
 use serde::de::DeserializeOwned;
 
 use crate::watcher;
 
 use super::{
-    dispatcher::{DynamicDispatcher, TypedReflectHandle}, Store,
+    dispatcher::{DynamicDispatcher, TypedReflectHandle},
+    Store,
 };
 
 #[derive(Clone)]
