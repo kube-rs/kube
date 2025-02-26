@@ -161,7 +161,7 @@ impl<'de, T: DeserializeOwned + Clone> serde::Deserialize<'de> for ObjectList<T>
         let mut resources = vec![];
         for o in items.iter_mut() {
             if o.types.is_none() {
-                o.types = types.clone().singular();
+                o.types = types.clone().singular_list();
             }
             let item = serde_json::to_value(o).map_err(de::Error::custom)?;
             resources.push(serde_json::from_value(item).map_err(de::Error::custom)?)

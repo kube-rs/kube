@@ -60,10 +60,10 @@ impl TypeMeta {
     ///
     /// let mut type_meta = TypeMeta::resource::<Pod>();
     /// type_meta.kind = "PodList".to_string();
-    /// assert_eq!(type_meta.clone().singular().kind, "Pod");
-    /// assert_eq!(type_meta.clone().singular().api_version, "v1");
+    /// assert_eq!(type_meta.clone().singular_list().unwrap().kind, "Pod");
+    /// assert_eq!(type_meta.clone().singular_list().unwrap().api_version, "v1");
     /// ```
-    pub fn singular(self) -> Option<Self> {
+    pub fn singular_list(self) -> Option<Self> {
         let kind = self.kind.strip_suffix("List")?.to_string();
         (!kind.is_empty()).then_some(Self { kind, ..self })
     }
