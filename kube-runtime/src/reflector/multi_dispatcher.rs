@@ -1,5 +1,11 @@
-use std::hash::Hash;
+use std::{
+    hash::Hash,
+    pin::Pin,
+    sync::Arc,
+    task::{Context, Poll},
+};
 
+use futures::{lock::Mutex, FutureExt, Stream, StreamExt as _};
 use kube_client::{api::DynamicObject, Resource};
 use serde::de::DeserializeOwned;
 
@@ -43,6 +49,46 @@ impl MultiDispatcher {
 
     /// Broadcast an event to any downstream listeners subscribed on the store
     pub(crate) async fn broadcast_event(&mut self, event: &watcher::Event<DynamicObject>) {
-        self.dispatcher.broadcast(event.clone()).await
+        match event {
+            watcher::Event::InitDone => {},
+            ev => self.dispatcher.broadcast(ev.clone()).await,
+        }
+    }
+}
+
+/// See [`Scheduler::hold`]
+pub struct BroadcastStream<W> {
+    pub stream: Arc<Mutex<W>>,
+}
+
+impl<W> Clone for BroadcastStream<W> {
+    fn clone(&self) -> Self {
+        Self {
+            stream: self.stream.clone(),
+        }
+    }
+}
+
+impl<W> BroadcastStream<W>
+where
+    W: Stream<Item = watcher::Result<watcher::Event<DynamicObject>>> + Unpin,
+{
+    pub fn new(stream: Arc<Mutex<W>>) -> Self {
+        Self { stream }
+    }
+}
+
+impl<W> Stream for BroadcastStream<W>
+where
+    W: Stream<Item = watcher::Result<watcher::Event<DynamicObject>>> + Unpin,
+{
+    type Item = W::Item;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        if let Some(mut stream) = self.stream.try_lock() {
+            return stream.poll_next_unpin(cx);
+        }
+
+        Poll::Pending
     }
 }
