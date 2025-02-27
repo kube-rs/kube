@@ -1,4 +1,4 @@
-use futures::{future, pin_mut, stream, StreamExt};
+use futures::{future, lock::Mutex, pin_mut, stream, StreamExt};
 use k8s_openapi::api::{
     apps::v1::Deployment,
     core::v1::{ConfigMap, Secret},
@@ -6,13 +6,15 @@ use k8s_openapi::api::{
 use kube::{
     api::ApiResource,
     runtime::{
-        broadcaster, controller::Action, reflector::multi_dispatcher::MultiDispatcher, watcher, Controller,
+        broadcaster,
+        controller::Action,
+        reflector::multi_dispatcher::{BroadcastStream, MultiDispatcher},
+        watcher, Controller,
     },
     Api, Client, ResourceExt,
 };
 use std::{fmt::Debug, pin::pin, sync::Arc, time::Duration};
 use thiserror::Error;
-use tokio::sync::Mutex;
 use tracing::*;
 
 #[derive(Debug, Error)]
@@ -43,7 +45,7 @@ async fn main() -> anyhow::Result<()> {
 
     // multireflector stream
     let combo_stream = Arc::new(Mutex::new(stream::select_all(vec![])));
-    let watcher = broadcaster(writer.clone(), combo_stream.clone());
+    let watcher = broadcaster(writer.clone(), BroadcastStream::new(combo_stream.clone()));
 
     combo_stream.lock().await.push(
         watcher::watcher(
