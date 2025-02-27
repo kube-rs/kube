@@ -17,10 +17,8 @@ use crate::{
 };
 #[cfg(feature = "unstable-runtime-subscribe")]
 use kube_client::api::DynamicObject;
-#[cfg(feature = "unstable-runtime-subscribe")]
-use std::sync::Arc;
-#[cfg(feature = "unstable-runtime-subscribe")]
-use tokio::sync::Mutex;
+#[cfg(feature = "unstable-runtime-subscribe")] use std::sync::Arc;
+#[cfg(feature = "unstable-runtime-subscribe")] use tokio::sync::Mutex;
 
 use crate::watcher::DefaultBackoff;
 use futures::{Stream, TryStream};

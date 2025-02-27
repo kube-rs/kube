@@ -19,7 +19,6 @@ impl MultiDispatcher {
     #[must_use]
     pub fn new(buf_size: usize) -> Self {
         Self {
-            // store: Default::default(),
             dispatcher: DynamicDispatcher::new(buf_size),
         }
     }
