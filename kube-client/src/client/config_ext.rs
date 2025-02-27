@@ -250,7 +250,7 @@ impl ConfigExt for Config {
 
     #[cfg(feature = "openssl-tls")]
     fn openssl_ssl_connector_builder(&self) -> Result<openssl::ssl::SslConnectorBuilder> {
-        let identity = self.exec_identity_pem().or_else(|| self.identity_pem());
+        let identity = self.exec_identity_pem().0.or_else(|| self.identity_pem());
         // TODO: pass self.tls_server_name for openssl
         tls::openssl_tls::ssl_connector_builder(identity.as_ref(), self.root_cert.as_ref())
             .map_err(|e| Error::OpensslTls(tls::openssl_tls::Error::CreateSslConnector(e)))
