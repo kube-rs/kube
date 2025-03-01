@@ -143,7 +143,7 @@ where
         }
     }
 
-    /// [Get Metadata](`Api::get_metadata`) for a named resource if it exists, returns [`None`] if it doesn't exit
+    /// [Get Metadata](`Api::get_metadata`) for a named resource if it exists, returns [`None`] if it doesn't exist
     ///
     /// ```no_run
     /// # use kube::Api;
@@ -162,7 +162,36 @@ where
     ///
     /// Note that [`PartialObjectMeta`] embeds the raw `ObjectMeta`.
     pub async fn get_metadata_opt(&self, name: &str) -> Result<Option<PartialObjectMeta<K>>> {
-        match self.get_metadata(name).await {
+        self.get_metadata_opt_with(name, &GetParams::default()).await
+    }
+
+    /// [Get Metadata](`Api::get_metadata`) of an object if it exists, using an explicit `resourceVersion`.
+    /// Returns [`None`] if it doesn't exist.
+    ///
+    /// ```no_run
+    /// # use kube::Api;
+    /// use k8s_openapi::api::core::v1::Pod;
+    /// use kube_core::params::GetParams;
+    ///
+    /// async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let client: kube::Client = todo!();
+    /// let pods: Api<Pod> = Api::namespaced(client, "apps");
+    /// if let Some(pod) = pods.get_metadata_opt_with("blog", &GetParams::any()).await? {
+    ///     // Pod was found
+    /// } else {
+    ///     // Pod was not found
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// Note that [`PartialObjectMeta`] embeds the raw `ObjectMeta`.
+    pub async fn get_metadata_opt_with(
+        &self,
+        name: &str,
+        gp: &GetParams,
+    ) -> Result<Option<PartialObjectMeta<K>>> {
+        match self.get_metadata_with(name, gp).await {
             Ok(meta) => Ok(Some(meta)),
             Err(Error::Api(ErrorResponse { reason, .. })) if &reason == "NotFound" => Ok(None),
             Err(err) => Err(err),
