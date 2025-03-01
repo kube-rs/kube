@@ -264,15 +264,22 @@ pub mod conditions {
         }
     }
 
-    /// An await condition for `Service`s of type `LoadBalancer` that returns `true` once the backing LoadBalancer has an external IP or hostname
+    /// An await condition for `Service`s of type `LoadBalancer` that returns `true` once the backing load balancer has an external IP or hostname
     #[must_use]
     pub fn is_service_loadbalancer_provisioned() -> impl Condition<Service> {
         |obj: Option<&Service>| {
             if let Some(svc) = &obj {
-                if let Some(s) = &svc.status {
-                    if let Some(lbs) = &s.load_balancer {
-                        if let Some(ings) = &lbs.ingress {
-                            return ings.iter().all(|ip| ip.ip.is_some() || ip.hostname.is_some());
+                // ignore services that are not type LoadBalancer (return true immediately)
+                if let Some(spec) = &svc.spec {
+                    if spec.type_ != Some("LoadBalancer".to_string()) {
+                        return true;
+                    }
+                    // carry on if this is a LoadBalancer service
+                    if let Some(s) = &svc.status {
+                        if let Some(lbs) = &s.load_balancer {
+                            if let Some(ings) = &lbs.ingress {
+                                return ings.iter().all(|ip| ip.ip.is_some() || ip.hostname.is_some());
+                            }
                         }
                     }
                 }
@@ -281,7 +288,7 @@ pub mod conditions {
         }
     }
 
-    /// An await condition for `Ingress` that returns `true` once the backing LoadBalancer has an external IP or hostname
+    /// An await condition for `Ingress` that returns `true` once the backing load balancer has an external IP or hostname
     #[must_use]
     pub fn is_ingress_provisioned() -> impl Condition<Ingress> {
         |obj: Option<&Ingress>| {
