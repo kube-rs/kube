@@ -163,7 +163,12 @@ impl<K, F: Fn(Option<&K>) -> bool> Condition<K> for F {
 pub mod conditions {
     pub use super::Condition;
     use k8s_openapi::{
-        api::{batch::v1::Job, core::v1::Pod},
+        api::{
+            apps::v1::Deployment,
+            batch::v1::Job,
+            core::v1::{Pod, Service},
+            networking::v1::Ingress,
+        },
         apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition,
     };
     use kube_client::Resource;
@@ -229,6 +234,62 @@ pub mod conditions {
                     if let Some(conds) = &s.conditions {
                         if let Some(pcond) = conds.iter().find(|c| c.type_ == "Complete") {
                             return pcond.status == "True";
+                        }
+                    }
+                }
+            }
+            false
+        }
+    }
+
+    /// An await condition for `Deployment` that returns `true` once the latest deployment has completed
+    ///
+    /// This looks for the condition that Kubernetes sets for completed deployments:
+    /// <https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#complete-deployment>
+    #[must_use]
+    pub fn is_deployment_completed() -> impl Condition<Deployment> {
+        |obj: Option<&Deployment>| {
+            if let Some(depl) = &obj {
+                if let Some(s) = &depl.status {
+                    if let Some(conds) = &s.conditions {
+                        if let Some(dcond) = conds.iter().find(|c| {
+                            c.type_ == "Progressing" && c.reason == Some("NewReplicaSetAvailable".to_string())
+                        }) {
+                            return dcond.status == "True";
+                        }
+                    }
+                }
+            }
+            false
+        }
+    }
+
+    /// An await condition for `Service`s of type `LoadBalancer` that returns `true` once the backing LoadBalancer has an external IP or hostname
+    #[must_use]
+    pub fn is_service_loadbalancer_provisioned() -> impl Condition<Service> {
+        |obj: Option<&Service>| {
+            if let Some(svc) = &obj {
+                if let Some(s) = &svc.status {
+                    if let Some(lbs) = &s.load_balancer {
+                        if let Some(ings) = &lbs.ingress {
+                            return ings.iter().all(|ip| ip.ip.is_some() || ip.hostname.is_some());
+                        }
+                    }
+                }
+            }
+            false
+        }
+    }
+
+    /// An await condition for `Ingress` that returns `true` once the backing LoadBalancer has an external IP or hostname
+    #[must_use]
+    pub fn is_ingress_provisioned() -> impl Condition<Ingress> {
+        |obj: Option<&Ingress>| {
+            if let Some(ing) = &obj {
+                if let Some(s) = &ing.status {
+                    if let Some(lbs) = &s.load_balancer {
+                        if let Some(ings) = &lbs.ingress {
+                            return ings.iter().all(|ip| ip.ip.is_some() || ip.hostname.is_some());
                         }
                     }
                 }
