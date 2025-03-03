@@ -2,31 +2,20 @@
 //!
 //! See [`watcher`] for the primary entry point.
 
-use crate::{
-    reflector::multi_dispatcher::BroadcastStream,
-    utils::{Backoff, ResetTimerBackoff},
-};
+use crate::utils::{Backoff, ResetTimerBackoff};
 
-use async_stream::stream;
 use async_trait::async_trait;
 use backon::BackoffBuilder;
 use educe::Educe;
-use futures::{
-    channel::mpsc::Receiver,
-    future::BoxFuture,
-    lock::Mutex,
-    stream::{self, empty, select_all, select_with_strategy, BoxStream, PollNext},
-    Stream, StreamExt,
-};
+use futures::{stream::BoxStream, Stream, StreamExt};
 use kube_client::{
     api::{ListParams, Resource, ResourceExt, VersionMatch, WatchEvent, WatchParams},
     core::{metadata::PartialObjectMeta, ObjectList, Selector},
     error::ErrorResponse,
     Api, Error as ClientErr,
 };
-use pin_project::pin_project;
 use serde::de::DeserializeOwned;
-use std::{clone::Clone, collections::VecDeque, fmt::Debug, future, pin::Pin, sync::Arc, time::Duration};
+use std::{clone::Clone, collections::VecDeque, fmt::Debug, future, time::Duration};
 use thiserror::Error;
 use tracing::{debug, error, warn};
 
@@ -157,7 +146,6 @@ enum State<K> {
     InitialWatch {
         #[educe(Debug(ignore))]
         stream: BoxStream<'static, kube_client::Result<WatchEvent<K>>>,
-        params: WatchParams,
     },
     /// The initial LIST was successful, so we should move on to starting the actual watch.
     InitListed { resource_version: String },
@@ -171,7 +159,6 @@ enum State<K> {
         resource_version: String,
         #[educe(Debug(ignore))]
         stream: BoxStream<'static, kube_client::Result<WatchEvent<K>>>,
-        params: WatchParams,
     },
 }
 
@@ -188,6 +175,7 @@ trait ApiMode {
         version: &str,
     ) -> kube_client::Result<BoxStream<'static, kube_client::Result<WatchEvent<Self::Value>>>>;
 }
+
 /// A wrapper around the `Api` of a `Resource` type that when used by the
 /// watcher will return the entire (full) object
 struct FullObject<'a, K> {
@@ -464,7 +452,6 @@ where
         wp: &WatchParams,
         version: &str,
     ) -> kube_client::Result<BoxStream<'static, kube_client::Result<WatchEvent<Self::Value>>>> {
-        let x = || async { self.api.watch(wp, version).await };
         self.api.watch(wp, version).await.map(StreamExt::boxed)
     }
 }
@@ -495,59 +482,6 @@ where
     }
 }
 
-/// A wrapper around the `Api` of a `Resource` type that when used by the
-/// watcher will return only the metadata associated with an object
-#[pin_project]
-struct Interruptable<'a, K> {
-    api: &'a Api<K>,
-    #[pin]
-    interrupt: Receiver<()>,
-}
-
-// /// Type to tell [`SelectWithStrategy`] which stream to poll next.
-// #[derive(Debug, PartialEq, Eq, Copy, Clone, Hash, Default)]
-// pub enum Interrupt {
-//     /// Poll the first stream.
-//     #[default]
-//     Regular,
-//     /// Poll the second stream once.
-//     Restart,
-// }
-
-// impl Interrupt {
-//     fn propagate(&mut self) -> PollNext {
-//         match self {
-//             Interrupt::Regular => PollNext::Left,
-//             Interrupt::Restart => {
-//                 *self = Interrupt::Regular;
-//                 PollNext::Right
-//             }
-//         }
-//     }
-// }
-
-// #[async_trait]
-// impl<K> ApiMode for Interruptable<'_, K>
-// where
-//     K: Clone + Debug + DeserializeOwned + Send + 'static,
-// {
-//     type Value = K;
-
-//     async fn list(&self, lp: &ListParams) -> kube_client::Result<ObjectList<Self::Value>> {
-//         self.api.list(lp).await
-//     }
-
-//     async fn watch(
-//         &self,
-//         wp: &WatchParams,
-//         version: &str,
-//     ) -> kube_client::Result<BoxStream<'static, kube_client::Result<WatchEvent<Self::Value>>>> {
-//         let stream = self.api.watch(wp, version).await.map(StreamExt::boxed)?;
-
-//         Ok(Box::pin(stream.restart_on(Box::pin(self.interrupt))))
-//     }
-// }
-
 /// Progresses the watcher a single step, returning (event, state)
 ///
 /// This function should be trampolined: if event == `None`
@@ -560,32 +494,26 @@ async fn step_trampolined<A>(
 ) -> (Option<Result<Event<A::Value>>>, State<A::Value>)
 where
     A: ApiMode,
-    A::Value: Resource + 'static + Send,
+    A::Value: Resource + 'static,
 {
     match state {
         State::Empty => match wc.initial_list_strategy {
-            InitialListStrategy::ListWatch => (
-                Some(Ok(Event::Init)),
-                State::InitPage {
-                    continue_token: None,
-                    objects: VecDeque::default(),
-                    last_bookmark: None,
-                },
-            ),
-            InitialListStrategy::StreamingList => {
-                let params = wc.to_watch_params();
-                match api.watch(&params, "0").await {
-                    Ok(stream) => (None, State::InitialWatch { stream, params }),
-                    Err(err) => {
-                        if std::matches!(err, ClientErr::Api(ErrorResponse { code: 403, .. })) {
-                            warn!("watch initlist error with 403: {err:?}");
-                        } else {
-                            debug!("watch initlist error: {err:?}");
-                        }
-                        (Some(Err(Error::WatchStartFailed(err))), State::default())
+            InitialListStrategy::ListWatch => (Some(Ok(Event::Init)), State::InitPage {
+                continue_token: None,
+                objects: VecDeque::default(),
+                last_bookmark: None,
+            }),
+            InitialListStrategy::StreamingList => match api.watch(&wc.to_watch_params(), "0").await {
+                Ok(stream) => (None, State::InitialWatch { stream }),
+                Err(err) => {
+                    if std::matches!(err, ClientErr::Api(ErrorResponse { code: 403, .. })) {
+                        warn!("watch initlist error with 403: {err:?}");
+                    } else {
+                        debug!("watch initlist error: {err:?}");
                     }
+                    (Some(Err(Error::WatchStartFailed(err))), State::default())
                 }
-            }
+            },
         },
         State::InitPage {
             continue_token,
@@ -593,14 +521,11 @@ where
             last_bookmark,
         } => {
             if let Some(next) = objects.pop_front() {
-                return (
-                    Some(Ok(Event::InitApply(next))),
-                    State::InitPage {
-                        continue_token,
-                        objects,
-                        last_bookmark,
-                    },
-                );
+                return (Some(Ok(Event::InitApply(next))), State::InitPage {
+                    continue_token,
+                    objects,
+                    last_bookmark,
+                });
             }
             // check if we need to perform more pages
             if continue_token.is_none() {
@@ -620,14 +545,11 @@ where
                     }
                     // Buffer page here, causing us to return to this enum branch (State::InitPage)
                     // until the objects buffer has drained
-                    (
-                        None,
-                        State::InitPage {
-                            continue_token,
-                            objects: list.items.into_iter().collect(),
-                            last_bookmark,
-                        },
-                    )
+                    (None, State::InitPage {
+                        continue_token,
+                        objects: list.items.into_iter().collect(),
+                        last_bookmark,
+                    })
                 }
                 Err(err) => {
                     if std::matches!(err, ClientErr::Api(ErrorResponse { code: 403, .. })) {
@@ -639,42 +561,26 @@ where
                 }
             }
         }
-        State::InitialWatch { mut stream, params } => {
-            if params != wc.to_watch_params() {
-                return (
-                    Some(Err(Error::WatchError(kube_client::core::ErrorResponse {
-                        status: "Restarting".into(),
-                        message: "Watches are restarting due to selector change".into(),
-                        reason: "Restart".into(),
-                        code: 410,
-                    }))),
-                    State::default(),
-                );
-            }
+        State::InitialWatch { mut stream } => {
             match stream.next().await {
-                Some(Ok(WatchEvent::Added(obj) | WatchEvent::Modified(obj))) => (
-                    Some(Ok(Event::InitApply(obj))),
-                    State::InitialWatch { stream, params },
-                ),
+                Some(Ok(WatchEvent::Added(obj) | WatchEvent::Modified(obj))) => {
+                    (Some(Ok(Event::InitApply(obj))), State::InitialWatch { stream })
+                }
                 Some(Ok(WatchEvent::Deleted(_obj))) => {
                     // Kubernetes claims these events are impossible
                     // https://kubernetes.io/docs/reference/using-api/api-concepts/#streaming-lists
                     error!("got deleted event during initial watch. this is a bug");
-                    (None, State::InitialWatch { stream, params })
+                    (None, State::InitialWatch { stream })
                 }
                 Some(Ok(WatchEvent::Bookmark(bm))) => {
                     let marks_initial_end = bm.metadata.annotations.contains_key("k8s.io/initial-events-end");
                     if marks_initial_end {
-                        (
-                            Some(Ok(Event::InitDone)),
-                            State::Watching {
-                                resource_version: bm.metadata.resource_version,
-                                stream,
-                                params,
-                            },
-                        )
+                        (Some(Ok(Event::InitDone)), State::Watching {
+                            resource_version: bm.metadata.resource_version,
+                            stream,
+                        })
                     } else {
-                        (None, State::InitialWatch { stream, params })
+                        (None, State::InitialWatch { stream })
                     }
                 }
                 Some(Ok(WatchEvent::Error(err))) => {
@@ -682,7 +588,7 @@ where
                     let new_state = if err.code == 410 {
                         State::default()
                     } else {
-                        State::InitialWatch { stream, params }
+                        State::InitialWatch { stream }
                     };
                     if err.code == 403 {
                         warn!("watcher watchevent error 403: {err:?}");
@@ -697,129 +603,89 @@ where
                     } else {
                         debug!("watcher error: {err:?}");
                     }
-                    (
-                        Some(Err(Error::WatchFailed(err))),
-                        State::InitialWatch { stream, params },
-                    )
+                    (Some(Err(Error::WatchFailed(err))), State::InitialWatch { stream })
                 }
                 None => (None, State::default()),
             }
         }
         State::InitListed { resource_version } => {
-            let params = wc.to_watch_params();
-            match api.watch(&params, &resource_version).await {
-                Ok(stream) => (
-                    None,
-                    State::Watching {
-                        resource_version,
-                        stream,
-                        params,
-                    },
-                ),
+            match api.watch(&wc.to_watch_params(), &resource_version).await {
+                Ok(stream) => (None, State::Watching {
+                    resource_version,
+                    stream,
+                }),
                 Err(err) => {
                     if std::matches!(err, ClientErr::Api(ErrorResponse { code: 403, .. })) {
                         warn!("watch initlist error with 403: {err:?}");
                     } else {
                         debug!("watch initlist error: {err:?}");
                     }
-                    (
-                        Some(Err(Error::WatchStartFailed(err))),
-                        State::InitListed { resource_version },
-                    )
+                    (Some(Err(Error::WatchStartFailed(err))), State::InitListed {
+                        resource_version,
+                    })
                 }
             }
         }
         State::Watching {
             resource_version,
             mut stream,
-            params,
-        } => {
-            if params != wc.to_watch_params() {
-                return (
-                    Some(Err(Error::WatchError(kube_client::core::ErrorResponse {
-                        status: "Restarting".into(),
-                        message: "Watches are restarting due to selector change".into(),
-                        reason: "Restart".into(),
-                        code: 410,
-                    }))),
-                    State::default(),
-                );
-            }
-            match stream.next().await {
-                Some(Ok(WatchEvent::Added(obj) | WatchEvent::Modified(obj))) => {
-                    let resource_version = obj.resource_version().unwrap_or_default();
-                    if resource_version.is_empty() {
-                        (Some(Err(Error::NoResourceVersion)), State::default())
-                    } else {
-                        (
-                            Some(Ok(Event::Apply(obj))),
-                            State::Watching {
-                                resource_version,
-                                stream,
-                                params,
-                            },
-                        )
-                    }
-                }
-                Some(Ok(WatchEvent::Deleted(obj))) => {
-                    let resource_version = obj.resource_version().unwrap_or_default();
-                    if resource_version.is_empty() {
-                        (Some(Err(Error::NoResourceVersion)), State::default())
-                    } else {
-                        (
-                            Some(Ok(Event::Delete(obj))),
-                            State::Watching {
-                                resource_version,
-                                stream,
-                                params,
-                            },
-                        )
-                    }
-                }
-                Some(Ok(WatchEvent::Bookmark(bm))) => (
-                    None,
-                    State::Watching {
-                        resource_version: bm.metadata.resource_version,
+        } => match stream.next().await {
+            Some(Ok(WatchEvent::Added(obj) | WatchEvent::Modified(obj))) => {
+                let resource_version = obj.resource_version().unwrap_or_default();
+                if resource_version.is_empty() {
+                    (Some(Err(Error::NoResourceVersion)), State::default())
+                } else {
+                    (Some(Ok(Event::Apply(obj))), State::Watching {
+                        resource_version,
                         stream,
-                        params,
-                    },
-                ),
-                Some(Ok(WatchEvent::Error(err))) => {
-                    // HTTP GONE, means we have desynced and need to start over and re-list :(
-                    let new_state = if err.code == 410 {
-                        State::default()
-                    } else {
-                        State::Watching {
-                            resource_version,
-                            stream,
-                            params,
-                        }
-                    };
-                    if err.code == 403 {
-                        warn!("watcher watchevent error 403: {err:?}");
-                    } else {
-                        debug!("error watchevent error: {err:?}");
-                    }
-                    (Some(Err(Error::WatchError(err))), new_state)
+                    })
                 }
-                Some(Err(err)) => {
-                    if std::matches!(err, ClientErr::Api(ErrorResponse { code: 403, .. })) {
-                        warn!("watcher error 403: {err:?}");
-                    } else {
-                        debug!("watcher error: {err:?}");
-                    }
-                    (
-                        Some(Err(Error::WatchFailed(err))),
-                        State::Watching {
-                            resource_version,
-                            stream,
-                            params,
-                        },
-                    )
-                }
-                None => (None, State::InitListed { resource_version }),
             }
-        }
+            Some(Ok(WatchEvent::Deleted(obj))) => {
+                let resource_version = obj.resource_version().unwrap_or_default();
+                if resource_version.is_empty() {
+                    (Some(Err(Error::NoResourceVersion)), State::default())
+                } else {
+                    (Some(Ok(Event::Delete(obj))), State::Watching {
+                        resource_version,
+                        stream,
+                    })
+                }
+            }
+            Some(Ok(WatchEvent::Bookmark(bm))) => (None, State::Watching {
+                resource_version: bm.metadata.resource_version,
+                stream,
+            }),
+            Some(Ok(WatchEvent::Error(err))) => {
+                // HTTP GONE, means we have desynced and need to start over and re-list :(
+                let new_state = if err.code == 410 {
+                    State::default()
+                } else {
+                    State::Watching {
+                        resource_version,
+                        stream,
+                    }
+                };
+                if err.code == 403 {
+                    warn!("watcher watchevent error 403: {err:?}");
+                } else {
+                    debug!("error watchevent error: {err:?}");
+                }
+                (Some(Err(Error::WatchError(err))), new_state)
+            }
+            Some(Err(err)) => {
+                if std::matches!(err, ClientErr::Api(ErrorResponse { code: 403, .. })) {
+                    warn!("watcher error 403: {err:?}");
+                } else {
+                    debug!("watcher error: {err:?}");
+                }
+                (Some(Err(Error::WatchFailed(err))), State::Watching {
+                    resource_version,
+                    stream,
+                })
+            }
+            None => (None, State::InitListed { resource_version }),
+        },
     }
 }
 
@@ -831,7 +697,7 @@ async fn step<A>(
 ) -> (Result<Event<A::Value>>, State<A::Value>)
 where
     A: ApiMode,
-    A::Value: Resource + 'static + Send,
+    A::Value: Resource + 'static,
 {
     loop {
         match step_trampolined(api, config, state).await {
@@ -902,33 +768,6 @@ pub fn watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
         },
     )
 }
-
-// pub fn watcher_restart<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
-//     api: Api<K>,
-//     watcher_config: Config,
-//     trigger: impl Stream<Item = ()> + Send + Sync + 'static + Clone
-// ) -> impl Stream<Item = Result<Event<K>>> + Send {
-//     futures::stream::unfold(
-//         (api, watcher_config, State::default(), trigger),
-//         |(api, watcher_config, state, trigger)| async move {
-//             let (event, state) = {
-//                 let api = FullObject { api: &api };
-//                 let config: &Config = &watcher_config;
-//                 let mut state = state;
-//                 let trigger = trigger.clone();
-//                 async move {
-//                     loop {
-//                         match step_trampolined(&api, config, state, trigger).await {
-//                             (Some(result), new_state) => return (result, new_state),
-//                             (None, new_state) => state = new_state,
-//                         }
-//                     }
-//                 }
-//             }.await;
-//             Some((event, (api, watcher_config, state, trigger)))
-//         },
-//     )
-// }
 
 /// Watches a Kubernetes Resource for changes continuously and receives only the
 /// metadata

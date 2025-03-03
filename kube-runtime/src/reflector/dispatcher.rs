@@ -256,31 +256,38 @@ where
     K::DynamicType: Eq + std::hash::Hash + Clone + Default,
     K: DeserializeOwned,
 {
-    type Item = Option<Arc<K>>;
+    type Item = Arc<K>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut this = self.project();
-        match ready!(this.rx.as_mut().poll_next(cx)) {
-            Some(event) => {
-                let obj = match event {
-                    Event::InitApply(obj) | Event::Apply(obj)
-                        if obj.gvk() == Some(K::gvk(&Default::default())) =>
-                    {
-                        obj.try_parse::<K>().ok().map(Arc::new).inspect(|o| {
-                            this.store.apply_shared_watcher_event(&Event::Apply(o.clone()));
-                        })
-                    }
-                    Event::Delete(obj) if obj.gvk() == Some(K::gvk(&Default::default())) => {
-                        obj.try_parse::<K>().ok().map(Arc::new).inspect(|o| {
-                            this.store.apply_shared_watcher_event(&Event::Delete(o.clone()));
-                        })
-                    }
-                    _ => None,
-                };
+        loop {
+            return match ready!(this.rx.as_mut().poll_next(cx)) {
+                Some(event) => {
+                    let obj = match event {
+                        Event::InitApply(obj) | Event::Apply(obj)
+                            if obj.gvk() == Some(K::gvk(&Default::default())) =>
+                        {
+                            obj.try_parse::<K>().ok().map(Arc::new).inspect(|o| {
+                                this.store.apply_shared_watcher_event(&Event::Apply(o.clone()));
+                            })
+                        }
+                        Event::Delete(obj) if obj.gvk() == Some(K::gvk(&Default::default())) => {
+                            obj.try_parse::<K>().ok().map(Arc::new).inspect(|o| {
+                                this.store.apply_shared_watcher_event(&Event::Delete(o.clone()));
+                            })
+                        }
+                        _ => None,
+                    };
 
-                Poll::Ready(Some(obj))
-            }
-            None => Poll::Ready(None),
+                    // Skip propagating all objects which do not belong to the cache
+                    if obj.is_none() {
+                        continue;
+                    }
+
+                    Poll::Ready(obj)
+                }
+                None => Poll::Ready(None),
+            };
         }
     }
 }

@@ -50,7 +50,8 @@ impl MultiDispatcher {
     /// Broadcast an event to any downstream listeners subscribed on the store
     pub(crate) async fn broadcast_event(&mut self, event: &watcher::Event<DynamicObject>) {
         match event {
-            watcher::Event::InitDone => {},
+            // Broadcast stores are pre-initialized
+            watcher::Event::InitDone => {}
             ev => self.dispatcher.broadcast(ev.clone()).await,
         }
     }

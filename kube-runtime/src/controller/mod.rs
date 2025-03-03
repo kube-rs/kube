@@ -851,10 +851,7 @@ where
     /// }
     /// # }
     #[cfg(feature = "unstable-runtime-subscribe")]
-    pub fn for_shared_stream(
-        trigger: impl Stream<Item = impl Into<Option<Arc<K>>> + Send + 'static> + Send + 'static,
-        reader: Store<K>,
-    ) -> Self
+    pub fn for_shared_stream(trigger: impl Stream<Item = Arc<K>> + Send + 'static, reader: Store<K>) -> Self
     where
         K::DynamicType: Default,
     {
@@ -881,16 +878,12 @@ where
     /// [`dynamic`]: kube_client::core::dynamic
     #[cfg(feature = "unstable-runtime-subscribe")]
     pub fn for_shared_stream_with(
-        trigger: impl Stream<Item = impl Into<Option<Arc<K>>> + Send + 'static> + Send + 'static,
+        trigger: impl Stream<Item = Arc<K>> + Send + 'static,
         reader: Store<K>,
         dyntype: K::DynamicType,
     ) -> Self {
         let mut trigger_selector = stream::SelectAll::new();
-        let self_watcher = trigger_self_shared(
-            trigger.filter_map(|r| async move { r.into() }).map(Ok),
-            dyntype.clone(),
-        )
-        .boxed();
+        let self_watcher = trigger_self_shared(trigger.map(Ok), dyntype.clone()).boxed();
         trigger_selector.push(self_watcher);
         Self {
             trigger_selector,
@@ -1119,7 +1112,7 @@ where
     #[must_use]
     pub fn owns_shared_stream<Child: Resource<DynamicType = ()> + Send + 'static>(
         self,
-        trigger: impl Stream<Item = impl Into<Option<Arc<Child>>> + Send + 'static> + Send + 'static,
+        trigger: impl Stream<Item = Arc<Child>> + Send + 'static,
     ) -> Self {
         self.owns_shared_stream_with(trigger, ())
     }
@@ -1137,17 +1130,13 @@ where
     #[must_use]
     pub fn owns_shared_stream_with<Child: Resource<DynamicType = ()> + Send + 'static>(
         mut self,
-        trigger: impl Stream<Item = impl Into<Option<Arc<Child>>> + Send + 'static> + Send + 'static,
+        trigger: impl Stream<Item = Arc<Child>> + Send + 'static,
         dyntype: Child::DynamicType,
     ) -> Self
     where
         Child::DynamicType: Debug + Eq + Hash + Clone,
     {
-        let child_watcher = trigger_owners_shared(
-            trigger.filter_map(|r| async move { r.into() }).map(Ok),
-            self.dyntype.clone(),
-            dyntype,
-        );
+        let child_watcher = trigger_owners_shared(trigger.map(Ok), self.dyntype.clone(), dyntype);
         self.trigger_selector.push(child_watcher.boxed());
         self
     }
@@ -1394,7 +1383,7 @@ where
     #[must_use]
     pub fn watches_shared_stream<Other, I>(
         self,
-        trigger: impl Stream<Item = impl Into<Option<Arc<Other>>> + Send + 'static> + Send + 'static,
+        trigger: impl Stream<Item = Arc<Other>> + Send + 'static,
         mapper: impl Fn(Arc<Other>) -> I + Sync + Send + 'static,
     ) -> Self
     where
@@ -1419,7 +1408,7 @@ where
     #[must_use]
     pub fn watches_shared_stream_with<Other, I>(
         mut self,
-        trigger: impl Stream<Item = impl Into<Option<Arc<Other>>> + Send + 'static> + Send + 'static,
+        trigger: impl Stream<Item = Arc<Other>> + Send + 'static,
         mapper: impl Fn(Arc<Other>) -> I + Sync + Send + 'static,
         dyntype: Other::DynamicType,
     ) -> Self
@@ -1429,11 +1418,7 @@ where
         I: 'static + IntoIterator<Item = ObjectRef<K>>,
         I::IntoIter: Send,
     {
-        let other_watcher = trigger_others_shared(
-            trigger.filter_map(|r| async move { r.into() }).map(Ok),
-            mapper,
-            dyntype,
-        );
+        let other_watcher = trigger_others_shared(trigger.map(Ok), mapper, dyntype);
         self.trigger_selector.push(other_watcher.boxed());
         self
     }
