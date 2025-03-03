@@ -77,61 +77,6 @@ where
     }
 }
 
-// A helper type that holds a broadcast transmitter and a broadcast receiver,
-// used to fan-out events from a root stream to multiple listeners.
-#[cfg(feature = "unstable-runtime-subscribe")]
-#[derive(Clone)]
-pub(crate) struct DynamicDispatcher {
-    dispatch_tx: Sender<Event<DynamicObject>>,
-    // An inactive reader that prevents the channel from closing until the
-    // writer is dropped.
-    _dispatch_rx: InactiveReceiver<Event<DynamicObject>>,
-}
-
-#[cfg(feature = "unstable-runtime-subscribe")]
-impl DynamicDispatcher {
-    /// Creates and returns a new self that wraps a broadcast sender and an
-    /// inactive broadcast receiver
-    ///
-    /// A buffer size is required to create the underlying broadcast channel.
-    /// Messages will be buffered until all active readers have received a copy
-    /// of the message. When the channel is full, senders will apply
-    /// backpressure by waiting for space to free up.
-    //
-    // N.B messages are eagerly broadcasted, meaning no active receivers are
-    // required for a message to be broadcasted.
-    pub(crate) fn new(buf_size: usize) -> DynamicDispatcher {
-        // Create a broadcast (tx, rx) pair
-        let (mut dispatch_tx, dispatch_rx) = async_broadcast::broadcast(buf_size);
-        // The tx half will not wait for any receivers to be active before
-        // broadcasting events. If no receivers are active, events will be
-        // buffered.
-        dispatch_tx.set_await_active(false);
-        Self {
-            dispatch_tx,
-            _dispatch_rx: dispatch_rx.deactivate(),
-        }
-    }
-
-    // Calls broadcast on the channel. Will return when the channel has enough
-    // space to send an event.
-    pub(crate) async fn broadcast(&mut self, evt: Event<DynamicObject>) {
-        let _ = self.dispatch_tx.broadcast_direct(evt).await;
-    }
-
-    // Creates a `TypedReflectHandle` by creating a receiver from the tx half.
-    // N.B: the new receiver will be fast-forwarded to the _latest_ event.
-    // The receiver won't have access to any events that are currently waiting
-    // to be acked by listeners.
-    pub(crate) fn subscribe<K>(&self) -> TypedReflectHandle<K>
-    where
-        K: Resource + DeserializeOwned + Clone,
-        K::DynamicType: Eq + std::hash::Hash + Clone + Default,
-    {
-        TypedReflectHandle::new(self.dispatch_tx.new_receiver())
-    }
-}
-
 /// A handle to a shared stream reader
 ///
 /// [`ReflectHandle`]s are created by calling [`subscribe()`] on a [`Writer`],

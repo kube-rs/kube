@@ -5,27 +5,36 @@ use std::{
     task::{Context, Poll},
 };
 
-use futures::{lock::Mutex, FutureExt, Stream, StreamExt as _};
+use crate::watcher::Event;
+use async_broadcast::{InactiveReceiver, Sender};
+use futures::{lock::Mutex, Stream, StreamExt as _};
 use kube_client::{api::DynamicObject, Resource};
 use serde::de::DeserializeOwned;
 
 use crate::watcher;
 
-use super::{
-    dispatcher::{DynamicDispatcher, TypedReflectHandle},
-    Store,
-};
+use super::{dispatcher::TypedReflectHandle, Store};
 
 #[derive(Clone)]
 pub struct MultiDispatcher {
-    dispatcher: DynamicDispatcher,
+    dispatch_tx: Sender<Event<DynamicObject>>,
+    // An inactive reader that prevents the channel from closing until the
+    // writer is dropped.
+    _dispatch_rx: InactiveReceiver<Event<DynamicObject>>,
 }
 
 impl MultiDispatcher {
     #[must_use]
     pub fn new(buf_size: usize) -> Self {
+        // Create a broadcast (tx, rx) pair
+        let (mut dispatch_tx, dispatch_rx) = async_broadcast::broadcast(buf_size);
+        // The tx half will not wait for any receivers to be active before
+        // broadcasting events. If no receivers are active, events will be
+        // buffered.
+        dispatch_tx.set_await_active(false);
         Self {
-            dispatcher: DynamicDispatcher::new(buf_size),
+            dispatch_tx,
+            _dispatch_rx: dispatch_rx.deactivate(),
         }
     }
 
@@ -42,7 +51,7 @@ impl MultiDispatcher {
         K: Resource + Clone + DeserializeOwned,
         K::DynamicType: Eq + Clone + Hash + Default,
     {
-        let sub = self.dispatcher.subscribe();
+        let sub = TypedReflectHandle::new(self.dispatch_tx.new_receiver());
         let reader = sub.reader();
         (sub, reader)
     }
@@ -52,7 +61,9 @@ impl MultiDispatcher {
         match event {
             // Broadcast stores are pre-initialized
             watcher::Event::InitDone => {}
-            ev => self.dispatcher.broadcast(ev.clone()).await,
+            ev => {
+                let _ = self.dispatch_tx.broadcast_direct(ev.clone()).await;
+            }
         }
     }
 }

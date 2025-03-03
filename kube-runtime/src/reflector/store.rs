@@ -99,7 +99,7 @@ where
     }
 
     /// Applies a single watcher event to the store
-    pub(crate) fn apply_watcher_event(&mut self, event: &watcher::Event<K>) {
+    pub fn apply_watcher_event(&mut self, event: &watcher::Event<K>) {
         match event {
             watcher::Event::Apply(obj) => {
                 let obj = Arc::new(obj.clone());
@@ -123,7 +123,7 @@ where
     }
 
     /// Applies a single shared watcher event to the store
-    pub(crate) fn apply_shared_watcher_event(&mut self, event: &watcher::Event<Arc<K>>) {
+    pub fn apply_shared_watcher_event(&mut self, event: &watcher::Event<Arc<K>>) {
         match event {
             watcher::Event::Apply(obj) => {
                 let key = obj.to_object_ref(self.dyntype.clone());
