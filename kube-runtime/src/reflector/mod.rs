@@ -4,8 +4,6 @@ mod dispatcher;
 #[cfg(feature = "unstable-runtime-subscribe")] pub mod multi_dispatcher;
 mod object_ref;
 pub mod store;
-#[cfg(feature = "unstable-runtime-subscribe")] use std::sync::Arc;
-#[cfg(feature = "unstable-runtime-subscribe")] use tokio::sync::Mutex;
 
 pub use self::{
     dispatcher::ReflectHandle,
@@ -13,7 +11,6 @@ pub use self::{
 };
 use crate::watcher;
 use async_stream::stream;
-#[cfg(feature = "unstable-runtime-subscribe")] use futures::stream::SelectAll;
 use futures::{Stream, StreamExt};
 #[cfg(feature = "unstable-runtime-subscribe")]
 use kube_client::api::DynamicObject;
@@ -22,7 +19,6 @@ use multi_dispatcher::BroadcastStream;
 #[cfg(feature = "unstable-runtime-subscribe")]
 use multi_dispatcher::MultiDispatcher;
 use std::hash::Hash;
-#[cfg(feature = "unstable-runtime-subscribe")] use std::pin::Pin;
 #[cfg(feature = "unstable-runtime-subscribe")] pub use store::store_shared;
 pub use store::{store, Store};
 

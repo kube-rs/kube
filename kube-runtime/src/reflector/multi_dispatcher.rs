@@ -68,7 +68,8 @@ impl MultiDispatcher {
     }
 }
 
-/// See [`Scheduler::hold`]
+/// BroadcastStream allows to stream shared list of dynamic objects,
+/// sources of which can be changed at any moment.
 pub struct BroadcastStream<W> {
     pub stream: Arc<Mutex<W>>,
 }

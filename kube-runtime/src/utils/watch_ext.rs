@@ -9,16 +9,10 @@ use crate::{
 };
 use kube_client::Resource;
 
-#[cfg(feature = "unstable-runtime-subscribe")]
-use crate::reflector::multi_dispatcher::MultiDispatcher;
 use crate::{
     reflector::store::Writer,
     utils::{Backoff, Reflect},
 };
-#[cfg(feature = "unstable-runtime-subscribe")]
-use kube_client::api::DynamicObject;
-#[cfg(feature = "unstable-runtime-subscribe")] use std::sync::Arc;
-#[cfg(feature = "unstable-runtime-subscribe")] use tokio::sync::Mutex;
 
 use crate::watcher::DefaultBackoff;
 use futures::{Stream, TryStream};
