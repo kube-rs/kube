@@ -885,39 +885,31 @@ pub fn watch_object<K: Resource + Clone + DeserializeOwned + Debug + Send + 'sta
 
 struct ExponentialBackoff {
     inner: backon::ExponentialBackoff,
-    min_delay: Duration,
-    max_delay: Duration,
-    factor: f32,
-    enable_jitter: bool,
+    builder: backon::ExponentialBuilder,
 }
 
 impl ExponentialBackoff {
     fn new(min_delay: Duration, max_delay: Duration, factor: f32, enable_jitter: bool) -> Self {
+        let builder = backon::ExponentialBuilder::default()
+            .with_min_delay(min_delay)
+            .with_max_delay(max_delay)
+            .with_factor(factor)
+            .without_max_times();
+
+        if enable_jitter {
+            builder.with_jitter();
+        }
+
         Self {
-            inner: backon::ExponentialBuilder::default()
-                .with_min_delay(min_delay)
-                .with_max_delay(max_delay)
-                .with_factor(factor)
-                .with_jitter()
-                .build(),
-            min_delay,
-            max_delay,
-            factor,
-            enable_jitter,
+            inner: builder.build(),
+            builder,
         }
     }
 }
 
 impl Backoff for ExponentialBackoff {
     fn reset(&mut self) {
-        let mut builder = backon::ExponentialBuilder::default()
-            .with_min_delay(self.min_delay)
-            .with_max_delay(self.max_delay)
-            .with_factor(self.factor);
-        if self.enable_jitter {
-            builder = builder.with_jitter();
-        }
-        self.inner = builder.build();
+        self.inner = self.builder.build();
     }
 }
 
