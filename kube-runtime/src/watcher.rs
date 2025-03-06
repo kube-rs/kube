@@ -883,13 +883,13 @@ pub fn watch_object<K: Resource + Clone + DeserializeOwned + Debug + Send + 'sta
         })
 }
 
-struct ExponentialBackoff {
+pub struct ExponentialBackoff {
     inner: backon::ExponentialBackoff,
     builder: backon::ExponentialBuilder,
 }
 
 impl ExponentialBackoff {
-    fn new(min_delay: Duration, max_delay: Duration, factor: f32, enable_jitter: bool) -> Self {
+    pub fn new(min_delay: Duration, max_delay: Duration, factor: f32, enable_jitter: bool) -> Self {
         let builder = backon::ExponentialBuilder::default()
             .with_min_delay(min_delay)
             .with_max_delay(max_delay)
