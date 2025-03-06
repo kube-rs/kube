@@ -883,7 +883,7 @@ pub fn watch_object<K: Resource + Clone + DeserializeOwned + Debug + Send + 'sta
         })
 }
 
-struct ExponentialBackoff {
+pub struct ExponentialBackoff {
     inner: backon::ExponentialBackoff,
     builder: backon::ExponentialBuilder,
 }
@@ -918,6 +918,15 @@ impl Iterator for ExponentialBackoff {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
+    }
+}
+
+impl From<backon::ExponentialBuilder> for ExponentialBackoff {
+    fn from(builder: backon::ExponentialBuilder) -> Self {
+        Self {
+            inner: builder.build(),
+            builder,
+        }
     }
 }
 
