@@ -145,16 +145,18 @@ mod test {
     use tower::ServiceBuilder;
 
     // hard disabled test atm due to k3d rustls issues: https://github.com/kube-rs/kube/issues?q=is%3Aopen+is%3Aissue+label%3Arustls
-    #[cfg(feature = "when_rustls_works_with_k3d")]
-    #[tokio::test]
+    #[allow(dead_code)]
+    // #[tokio::test]
     #[ignore = "needs cluster (lists pods)"]
     #[cfg(feature = "rustls-tls")]
     async fn custom_client_rustls_configuration() -> Result<(), Box<dyn std::error::Error>> {
+        use hyper_util::rt::TokioExecutor;
+
         let config = Config::infer().await?;
         let https = config.rustls_https_connector()?;
         let service = ServiceBuilder::new()
             .layer(config.base_uri_layer())
-            .service(hyper::Client::builder().build(https));
+            .service(hyper_util::client::legacy::Client::builder(TokioExecutor::new()).build(https));
         let client = Client::new(service, config.default_namespace);
         let pods: Api<Pod> = Api::default_namespaced(client);
         pods.list(&Default::default()).await?;
@@ -180,7 +182,7 @@ mod test {
 
     #[tokio::test]
     #[ignore = "needs cluster (lists api resources)"]
-    #[cfg(feature = "discovery")]
+    #[cfg(feature = "client")]
     async fn group_discovery_oneshot() -> Result<(), Box<dyn std::error::Error>> {
         use crate::{core::DynamicObject, discovery};
         let client = Client::try_default().await?;
@@ -277,6 +279,7 @@ mod test {
     #[cfg(feature = "ws")]
     async fn pod_can_exec_and_write_to_stdin() -> Result<(), Box<dyn std::error::Error>> {
         use crate::api::{DeleteParams, ListParams, Patch, PatchParams, WatchEvent};
+        use tokio::io::AsyncWriteExt;
 
         let client = Client::try_default().await?;
         let pods: Api<Pod> = Api::default_namespaced(client);
@@ -346,9 +349,42 @@ mod test {
             assert_eq!(out, "1\n2\n3\n");
         }
 
+        // Verify we read from stdout after stdin is closed.
+        {
+            let name = "busybox-kube2";
+            let command = vec!["sh", "-c", "sleep 2; echo test string 2"];
+            let ap = AttachParams::default().stdin(true).stderr(false);
+
+            // Make a connection so we can determine if the K8s cluster supports stream closing.
+            let mut req = pods.request.exec(name, command.clone(), &ap)?;
+            req.extensions_mut().insert("exec");
+            let stream = pods.client.connect(req).await?;
+
+            // This only works is the cluster supports protocol version v5.channel.k8s.io
+            // Skip for older protocols.
+            if stream.supports_stream_close() {
+                let mut attached = pods.exec(name, command, &ap).await?;
+                let mut stdin_writer = attached.stdin().unwrap();
+                let mut stdout_stream = tokio_util::io::ReaderStream::new(attached.stdout().unwrap());
+
+                stdin_writer.write_all(b"this will be ignored\n").await?;
+                _ = stdin_writer.shutdown().await;
+
+                let next_stdout = stdout_stream.next();
+                let stdout = String::from_utf8(next_stdout.await.unwrap().unwrap().to_vec()).unwrap();
+                assert_eq!(stdout, "test string 2\n");
+
+                // AttachedProcess resolves with status object.
+                let status = attached.take_status().unwrap();
+                if let Some(status) = status.await {
+                    assert_eq!(status.status, Some("Success".to_owned()));
+                    assert_eq!(status.reason, None);
+                }
+            }
+        }
+
         // Verify we can write to Stdin
         {
-            use tokio::io::AsyncWriteExt;
             let mut attached = pods
                 .exec(
                     "busybox-kube2",

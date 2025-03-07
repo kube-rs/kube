@@ -1,6 +1,6 @@
 use std::{
     collections::HashMap,
-    fs,
+    fs, io,
     path::{Path, PathBuf},
 };
 
@@ -111,6 +111,14 @@ pub struct Cluster {
     #[serde(rename = "proxy-url")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub proxy_url: Option<String>,
+    /// Compression is enabled by default with the `gzip` feature.
+    /// `disable_compression` allows client to opt-out of response compression for all requests to the server.
+    /// This is useful to speed up requests (specifically lists) when client-server network bandwidth is ample,
+    /// by saving time on compression (server-side) and decompression (client-side):
+    /// https://github.com/kubernetes/kubernetes/issues/112296
+    #[serde(rename = "disable-compression")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub disable_compression: Option<bool>,
     /// Name used to check server certificate.
     ///
     /// If `tls_server_name` is `None`, the hostname used to contact the server is used.
@@ -149,7 +157,7 @@ where
     D: Deserializer<'de>,
 {
     match Option::<String>::deserialize(deserializer) {
-        Ok(Some(secret)) => Ok(Some(SecretString::new(secret))),
+        Ok(Some(secret)) => Ok(Some(SecretString::new(secret.into()))),
         Ok(None) => Ok(None),
         Err(e) => Err(e),
     }
@@ -195,6 +203,7 @@ pub struct AuthInfo {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub client_certificate: Option<String>,
     /// PEM-encoded data from a client cert file for TLS. Overrides `client_certificate`
+    /// this key should be base64 encoded instead of the decode string data
     #[serde(rename = "client-certificate-data")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub client_certificate_data: Option<String>,
@@ -204,6 +213,7 @@ pub struct AuthInfo {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub client_key: Option<String>,
     /// PEM-encoded data from a client key file for TLS. Overrides `client_key`
+    /// this key should be base64 encoded instead of the decode string data
     #[serde(rename = "client-key-data")]
     #[serde(skip_serializing_if = "Option::is_none", default)]
     #[serde(
@@ -326,7 +336,7 @@ pub struct Context {
     /// Name of the cluster for this context
     pub cluster: String,
     /// Name of the `AuthInfo` for this context
-    pub user: String,
+    pub user: Option<String>,
     /// The default namespace to use on unspecified requests
     #[serde(skip_serializing_if = "Option::is_none")]
     pub namespace: Option<String>,
@@ -341,8 +351,8 @@ const KUBECONFIG: &str = "KUBECONFIG";
 impl Kubeconfig {
     /// Read a Config from an arbitrary location
     pub fn read_from<P: AsRef<Path>>(path: P) -> Result<Kubeconfig, KubeconfigError> {
-        let data = fs::read_to_string(&path)
-            .map_err(|source| KubeconfigError::ReadConfig(source, path.as_ref().into()))?;
+        let data =
+            read_path(&path).map_err(|source| KubeconfigError::ReadConfig(source, path.as_ref().into()))?;
 
         // Remap all files we read to absolute paths.
         let mut merged_docs = None;
@@ -487,6 +497,33 @@ where
     });
 }
 
+fn read_path<P: AsRef<Path>>(path: P) -> io::Result<String> {
+    let bytes = fs::read(&path)?;
+    match bytes.as_slice() {
+        [0xFF, 0xFE, ..] => {
+            let utf16_data: Vec<u16> = bytes[2..]
+                .chunks(2)
+                .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
+                .collect();
+            String::from_utf16(&utf16_data)
+                .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Invalid UTF-16 LE"))
+        }
+        [0xFE, 0xFF, ..] => {
+            let utf16_data: Vec<u16> = bytes[2..]
+                .chunks(2)
+                .map(|chunk| u16::from_be_bytes([chunk[0], chunk[1]]))
+                .collect();
+            String::from_utf16(&utf16_data)
+                .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Invalid UTF-16 BE"))
+        }
+        [0xEF, 0xBB, 0xBF, ..] => String::from_utf8(bytes[3..].to_vec())
+            .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Invalid UTF-8 BOM")),
+        _ => {
+            String::from_utf8(bytes).map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Invalid UTF-8"))
+        }
+    }
+}
+
 fn to_absolute(dir: &Path, file: &str) -> Option<String> {
     let path = Path::new(&file);
     if path.is_relative() {
@@ -531,18 +568,15 @@ impl AuthInfo {
         // TODO Shouldn't error when `self.client_key_data.is_none() && self.client_key.is_none()`
 
         load_from_base64_or_file(
-            &self
-                .client_key_data
-                .as_ref()
-                .map(|secret| secret.expose_secret().as_str()),
+            &self.client_key_data.as_ref().map(|secret| secret.expose_secret()),
             &self.client_key,
         )
         .map_err(KubeconfigError::LoadClientKey)
     }
 }
 
-/// Cluster stores information to connect Kubernetes cluster used with auth plugins
-/// that have `provideClusterInfo`` enabled.
+/// Connection information for auth plugins that have `provideClusterInfo` enabled.
+///
 /// This is a copy of [`kube::config::Cluster`] with certificate_authority passed as bytes without the path.
 /// Taken from [clientauthentication/types.go#Cluster](https://github.com/kubernetes/client-go/blob/477cb782cf024bc70b7239f0dca91e5774811950/pkg/apis/clientauthentication/types.go#L73-L129)
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
@@ -662,7 +696,6 @@ mod tests {
 
     use super::*;
     use serde_json::{json, Value};
-    use std::str::FromStr;
 
     #[test]
     fn kubeconfig_merge() {
@@ -671,7 +704,7 @@ mod tests {
             auth_infos: vec![NamedAuthInfo {
                 name: "red-user".into(),
                 auth_info: Some(AuthInfo {
-                    token: Some(SecretString::from_str("first-token").unwrap()),
+                    token: Some(SecretString::new("first-token".into())),
                     ..Default::default()
                 }),
             }],
@@ -683,7 +716,7 @@ mod tests {
                 NamedAuthInfo {
                     name: "red-user".into(),
                     auth_info: Some(AuthInfo {
-                        token: Some(SecretString::from_str("second-token").unwrap()),
+                        token: Some(SecretString::new("second-token".into())),
                         username: Some("red-user".into()),
                         ..Default::default()
                     }),
@@ -691,7 +724,7 @@ mod tests {
                 NamedAuthInfo {
                     name: "green-user".into(),
                     auth_info: Some(AuthInfo {
-                        token: Some(SecretString::from_str("new-token").unwrap()),
+                        token: Some(SecretString::new("new-token".into())),
                         ..Default::default()
                     }),
                 },
@@ -711,8 +744,8 @@ mod tests {
                 .unwrap()
                 .token
                 .as_ref()
-                .map(|t| t.expose_secret().to_string()),
-            Some("first-token".to_string())
+                .map(|t| t.expose_secret()),
+            Some("first-token")
         );
         // Even if it's not conflicting
         assert_eq!(merged.auth_infos[0].auth_info.as_ref().unwrap().username, None);
@@ -908,7 +941,7 @@ password: kube_rs
         let authinfo_debug_output = format!("{authinfo:?}");
         let expected_output = "AuthInfo { \
         username: Some(\"user\"), \
-        password: Some(Secret([REDACTED alloc::string::String])), \
+        password: Some(SecretBox<str>([REDACTED])), \
         token: None, token_file: None, client_certificate: None, \
         client_certificate_data: None, client_key: None, \
         client_key_data: None, impersonate: None, \
@@ -962,5 +995,26 @@ users:
             cluster.config.unwrap(),
             json!({"audience": "foo", "other": "bar"})
         );
+    }
+
+    #[tokio::test]
+    async fn parse_kubeconfig_encodings() {
+        let files = vec![
+            "kubeconfig_utf8.yaml",
+            "kubeconfig_utf16le.yaml",
+            "kubeconfig_utf16be.yaml",
+        ];
+
+        for file_name in files {
+            let path = PathBuf::from(format!(
+                "{}/src/config/test_data/{}",
+                env!("CARGO_MANIFEST_DIR"),
+                file_name
+            ));
+            let cfg = Kubeconfig::read_from(path).unwrap();
+            assert_eq!(cfg.clusters[0].name, "k3d-promstack");
+            assert_eq!(cfg.contexts[0].name, "k3d-promstack");
+            assert_eq!(cfg.auth_infos[0].name, "admin@k3d-k3s-default");
+        }
     }
 }

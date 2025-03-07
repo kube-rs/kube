@@ -46,7 +46,7 @@ where
 
 #[cfg(test)]
 pub(crate) mod test {
-    use std::{pin::pin, task::Poll, vec};
+    use std::{pin::pin, task::Poll};
 
     use super::{Error, Event, EventModify};
     use futures::{poll, stream, StreamExt};
@@ -54,9 +54,9 @@ pub(crate) mod test {
     #[tokio::test]
     async fn eventmodify_modifies_innner_value_of_event() {
         let st = stream::iter([
-            Ok(Event::Applied(0)),
-            Err(Error::TooManyObjects),
-            Ok(Event::Restarted(vec![10])),
+            Ok(Event::Apply(0)),
+            Err(Error::NoResourceVersion),
+            Ok(Event::InitApply(10)),
         ]);
         let mut ev_modify = pin!(EventModify::new(st, |x| {
             *x += 1;
@@ -64,18 +64,18 @@ pub(crate) mod test {
 
         assert!(matches!(
             poll!(ev_modify.next()),
-            Poll::Ready(Some(Ok(Event::Applied(1))))
+            Poll::Ready(Some(Ok(Event::Apply(1))))
         ));
 
         assert!(matches!(
             poll!(ev_modify.next()),
-            Poll::Ready(Some(Err(Error::TooManyObjects)))
+            Poll::Ready(Some(Err(Error::NoResourceVersion)))
         ));
 
         let restarted = poll!(ev_modify.next());
         assert!(matches!(
             restarted,
-            Poll::Ready(Some(Ok(Event::Restarted(vec)))) if vec == [11]
+            Poll::Ready(Some(Ok(Event::InitApply(x)))) if x == 11
         ));
 
         assert!(matches!(poll!(ev_modify.next()), Poll::Ready(None)));

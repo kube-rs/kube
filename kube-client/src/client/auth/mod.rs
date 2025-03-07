@@ -10,7 +10,7 @@ use http::{
     header::{InvalidHeaderValue, AUTHORIZATION},
     HeaderValue, Request,
 };
-use jsonpath_rust::{path::config::JsonPathConfig, JsonPathInst};
+use jsonpath_rust::JsonPath;
 use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -144,7 +144,7 @@ impl TokenFile {
 
     /// Get the cached token. Returns `None` if it's expiring.
     fn cached_token(&self) -> Option<&str> {
-        (!self.is_expiring()).then(|| self.token.expose_secret().as_ref())
+        (!self.is_expiring()).then(|| self.token.expose_secret())
     }
 
     /// Get a token. Reloads from file if the cached token is expiring.
@@ -498,10 +498,9 @@ fn token_from_gcp_provider(provider: &AuthProviderConfig) -> Result<ProviderToke
 }
 
 fn extract_value(json: &serde_json::Value, context: &str, path: &str) -> Result<String, Error> {
-    let cfg = JsonPathConfig::default(); // no need for regex caching here
     let parsed_path = path
         .trim_matches(|c| c == '"' || c == '{' || c == '}')
-        .parse::<JsonPathInst>()
+        .parse::<JsonPath>()
         .map_err(|err| {
             Error::AuthExec(format!(
                 "Failed to parse {context:?} as a JsonPath: {path}\n
@@ -509,7 +508,7 @@ fn extract_value(json: &serde_json::Value, context: &str, path: &str) -> Result<
             ))
         })?;
 
-    let res = parsed_path.find_slice(json, cfg);
+    let res = parsed_path.find_slice(json);
 
     let Some(res) = res.into_iter().next() else {
         return Err(Error::AuthExec(format!(
@@ -517,14 +516,12 @@ fn extract_value(json: &serde_json::Value, context: &str, path: &str) -> Result<
         )));
     };
 
-    if let Some(val) = res.as_str() {
-        Ok(val.to_owned())
-    } else {
-        Err(Error::AuthExec(format!(
-            "Target {:?} value {:?} is not a string: {:?}",
-            context, path, *res
-        )))
-    }
+    let jval = res.to_data();
+    let val = jval.as_str().ok_or(Error::AuthExec(format!(
+        "Target {context:?} value {path:?} is not a string"
+    )))?;
+
+    Ok(val.to_string())
 }
 
 /// ExecCredentials is used by exec-based plugins to communicate credentials to

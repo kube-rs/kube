@@ -1,3 +1,4 @@
+[graph]
 # examples sometimes lag behind as they use higher level dependencies
 # we exclude these from the check because they are not part of our
 # actual dependency tree
@@ -6,20 +7,19 @@ exclude = ["kube-examples"]
 [advisories]
 db-path = "~/.cargo/advisory-db"
 db-urls = ["https://github.com/rustsec/advisory-db"]
-vulnerability = "deny"
-unmaintained = "warn"
+# these are deprecated, but not super helpful for us
+# https://embarkstudios.github.io/cargo-deny/checks/advisories/cfg.html#the-version-field-optional
+# remove them when we have to
 yanked = "warn"
-notice = "warn"
 
+ignore = [
+    "RUSTSEC-2024-0384", # instant dep via unmaintained backoff dep
+]
 
 [licenses]
 # See https://spdx.org/licenses/ for list of possible licenses
 # [possible values: any SPDX 3.11 short identifier (+ optional exception)].
-
 confidence-threshold = 1.0
-copyleft = "deny"
-default = "deny"
-unlicensed = "deny"
 
 # We are beholden to https://github.com/cncf/foundation/blob/master/allowed-third-party-license-policy.md#approved-licenses-for-allowlist
 allow = [
@@ -28,6 +28,14 @@ allow = [
     "BSD-3-Clause",
     "ISC",
     "LicenseRef-ring",
+    # Blanket addition for Unicode-3.0 libs for optional features (affects many deps, but it's a very clean license)
+    # https://github.com/unicode-org/icu4x/blob/main/LICENSE
+    "Unicode-3.0",
+    # Pulled in via aws_lc_rs when using rustls-tls and aws-lc-rs features
+    # https://openssl-library.org/source/license/index.html
+    "OpenSSL",
+    # Pulled in via hashbrown through its foldhash dependency
+    "Zlib",
 ]
 
 exceptions = [
@@ -36,8 +44,10 @@ exceptions = [
     # included in the application. We do not distribute those data files so
     # this is not a problem for us. See https://github.com/dtolnay/unicode-ident/pull/9/files
     # for more details.
-    { allow = ["Unicode-DFS-2016"], name = "unicode-ident" }
-
+    { allow = ["Unicode-DFS-2016"], name = "unicode-ident" },
+    # Pulled in via hyper-rustls when using the webpki-roots feature,
+    # which is off by default.
+    { allow = ["MPL-2.0"], name = "webpki-roots" },
 ]
 
 [[licenses.clarify]]
@@ -53,19 +63,15 @@ unknown-git = "deny"
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
 allow-git = ["https://github.com/tyrone-wu/runtime-macros.git"]
 
+
 [bans]
 multiple-versions = "deny"
 
 [[bans.skip]]
-name = "hermit-abi"
+name = "rustls-native-certs"
 
 [[bans.skip]]
-# Needs a complicated upgrade
-name = "syn"
-
-[[bans.skip]]
-# waiting for pem to bump base64
-# https://github.com/jcreekmore/pem-rs/blob/master/Cargo.toml#L16
+# base64 did some annoying breaking changes
 name = "base64"
 
 [[bans.skip]]
@@ -73,9 +79,35 @@ name = "base64"
 # newer via tower-http (we have latest)
 name = "bitflags"
 
-[[bans.skip]]
-# deep in dependency tree, only dual use via dev dependency
-name = "redox_syscall"
-
 [[bans.skip-tree]]
 name = "windows-sys"
+
+[[bans.skip]]
+# different sources of miniz_oxide which users will not generally see
+name = "miniz_oxide"
+
+# currently multiple version of thiserror in flight due to its major bump
+[[bans.skip]]
+name = "thiserror"
+[[bans.skip]]
+name = "thiserror-impl"
+
+# 2 deps from 2 different version of rustls-native-certs not fully upgradeable yet
+[[bans.skip]]
+name = "security-framework"
+[[bans.skip]]
+name = "core-foundation"
+
+# currently tungstenite hasn't upgraded rand to 0.9 yet, all these are related
+[[bans.skip]]
+name = "rand"
+[[bans.skip]]
+name = "rand_core"
+[[bans.skip]]
+name = "rand_chacha"
+[[bans.skip]]
+name = "getrandom"
+[[bans.skip]]
+name = "wasi"
+[[bans.skip]]
+name = "zerocopy"

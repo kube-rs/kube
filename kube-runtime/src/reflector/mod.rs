@@ -141,7 +141,7 @@ mod tests {
     use futures::{stream, StreamExt, TryStreamExt};
     use k8s_openapi::{api::core::v1::ConfigMap, apimachinery::pkg::apis::meta::v1::ObjectMeta};
     use rand::{
-        distributions::{Bernoulli, Uniform},
+        distr::{Bernoulli, Uniform},
         Rng,
     };
     use std::collections::{BTreeMap, HashMap};
@@ -157,13 +157,10 @@ mod tests {
             },
             ..ConfigMap::default()
         };
-        reflector(
-            store_w,
-            stream::iter(vec![Ok(watcher::Event::Applied(cm.clone()))]),
-        )
-        .map(|_| ())
-        .collect::<()>()
-        .await;
+        reflector(store_w, stream::iter(vec![Ok(watcher::Event::Apply(cm.clone()))]))
+            .map(|_| ())
+            .collect::<()>()
+            .await;
         assert_eq!(store.get(&ObjectRef::from_obj(&cm)).as_deref(), Some(&cm));
     }
 
@@ -189,8 +186,8 @@ mod tests {
         reflector(
             store_w,
             stream::iter(vec![
-                Ok(watcher::Event::Applied(cm.clone())),
-                Ok(watcher::Event::Applied(updated_cm.clone())),
+                Ok(watcher::Event::Apply(cm.clone())),
+                Ok(watcher::Event::Apply(updated_cm.clone())),
             ]),
         )
         .map(|_| ())
@@ -213,8 +210,8 @@ mod tests {
         reflector(
             store_w,
             stream::iter(vec![
-                Ok(watcher::Event::Applied(cm.clone())),
-                Ok(watcher::Event::Deleted(cm.clone())),
+                Ok(watcher::Event::Apply(cm.clone())),
+                Ok(watcher::Event::Delete(cm.clone())),
             ]),
         )
         .map(|_| ())
@@ -244,8 +241,10 @@ mod tests {
         reflector(
             store_w,
             stream::iter(vec![
-                Ok(watcher::Event::Applied(cm_a.clone())),
-                Ok(watcher::Event::Restarted(vec![cm_b.clone()])),
+                Ok(watcher::Event::Apply(cm_a.clone())),
+                Ok(watcher::Event::Init),
+                Ok(watcher::Event::InitApply(cm_b.clone())),
+                Ok(watcher::Event::InitDone),
             ]),
         )
         .map(|_| ())
@@ -257,8 +256,8 @@ mod tests {
 
     #[tokio::test]
     async fn reflector_store_should_not_contain_duplicates() {
-        let mut rng = rand::thread_rng();
-        let item_dist = Uniform::new(0_u8, 100);
+        let mut rng = rand::rng();
+        let item_dist = Uniform::new(0_u8, 100).unwrap();
         let deleted_dist = Bernoulli::new(0.40).unwrap();
         let store_w = store::Writer::default();
         let store = store_w.as_reader();
@@ -276,9 +275,9 @@ mod tests {
                     ..ConfigMap::default()
                 };
                 Ok(if deleted {
-                    watcher::Event::Deleted(obj)
+                    watcher::Event::Delete(obj)
                 } else {
-                    watcher::Event::Applied(obj)
+                    watcher::Event::Apply(obj)
                 })
             })),
         )

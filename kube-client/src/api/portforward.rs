@@ -228,8 +228,7 @@ where
         .map_err(Error::ReceiveWebSocketMessage)?
     {
         match msg {
-            ws::Message::Binary(bin) if bin.len() > 1 => {
-                let mut bytes = Bytes::from(bin);
+            ws::Message::Binary(mut bytes) if bytes.len() > 1 => {
                 let ch = bytes.split_to(1)[0];
                 sender
                     .send(Message::FromPod(ch, bytes))

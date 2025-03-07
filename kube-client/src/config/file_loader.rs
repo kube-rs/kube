@@ -82,15 +82,22 @@ impl ConfigLoader {
             .and_then(|named_cluster| named_cluster.cluster.clone())
             .ok_or_else(|| KubeconfigError::LoadClusterOfContext(cluster_name.clone()))?;
 
-        let user_name = user.unwrap_or(&current_context.user);
-        let mut user = config
-            .auth_infos
-            .iter()
-            .find(|named_user| &named_user.name == user_name)
-            .and_then(|named_user| named_user.auth_info.clone())
-            .ok_or_else(|| KubeconfigError::FindUser(user_name.clone()))?;
+        let user_name = user.or_else(|| current_context.user.as_ref());
 
-        if let Some(exec_config) = &mut user.exec {
+        // client-go doesn't fail on empty/missing user, so we don't either
+        // see https://github.com/kube-rs/kube/issues/1594
+        let mut auth_info = if let Some(user) = user_name {
+            config
+                .auth_infos
+                .iter()
+                .find(|named_user| &named_user.name == user)
+                .and_then(|named_user| named_user.auth_info.clone())
+                .unwrap_or_else(AuthInfo::default)
+        } else {
+            AuthInfo::default()
+        };
+
+        if let Some(exec_config) = &mut auth_info.exec {
             if exec_config.provide_cluster_info {
                 exec_config.cluster = Some((&cluster).try_into()?);
             }
@@ -99,7 +106,7 @@ impl ConfigLoader {
         Ok(ConfigLoader {
             current_context,
             cluster,
-            user,
+            user: auth_info,
         })
     }
 
@@ -117,8 +124,6 @@ impl ConfigLoader {
         let nonempty = |o: Option<String>| o.filter(|s| !s.is_empty());
 
         if let Some(proxy) = nonempty(self.cluster.proxy_url.clone())
-            .or_else(|| nonempty(std::env::var("HTTP_PROXY").ok()))
-            .or_else(|| nonempty(std::env::var("http_proxy").ok()))
             .or_else(|| nonempty(std::env::var("HTTPS_PROXY").ok()))
             .or_else(|| nonempty(std::env::var("https_proxy").ok()))
         {

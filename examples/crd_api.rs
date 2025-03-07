@@ -19,7 +19,10 @@ use kube::{
 #[derive(CustomResource, Deserialize, Serialize, Clone, Debug, Validate, JsonSchema)]
 #[kube(group = "clux.dev", version = "v1", kind = "Foo", namespaced)]
 #[kube(status = "FooStatus")]
-#[kube(scale = r#"{"specReplicasPath":".spec.replicas", "statusReplicasPath":".status.replicas"}"#)]
+#[kube(scale(
+    spec_replicas_path = ".spec.replicas",
+    status_replicas_path = ".status.replicas"
+))]
 #[kube(printcolumn = r#"{"name":"Team", "jsonPath": ".spec.metadata.team", "type": "string"}"#)]
 pub struct FooSpec {
     #[schemars(length(min = 3))]
@@ -204,7 +207,7 @@ async fn main() -> Result<()> {
         replicas: 1,
     });
     // using derived Validate rules locally:
-    assert!(fx.spec.validate(&()).is_err());
+    assert!(fx.spec.validate().is_err());
     // check rejection from apiserver (validation rules embedded in JsonSchema)
     match foos.create(&pp, &fx).await {
         Err(kube::Error::Api(ae)) => {

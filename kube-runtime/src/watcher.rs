@@ -2,20 +2,20 @@
 //!
 //! See [`watcher`] for the primary entry point.
 
-use crate::utils::ResetTimerBackoff;
+use crate::utils::{Backoff, ResetTimerBackoff};
+
 use async_trait::async_trait;
-use backoff::{backoff::Backoff, ExponentialBackoff};
-use derivative::Derivative;
+use backon::BackoffBuilder;
+use educe::Educe;
 use futures::{stream::BoxStream, Stream, StreamExt};
 use kube_client::{
     api::{ListParams, Resource, ResourceExt, VersionMatch, WatchEvent, WatchParams},
-    core::{metadata::PartialObjectMeta, ObjectList},
+    core::{metadata::PartialObjectMeta, ObjectList, Selector},
     error::ErrorResponse,
     Api, Error as ClientErr,
 };
 use serde::de::DeserializeOwned;
-use smallvec::SmallVec;
-use std::{clone::Clone, fmt::Debug, time::Duration};
+use std::{clone::Clone, collections::VecDeque, fmt::Debug, future, time::Duration};
 use thiserror::Error;
 use tracing::{debug, error, warn};
 
@@ -31,8 +31,6 @@ pub enum Error {
     WatchFailed(#[source] kube_client::Error),
     #[error("no metadata.resourceVersion in watch result (does resource support watch?)")]
     NoResourceVersion,
-    #[error("too many objects matched search criteria")]
-    TooManyObjects,
 }
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -40,19 +38,33 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 /// Watch events returned from the [`watcher`]
 pub enum Event<K> {
     /// An object was added or modified
-    Applied(K),
+    Apply(K),
     /// An object was deleted
     ///
     /// NOTE: This should not be used for managing persistent state elsewhere, since
     /// events may be lost if the watcher is unavailable. Use Finalizers instead.
-    Deleted(K),
-    /// The watch stream was restarted, so `Deleted` events may have been missed
+    Delete(K),
+    /// The watch stream was restarted.
     ///
-    /// Should be used as a signal to replace the store contents atomically.
+    /// A series of `InitApply` events are expected to follow until all matching objects
+    /// have been listed. This event can be used to prepare a buffer for `InitApply` events.
+    Init,
+    /// Received an object during `Init`.
     ///
-    /// Any objects that were previously [`Applied`](Event::Applied) but are not listed in this event
-    /// should be assumed to have been [`Deleted`](Event::Deleted).
-    Restarted(Vec<K>),
+    /// Objects returned here are either from the initial stream using the `StreamingList` strategy,
+    /// or from pages using the `ListWatch` strategy.
+    ///
+    /// These events can be passed up if having a complete set of objects is not a concern.
+    /// If you need to wait for a complete set, please buffer these events until an `InitDone`.
+    InitApply(K),
+    /// The initialisation is complete.
+    ///
+    /// This can be used as a signal to replace buffered store contents atomically.
+    /// No more `InitApply` events will happen until the next `Init` event.
+    ///
+    /// Any objects that were previously [`Applied`](Event::Applied) but are not listed in any of
+    /// the `InitApply` events should be assumed to have been [`Deleted`](Event::Deleted).
+    InitDone,
 }
 
 impl<K> Event<K> {
@@ -60,11 +72,14 @@ impl<K> Event<K> {
     ///
     /// `Deleted` objects are ignored, all objects mentioned by `Restarted` events are
     /// emitted individually.
+    #[deprecated(
+        since = "0.92.0",
+        note = "unnecessary to flatten a single object. This fn will be removed in 0.96.0."
+    )]
     pub fn into_iter_applied(self) -> impl Iterator<Item = K> {
         match self {
-            Event::Applied(obj) => SmallVec::from_buf([obj]),
-            Event::Deleted(_) => SmallVec::new(),
-            Event::Restarted(objs) => SmallVec::from_vec(objs),
+            Self::Apply(obj) | Self::InitApply(obj) => Some(obj),
+            Self::Delete(_) | Self::Init | Self::InitDone => None,
         }
         .into_iter()
     }
@@ -74,10 +89,14 @@ impl<K> Event<K> {
     /// Note that `Deleted` events may be missed when restarting the stream. Use finalizers
     /// or owner references instead if you care about cleaning up external resources after
     /// deleted objects.
+    #[deprecated(
+        since = "0.92.0",
+        note = "unnecessary to flatten a single object. This fn will be removed in 0.96.0."
+    )]
     pub fn into_iter_touched(self) -> impl Iterator<Item = K> {
         match self {
-            Event::Applied(obj) | Event::Deleted(obj) => SmallVec::from_buf([obj]),
-            Event::Restarted(objs) => SmallVec::from_vec(objs),
+            Self::Apply(obj) | Self::Delete(obj) | Self::InitApply(obj) => Some(obj),
+            Self::Init | Self::InitDone => None,
         }
         .into_iter()
     }
@@ -102,31 +121,30 @@ impl<K> Event<K> {
     #[must_use]
     pub fn modify(mut self, mut f: impl FnMut(&mut K)) -> Self {
         match &mut self {
-            Event::Applied(obj) | Event::Deleted(obj) => (f)(obj),
-            Event::Restarted(objs) => {
-                for k in objs {
-                    (f)(k)
-                }
-            }
+            Self::Apply(obj) | Self::Delete(obj) | Self::InitApply(obj) => (f)(obj),
+            Self::Init | Self::InitDone => {} // markers, nothing to modify
         }
         self
     }
 }
 
-#[derive(Derivative)]
-#[derivative(Debug)]
+#[derive(Educe, Default)]
+#[educe(Debug)]
 /// The internal finite state machine driving the [`watcher`]
 enum State<K> {
     /// The Watcher is empty, and the next [`poll`](Stream::poll_next) will start the initial LIST to get all existing objects
-    Empty {
+    #[default]
+    Empty,
+    /// The Watcher is in the process of paginating through the initial LIST
+    InitPage {
         continue_token: Option<String>,
-        objects: Vec<K>,
+        objects: VecDeque<K>,
+        last_bookmark: Option<String>,
     },
     /// Kubernetes 1.27 Streaming Lists
     /// The initial watch is in progress
-    IntialWatch {
-        objects: Vec<K>,
-        #[derivative(Debug = "ignore")]
+    InitialWatch {
+        #[educe(Debug(ignore))]
         stream: BoxStream<'static, kube_client::Result<WatchEvent<K>>>,
     },
     /// The initial LIST was successful, so we should move on to starting the actual watch.
@@ -139,18 +157,9 @@ enum State<K> {
     /// with `Empty`.
     Watching {
         resource_version: String,
-        #[derivative(Debug = "ignore")]
+        #[educe(Debug(ignore))]
         stream: BoxStream<'static, kube_client::Result<WatchEvent<K>>>,
     },
-}
-
-impl<K: Resource + Clone> Default for State<K> {
-    fn default() -> Self {
-        Self::Empty {
-            continue_token: None,
-            objects: vec![],
-        }
-    }
 }
 
 /// Used to control whether the watcher receives the full object, or only the
@@ -329,6 +338,27 @@ impl Config {
         self
     }
 
+    /// Configure typed label selectors
+    ///
+    /// Configure typed selectors from [`Selector`](kube_client::core::Selector) and [`Expression`](kube_client::core::Expression) lists.
+    ///
+    /// ```
+    /// use kube_runtime::watcher::Config;
+    /// use kube_client::core::{Expression, Selector, ParseExpressionError};
+    /// use k8s_openapi::apimachinery::pkg::apis::meta::v1::LabelSelector;
+    /// let selector: Selector = Expression::In("env".into(), ["development".into(), "sandbox".into()].into()).into();
+    /// let cfg = Config::default().labels_from(&selector);
+    /// let cfg = Config::default().labels_from(&Expression::Exists("foo".into()).into());
+    /// let selector: Selector = LabelSelector::default().try_into()?;
+    /// let cfg = Config::default().labels_from(&selector);
+    /// # Ok::<(), ParseExpressionError>(())
+    ///```
+    #[must_use]
+    pub fn labels_from(mut self, selector: &Selector) -> Self {
+        self.label_selector = Some(selector.to_string());
+        self
+    }
+
     /// Sets list semantic to configure re-list performance and consistency
     ///
     /// NB: This option only has an effect for [`InitialListStrategy::ListWatch`].
@@ -467,43 +497,14 @@ where
     A::Value: Resource + 'static,
 {
     match state {
-        State::Empty {
-            continue_token,
-            mut objects,
-        } => match wc.initial_list_strategy {
-            InitialListStrategy::ListWatch => {
-                let mut lp = wc.to_list_params();
-                lp.continue_token = continue_token;
-                match api.list(&lp).await {
-                    Ok(list) => {
-                        objects.extend(list.items);
-                        if let Some(continue_token) = list.metadata.continue_.filter(|s| !s.is_empty()) {
-                            (None, State::Empty {
-                                continue_token: Some(continue_token),
-                                objects,
-                            })
-                        } else if let Some(resource_version) =
-                            list.metadata.resource_version.filter(|s| !s.is_empty())
-                        {
-                            (Some(Ok(Event::Restarted(objects))), State::InitListed {
-                                resource_version,
-                            })
-                        } else {
-                            (Some(Err(Error::NoResourceVersion)), State::default())
-                        }
-                    }
-                    Err(err) => {
-                        if std::matches!(err, ClientErr::Api(ErrorResponse { code: 403, .. })) {
-                            warn!("watch list error with 403: {err:?}");
-                        } else {
-                            debug!("watch list error: {err:?}");
-                        }
-                        (Some(Err(Error::InitialListFailed(err))), State::default())
-                    }
-                }
-            }
+        State::Empty => match wc.initial_list_strategy {
+            InitialListStrategy::ListWatch => (Some(Ok(Event::Init)), State::InitPage {
+                continue_token: None,
+                objects: VecDeque::default(),
+                last_bookmark: None,
+            }),
             InitialListStrategy::StreamingList => match api.watch(&wc.to_watch_params(), "0").await {
-                Ok(stream) => (None, State::IntialWatch { stream, objects }),
+                Ok(stream) => (None, State::InitialWatch { stream }),
                 Err(err) => {
                     if std::matches!(err, ClientErr::Api(ErrorResponse { code: 403, .. })) {
                         warn!("watch initlist error with 403: {err:?}");
@@ -514,31 +515,72 @@ where
                 }
             },
         },
-        State::IntialWatch {
+        State::InitPage {
+            continue_token,
             mut objects,
-            mut stream,
+            last_bookmark,
         } => {
+            if let Some(next) = objects.pop_front() {
+                return (Some(Ok(Event::InitApply(next))), State::InitPage {
+                    continue_token,
+                    objects,
+                    last_bookmark,
+                });
+            }
+            // check if we need to perform more pages
+            if continue_token.is_none() {
+                if let Some(resource_version) = last_bookmark {
+                    // we have drained the last page - move on to next stage
+                    return (Some(Ok(Event::InitDone)), State::InitListed { resource_version });
+                }
+            }
+            let mut lp = wc.to_list_params();
+            lp.continue_token = continue_token;
+            match api.list(&lp).await {
+                Ok(list) => {
+                    let last_bookmark = list.metadata.resource_version.filter(|s| !s.is_empty());
+                    let continue_token = list.metadata.continue_.filter(|s| !s.is_empty());
+                    if last_bookmark.is_none() && continue_token.is_none() {
+                        return (Some(Err(Error::NoResourceVersion)), State::Empty);
+                    }
+                    // Buffer page here, causing us to return to this enum branch (State::InitPage)
+                    // until the objects buffer has drained
+                    (None, State::InitPage {
+                        continue_token,
+                        objects: list.items.into_iter().collect(),
+                        last_bookmark,
+                    })
+                }
+                Err(err) => {
+                    if std::matches!(err, ClientErr::Api(ErrorResponse { code: 403, .. })) {
+                        warn!("watch list error with 403: {err:?}");
+                    } else {
+                        debug!("watch list error: {err:?}");
+                    }
+                    (Some(Err(Error::InitialListFailed(err))), State::Empty)
+                }
+            }
+        }
+        State::InitialWatch { mut stream } => {
             match stream.next().await {
                 Some(Ok(WatchEvent::Added(obj) | WatchEvent::Modified(obj))) => {
-                    objects.push(obj);
-                    (None, State::IntialWatch { objects, stream })
+                    (Some(Ok(Event::InitApply(obj))), State::InitialWatch { stream })
                 }
-                Some(Ok(WatchEvent::Deleted(obj))) => {
-                    objects.retain(|o| o.name_any() != obj.name_any() && o.namespace() != obj.namespace());
-                    (None, State::IntialWatch { objects, stream })
+                Some(Ok(WatchEvent::Deleted(_obj))) => {
+                    // Kubernetes claims these events are impossible
+                    // https://kubernetes.io/docs/reference/using-api/api-concepts/#streaming-lists
+                    error!("got deleted event during initial watch. this is a bug");
+                    (None, State::InitialWatch { stream })
                 }
                 Some(Ok(WatchEvent::Bookmark(bm))) => {
                     let marks_initial_end = bm.metadata.annotations.contains_key("k8s.io/initial-events-end");
                     if marks_initial_end {
-                        (Some(Ok(Event::Restarted(objects))), State::Watching {
+                        (Some(Ok(Event::InitDone)), State::Watching {
                             resource_version: bm.metadata.resource_version,
                             stream,
                         })
                     } else {
-                        (None, State::Watching {
-                            resource_version: bm.metadata.resource_version,
-                            stream,
-                        })
+                        (None, State::InitialWatch { stream })
                     }
                 }
                 Some(Ok(WatchEvent::Error(err))) => {
@@ -546,7 +588,7 @@ where
                     let new_state = if err.code == 410 {
                         State::default()
                     } else {
-                        State::IntialWatch { objects, stream }
+                        State::InitialWatch { stream }
                     };
                     if err.code == 403 {
                         warn!("watcher watchevent error 403: {err:?}");
@@ -561,10 +603,7 @@ where
                     } else {
                         debug!("watcher error: {err:?}");
                     }
-                    (Some(Err(Error::WatchFailed(err))), State::IntialWatch {
-                        objects,
-                        stream,
-                    })
+                    (Some(Err(Error::WatchFailed(err))), State::InitialWatch { stream })
                 }
                 None => (None, State::default()),
             }
@@ -596,7 +635,7 @@ where
                 if resource_version.is_empty() {
                     (Some(Err(Error::NoResourceVersion)), State::default())
                 } else {
-                    (Some(Ok(Event::Applied(obj))), State::Watching {
+                    (Some(Ok(Event::Apply(obj))), State::Watching {
                         resource_version,
                         stream,
                     })
@@ -607,7 +646,7 @@ where
                 if resource_version.is_empty() {
                     (Some(Err(Error::NoResourceVersion)), State::default())
                 } else {
-                    (Some(Ok(Event::Deleted(obj))), State::Watching {
+                    (Some(Ok(Event::Delete(obj))), State::Watching {
                         resource_version,
                         stream,
                     })
@@ -678,8 +717,8 @@ where
 /// [`try_for_each`](futures::TryStreamExt::try_for_each) and [`try_concat`](futures::TryStreamExt::try_concat))
 /// will terminate eagerly as soon as they receive an [`Err`].
 ///
-/// This is intended to provide a safe and atomic input interface for a state store like a [`reflector`].
-/// Direct users may want to flatten composite events via [`WatchStreamExt`]:
+/// The events are intended to provide a safe input interface for a state store like a [`reflector`].
+/// Direct users may want to use [`WatchStreamExt`] for higher-level constructs.
 ///
 /// ```no_run
 /// use kube::{
@@ -699,7 +738,7 @@ where
 ///             Ok(())
 ///         })
 ///         .await?;
-///    Ok(())
+///     Ok(())
 /// }
 /// ```
 /// [`WatchStreamExt`]: super::WatchStreamExt
@@ -716,7 +755,7 @@ where
 /// [resource version](https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes)
 /// that we have seen on the stream. If this is successful then the stream is simply resumed from where it left off.
 /// If this fails because the resource version is no longer valid then we start over with a new stream, starting with
-/// an [`Event::Restarted`]. The internals mechanics of recovery should be considered an implementation detail.
+/// an [`Event::Init`]. The internals mechanics of recovery should be considered an implementation detail.
 pub fn watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
     api: Api<K>,
     watcher_config: Config,
@@ -741,8 +780,8 @@ pub fn watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
 /// [`try_for_each`](futures::TryStreamExt::try_for_each) and [`try_concat`](futures::TryStreamExt::try_concat))
 /// will terminate eagerly as soon as they receive an [`Err`].
 ///
-/// This is intended to provide a safe and atomic input interface for a state store like a [`reflector`].
-/// Direct users may want to flatten composite events via [`WatchStreamExt`]:
+/// The events are intended to provide a safe input interface for a state store like a [`reflector`].
+/// Direct users may want to use [`WatchStreamExt`] for higher-level constructs.
 ///
 /// ```no_run
 /// use kube::{
@@ -762,7 +801,7 @@ pub fn watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
 ///             Ok(())
 ///         })
 ///         .await?;
-///    Ok(())
+///     Ok(())
 /// }
 /// ```
 /// [`WatchStreamExt`]: super::WatchStreamExt
@@ -779,7 +818,7 @@ pub fn watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
 /// [resource version](https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes)
 /// that we have seen on the stream. If this is successful then the stream is simply resumed from where it left off.
 /// If this fails because the resource version is no longer valid then we start over with a new stream, starting with
-/// an [`Event::Restarted`]. The internals mechanics of recovery should be considered an implementation detail.
+/// an [`Event::Init`]. The internals mechanics of recovery should be considered an implementation detail.
 #[allow(clippy::module_name_repetitions)]
 pub fn metadata_watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
     api: Api<K>,
@@ -798,35 +837,88 @@ pub fn metadata_watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 
 ///
 /// Emits `None` if the object is deleted (or not found), and `Some` if an object is updated (or created/found).
 ///
-/// Compared to [`watcher`], `watch_object` does not return return [`Event`], since there is no need for an atomic
-/// [`Event::Restarted`] when only one object is covered anyway.
+/// Often invoked indirectly via [`await_condition`](crate::wait::await_condition()).
+///
+/// ## Scope Warning
+///
+/// When using this with an `Api::all` on namespaced resources there is a chance of duplicated names.
+/// To avoid getting confusing / wrong answers for this, use `Api::namespaced` bound to a specific namespace
+/// when watching for transitions to namespaced objects.
 pub fn watch_object<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
     api: Api<K>,
     name: &str,
 ) -> impl Stream<Item = Result<Option<K>>> + Send {
-    watcher(api, Config::default().fields(&format!("metadata.name={name}"))).map(|event| match event? {
-        Event::Deleted(_) => Ok(None),
-        // We're filtering by object name, so getting more than one object means that either:
-        // 1. The apiserver is accepting multiple objects with the same name, or
-        // 2. The apiserver is ignoring our query
-        // In either case, the K8s apiserver is broken and our API will return invalid data, so
-        // we had better bail out ASAP.
-        Event::Restarted(objs) if objs.len() > 1 => Err(Error::TooManyObjects),
-        Event::Restarted(mut objs) => Ok(objs.pop()),
-        Event::Applied(obj) => Ok(Some(obj)),
-    })
+    // filtering by object name in given scope, so there's at most one matching object
+    // footgun: Api::all may generate events from namespaced objects with the same name in different namespaces
+    let fields = format!("metadata.name={name}");
+    watcher(api, Config::default().fields(&fields))
+        // The `obj_seen` state is used to track whether the object exists in each Init / InitApply / InitDone
+        // sequence of events. If the object wasn't seen in any particular sequence it is treated as deleted and
+        // `None` is emitted when the InitDone event is received.
+        //
+        // The first check ensures `None` is emitted if the object was already gone (or not found), subsequent
+        // checks ensure `None` is emitted even if for some reason the Delete event wasn't received, which
+        // could happen given K8S events aren't guaranteed delivery.
+        .scan(false, |obj_seen, event| {
+            if matches!(event, Ok(Event::Init)) {
+                *obj_seen = false;
+            } else if matches!(event, Ok(Event::InitApply(_))) {
+                *obj_seen = true;
+            }
+            future::ready(Some((*obj_seen, event)))
+        })
+        .filter_map(|(obj_seen, event)| async move {
+            match event {
+                // Pass up `Some` for Found / Updated
+                Ok(Event::Apply(obj) | Event::InitApply(obj)) => Some(Ok(Some(obj))),
+                // Pass up `None` for Deleted
+                Ok(Event::Delete(_)) => Some(Ok(None)),
+                // Pass up `None` if the object wasn't seen in the initial list
+                Ok(Event::InitDone) if !obj_seen => Some(Ok(None)),
+                // Ignore marker events
+                Ok(Event::Init | Event::InitDone) => None,
+                // Bubble up errors
+                Err(err) => Some(Err(err)),
+            }
+        })
 }
 
-/// Default watch [`Backoff`] inspired by Kubernetes' client-go.
-///
-/// This fn has been moved into [`DefaultBackoff`].
-#[must_use]
-#[deprecated(
-    since = "0.84.0",
-    note = "replaced by `watcher::DefaultBackoff`. This fn will be removed in 0.88.0."
-)]
-pub fn default_backoff() -> DefaultBackoff {
-    DefaultBackoff::default()
+struct ExponentialBackoff {
+    inner: backon::ExponentialBackoff,
+    builder: backon::ExponentialBuilder,
+}
+
+impl ExponentialBackoff {
+    fn new(min_delay: Duration, max_delay: Duration, factor: f32, enable_jitter: bool) -> Self {
+        let builder = backon::ExponentialBuilder::default()
+            .with_min_delay(min_delay)
+            .with_max_delay(max_delay)
+            .with_factor(factor)
+            .without_max_times();
+
+        if enable_jitter {
+            builder.with_jitter();
+        }
+
+        Self {
+            inner: builder.build(),
+            builder,
+        }
+    }
+}
+
+impl Backoff for ExponentialBackoff {
+    fn reset(&mut self) {
+        self.inner = self.builder.build();
+    }
+}
+
+impl Iterator for ExponentialBackoff {
+    type Item = Duration;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
 }
 
 /// Default watcher backoff inspired by Kubernetes' client-go.
@@ -845,25 +937,22 @@ type Strategy = ResetTimerBackoff<ExponentialBackoff>;
 impl Default for DefaultBackoff {
     fn default() -> Self {
         Self(ResetTimerBackoff::new(
-            backoff::ExponentialBackoff {
-                initial_interval: Duration::from_millis(800),
-                max_interval: Duration::from_secs(30),
-                randomization_factor: 1.0,
-                multiplier: 2.0,
-                max_elapsed_time: None,
-                ..ExponentialBackoff::default()
-            },
+            ExponentialBackoff::new(Duration::from_millis(800), Duration::from_secs(30), 2.0, true),
             Duration::from_secs(120),
         ))
     }
 }
 
-impl Backoff for DefaultBackoff {
-    fn next_backoff(&mut self) -> Option<Duration> {
-        self.0.next_backoff()
-    }
+impl Iterator for DefaultBackoff {
+    type Item = Duration;
 
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.next()
+    }
+}
+
+impl Backoff for DefaultBackoff {
     fn reset(&mut self) {
-        self.0.reset()
+        self.0.reset();
     }
 }

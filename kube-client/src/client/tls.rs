@@ -4,7 +4,7 @@ pub mod rustls_tls {
     use rustls::{
         self,
         client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier},
-        pki_types::{CertificateDer, PrivateKeyDer, ServerName},
+        pki_types::{CertificateDer, InvalidDnsNameError, PrivateKeyDer, ServerName},
         ClientConfig, DigitallySignedStruct,
     };
     use thiserror::Error;
@@ -14,7 +14,7 @@ pub mod rustls_tls {
     pub enum Error {
         /// Identity PEM is invalid
         #[error("identity PEM is invalid: {0}")]
-        InvalidIdentityPem(#[source] std::io::Error),
+        InvalidIdentityPem(#[source] rustls::pki_types::pem::Error),
 
         /// Identity PEM is missing a private key: the key must be PKCS8 or RSA/PKCS1
         #[error("identity PEM is missing a private key: the key must be PKCS8 or RSA/PKCS1")]
@@ -38,8 +38,12 @@ pub mod rustls_tls {
         AddRootCertificate(#[source] Box<dyn std::error::Error + Send + Sync>),
 
         /// No valid native root CA certificates found
-        #[error("No valid native root CA certificates found")]
+        #[error("no valid native root CA certificates found")]
         NoValidNativeRootCA(#[source] std::io::Error),
+
+        /// Invalid server name
+        #[error("invalid server name: {0}")]
+        InvalidServerName(#[source] InvalidDnsNameError),
     }
 
     /// Create `rustls::ClientConfig`.
@@ -51,9 +55,18 @@ pub mod rustls_tls {
         let config_builder = if let Some(certs) = root_certs {
             ClientConfig::builder().with_root_certificates(root_store(certs)?)
         } else {
-            ClientConfig::builder()
-                .with_native_roots()
-                .map_err(Error::NoValidNativeRootCA)?
+            #[cfg(feature = "webpki-roots")]
+            {
+                // Use WebPKI roots.
+                ClientConfig::builder().with_webpki_roots()
+            }
+            #[cfg(not(feature = "webpki-roots"))]
+            {
+                // Use native roots. This will panic on Android and iOS.
+                ClientConfig::builder()
+                    .with_native_roots()
+                    .map_err(Error::NoValidNativeRootCA)?
+            }
         };
 
         let mut client_config = if let Some((chain, pkey)) = identity_pem.map(client_auth).transpose()? {
@@ -83,22 +96,19 @@ pub mod rustls_tls {
     }
 
     fn client_auth(data: &[u8]) -> Result<(Vec<CertificateDer<'static>>, PrivateKeyDer<'static>), Error> {
-        use rustls_pemfile::Item;
+        use rustls::pki_types::pem::{self, SectionKind};
 
         let mut cert_chain = Vec::new();
         let mut pkcs8_key = None;
         let mut pkcs1_key = None;
         let mut sec1_key = None;
         let mut reader = std::io::Cursor::new(data);
-        for item in rustls_pemfile::read_all(&mut reader)
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(Error::InvalidIdentityPem)?
-        {
-            match item {
-                Item::X509Certificate(cert) => cert_chain.push(cert),
-                Item::Pkcs8Key(key) => pkcs8_key = Some(PrivateKeyDer::Pkcs8(key)),
-                Item::Pkcs1Key(key) => pkcs1_key = Some(PrivateKeyDer::from(key)),
-                Item::Sec1Key(key) => sec1_key = Some(PrivateKeyDer::from(key)),
+        while let Some((kind, der)) = pem::from_buf(&mut reader).map_err(Error::InvalidIdentityPem)? {
+            match kind {
+                SectionKind::Certificate => cert_chain.push(der.into()),
+                SectionKind::PrivateKey => pkcs8_key = Some(PrivateKeyDer::Pkcs8(der.into())),
+                SectionKind::RsaPrivateKey => pkcs1_key = Some(PrivateKeyDer::Pkcs1(der.into())),
+                SectionKind::EcPrivateKey => sec1_key = Some(PrivateKeyDer::Sec1(der.into())),
                 _ => return Err(Error::UnknownPrivateKeyFormat),
             }
         }

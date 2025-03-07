@@ -1,4 +1,4 @@
-use derivative::Derivative;
+use educe::Educe;
 use k8s_openapi::{api::core::v1::ObjectReference, apimachinery::pkg::apis::meta::v1::OwnerReference};
 #[cfg(doc)] use kube_client::core::ObjectMeta;
 use kube_client::{
@@ -98,13 +98,12 @@ impl<K: Resource> Lookup for K {
     }
 }
 
-#[derive(Derivative)]
-#[derivative(
-    Debug(bound = "K::DynamicType: Debug"),
-    PartialEq(bound = "K::DynamicType: PartialEq"),
-    Eq(bound = "K::DynamicType: Eq"),
-    Hash(bound = "K::DynamicType: Hash"),
-    Clone(bound = "K::DynamicType: Clone")
+#[derive(Educe)]
+#[educe(
+    Debug(bound("K::DynamicType: Debug")),
+    PartialEq(bound("K::DynamicType: PartialEq")),
+    Hash(bound("K::DynamicType: Hash")),
+    Clone(bound("K::DynamicType: Clone"))
 )]
 /// A typed and namedspaced (if relevant) reference to a Kubernetes object
 ///
@@ -141,9 +140,11 @@ pub struct ObjectRef<K: Lookup + ?Sized> {
     ///
     /// This is *not* considered when comparing objects, but may be used when converting to and from other representations,
     /// such as [`OwnerReference`] or [`ObjectReference`].
-    #[derivative(Hash = "ignore", PartialEq = "ignore")]
+    #[educe(Hash(ignore), PartialEq(ignore))]
     pub extra: Extra,
 }
+
+impl<K: Lookup + ?Sized> Eq for ObjectRef<K> where K::DynamicType: Eq {}
 
 /// Non-vital information about an object being referred to
 ///
@@ -167,11 +168,17 @@ where
     }
 
     #[must_use]
-    pub fn from_obj(obj: &K) -> Self
-    where
-        K: Lookup,
-    {
+    pub fn from_obj(obj: &K) -> Self {
         obj.to_object_ref(Default::default())
+    }
+}
+
+impl<K: Lookup> From<&K> for ObjectRef<K>
+where
+    K::DynamicType: Default,
+{
+    fn from(obj: &K) -> Self {
+        Self::from_obj(obj)
     }
 }
 

@@ -12,9 +12,8 @@ keywords = ["kubernetes", "runtime", "reflector", "watcher", "controller"]
 categories = ["web-programming::http-client", "caching", "network-programming"]
 
 [features]
-unstable-runtime = ["unstable-runtime-subscribe", "unstable-runtime-predicates", "unstable-runtime-stream-control", "unstable-runtime-reconcile-on"]
+unstable-runtime = ["unstable-runtime-subscribe", "unstable-runtime-stream-control", "unstable-runtime-reconcile-on"]
 unstable-runtime-subscribe = []
-unstable-runtime-predicates = []
 unstable-runtime-stream-control = []
 unstable-runtime-reconcile-on = []
 
@@ -30,11 +29,10 @@ rust.unsafe_code = "forbid"
 #rust.missing_docs = "warn"
 
 [dependencies]
-futures.workspace = true
-kube-client = { path = "../kube-client", version = "=0.91.0", default-features = false, features = ["jsonpatch", "client"] }
-derivative.workspace = true
+futures = { workspace = true, features = ["async-await"] }
+kube-client = { path = "../kube-client", version = "=0.98.0", default-features = false, features = ["jsonpatch", "client"] }
+educe = { workspace = true, features = ["Clone", "Debug", "Hash", "PartialEq"] }
 serde.workspace = true
-smallvec.workspace = true
 ahash.workspace = true
 parking_lot.workspace = true
 pin-project.workspace = true
@@ -42,18 +40,21 @@ tokio = { workspace = true, features = ["time"] }
 tokio-util = { workspace = true, features = ["time"] }
 tracing.workspace = true
 json-patch.workspace = true
+jsonptr.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
-backoff.workspace = true
+backon.workspace = true
 async-trait.workspace = true
 hashbrown.workspace = true
 k8s-openapi.workspace = true
 async-broadcast.workspace = true
 async-stream.workspace = true
+hostname.workspace = true
 
 [dev-dependencies]
 kube = { path = "../kube", features = ["derive", "client", "runtime"], version = "<1.0.0, >=0.60.0" }
 serde_json.workspace = true
+serde_yaml.workspace = true
 tokio = { workspace = true, features = ["full", "test-util"] }
 rand.workspace = true
 schemars.workspace = true

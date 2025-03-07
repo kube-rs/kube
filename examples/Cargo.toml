@@ -24,12 +24,13 @@ latest = ["k8s-openapi/latest"]
 [dev-dependencies]
 tokio-util.workspace = true
 assert-json-diff.workspace = true
-garde = { version = "0.18.0", default-features = false, features = ["derive"] }
+garde = { version = "0.22.0", default-features = false, features = ["derive"] }
 anyhow.workspace = true
 futures = { workspace = true, features = ["async-await"] }
 jsonpath-rust.workspace = true
-kube = { path = "../kube", version = "^0.91.0", default-features = false, features = ["admission"] }
-kube-derive = { path = "../kube-derive", version = "^0.91.0", default-features = false } # only needed to opt out of schema
+jsonptr.workspace = true
+kube = { path = "../kube", version = "^0.98.0", default-features = false, features = ["admission"] }
+kube-derive = { path = "../kube-derive", version = "^0.98.0", default-features = false } # only needed to opt out of schema
 k8s-openapi.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
@@ -51,11 +52,11 @@ tower-http = { workspace = true, features = ["trace", "decompression-gzip"] }
 hyper = { workspace = true, features = ["client", "http1"] }
 hyper-util = { workspace = true, features = ["client-legacy", "http1", "tokio"] }
 thiserror.workspace = true
-backoff.workspace = true
+backon.workspace = true
 clap = { version = "4.0", default-features = false, features = ["std", "cargo", "derive"] }
 edit = "0.1.3"
 tokio-stream = { version = "0.1.9", features = ["net"] }
-crossterm = "0.27.0"
+crossterm = "0.28.1"
 
 [[example]]
 name = "configmapgen_controller"
@@ -183,6 +184,10 @@ name = "pod_watcher"
 path = "pod_watcher.rs"
 
 [[example]]
+name = "errorbounded_configmap_watcher"
+path = "errorbounded_configmap_watcher.rs"
+
+[[example]]
 name = "request_raw"
 path = "request_raw.rs"
 
@@ -218,6 +223,10 @@ required-features = ["openssl-tls", "rustls-tls"]
 [[example]]
 name = "custom_client_trace"
 path = "custom_client_trace.rs"
+
+[[example]]
+name = "cert_check"
+path = "cert_check.rs"
 
 [[example]]
 name = "secret_syncer"

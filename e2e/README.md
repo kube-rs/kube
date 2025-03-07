@@ -34,4 +34,4 @@ Then, run `just e2e-incluster openssl,latest` or `just e2e-incluster rustls,late
 
 Build the `boot` bin against various `k8s-openapi` version features, and check that it runs. Uses local auth; not dockerised.
 
-To run this with all feature combinations combinations, run `just e2e-mink8s`.
+To run this with all feature combinations, run `just e2e-mink8s`.

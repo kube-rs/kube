@@ -24,7 +24,7 @@ async fn main() -> anyhow::Result<()> {
         .default_backoff()
         .reflect(writer)
         .applied_objects()
-        .predicate_filter(predicates::labels.combine(predicates::annotations)); // NB: requires an unstable feature
+        .predicate_filter(predicates::labels.combine(predicates::annotations));
     let mut stream = pin!(stream);
 
     // Periodically read our state in the background

@@ -4,7 +4,7 @@ use core::{
 };
 use std::{fmt::Debug, sync::Arc};
 
-use derivative::Derivative;
+use educe::Educe;
 use futures::Stream;
 use pin_project::pin_project;
 use std::task::ready;
@@ -14,8 +14,8 @@ use async_broadcast::{InactiveReceiver, Receiver, Sender};
 
 use super::Lookup;
 
-#[derive(Derivative)]
-#[derivative(Debug(bound = "K: Debug, K::DynamicType: Debug"), Clone)]
+#[derive(Educe)]
+#[educe(Debug(bound("K: Debug, K::DynamicType: Debug")), Clone)]
 // A helper type that holds a broadcast transmitter and a broadcast receiver,
 // used to fan-out events from a root stream to multiple listeners.
 pub(crate) struct Dispatcher<K>
@@ -148,10 +148,10 @@ pub(crate) mod test {
         watcher::{Error, Event},
         WatchStreamExt,
     };
-    use std::{sync::Arc, task::Poll, vec};
+    use std::{pin::pin, sync::Arc, task::Poll};
 
     use crate::reflector;
-    use futures::{pin_mut, poll, stream, StreamExt};
+    use futures::{poll, stream, StreamExt};
     use k8s_openapi::api::core::v1::Pod;
 
     fn testpod(name: &str) -> Pod {
@@ -165,32 +165,46 @@ pub(crate) mod test {
         let foo = testpod("foo");
         let bar = testpod("bar");
         let st = stream::iter([
-            Ok(Event::Applied(foo.clone())),
-            Err(Error::TooManyObjects),
-            Ok(Event::Restarted(vec![foo, bar])),
+            Ok(Event::Apply(foo.clone())),
+            Err(Error::NoResourceVersion),
+            Ok(Event::Init),
+            Ok(Event::InitApply(foo)),
+            Ok(Event::InitApply(bar)),
+            Ok(Event::InitDone),
         ]);
 
         let (reader, writer) = reflector::store_shared(10);
-        let reflect = st.reflect_shared(writer);
-        pin_mut!(reflect);
+        let mut reflect = pin!(st.reflect_shared(writer));
 
         // Prior to any polls, we should have an empty store.
         assert_eq!(reader.len(), 0);
         assert!(matches!(
             poll!(reflect.next()),
-            Poll::Ready(Some(Ok(Event::Applied(_))))
+            Poll::Ready(Some(Ok(Event::Apply(_))))
         ));
 
         // Make progress and assert all events are seen
         assert_eq!(reader.len(), 1);
         assert!(matches!(
             poll!(reflect.next()),
-            Poll::Ready(Some(Err(Error::TooManyObjects)))
+            Poll::Ready(Some(Err(Error::NoResourceVersion)))
         ));
         assert_eq!(reader.len(), 1);
 
         let restarted = poll!(reflect.next());
-        assert!(matches!(restarted, Poll::Ready(Some(Ok(Event::Restarted(_))))));
+        assert!(matches!(restarted, Poll::Ready(Some(Ok(Event::Init)))));
+        assert_eq!(reader.len(), 1);
+
+        let restarted = poll!(reflect.next());
+        assert!(matches!(restarted, Poll::Ready(Some(Ok(Event::InitApply(_))))));
+        assert_eq!(reader.len(), 1);
+
+        let restarted = poll!(reflect.next());
+        assert!(matches!(restarted, Poll::Ready(Some(Ok(Event::InitApply(_))))));
+        assert_eq!(reader.len(), 1);
+
+        let restarted = poll!(reflect.next());
+        assert!(matches!(restarted, Poll::Ready(Some(Ok(Event::InitDone)))));
         assert_eq!(reader.len(), 2);
 
         assert!(matches!(poll!(reflect.next()), Poll::Ready(None)));
@@ -206,48 +220,66 @@ pub(crate) mod test {
         let foo = testpod("foo");
         let bar = testpod("bar");
         let st = stream::iter([
-            Ok(Event::Deleted(foo.clone())),
-            Ok(Event::Applied(foo.clone())),
-            Err(Error::TooManyObjects),
-            Ok(Event::Restarted(vec![foo.clone(), bar.clone()])),
+            Ok(Event::Delete(foo.clone())),
+            Ok(Event::Apply(foo.clone())),
+            Err(Error::NoResourceVersion),
+            Ok(Event::Init),
+            Ok(Event::InitApply(foo.clone())),
+            Ok(Event::InitApply(bar.clone())),
+            Ok(Event::InitDone),
         ]);
 
         let foo = Arc::new(foo);
-        let bar = Arc::new(bar);
+        let _bar = Arc::new(bar);
 
         let (_, writer) = reflector::store_shared(10);
-        let subscriber = writer.subscribe().unwrap();
-        let reflect = st.reflect_shared(writer);
-        pin_mut!(reflect);
-        pin_mut!(subscriber);
+        let mut subscriber = pin!(writer.subscribe().unwrap());
+        let mut reflect = pin!(st.reflect_shared(writer));
 
         // Deleted events should be skipped by subscriber.
         assert!(matches!(
             poll!(reflect.next()),
-            Poll::Ready(Some(Ok(Event::Deleted(_))))
+            Poll::Ready(Some(Ok(Event::Delete(_))))
         ));
         assert_eq!(poll!(subscriber.next()), Poll::Pending);
 
         assert!(matches!(
             poll!(reflect.next()),
-            Poll::Ready(Some(Ok(Event::Applied(_))))
+            Poll::Ready(Some(Ok(Event::Apply(_))))
         ));
         assert_eq!(poll!(subscriber.next()), Poll::Ready(Some(foo.clone())));
 
         // Errors are not propagated to subscribers.
         assert!(matches!(
             poll!(reflect.next()),
-            Poll::Ready(Some(Err(Error::TooManyObjects)))
+            Poll::Ready(Some(Err(Error::NoResourceVersion)))
         ));
         assert!(matches!(poll!(subscriber.next()), Poll::Pending));
 
         // Restart event will yield all objects in the list
+
         assert!(matches!(
             poll!(reflect.next()),
-            Poll::Ready(Some(Ok(Event::Restarted(_))))
+            Poll::Ready(Some(Ok(Event::Init)))
         ));
-        assert_eq!(poll!(subscriber.next()), Poll::Ready(Some(foo.clone())));
-        assert_eq!(poll!(subscriber.next()), Poll::Ready(Some(bar.clone())));
+
+        assert!(matches!(
+            poll!(reflect.next()),
+            Poll::Ready(Some(Ok(Event::InitApply(_))))
+        ));
+        assert!(matches!(
+            poll!(reflect.next()),
+            Poll::Ready(Some(Ok(Event::InitApply(_))))
+        ));
+
+        assert!(matches!(
+            poll!(reflect.next()),
+            Poll::Ready(Some(Ok(Event::InitDone)))
+        ));
+
+        // these don't come back in order atm:
+        assert!(matches!(poll!(subscriber.next()), Poll::Ready(Some(_))));
+        assert!(matches!(poll!(subscriber.next()), Poll::Ready(Some(_))));
 
         // When main channel is closed, it is propagated to subscribers
         assert!(matches!(poll!(reflect.next()), Poll::Ready(None)));
@@ -261,21 +293,23 @@ pub(crate) mod test {
         let foo = testpod("foo");
         let bar = testpod("bar");
         let st = stream::iter([
-            Ok(Event::Applied(foo.clone())),
-            Ok(Event::Restarted(vec![foo.clone(), bar.clone()])),
+            Ok(Event::Apply(foo.clone())),
+            Ok(Event::Init),
+            Ok(Event::InitApply(foo.clone())),
+            Ok(Event::InitApply(bar.clone())),
+            Ok(Event::InitDone),
         ]);
 
         let foo = Arc::new(foo);
-        let bar = Arc::new(bar);
+        let _bar = Arc::new(bar);
 
         let (_, writer) = reflector::store_shared(10);
-        let subscriber = writer.subscribe().unwrap();
+        let mut subscriber = pin!(writer.subscribe().unwrap());
         let mut reflect = Box::pin(st.reflect_shared(writer));
-        pin_mut!(subscriber);
 
         assert!(matches!(
             poll!(reflect.next()),
-            Poll::Ready(Some(Ok(Event::Applied(_))))
+            Poll::Ready(Some(Ok(Event::Apply(_))))
         ));
         assert_eq!(poll!(subscriber.next()), Poll::Ready(Some(foo.clone())));
 
@@ -284,14 +318,34 @@ pub(crate) mod test {
         //
         // First, subscribers should be pending.
         assert_eq!(poll!(subscriber.next()), Poll::Pending);
+
         assert!(matches!(
             poll!(reflect.next()),
-            Poll::Ready(Some(Ok(Event::Restarted(_))))
+            Poll::Ready(Some(Ok(Event::Init)))
+        ));
+        assert_eq!(poll!(subscriber.next()), Poll::Pending);
+
+        assert!(matches!(
+            poll!(reflect.next()),
+            Poll::Ready(Some(Ok(Event::InitApply(_))))
+        ));
+        assert_eq!(poll!(subscriber.next()), Poll::Pending);
+
+        assert!(matches!(
+            poll!(reflect.next()),
+            Poll::Ready(Some(Ok(Event::InitApply(_))))
+        ));
+        assert_eq!(poll!(subscriber.next()), Poll::Pending);
+
+        assert!(matches!(
+            poll!(reflect.next()),
+            Poll::Ready(Some(Ok(Event::InitDone)))
         ));
         drop(reflect);
 
-        assert_eq!(poll!(subscriber.next()), Poll::Ready(Some(foo.clone())));
-        assert_eq!(poll!(subscriber.next()), Poll::Ready(Some(bar.clone())));
+        // we will get foo and bar here, but we dont have a guaranteed ordering on page events
+        assert!(matches!(poll!(subscriber.next()), Poll::Ready(Some(_))));
+        assert!(matches!(poll!(subscriber.next()), Poll::Ready(Some(_))));
         assert_eq!(poll!(subscriber.next()), Poll::Ready(None));
     }
 
@@ -305,33 +359,33 @@ pub(crate) mod test {
         let foo = testpod("foo");
         let bar = testpod("bar");
         let st = stream::iter([
-            Ok(Event::Applied(foo.clone())),
-            Ok(Event::Restarted(vec![foo.clone(), bar.clone()])),
+            //TODO: include a ready event here to avoid dealing with Init?
+            Ok(Event::Apply(foo.clone())),
+            Ok(Event::Apply(bar.clone())),
+            Ok(Event::Apply(foo.clone())),
         ]);
 
         let foo = Arc::new(foo);
         let bar = Arc::new(bar);
 
         let (_, writer) = reflector::store_shared(1);
-        let subscriber = writer.subscribe().unwrap();
-        let subscriber_slow = writer.subscribe().unwrap();
-        let reflect = st.reflect_shared(writer);
-        pin_mut!(reflect);
-        pin_mut!(subscriber);
-        pin_mut!(subscriber_slow);
+        let mut subscriber = pin!(writer.subscribe().unwrap());
+        let mut subscriber_slow = pin!(writer.subscribe().unwrap());
+        let mut reflect = pin!(st.reflect_shared(writer));
 
         assert_eq!(poll!(subscriber.next()), Poll::Pending);
         assert_eq!(poll!(subscriber_slow.next()), Poll::Pending);
 
         // Poll first subscriber, but not the second.
         //
-        // The buffer can hold one value, so even if we have a slow subscriber,
+        // The buffer can hold one object value, so even if we have a slow subscriber,
         // we will still get an event from the root.
         assert!(matches!(
             poll!(reflect.next()),
-            Poll::Ready(Some(Ok(Event::Applied(_))))
+            Poll::Ready(Some(Ok(Event::Apply(_))))
         ));
         assert_eq!(poll!(subscriber.next()), Poll::Ready(Some(foo.clone())));
+
         // One subscriber is not reading, so we need to apply backpressure until
         // channel has capacity.
         //
@@ -348,18 +402,21 @@ pub(crate) mod test {
 
         // We now have room for only one more item. In total, the previous event
         // had two. We repeat the same pattern.
-        assert!(matches!(poll!(reflect.next()), Poll::Pending));
-        assert_eq!(poll!(subscriber.next()), Poll::Ready(Some(foo.clone())));
-        assert!(matches!(poll!(reflect.next()), Poll::Pending));
-        assert_eq!(poll!(subscriber_slow.next()), Poll::Ready(Some(foo.clone())));
         assert!(matches!(
             poll!(reflect.next()),
-            Poll::Ready(Some(Ok(Event::Restarted(_))))
+            Poll::Ready(Some(Ok(Event::Apply(_))))
+        ));
+        assert_eq!(poll!(subscriber.next()), Poll::Ready(Some(bar.clone())));
+        assert!(matches!(poll!(reflect.next()), Poll::Pending));
+        assert_eq!(poll!(subscriber_slow.next()), Poll::Ready(Some(bar.clone())));
+        assert!(matches!(
+            poll!(reflect.next()),
+            Poll::Ready(Some(Ok(Event::Apply(_))))
         ));
         // Poll again to drain the queue.
         assert!(matches!(poll!(reflect.next()), Poll::Ready(None)));
-        assert_eq!(poll!(subscriber.next()), Poll::Ready(Some(bar.clone())));
-        assert_eq!(poll!(subscriber_slow.next()), Poll::Ready(Some(bar.clone())));
+        assert_eq!(poll!(subscriber.next()), Poll::Ready(Some(foo.clone())));
+        assert_eq!(poll!(subscriber_slow.next()), Poll::Ready(Some(foo.clone())));
 
         assert_eq!(poll!(subscriber.next()), Poll::Ready(None));
         assert_eq!(poll!(subscriber_slow.next()), Poll::Ready(None));

@@ -10,11 +10,11 @@
 //! - [`client`] with the Kubernetes [`Client`] and its layers
 //! - [`config`] for cluster [`Config`]
 //! - [`api`] with the generic Kubernetes [`Api`]
-//! - [`derive`](kube_derive) with the [`CustomResource`] derive for building controllers types
+//! - [`derive`](kube_derive) with the [`CustomResource`] / [`Resource`](kube_derive::Resource) derive for building controllers types
 //! - [`runtime`] with a [`Controller`](crate::runtime::Controller) / [`watcher`](crate::runtime::watcher()) / [`reflector`](crate::runtime::reflector::reflector) / [`Store`](crate::runtime::reflector::Store)
 //! - [`core`] with generics from `apimachinery`
 //!
-//! You can use each of these as you need with the help of the [exported features](https://github.com/kube-rs/kube/blob/main/kube/Cargo.toml#L18).
+//! You can use each of these as you need with the help of the [exported features](https://kube.rs/features/).
 //!
 //! # Using the Client
 //! ```no_run
@@ -160,26 +160,56 @@ cfg_error! {
     pub type Result<T, E = Error> = std::result::Result<T, E>;
 }
 
-/// Re-exports from [`kube-derive`](kube_derive)
 #[cfg(feature = "derive")]
 #[cfg_attr(docsrs, doc(cfg(feature = "derive")))]
 pub use kube_derive::CustomResource;
 
-/// Re-exports from `kube-runtime`
+#[cfg(feature = "derive")]
+#[cfg_attr(docsrs, doc(cfg(feature = "derive")))]
+pub use kube_derive::Resource;
+
+#[cfg(feature = "derive")]
+#[cfg_attr(docsrs, doc(cfg(feature = "derive")))]
+pub use kube_derive::CELSchema;
+
 #[cfg(feature = "runtime")]
 #[cfg_attr(docsrs, doc(cfg(feature = "runtime")))]
 #[doc(inline)]
 pub use kube_runtime as runtime;
 
 pub use crate::core::{CustomResourceExt, Resource, ResourceExt};
-/// Re-exports from `kube_core`
-#[doc(inline)]
-pub use kube_core as core;
+#[doc(inline)] pub use kube_core as core;
 
 // Mock tests for the runtime
 #[cfg(test)]
 #[cfg(all(feature = "derive", feature = "runtime"))]
 mod mock_tests;
+
+pub mod prelude {
+    //! A prelude for kube. Reduces the number of duplicated imports.
+    //!
+    //! This prelude is similar to the standard library's prelude in that you'll
+    //! almost always want to import its entire contents, but unlike the
+    //! standard library's prelude you'll have to do so manually:
+    //!
+    //! ```
+    //! use kube::prelude::*;
+    //! ```
+    //!
+    //! The prelude may grow over time as additional items see ubiquitous use.
+
+    #[cfg(feature = "client")]
+    #[allow(unreachable_pub)]
+    pub use crate::client::ConfigExt as _;
+
+    #[cfg(feature = "unstable-client")] pub use crate::client::scope::NamespacedRef;
+
+    #[allow(unreachable_pub)] pub use crate::core::PartialObjectMetaExt as _;
+    #[allow(unreachable_pub)] pub use crate::core::SelectorExt as _;
+    pub use crate::{core::crd::CustomResourceExt as _, Resource as _, ResourceExt as _};
+
+    #[cfg(feature = "runtime")] pub use crate::runtime::utils::WatchStreamExt as _;
+}
 
 // Tests that require a cluster and the complete feature set
 // Can be run with `cargo test -p kube --lib --features=runtime,derive -- --ignored`
@@ -197,7 +227,10 @@ mod test {
     #[derive(CustomResource, Deserialize, Serialize, Clone, Debug, JsonSchema)]
     #[kube(group = "clux.dev", version = "v1", kind = "Foo", namespaced)]
     #[kube(status = "FooStatus")]
-    #[kube(scale = r#"{"specReplicasPath":".spec.replicas", "statusReplicasPath":".status.replicas"}"#)]
+    #[kube(scale(
+        spec_replicas_path = ".spec.replicas",
+        status_replicas_path = ".status.replicas"
+    ))]
     #[kube(crates(kube_core = "crate::core"))] // for dev-dep test structure
     pub struct FooSpec {
         name: String,

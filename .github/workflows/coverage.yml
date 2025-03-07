@@ -6,9 +6,9 @@ on:
       - main
   pull_request:
     paths:
-      - '**.rs'
-      - '**.toml'
-      - '**.yml'
+      - "**.rs"
+      - "**.toml"
+      - "**.yml"
 
 jobs:
   tarpaulin-codecov:
@@ -17,7 +17,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install stable toolchain
-        uses: dtolnay/rust-toolchain@stable
+        # tarpaulin is currently broken for Rust 1.83, see #1657
+        uses: dtolnay/rust-toolchain@1.82.0
       - uses: Swatinem/rust-cache@v2
       - name: Install tarpaulin
         uses: taiki-e/install-action@v2
@@ -25,7 +26,7 @@ jobs:
           tool: cargo-tarpaulin@0.28.0
       - uses: nolar/setup-k3d-k3s@v1
         with:
-          version: v1.25
+          version: "v1.28" # MK8SV
           # k3d-kube
           k3d-name: kube
           # Used to avoid rate limits when fetching the releases from k3s repo.
@@ -35,8 +36,9 @@ jobs:
 
       - name: Run cargo-tarpaulin
         run: |
-          rustup run stable cargo tarpaulin -o xml --skip-clean
+          # tarpaulin is currently broken for Rust 1.83, see #1657
+          rustup run 1.82.0 cargo tarpaulin -o xml --skip-clean
       - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}

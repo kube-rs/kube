@@ -82,27 +82,56 @@ impl TryFrom<Config> for ClientBuilder<GenericService> {
         let mut connector = HttpConnector::new();
         connector.enforce_http(false);
 
+        #[cfg(all(feature = "aws-lc-rs", feature = "rustls-tls"))]
+        {
+            if rustls::crypto::CryptoProvider::get_default().is_none() {
+                // the only error here is if it's been initialized in between: we can ignore it
+                // since our semantic is only to set the default value if it does not exist.
+                let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+            }
+        }
+
         match config.proxy_url.as_ref() {
-            #[cfg(feature = "socks5")]
             Some(proxy_url) if proxy_url.scheme_str() == Some("socks5") => {
-                let connector = hyper_socks2::SocksConnector {
-                    proxy_addr: proxy_url.clone(),
-                    auth: None,
-                    connector,
-                };
+                #[cfg(feature = "socks5")]
+                {
+                    let connector = hyper_socks2::SocksConnector {
+                        proxy_addr: proxy_url.clone(),
+                        auth: None,
+                        connector,
+                    };
+                    make_generic_builder(connector, config)
+                }
 
-                make_generic_builder(connector, config)
+                #[cfg(not(feature = "socks5"))]
+                Err(Error::ProxyProtocolDisabled {
+                    proxy_url: proxy_url.clone(),
+                    protocol_feature: "kube/socks5",
+                })
             }
 
-            #[cfg(feature = "http-proxy")]
             Some(proxy_url) if proxy_url.scheme_str() == Some("http") => {
-                let proxy = hyper_proxy2::Proxy::new(hyper_proxy2::Intercept::All, proxy_url.clone());
-                let connector = hyper_proxy2::ProxyConnector::from_proxy_unsecured(connector, proxy);
+                #[cfg(feature = "http-proxy")]
+                {
+                    let proxy =
+                        hyper_http_proxy::Proxy::new(hyper_http_proxy::Intercept::All, proxy_url.clone());
+                    let connector = hyper_http_proxy::ProxyConnector::from_proxy_unsecured(connector, proxy);
 
-                make_generic_builder(connector, config)
+                    make_generic_builder(connector, config)
+                }
+
+                #[cfg(not(feature = "http-proxy"))]
+                Err(Error::ProxyProtocolDisabled {
+                    proxy_url: proxy_url.clone(),
+                    protocol_feature: "kube/http-proxy",
+                })
             }
 
-            _ => make_generic_builder(connector, config),
+            Some(proxy_url) => Err(Error::ProxyProtocolUnsupported {
+                proxy_url: proxy_url.clone(),
+            }),
+
+            None => make_generic_builder(connector, config),
         }
     }
 }
@@ -149,7 +178,13 @@ where
     #[cfg(feature = "gzip")]
     let stack = ServiceBuilder::new()
         .layer(stack)
-        .layer(tower_http::decompression::DecompressionLayer::new())
+        .layer(
+            tower_http::decompression::DecompressionLayer::new()
+                .no_br()
+                .no_deflate()
+                .no_zstd()
+                .gzip(!config.disable_compression),
+        )
         .into_inner();
 
     let service = ServiceBuilder::new()
@@ -204,6 +239,7 @@ where
                     }
                 }),
         )
+        .map_err(BoxError::from)
         .service(client);
 
     Ok(ClientBuilder::new(
@@ -215,4 +251,71 @@ where
         ),
         default_ns,
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    #[cfg(feature = "gzip")] use super::*;
+
+    #[cfg(feature = "gzip")]
+    #[tokio::test]
+    async fn test_no_accept_encoding_header_sent_when_compression_disabled(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        use http::Uri;
+        use std::net::SocketAddr;
+        use tokio::net::{TcpListener, TcpStream};
+
+        // setup a server that echoes back any encoding header value
+        let addr: SocketAddr = ([127, 0, 0, 1], 0).into();
+        let listener = TcpListener::bind(addr).await?;
+        let local_addr = listener.local_addr()?;
+        let uri: Uri = format!("http://{}", local_addr).parse()?;
+
+        tokio::spawn(async move {
+            use http_body_util::Full;
+            use hyper::{server::conn::http1, service::service_fn};
+            use hyper_util::rt::{TokioIo, TokioTimer};
+            use std::convert::Infallible;
+
+            loop {
+                let (tcp, _) = listener.accept().await.unwrap();
+                let io: TokioIo<TcpStream> = TokioIo::new(tcp);
+
+                tokio::spawn(async move {
+                    let _ = http1::Builder::new()
+                        .timer(TokioTimer::new())
+                        .serve_connection(
+                            io,
+                            service_fn(|req| async move {
+                                let response = req
+                                    .headers()
+                                    .get(http::header::ACCEPT_ENCODING)
+                                    .map(|b| Bytes::copy_from_slice(b.as_bytes()))
+                                    .unwrap_or_default();
+                                Ok::<_, Infallible>(Response::new(Full::new(response)))
+                            }),
+                        )
+                        .await
+                        .unwrap();
+                });
+            }
+        });
+
+        // confirm gzip echoed back with default config
+        let config = Config { ..Config::new(uri) };
+        let client = make_generic_builder(HttpConnector::new(), config.clone())?.build();
+        let response = client.request_text(http::Request::default()).await?;
+        assert_eq!(&response, "gzip");
+
+        // now disable and check empty string echoed back
+        let config = Config {
+            disable_compression: true,
+            ..config
+        };
+        let client = make_generic_builder(HttpConnector::new(), config)?.build();
+        let response = client.request_text(http::Request::default()).await?;
+        assert_eq!(&response, "");
+
+        Ok(())
+    }
 }

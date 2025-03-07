@@ -89,7 +89,7 @@ async fn main() -> anyhow::Result<()> {
                 message = stdin.next() => {
                     match message {
                         Some(Ok(message)) => {
-                            input.write(&message).await?;
+                            input.write_all(&message).await?;
                         }
                         _ => {
                             break;
@@ -99,7 +99,7 @@ async fn main() -> anyhow::Result<()> {
                 message = output.next() => {
                     match message {
                         Some(Ok(message)) => {
-                            stdout.write(&message).await?;
+                            stdout.write_all(&message).await?;
                             stdout.flush().await?;
                         },
                         _ => {

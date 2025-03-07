@@ -1,4 +1,5 @@
 //! Error handling and error types
+use http::Uri;
 use thiserror::Error;
 
 pub use kube_core::ErrorResponse;
@@ -24,6 +25,21 @@ pub enum Error {
     #[cfg(feature = "client")]
     #[error("ServiceError: {0}")]
     Service(#[source] tower::BoxError),
+
+    /// Returned when the configured proxy uses an unsupported protocol.
+    #[error("configured proxy {proxy_url:?} uses an unsupported protocol")]
+    ProxyProtocolUnsupported {
+        /// The URL of the proxy.
+        proxy_url: Uri,
+    },
+    /// Returned when the configured proxy uses a protocol that requires a Cargo feature that is currently disabled
+    #[error("configured proxy {proxy_url:?} requires the disabled feature {protocol_feature:?}")]
+    ProxyProtocolDisabled {
+        /// The URL of the proxy.
+        proxy_url: Uri,
+        /// The Cargo feature that the proxy protocol requires.
+        protocol_feature: &'static str,
+    },
 
     /// UTF-8 Error
     #[error("UTF-8 Error: {0}")]
@@ -86,6 +102,12 @@ pub enum Error {
     #[cfg_attr(docsrs, doc(cfg(feature = "client")))]
     #[error("auth error: {0}")]
     Auth(#[source] crate::client::AuthError),
+
+    /// Error resolving resource reference
+    #[cfg(feature = "unstable-client")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "unstable-client")))]
+    #[error("Reference resolve error: {0}")]
+    RefResolve(String),
 }
 
 #[derive(Error, Debug)]

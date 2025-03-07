@@ -8,11 +8,12 @@ use crate::{
         ObjectRef,
     },
     scheduler::{debounced_scheduler, ScheduleRequest},
-    utils::{trystream_try_via, CancelableJoinHandle, KubeRuntimeStreamExt, StreamBackoff, WatchStreamExt},
+    utils::{
+        trystream_try_via, Backoff, CancelableJoinHandle, KubeRuntimeStreamExt, StreamBackoff, WatchStreamExt,
+    },
     watcher::{self, metadata_watcher, watcher, DefaultBackoff},
 };
-use backoff::backoff::Backoff;
-use derivative::Derivative;
+use educe::Educe;
 use futures::{
     channel,
     future::{self, BoxFuture},
@@ -267,19 +268,20 @@ where
 /// NOTE: The reason is ignored for comparison purposes. This means that, for example,
 /// an object can only occupy one scheduler slot, even if it has been scheduled for multiple reasons.
 /// In this case, only *the first* reason is stored.
-#[derive(Derivative)]
-#[derivative(
-    Debug(bound = "K::DynamicType: Debug"),
-    Clone(bound = "K::DynamicType: Clone"),
-    PartialEq(bound = "K::DynamicType: PartialEq"),
-    Eq(bound = "K::DynamicType: Eq"),
-    Hash(bound = "K::DynamicType: Hash")
+#[derive(Educe)]
+#[educe(
+    Debug(bound("K::DynamicType: Debug")),
+    Clone(bound("K::DynamicType: Clone")),
+    PartialEq(bound("K::DynamicType: PartialEq")),
+    Hash(bound("K::DynamicType: Hash"))
 )]
 pub struct ReconcileRequest<K: Resource> {
     pub obj_ref: ObjectRef<K>,
-    #[derivative(PartialEq = "ignore", Hash = "ignore")]
+    #[educe(PartialEq(ignore), Hash(ignore))]
     pub reason: ReconcileReason,
 }
+
+impl<K: Resource> Eq for ReconcileRequest<K> where K::DynamicType: Eq {}
 
 impl<K: Resource> From<ObjectRef<K>> for ReconcileRequest<K> {
     fn from(obj_ref: ObjectRef<K>) -> Self {
@@ -331,6 +333,7 @@ const APPLIER_REQUEUE_BUF_SIZE: usize = 100;
 /// This is the "hard-mode" version of [`Controller`], which allows you some more customization
 /// (such as triggering from arbitrary [`Stream`]s), at the cost of being a bit more verbose.
 #[allow(clippy::needless_pass_by_value)]
+#[allow(clippy::type_complexity)]
 pub fn applier<K, QueueStream, ReconcilerFut, Ctx>(
     mut reconciler: impl FnMut(Arc<K>, Arc<Ctx>) -> ReconcilerFut,
     error_policy: impl Fn(Arc<K>, &ReconcilerFut::Error, Arc<Ctx>) -> Action,
@@ -913,7 +916,7 @@ where
     /// The [`default_backoff`](crate::watcher::default_backoff) follows client-go conventions,
     /// but can be overridden by calling this method.
     #[must_use]
-    pub fn trigger_backoff(mut self, backoff: impl Backoff + Send + 'static) -> Self {
+    pub fn trigger_backoff(mut self, backoff: impl Backoff + 'static) -> Self {
         self.trigger_backoff = Box::new(backoff);
         self
     }
@@ -1750,10 +1753,10 @@ mod tests {
         let (queue_tx, queue_rx) = futures::channel::mpsc::unbounded::<ObjectRef<ConfigMap>>();
         let (store_rx, mut store_tx) = reflector::store();
         let mut applier = pin!(applier(
-            |obj, _| {
+            |_obj, _| {
                 Box::pin(async move {
                     // Try to flood the rescheduling buffer buffer by just putting it back in the queue immediately
-                    println!("reconciling {:?}", obj.metadata.name);
+                    //println!("reconciling {:?}", obj.metadata.name);
                     Ok(Action::requeue(Duration::ZERO))
                 })
             },
@@ -1763,6 +1766,7 @@ mod tests {
             queue_rx.map(Result::<_, Infallible>::Ok),
             Config::default(),
         ));
+        store_tx.apply_watcher_event(&watcher::Event::InitDone);
         for i in 0..items {
             let obj = ConfigMap {
                 metadata: ObjectMeta {
@@ -1772,7 +1776,7 @@ mod tests {
                 },
                 ..Default::default()
             };
-            store_tx.apply_watcher_event(&watcher::Event::Applied(obj.clone()));
+            store_tx.apply_watcher_event(&watcher::Event::Apply(obj.clone()));
             queue_tx.unbounded_send(ObjectRef::from_obj(&obj)).unwrap();
         }
 

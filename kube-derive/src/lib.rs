@@ -3,7 +3,9 @@
 extern crate proc_macro;
 #[macro_use] extern crate quote;
 
+mod cel_schema;
 mod custom_resource;
+mod resource;
 
 /// A custom derive for kubernetes custom resource definitions.
 ///
@@ -127,8 +129,22 @@ mod custom_resource;
 /// NOTE: `CustomResourceDefinition`s require a schema. If `schema = "disabled"` then
 /// `Self::crd()` will not be installable into the cluster as-is.
 ///
-/// ## `#[kube(scale = r#"json"#)]`
+/// ## `#[kube(scale(...))]`
+///
 /// Allow customizing the scale struct for the [scale subresource](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#subresources).
+/// It should be noted, that the status subresource must also be enabled to use the scale subresource. This is because
+/// the `statusReplicasPath` only accepts JSONPaths under `.status`.
+///
+/// ```ignore
+/// #[kube(scale(
+///     specReplicasPath = ".spec.replicas",
+///     statusReplicaPath = ".status.replicas",
+///     labelSelectorPath = ".spec.labelSelector"
+/// ))]
+/// ```
+///
+/// The deprecated way of customizing the scale subresource using a raw JSON string is still
+/// support for backwards-compatibility.
 ///
 /// ## `#[kube(printcolumn = r#"json"#)]`
 /// Allows adding straight json to [printcolumns](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#additional-printer-columns).
@@ -139,9 +155,42 @@ mod custom_resource;
 /// ## `#[kube(category = "apps")]`
 /// Add a single category to `crd.spec.names.categories`.
 ///
+/// ## `#[kube(selectable = "fieldSelectorPath")]`
+/// Adds a Kubernetes >=1.30 `selectableFields` property ([KEP-4358](https://github.com/kubernetes/enhancements/blob/master/keps/sig-api-machinery/4358-custom-resource-field-selectors/README.md)) to the schema.
+/// Unlocks `kubectl get kind --field-selector fieldSelectorPath`.
+///
 /// ## `#[kube(doc = "description")]`
 /// Sets the description of the schema in the generated CRD. If not specified
 /// `Auto-generated derived type for {customResourceName} via CustomResource` will be used instead.
+///
+/// ## `#[kube(annotation("ANNOTATION_KEY", "ANNOTATION_VALUE"))]`
+/// Add a single annotation to the generated CRD.
+///
+/// ## `#[kube(label("LABEL_KEY", "LABEL_VALUE"))]`
+/// Add a single label to the generated CRD.
+///
+/// ## `#[kube(storage = true)]`
+/// Sets the `storage` property to `true` or `false`.
+///
+/// ## `#[kube(served = true)]`
+/// Sets the `served` property to `true` or `false`.
+///
+/// ## `#[kube(deprecated [= "warning"])]`
+/// Sets the `deprecated` property to `true`.
+///
+/// ```ignore
+/// #[kube(deprecated)]
+/// ```
+///
+/// Aditionally, you can provide a `deprecationWarning` using the following example.
+///
+/// ```ignore
+/// #[kube(deprecated = "Replaced by other CRD")]
+/// ```
+///
+/// ## `#[kube(rule = Rule::new("self == oldSelf").message("field is immutable"))]`
+/// Inject a top level CEL validation rule for the top level generated struct.
+/// This attribute is for resources deriving [`CELSchema`] instead of [`schemars::JsonSchema`].
 ///
 /// ## Example with all properties
 ///
@@ -164,7 +213,8 @@ mod custom_resource;
 ///     plural = "feetz",
 ///     shortname = "f",
 ///     scale = r#"{"specReplicasPath":".spec.replicas", "statusReplicasPath":".status.replicas"}"#,
-///     printcolumn = r#"{"name":"Spec", "type":"string", "description":"name of foo", "jsonPath":".spec.name"}"#
+///     printcolumn = r#"{"name":"Spec", "type":"string", "description":"name of foo", "jsonPath":".spec.name"}"#,
+///     selectable = "spec.replicasCount"
 /// )]
 /// #[serde(rename_all = "camelCase")]
 /// struct FooSpec {
@@ -215,8 +265,7 @@ mod custom_resource;
 /// - [Serde/Schemars Attributes](https://graham.cool/schemars/examples/3-schemars_attrs/) (no need to duplicate serde renames)
 /// - [`#[schemars(schema_with = "func")]`](https://graham.cool/schemars/examples/7-custom_serialization/) (e.g. like in the [`crd_derive` example](https://github.com/kube-rs/kube/blob/main/examples/crd_derive.rs))
 /// - `impl JsonSchema` on a type / newtype around external type. See [#129](https://github.com/kube-rs/kube/issues/129#issuecomment-750852916)
-/// - [`#[garde(...)]` field attributes for client-side validation](https://github.com/jprochazk/garde) (see [`crd_api`
-/// example](https://github.com/kube-rs/kube/blob/main/examples/crd_api.rs))
+/// - [`#[garde(...)]` field attributes for client-side validation](https://github.com/jprochazk/garde) (see [`crd_api` example](https://github.com/kube-rs/kube/blob/main/examples/crd_api.rs))
 ///
 /// You might need to override parts of the schemas (for fields in question) when you are:
 /// - **using complex enums**: enums do not currently generate [structural schemas](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#specifying-a-structural-schema), so kubernetes won't support them by default
@@ -308,4 +357,94 @@ mod custom_resource;
 #[proc_macro_derive(CustomResource, attributes(kube))]
 pub fn derive_custom_resource(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     custom_resource::derive(proc_macro2::TokenStream::from(input)).into()
+}
+
+/// Generates a JsonSchema implementation a set of CEL validation rules applied on the CRD.
+///
+/// ```rust
+/// use kube::CELSchema;
+/// use kube::CustomResource;
+/// use serde::Deserialize;
+/// use serde::Serialize;
+/// use kube::core::crd::CustomResourceExt;
+///
+/// #[derive(CustomResource, CELSchema, Serialize, Deserialize, Clone, Debug)]
+/// #[kube(
+///     group = "kube.rs",
+///     version = "v1",
+///     kind = "Struct",
+///     rule = Rule::new("self.matadata.name == 'singleton'"),
+/// )]
+/// #[cel_validate(rule = Rule::new("self == oldSelf"))]
+/// struct MyStruct {
+///     #[serde(default = "default")]
+///     #[cel_validate(rule = Rule::new("self != ''").message("failure message"))]
+///     field: String,
+/// }
+///
+/// fn default() -> String {
+///     "value".into()
+/// }
+///
+/// assert!(serde_json::to_string(&Struct::crd()).unwrap().contains("x-kubernetes-validations"));
+/// assert!(serde_json::to_string(&Struct::crd()).unwrap().contains(r#""rule":"self == oldSelf""#));
+/// assert!(serde_json::to_string(&Struct::crd()).unwrap().contains(r#""rule":"self != ''""#));
+/// assert!(serde_json::to_string(&Struct::crd()).unwrap().contains(r#""message":"failure message""#));
+/// assert!(serde_json::to_string(&Struct::crd()).unwrap().contains(r#""default":"value""#));
+/// assert!(serde_json::to_string(&Struct::crd()).unwrap().contains(r#""rule":"self.matadata.name == 'singleton'""#));
+/// ```
+#[proc_macro_derive(CELSchema, attributes(cel_validate, schemars))]
+pub fn derive_schema_validation(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    cel_schema::derive_validated_schema(input.into()).into()
+}
+
+/// A custom derive for inheriting Resource impl for the type.
+///
+/// This will generate a [`kube::Resource`] trait implementation,
+/// inheriting from a specified resource trait implementation.
+///
+/// This allows strict typing to some typical resources like `Secret` or `ConfigMap`,
+/// in cases when implementing CRD is not desirable or it does not fit the use-case.
+///
+/// Once derived, the type can be used with [`kube::Api`].
+///
+/// # Example
+///
+/// ```rust,no_run
+/// use kube::api::ObjectMeta;
+/// use k8s_openapi::api::core::v1::ConfigMap;
+/// use kube_derive::Resource;
+/// use kube::Client;
+/// use kube::Api;
+/// use serde::Deserialize;
+///
+/// #[derive(Resource, Clone, Debug, Deserialize)]
+/// #[resource(inherit = "ConfigMap")]
+/// struct FooMap {
+///     metadata: ObjectMeta,
+///     data: Option<FooMapSpec>,
+/// }
+///
+/// #[derive(Clone, Debug, Deserialize)]
+/// struct FooMapSpec {
+///     field: String,
+/// }
+///
+/// let client: Client = todo!();
+/// let api: Api<FooMap> = Api::default_namespaced(client);
+/// let config_map = api.get("with-field");
+/// ```
+///
+/// The example above will generate:
+/// ```
+/// // impl kube::Resource for FooMap { .. }
+/// ```
+/// [`kube`]: https://docs.rs/kube
+/// [`kube::Api`]: https://docs.rs/kube/*/kube/struct.Api.html
+/// [`kube::Resource`]: https://docs.rs/kube/*/kube/trait.Resource.html
+/// [`kube::core::ApiResource`]: https://docs.rs/kube/*/kube/core/struct.ApiResource.html
+/// [`kube::CustomResourceExt`]: https://docs.rs/kube/*/kube/trait.CustomResourceExt.html
+#[proc_macro_derive(Resource, attributes(resource))]
+pub fn derive_resource(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    resource::derive(proc_macro2::TokenStream::from(input)).into()
 }

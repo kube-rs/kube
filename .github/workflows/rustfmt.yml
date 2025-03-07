@@ -13,26 +13,19 @@ jobs:
   rustfmt_nightly:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout sources
-        uses: actions/checkout@v4
-
-      - name: Install nightly toolchain with rustfmt available
-        uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
         with:
-          toolchain: nightly
-          override: true
           components: rustfmt
-
-      - run: rustfmt +nightly --edition 2018 $(find . -type f -iname *.rs)
-
+      - run: rustfmt +nightly --edition 2021 $(find . -type f -iname *.rs)
       - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v6
+        uses: peter-evans/create-pull-request@v7
         with:
           commit-message: rustfmt
           signoff: true
           title: rustfmt
           body: |
-            Changes from `rustfmt +nightly --edition 2018 $(find . -type f -iname *.rs)`.
+            Changes from `rustfmt +nightly --edition 2021 $(find . -type f -iname *.rs)`.
           branch: rustfmt
           # Delete branch when merged
           delete-branch: true

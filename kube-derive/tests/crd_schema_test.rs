@@ -1,14 +1,16 @@
+#![allow(missing_docs)]
 #![recursion_limit = "256"]
 
 use assert_json_diff::assert_json_eq;
-use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
+use chrono::{DateTime, Utc};
+use kube::CELSchema;
 use kube_derive::CustomResource;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
 // See `crd_derive_schema` example for how the schema generated from this struct affects defaulting and validation.
-#[derive(CustomResource, Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+#[derive(CustomResource, Serialize, Deserialize, Debug, PartialEq, Clone, CELSchema)]
 #[kube(
     group = "clux.dev",
     version = "v1",
@@ -18,8 +20,25 @@ use std::collections::{HashMap, HashSet};
     doc = "Custom resource representing a Foo",
     derive = "PartialEq",
     shortname = "fo",
-    shortname = "f"
+    shortname = "f",
+    served = false,
+    storage = false,
+    deprecated = "my warning",
+    selectable = ".spec.nonNullable",
+    selectable = ".spec.nullable",
+    annotation("clux.dev", "cluxingv1"),
+    annotation("clux.dev/firewall", "enabled"),
+    label("clux.dev", "cluxingv1"),
+    label("clux.dev/persistence", "disabled"),
+    rule = Rule::new("self.metadata.name == 'singleton'"),
+    status = "Status",
+    scale(
+        spec_replicas_path = ".spec.replicas",
+        status_replicas_path = ".status.replicas",
+        label_selector_path = ".status.labelSelector"
+    ),
 )]
+#[cel_validate(rule = Rule::new("has(self.nonNullable)"))]
 #[serde(rename_all = "camelCase")]
 struct FooSpec {
     non_nullable: String,
@@ -42,12 +61,20 @@ struct FooSpec {
     timestamp: DateTime<Utc>,
 
     /// This is a complex enum with a description
+    #[cel_validate(rule = Rule::new("!has(self.variantOne) || self.variantOne.int > 22"))]
     complex_enum: ComplexEnum,
 
     /// This is a untagged enum with a description
     untagged_enum_person: UntaggedEnumPerson,
 
     set: HashSet<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Status {
+    replicas: usize,
+    label_selector: String,
 }
 
 fn default_value() -> String {
@@ -135,7 +162,7 @@ fn test_serialized_matches_expected() {
             nullable: None,
             nullable_skipped_with_default: None,
             nullable_with_default: None,
-            timestamp: TimeZone::from_utc_datetime(&Utc, &NaiveDateTime::from_timestamp_opt(0, 0).unwrap()),
+            timestamp: DateTime::from_timestamp(0, 0).unwrap(),
             complex_enum: ComplexEnum::VariantOne { int: 23 },
             untagged_enum_person: UntaggedEnumPerson::GenderAndAge(GenderAndAge {
                 age: 42,
@@ -148,6 +175,14 @@ fn test_serialized_matches_expected() {
             "apiVersion": "clux.dev/v1",
             "kind": "Foo",
             "metadata": {
+                "annotations": {
+                    "clux.dev": "cluxingv1",
+                    "clux.dev/firewall": "enabled",
+                },
+                "labels": {
+                    "clux.dev": "cluxingv1",
+                    "clux.dev/persistence": "disabled",
+                },
                 "name": "bar",
             },
             "spec": {
@@ -180,6 +215,14 @@ fn test_crd_schema_matches_expected() {
             "apiVersion": "apiextensions.k8s.io/v1",
             "kind": "CustomResourceDefinition",
             "metadata": {
+                "annotations": {
+                    "clux.dev": "cluxingv1",
+                    "clux.dev/firewall": "enabled",
+                },
+                "labels": {
+                    "clux.dev": "cluxingv1",
+                    "clux.dev/persistence": "disabled",
+                },
                 "name": "foos.clux.dev"
             },
             "spec": {
@@ -195,9 +238,24 @@ fn test_crd_schema_matches_expected() {
                 "versions": [
                     {
                         "name": "v1",
-                        "served": true,
-                        "storage": true,
+                        "served": false,
+                        "storage": false,
+                        "deprecated": true,
+                        "deprecationWarning": "my warning",
                         "additionalPrinterColumns": [],
+                        "selectableFields": [{
+                            "jsonPath": ".spec.nonNullable"
+                        }, {
+                            "jsonPath": ".spec.nullable"
+                        }],
+                        "subresources": {
+                            "status": {},
+                            "scale": {
+                                "specReplicasPath": ".spec.replicas",
+                                "labelSelectorPath": ".status.labelSelector",
+                                "statusReplicasPath": ".status.replicas"
+                            }
+                        },
                         "schema": {
                             "openAPIV3Schema": {
                                 "description": "Custom resource representing a Foo",
@@ -274,6 +332,9 @@ fn test_crd_schema_matches_expected() {
                                                         "required": ["variantThree"]
                                                     }
                                                 ],
+                                                "x-kubernetes-validations": [{
+                                                    "rule": "!has(self.variantOne) || self.variantOne.int > 22",
+                                                }],
                                                 "description": "This is a complex enum with a description"
                                             },
                                             "untaggedEnumPerson": {
@@ -318,17 +379,40 @@ fn test_crd_schema_matches_expected() {
                                             "timestamp",
                                             "untaggedEnumPerson"
                                         ],
+                                        "x-kubernetes-validations": [{
+                                            "rule": "has(self.nonNullable)",
+                                        }],
+                                        "type": "object"
+                                    },
+                                    "status": {
+                                        "properties": {
+                                            "replicas": {
+                                                "type": "integer",
+                                                "format": "uint",
+                                                "minimum": 0.0,
+                                            },
+                                            "labelSelector": {
+                                                "type": "string"
+                                            }
+                                        },
+                                        "required": [
+                                            "labelSelector",
+                                            "replicas"
+                                        ],
+                                        "nullable": true,
                                         "type": "object"
                                     }
                                 },
                                 "required": [
                                     "spec"
                                 ],
-                                "title": "Foo",
+                                "x-kubernetes-validations": [{
+                                    "rule": "self.metadata.name == 'singleton'",
+                                }],
+                                "title": "Foo_kube_validation",
                                 "type": "object"
                             }
                         },
-                        "subresources": {},
                     }
                 ]
             }

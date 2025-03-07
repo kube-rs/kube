@@ -11,7 +11,7 @@ use std::{
     hash::{Hash, Hasher},
 };
 
-fn hash<T: Hash>(t: &T) -> u64 {
+fn hash<T: Hash + ?Sized>(t: &T) -> u64 {
     let mut hasher = DefaultHasher::new();
     t.hash(&mut hasher);
     hasher.finish()
@@ -191,6 +191,11 @@ pub mod predicates {
     pub fn annotations<K: Resource>(obj: &K) -> Option<u64> {
         Some(hash(obj.annotations()))
     }
+
+    /// Hash the finalizers of a Resource K
+    pub fn finalizers<K: Resource>(obj: &K) -> Option<u64> {
+        Some(hash(obj.finalizers()))
+    }
 }
 
 #[cfg(test)]
@@ -225,7 +230,7 @@ pub(crate) mod tests {
         };
         let data = stream::iter([
             Ok(mkobj(1)),
-            Err(Error::TooManyObjects),
+            Err(Error::NoResourceVersion),
             Ok(mkobj(1)),
             Ok(mkobj(2)),
         ]);
@@ -238,7 +243,7 @@ pub(crate) mod tests {
         // Error passed through
         assert!(matches!(
             poll!(rx.next()),
-            Poll::Ready(Some(Err(Error::TooManyObjects)))
+            Poll::Ready(Some(Err(Error::NoResourceVersion)))
         ));
         // (no repeat mkobj(1) - same generation)
         // mkobj(2) next

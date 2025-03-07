@@ -1,4 +1,7 @@
-//! Kubernetes configuration objects from `~/.kube/config`, `$KUBECONFIG`, or the [cluster environment](https://kubernetes.io/docs/tasks/access-application-cluster/access-cluster/#accessing-the-api-from-a-pod).
+//! Kubernetes configuration objects.
+//!
+//! Reads locally from `$KUBECONFIG` or `~/.kube/config`,
+//! and in-cluster from the [pod environment](https://kubernetes.io/docs/tasks/run-application/access-api-from-pod/#accessing-the-api-from-within-a-pod).
 //!
 //! # Usage
 //! The [`Config`] has several constructors plus logic to infer environment.
@@ -6,6 +9,7 @@
 //! Unless you have issues, prefer using [`Config::infer`], and pass it to a [`Client`][crate::Client].
 use std::{path::PathBuf, time::Duration};
 
+use http::{HeaderName, HeaderValue};
 use thiserror::Error;
 
 mod file_config;
@@ -48,10 +52,6 @@ pub enum KubeconfigError {
     /// Failed to load the cluster of context
     #[error("failed to load the cluster of context: {0}")]
     LoadClusterOfContext(String),
-
-    /// Failed to find named user
-    #[error("failed to find named user: {0}")]
-    FindUser(String),
 
     /// Failed to find the path of kubeconfig
     #[error("failed to find the path of kubeconfig")]
@@ -114,7 +114,10 @@ pub enum LoadDataError {
     NoBase64DataOrFile,
 }
 
-/// Configuration object detailing things like cluster URL, default namespace, root certificates, and timeouts.
+/// Configuration object for accessing a Kuernetes cluster
+///
+/// The configurable parameters for connecting like cluster URL, default namespace, root certificates, and timeouts.
+/// Normally created implicitly through [`Config::infer`] or [`Client::try_default`](crate::Client::try_default).
 ///
 /// # Usage
 /// Construct a [`Config`] instance by using one of the many constructors.
@@ -148,12 +151,16 @@ pub struct Config {
     pub accept_invalid_certs: bool,
     /// Stores information to tell the cluster who you are.
     pub auth_info: AuthInfo,
+    /// Whether to disable compression (would only have an effect when the `gzip` feature is enabled)
+    pub disable_compression: bool,
     /// Optional proxy URL. Proxy support requires the `socks5` feature.
     pub proxy_url: Option<http::Uri>,
     /// If set, apiserver certificate will be validated to contain this string
     ///
     /// If not set, the `cluster_url` is used instead
     pub tls_server_name: Option<String>,
+    /// Headers to pass with every request.
+    pub headers: Vec<(HeaderName, HeaderValue)>,
 }
 
 impl Config {
@@ -172,8 +179,10 @@ impl Config {
             write_timeout: Some(DEFAULT_WRITE_TIMEOUT),
             accept_invalid_certs: false,
             auth_info: AuthInfo::default(),
+            disable_compression: false,
             proxy_url: None,
             tls_server_name: None,
+            headers: Vec::new(),
         }
     }
 
@@ -253,8 +262,10 @@ impl Config {
                 token_file: Some(incluster_config::token_file()),
                 ..Default::default()
             },
+            disable_compression: false,
             proxy_url: None,
             tls_server_name: None,
+            headers: Vec::new(),
         })
     }
 
@@ -295,6 +306,8 @@ impl Config {
             .unwrap_or_else(|| String::from("default"));
 
         let accept_invalid_certs = loader.cluster.insecure_skip_tls_verify.unwrap_or(false);
+        let disable_compression = loader.cluster.disable_compression.unwrap_or(false);
+
         let mut root_cert = None;
 
         if let Some(ca_bundle) = loader.ca_bundle()? {
@@ -309,9 +322,11 @@ impl Config {
             read_timeout: Some(DEFAULT_READ_TIMEOUT),
             write_timeout: Some(DEFAULT_WRITE_TIMEOUT),
             accept_invalid_certs,
+            disable_compression,
             proxy_url: loader.proxy_url()?,
             auth_info: loader.user,
             tls_server_name: loader.cluster.tls_server_name,
+            headers: Vec::new(),
         })
     }
 

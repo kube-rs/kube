@@ -1,15 +1,20 @@
-#[cfg(feature = "unstable-runtime-predicates")]
-use crate::utils::predicate::{Predicate, PredicateFilter};
 use crate::{
-    utils::{event_flatten::EventFlatten, event_modify::EventModify, stream_backoff::StreamBackoff},
+    utils::{
+        event_decode::EventDecode,
+        event_modify::EventModify,
+        predicate::{Predicate, PredicateFilter},
+        stream_backoff::StreamBackoff,
+    },
     watcher,
 };
 use kube_client::Resource;
 
-use crate::{reflector::store::Writer, utils::Reflect};
+use crate::{
+    reflector::store::Writer,
+    utils::{Backoff, Reflect},
+};
 
 use crate::watcher::DefaultBackoff;
-use backoff::backoff::Backoff;
 use futures::{Stream, TryStream};
 
 /// Extension trait for streams returned by [`watcher`](watcher()) or [`reflector`](crate::reflector::reflector)
@@ -33,24 +38,24 @@ pub trait WatchStreamExt: Stream {
         StreamBackoff::new(self, b)
     }
 
-    /// Flatten a [`watcher()`] stream into a stream of applied objects
+    /// Decode a [`watcher()`] stream into a stream of applied objects
     ///
     /// All Added/Modified events are passed through, and critical errors bubble up.
-    fn applied_objects<K>(self) -> EventFlatten<Self, K>
+    fn applied_objects<K>(self) -> EventDecode<Self>
     where
         Self: Stream<Item = Result<watcher::Event<K>, watcher::Error>> + Sized,
     {
-        EventFlatten::new(self, false)
+        EventDecode::new(self, false)
     }
 
-    /// Flatten a [`watcher()`] stream into a stream of touched objects
+    /// Decode a [`watcher()`] stream into a stream of touched objects
     ///
     /// All Added/Modified/Deleted events are passed through, and critical errors bubble up.
-    fn touched_objects<K>(self) -> EventFlatten<Self, K>
+    fn touched_objects<K>(self) -> EventDecode<Self>
     where
         Self: Stream<Item = Result<watcher::Event<K>, watcher::Error>> + Sized,
     {
-        EventFlatten::new(self, true)
+        EventDecode::new(self, true)
     }
 
     /// Modify elements of a [`watcher()`] stream.
@@ -88,13 +93,11 @@ pub trait WatchStreamExt: Stream {
         EventModify::new(self, f)
     }
 
-    /// Filter out a flattened stream on [`predicates`](crate::predicates).
+    /// Filter a stream based on on [`predicates`](crate::predicates).
     ///
     /// This will filter out repeat calls where the predicate returns the same result.
     /// Common use case for this is to avoid repeat events for status updates
     /// by filtering on [`predicates::generation`](crate::predicates::generation).
-    ///
-    /// **NB**: This is constructor requires an [`unstable`](https://github.com/kube-rs/kube/blob/main/kube-runtime/Cargo.toml#L17-L21) feature.
     ///
     /// ## Usage
     /// ```no_run
@@ -116,7 +119,6 @@ pub trait WatchStreamExt: Stream {
     /// # Ok(())
     /// # }
     /// ```
-    #[cfg(feature = "unstable-runtime-predicates")]
     fn predicate_filter<K, P>(self, predicate: P) -> PredicateFilter<Self, K, P>
     where
         Self: Stream<Item = Result<K, watcher::Error>> + Sized,
@@ -214,10 +216,10 @@ pub trait WatchStreamExt: Stream {
     /// [`ReflectHandle`]: crate::reflector::dispatcher::ReflectHandle
     /// ## Usage
     /// ```no_run
-    /// # use futures::{pin_mut, Stream, StreamExt, TryStreamExt};
+    /// # use futures::StreamExt;
     /// # use std::time::Duration;
     /// # use tracing::{info, warn};
-    /// use kube::{Api, Client, ResourceExt};
+    /// use kube::{Api, ResourceExt};
     /// use kube_runtime::{watcher, WatchStreamExt, reflector};
     /// use k8s_openapi::api::apps::v1::Deployment;
     /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
@@ -226,7 +228,7 @@ pub trait WatchStreamExt: Stream {
     /// let deploys: Api<Deployment> = Api::default_namespaced(client);
     /// let subscriber_buf_sz = 100;
     /// let (reader, writer) = reflector::store_shared::<Deployment>(subscriber_buf_sz);
-    /// let subscriber = &writer.subscribe().unwrap();
+    /// let subscriber = writer.subscribe().unwrap();
     ///
     /// tokio::spawn(async move {
     ///     // start polling the store once the reader is ready
@@ -236,6 +238,13 @@ pub trait WatchStreamExt: Stream {
     ///         info!("Current {} deploys: {:?}", names.len(), names);
     ///         tokio::time::sleep(Duration::from_secs(10)).await;
     ///     }
+    /// });
+    ///
+    /// tokio::spawn(async move {
+    ///     // subscriber can be used to receive applied_objects
+    ///     subscriber.for_each(|obj| async move {
+    ///         info!("saw in subscriber {}", &obj.name_any())
+    ///     }).await;
     /// });
     ///
     /// // configure the watcher stream and populate the store while polling
@@ -249,11 +258,6 @@ pub trait WatchStreamExt: Stream {
     ///         }
     ///     })
     ///     .await;
-    ///
-    /// // subscriber can be used to receive applied_objects
-    /// subscriber.for_each(|obj| async move {
-    ///     info!("saw in subscriber {}", &obj.name_any())
-    /// }).await;
     ///
     /// # Ok(())
     /// # }
@@ -272,12 +276,11 @@ pub trait WatchStreamExt: Stream {
 impl<St: ?Sized> WatchStreamExt for St where St: Stream {}
 
 // Compile tests
-#[cfg(feature = "unstable-runtime-predicates")]
 #[cfg(test)]
 pub(crate) mod tests {
-    use super::*;
-    use crate::predicates;
-    use futures::StreamExt;
+    use super::watcher;
+    use crate::{predicates, WatchStreamExt as _};
+    use futures::prelude::*;
     use k8s_openapi::api::core::v1::Pod;
     use kube_client::{Api, Resource};
 

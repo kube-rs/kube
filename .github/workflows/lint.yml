@@ -21,7 +21,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - uses: EmbarkStudios/cargo-deny-action@v1
+      - uses: EmbarkStudios/cargo-deny-action@v2
         with:
           command: check ${{ matrix.checks }}
 
@@ -30,12 +30,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions-rs/toolchain@v1.0.7
+      - uses: dtolnay/rust-toolchain@nightly
         with:
-          profile: minimal
-          toolchain: nightly
           components: rustfmt
-          override: true
-      - name: Run rustfmt
-        id: rustfmt
-        run: rustfmt +nightly --edition 2018 --check $(find . -type f -iname *.rs)
+      - run: rustfmt +nightly --edition 2021 --check $(find . -type f -iname *.rs)

@@ -6,9 +6,8 @@ use std::{
 };
 
 use bytes::Bytes;
-use futures::{stream::Stream, TryStreamExt};
 use http_body::{Body as HttpBody, Frame, SizeHint};
-use http_body_util::{combinators::UnsyncBoxBody, BodyExt, BodyStream};
+use http_body_util::{combinators::UnsyncBoxBody, BodyExt};
 
 /// A request body.
 pub struct Body {
@@ -53,11 +52,6 @@ impl Body {
     /// Collect all the data frames and trailers of this request body and return the data frame
     pub async fn collect_bytes(self) -> Result<Bytes, crate::Error> {
         Ok(self.collect().await?.to_bytes())
-    }
-
-    // Convert this body into `Stream` which iterates only data frame skipping the other kind of frame
-    pub(crate) fn into_data_stream(self) -> impl Stream<Item = Result<Bytes, crate::Error>> {
-        Box::pin(BodyStream::new(self).try_filter_map(|frame| async { Ok(frame.into_data().ok()) }))
     }
 }
 

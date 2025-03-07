@@ -606,7 +606,7 @@ where
             .request
             .portforward(name, ports)
             .map_err(Error::BuildRequest)?;
-        let stream = self.client.connect(req).await?;
-        Ok(Portforwarder::new(stream, ports))
+        let connection = self.client.connect(req).await?;
+        Ok(Portforwarder::new(connection.into_stream(), ports))
     }
 }

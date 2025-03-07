@@ -1,6 +1,6 @@
 use std::pin::pin;
 
-use futures::TryStreamExt;
+use futures::StreamExt;
 use k8s_openapi::{
     api::{core::v1::ObjectReference, events::v1::Event},
     apimachinery::pkg::apis::meta::v1::Time,
@@ -36,18 +36,28 @@ async fn main() -> anyhow::Result<()> {
     if let Some(forval) = app.r#for {
         if let Some((kind, name)) = forval.split_once('/') {
             conf = conf.fields(&format!("regarding.kind={kind},regarding.name={name}"));
+        } else {
+            return Err(anyhow::Error::msg("Usage: --for=<KIND>/<NAME>"));
         }
     }
     let event_stream = watcher(events, conf).default_backoff().applied_objects();
     let mut event_stream = pin!(event_stream);
 
-    println!("{0:<6} {1:<15} {2:<55} {3}", "AGE", "REASON", "OBJECT", "MESSAGE");
-    while let Some(ev) = event_stream.try_next().await? {
-        let age = ev.creation_timestamp().map(format_creation).unwrap_or_default();
-        let reason = ev.reason.unwrap_or_default();
-        let obj = ev.regarding.map(format_objref).flatten().unwrap_or_default();
-        let note = ev.note.unwrap_or_default();
-        println!("{0:<6} {1:<15} {2:<55} {3}", age, reason, obj, note);
+    fn print_event(age: &str, reason: &str, obj: &str, note: &str) {
+        println!("{age:<6} {reason:<15} {obj:<55} {note}");
+    }
+    print_event("AGE", "REASON", "OBJECT", "MESSAGE");
+    while let Some(ev) = event_stream.next().await {
+        match ev {
+            Ok(ev) => {
+                let age = ev.creation_timestamp().map(format_creation).unwrap_or_default();
+                let reason = ev.reason.unwrap_or_default();
+                let obj = ev.regarding.and_then(format_objref).unwrap_or_default();
+                let note = ev.note.unwrap_or_default();
+                print_event(&age, &reason, &obj, &note);
+            }
+            Err(err) => eprintln!("{:?}", anyhow::Error::new(err)),
+        }
     }
     Ok(())
 }

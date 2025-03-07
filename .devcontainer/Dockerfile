@@ -1,4 +1,4 @@
-FROM docker.io/rust:1.75.0-bullseye
+FROM docker.io/rust:1.81.0-bullseye
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt update && apt upgrade -y
@@ -44,16 +44,16 @@ RUN scurl https://raw.githubusercontent.com/rancher/k3d/main/install.sh \
 RUN rustup component add clippy rls rust-src rustfmt
 
 # Install cargo-deny
-ARG CARGO_DENY_VERSION=0.11.4
+ARG CARGO_DENY_VERSION=0.16.1
 RUN scurl "https://github.com/EmbarkStudios/cargo-deny/releases/download/${CARGO_DENY_VERSION}/cargo-deny-${CARGO_DENY_VERSION}-x86_64-unknown-linux-musl.tar.gz" \
     | tar zvxf - --strip-components=1 -C $HOME/bin "cargo-deny-${CARGO_DENY_VERSION}-x86_64-unknown-linux-musl/cargo-deny"
 
 # Install cargo-tarpaulin
-ARG CARGO_TARPAULIN_VERSION=0.20.0
-RUN scurl "https://github.com/xd009642/tarpaulin/releases/download/${CARGO_TARPAULIN_VERSION}/cargo-tarpaulin-${CARGO_TARPAULIN_VERSION}-travis.tar.gz" \
+ARG CARGO_TARPAULIN_VERSION=0.31.2
+RUN scurl "https://github.com/xd009642/tarpaulin/releases/download/${CARGO_TARPAULIN_VERSION}/cargo-tarpaulin-x86_64-unknown-linux-musl.tar.gz" \
     | tar xzvf - -C $HOME/bin
 
-ARG JUST_VERSION=1.1.3
+ARG JUST_VERSION=1.35.0
 RUN scurl https://github.com/casey/just/releases/download/${JUST_VERSION}/just-${JUST_VERSION}-x86_64-unknown-linux-musl.tar.gz \
     | tar xzvf - -C $HOME/bin
 
