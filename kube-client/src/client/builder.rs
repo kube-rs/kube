@@ -1,4 +1,5 @@
 use bytes::Bytes;
+use chrono::{DateTime, Utc};
 use http::{header::HeaderMap, Request, Response};
 use hyper::{
     body::Incoming,
@@ -30,6 +31,7 @@ pub type DynBody = dyn http_body::Body<Data = Bytes, Error = BoxError> + Send + 
 pub struct ClientBuilder<Svc> {
     service: Svc,
     default_ns: String,
+    valid_until: Option<DateTime<Utc>>,
 }
 
 impl<Svc> ClientBuilder<Svc> {
@@ -44,6 +46,7 @@ impl<Svc> ClientBuilder<Svc> {
         Self {
             service,
             default_ns: default_namespace.into(),
+            valid_until: None,
         }
     }
 
@@ -52,10 +55,21 @@ impl<Svc> ClientBuilder<Svc> {
         let Self {
             service: stack,
             default_ns,
+            valid_until,
         } = self;
         ClientBuilder {
             service: layer.layer(stack),
             default_ns,
+            valid_until,
+        }
+    }
+
+    /// Sets an expiration timestamp for the client.
+    pub fn with_valid_until(self, valid_until: Option<DateTime<Utc>>) -> Self {
+        ClientBuilder {
+            service: self.service,
+            default_ns: self.default_ns,
+            valid_until,
         }
     }
 
@@ -68,7 +82,7 @@ impl<Svc> ClientBuilder<Svc> {
         B: http_body::Body<Data = bytes::Bytes> + Send + 'static,
         B::Error: Into<BoxError>,
     {
-        Client::new(self.service, self.default_ns)
+        Client::new(self.service, self.default_ns).with_valid_until(self.valid_until)
     }
 }
 
@@ -242,7 +256,10 @@ where
         .map_err(BoxError::from)
         .service(client);
 
-    Ok(ClientBuilder::new(
+
+    let (_, expiration) = config.exec_identity_pem();
+
+    let client = ClientBuilder::new(
         BoxService::new(
             MapResponseBodyLayer::new(|body| {
                 Box::new(http_body_util::BodyExt::map_err(body, BoxError::from)) as Box<DynBody>
@@ -250,7 +267,10 @@ where
             .layer(service),
         ),
         default_ns,
-    ))
+    )
+    .with_valid_until(expiration);
+
+    Ok(client)
 }
 
 #[cfg(test)]
