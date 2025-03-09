@@ -12,7 +12,7 @@ keywords = ["kubernetes", "client", "runtime", "cncf"]
 categories = ["network-programming", "caching", "api-bindings", "encoding"]
 
 [features]
-default = ["client", "rustls-tls"]
+default = ["client", "rustls-tls", "ring"]
 
 # default features
 client = ["kube-client/client", "config"]
@@ -22,6 +22,7 @@ rustls-tls = ["kube-client/rustls-tls", "client"]
 # alternative features
 openssl-tls = ["kube-client/openssl-tls", "client"]
 aws-lc-rs = ["kube-client?/aws-lc-rs"]
+ring = ["kube-client?/ring"]
 
 # auxiliary features
 ws = ["kube-client/ws", "kube-core/ws"]
