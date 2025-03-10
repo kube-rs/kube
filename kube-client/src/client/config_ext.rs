@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use chrono::{DateTime, Utc};
 use http::{header::HeaderName, HeaderValue};
 #[cfg(feature = "openssl-tls")] use hyper::rt::{Read, Write};
 use hyper_util::client::legacy::connect::HttpConnector;
@@ -176,7 +177,7 @@ impl ConfigExt for Config {
             Auth::RefreshableToken(refreshable) => {
                 Some(AuthLayer(Either::Right(AsyncFilterLayer::new(refreshable))))
             }
-            Auth::Certificate(_client_certificate_data, _client_key_data) => None,
+            Auth::Certificate(_client_certificate_data, _client_key_data, _) => None,
         })
     }
 
@@ -207,7 +208,7 @@ impl ConfigExt for Config {
 
     #[cfg(feature = "rustls-tls")]
     fn rustls_client_config(&self) -> Result<rustls::ClientConfig> {
-        let identity = self.exec_identity_pem().or_else(|| self.identity_pem());
+        let identity = self.exec_identity_pem().0.or_else(|| self.identity_pem());
         tls::rustls_tls::rustls_client_config(
             identity.as_deref(),
             self.root_cert.as_deref(),
@@ -249,7 +250,7 @@ impl ConfigExt for Config {
 
     #[cfg(feature = "openssl-tls")]
     fn openssl_ssl_connector_builder(&self) -> Result<openssl::ssl::SslConnectorBuilder> {
-        let identity = self.exec_identity_pem().or_else(|| self.identity_pem());
+        let identity = self.exec_identity_pem().0.or_else(|| self.identity_pem());
         // TODO: pass self.tls_server_name for openssl
         tls::openssl_tls::ssl_connector_builder(identity.as_ref(), self.root_cert.as_ref())
             .map_err(|e| Error::OpensslTls(tls::openssl_tls::Error::CreateSslConnector(e)))
@@ -295,18 +296,18 @@ impl Config {
     // returns a client certificate and key instead of a token.
     // This has be to be checked on TLS configuration vs tokens
     // which can be added in as an AuthLayer.
-    fn exec_identity_pem(&self) -> Option<Vec<u8>> {
+    pub(crate) fn exec_identity_pem(&self) -> (Option<Vec<u8>>, Option<DateTime<Utc>>) {
         match Auth::try_from(&self.auth_info) {
-            Ok(Auth::Certificate(client_certificate_data, client_key_data)) => {
+            Ok(Auth::Certificate(client_certificate_data, client_key_data, expiratiom)) => {
                 const NEW_LINE: u8 = b'\n';
 
                 let mut buffer = client_key_data.expose_secret().as_bytes().to_vec();
                 buffer.push(NEW_LINE);
                 buffer.extend_from_slice(client_certificate_data.as_bytes());
                 buffer.push(NEW_LINE);
-                Some(buffer)
+                (Some(buffer), expiratiom)
             }
-            _ => None,
+            _ => (None, None),
         }
     }
 }
