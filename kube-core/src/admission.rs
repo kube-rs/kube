@@ -222,8 +222,7 @@ pub enum Operation {
 ///     .deny("Some rejection reason.")
 ///     .into_review();
 ///
-/// use json_patch::{AddOperation, Patch, PatchOperation};
-/// use jsonptr::PointerBuf;
+/// use json_patch::{AddOperation, Patch, PatchOperation, jsonptr::PointerBuf};
 ///
 /// // A response adding a label to the resource.
 /// let _: AdmissionReview<_> = AdmissionResponse::from(&req)
