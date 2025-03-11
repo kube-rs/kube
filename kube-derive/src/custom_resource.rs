@@ -812,8 +812,7 @@ fn process_status(
     visibility: &Visibility,
     kube_core: &Path,
 ) -> StatusInformation {
-    if let Some(status_path) = &status {
-        let pth = quote! { #status_path };
+    if let Some(pth) = &status {
         StatusInformation {
             field: quote! {
                 #[serde(skip_serializing_if = "Option::is_none")]
