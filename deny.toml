@@ -89,3 +89,11 @@ name = "thiserror-impl"
 name = "security-framework"
 [[bans.skip]]
 name = "core-foundation"
+
+# rand / ahash inconsistencies;
+[[bans.skip]]
+name = "getrandom"
+[[bans.skip]]
+name = "wasi"
+[[bans.skip]]
+name = "zerocopy"
