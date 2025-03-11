@@ -1,8 +1,7 @@
 //! Finalizer helper for [`Controller`](crate::Controller) reconcilers
 use crate::controller::Action;
 use futures::{TryFuture, TryFutureExt};
-use json_patch::jsonptr::PointerBuf;
-use json_patch::{AddOperation, PatchOperation, RemoveOperation, TestOperation};
+use json_patch::{jsonptr::PointerBuf, AddOperation, PatchOperation, RemoveOperation, TestOperation};
 use kube_client::{
     api::{Patch, PatchParams},
     Api, Resource, ResourceExt,
