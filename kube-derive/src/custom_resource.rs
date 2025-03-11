@@ -25,7 +25,7 @@ struct KubeAttrs {
     #[darling(multiple, rename = "derive")]
     derives: Vec<String>,
     schema: Option<SchemaMode>,
-    status: Option<String>,
+    status: Option<Path>,
     #[darling(multiple, rename = "category")]
     categories: Vec<String>,
     #[darling(multiple, rename = "shortname")]
@@ -808,28 +808,27 @@ struct StatusInformation {
 /// returns: A `StatusInformation` struct
 fn process_status(
     root_ident: &Ident,
-    status: &Option<String>,
+    status: &Option<Path>,
     visibility: &Visibility,
     kube_core: &Path,
 ) -> StatusInformation {
-    if let Some(status_name) = &status {
-        let ident = format_ident!("{}", status_name);
+    if let Some(pth) = &status {
         StatusInformation {
             field: quote! {
                 #[serde(skip_serializing_if = "Option::is_none")]
-                #visibility status: Option<#ident>,
+                #visibility status: Option<#pth>,
             },
             default: quote! { status: None, },
             impl_hasstatus: quote! {
                 impl #kube_core::object::HasStatus for #root_ident {
 
-                    type Status = #ident;
+                    type Status = #pth;
 
-                    fn status(&self) -> Option<&#ident> {
+                    fn status(&self) -> Option<&#pth> {
                         self.status.as_ref()
                     }
 
-                    fn status_mut(&mut self) -> &mut Option<#ident> {
+                    fn status_mut(&mut self) -> &mut Option<#pth> {
                         &mut self.status
                     }
                 }

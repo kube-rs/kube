@@ -13,17 +13,33 @@ mod v1 {
     use super::*;
     // spec that is forwards compatible with v2 (can upgrade by truncating)
     #[derive(CustomResource, Serialize, Deserialize, Default, Debug, Clone, JsonSchema)]
-    #[kube(group = "kube.rs", version = "v1", kind = "ManyDerive", namespaced)]
+    #[kube(
+        group = "kube.rs",
+        version = "v1",
+        kind = "ManyDerive",
+        status = "ManyDeriveStatus",
+        namespaced
+    )]
     pub struct ManyDeriveSpec {
         pub name: String,
         pub oldprop: u32,
+    }
+    #[derive(Serialize, Deserialize, Default, Debug, Clone, JsonSchema)]
+    pub struct ManyDeriveStatus {
+        pub condition: Option<bool>,
     }
 }
 mod v2 {
     // spec that is NOT backwards compatible with v1 (cannot retrieve oldprop if truncated)
     use super::*;
     #[derive(CustomResource, Serialize, Deserialize, Default, Debug, Clone, JsonSchema)]
-    #[kube(group = "kube.rs", version = "v2", kind = "ManyDerive", namespaced)]
+    #[kube(
+        group = "kube.rs",
+        version = "v2",
+        kind = "ManyDerive",
+        namespaced,
+        status = "v1::ManyDeriveStatus" // cross-referencing from v1 module
+    )]
     pub struct ManyDeriveSpec {
         pub name: String,
         pub extra: Option<String>,
