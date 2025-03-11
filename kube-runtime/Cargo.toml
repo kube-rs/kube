@@ -40,7 +40,6 @@ tokio = { workspace = true, features = ["time"] }
 tokio-util = { workspace = true, features = ["time"] }
 tracing.workspace = true
 json-patch.workspace = true
-jsonptr.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 backon.workspace = true
@@ -54,6 +53,7 @@ hostname.workspace = true
 [dev-dependencies]
 kube = { path = "../kube", features = ["derive", "client", "runtime"], version = "<1.0.0, >=0.60.0" }
 serde_json.workspace = true
+serde_yaml.workspace = true
 tokio = { workspace = true, features = ["full", "test-util"] }
 rand.workspace = true
 schemars.workspace = true

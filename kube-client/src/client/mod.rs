@@ -7,6 +7,7 @@
 //!
 //! The [`Client`] can also be used with [`Discovery`](crate::Discovery) to dynamically
 //! retrieve the resources served by the kubernetes API.
+use chrono::{DateTime, Utc};
 use either::{Either, Left, Right};
 use futures::{future::BoxFuture, AsyncBufRead, StreamExt, TryStream, TryStreamExt};
 use http::{self, Request, Response};
@@ -78,6 +79,30 @@ pub struct Client {
     // - `BoxFuture` for dynamic response future type
     inner: Buffer<Request<Body>, BoxFuture<'static, Result<Response<Body>, BoxError>>>,
     default_ns: String,
+    valid_until: Option<DateTime<Utc>>,
+}
+
+/// Represents a WebSocket connection.
+/// Value returned by [`Client::connect`].
+#[cfg(feature = "ws")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
+pub struct Connection {
+    stream: WebSocketStream<TokioIo<hyper::upgrade::Upgraded>>,
+    protocol: upgrade::StreamProtocol,
+}
+
+#[cfg(feature = "ws")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
+impl Connection {
+    /// Return true if the stream supports graceful close signaling.
+    pub fn supports_stream_close(&self) -> bool {
+        self.protocol.supports_stream_close()
+    }
+
+    /// Transform into the raw WebSocketStream.
+    pub fn into_stream(self) -> WebSocketStream<TokioIo<hyper::upgrade::Upgraded>> {
+        self.stream
+    }
 }
 
 /// Constructors and low-level api interfaces.
@@ -131,7 +156,18 @@ impl Client {
         Self {
             inner: Buffer::new(BoxService::new(service), 1024),
             default_ns: default_namespace.into(),
+            valid_until: None,
         }
+    }
+
+    /// Sets an expiration timestamp to the client, which has to be checked by the user using [`Client::valid_until`] function.
+    pub fn with_valid_until(self, valid_until: Option<DateTime<Utc>>) -> Self {
+        Client { valid_until, ..self }
+    }
+
+    /// Get the expiration timestamp of the client, if it has been set.
+    pub fn valid_until(&self) -> &Option<DateTime<Utc>> {
+        &self.valid_until
     }
 
     /// Create and initialize a [`Client`] using the inferred configuration.
@@ -190,10 +226,7 @@ impl Client {
     /// Make WebSocket connection.
     #[cfg(feature = "ws")]
     #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
-    pub async fn connect(
-        &self,
-        request: Request<Vec<u8>>,
-    ) -> Result<WebSocketStream<TokioIo<hyper::upgrade::Upgraded>>> {
+    pub async fn connect(&self, request: Request<Vec<u8>>) -> Result<Connection> {
         use http::header::HeaderValue;
         let (mut parts, body) = request.into_parts();
         parts
@@ -211,25 +244,20 @@ impl Client {
             http::header::SEC_WEBSOCKET_KEY,
             key.parse().expect("valid header value"),
         );
-        // Use the binary subprotocol v4, to get JSON `Status` object in `error` channel (3).
-        // There's no official documentation about this protocol, but it's described in
-        // [`k8s.io/apiserver/pkg/util/wsstream/conn.go`](https://git.io/JLQED).
-        // There's a comment about v4 and `Status` object in
-        // [`kublet/cri/streaming/remotecommand/httpstream.go`](https://git.io/JLQEh).
-        parts.headers.insert(
-            http::header::SEC_WEBSOCKET_PROTOCOL,
-            HeaderValue::from_static(upgrade::WS_PROTOCOL),
-        );
+        upgrade::StreamProtocol::add_to_headers(&mut parts.headers)?;
 
         let res = self.send(Request::from_parts(parts, Body::from(body))).await?;
-        upgrade::verify_response(&res, &key).map_err(Error::UpgradeConnection)?;
+        let protocol = upgrade::verify_response(&res, &key).map_err(Error::UpgradeConnection)?;
         match hyper::upgrade::on(res).await {
-            Ok(upgraded) => Ok(WebSocketStream::from_raw_socket(
-                TokioIo::new(upgraded),
-                ws::protocol::Role::Client,
-                None,
-            )
-            .await),
+            Ok(upgraded) => Ok(Connection {
+                stream: WebSocketStream::from_raw_socket(
+                    TokioIo::new(upgraded),
+                    ws::protocol::Role::Client,
+                    None,
+                )
+                .await,
+                protocol,
+            }),
 
             Err(e) => Err(Error::UpgradeConnection(
                 UpgradeConnectionError::GetPendingUpgrade(e),

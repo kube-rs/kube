@@ -1,4 +1,4 @@
-use jsonptr::PointerBuf;
+use json_patch::jsonptr::PointerBuf;
 use kube::core::{
     admission::{AdmissionRequest, AdmissionResponse, AdmissionReview},
     DynamicObject, Resource, ResourceExt,
