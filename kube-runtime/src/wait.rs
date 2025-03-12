@@ -200,15 +200,10 @@ pub mod conditions {
     #[must_use]
     pub fn is_crd_established() -> impl Condition<CustomResourceDefinition> {
         |obj: Option<&CustomResourceDefinition>| {
-            let cond = obj
-                .as_ref()?
-                .status
-                .as_ref()?
-                .conditions
-                .as_ref()?
-                .iter()
-                .find(|c| c.type_ == "Established")?;
-            Some(cond.status == "True")
+            let status = obj.as_ref()?.status.as_ref()?;
+            let conds = status.conditions.as_ref()?;
+            let established = conds.iter().find(|c| c.type_ == "Established")?;
+            Some(established.status == "True")
         }
     }
 
@@ -222,14 +217,10 @@ pub mod conditions {
     #[must_use]
     pub fn is_job_completed() -> impl Condition<Job> {
         |obj: Option<&Job>| {
-            let cond = obj?
-                .status
-                .as_ref()?
-                .conditions
-                .as_ref()?
-                .iter()
-                .find(|c| c.type_ == "Complete")?;
-            Some(cond.status == "True")
+            let status = obj.as_ref()?.status.as_ref()?;
+            let conds = status.conditions.as_ref()?;
+            let complete = conds.iter().find(|c| c.type_ == "Complete")?;
+            Some(complete.status == "True")
         }
     }
 
@@ -240,18 +231,11 @@ pub mod conditions {
     #[must_use]
     pub fn is_deployment_completed() -> impl Condition<Deployment> {
         |obj: Option<&Deployment>| {
-            if let Some(depl) = &obj {
-                if let Some(s) = &depl.status {
-                    if let Some(conds) = &s.conditions {
-                        if let Some(dcond) = conds.iter().find(|c| {
-                            c.type_ == "Progressing" && c.reason == Some("NewReplicaSetAvailable".to_string())
-                        }) {
-                            return dcond.status == "True";
-                        }
-                    }
-                }
-            }
-            false
+            let conds = obj?.status.as_ref()?.conditions.as_ref()?;
+            let progressing = conds.iter().find(|c| {
+                c.type_ == "Progressing" && c.reason == Some("NewReplicaSetAvailable".to_string())
+            })?;
+            Some(progressing.status == "True")
         }
     }
 
@@ -259,23 +243,9 @@ pub mod conditions {
     #[must_use]
     pub fn is_service_loadbalancer_provisioned() -> impl Condition<Service> {
         |obj: Option<&Service>| {
-            if let Some(svc) = &obj {
-                // ignore services that are not type LoadBalancer (return true immediately)
-                if let Some(spec) = &svc.spec {
-                    if spec.type_ != Some("LoadBalancer".to_string()) {
-                        return true;
-                    }
-                    // carry on if this is a LoadBalancer service
-                    if let Some(s) = &svc.status {
-                        if let Some(lbs) = &s.load_balancer {
-                            if let Some(ings) = &lbs.ingress {
-                                return ings.iter().all(|ip| ip.ip.is_some() || ip.hostname.is_some());
-                            }
-                        }
-                    }
-                }
-            }
-            false
+            let status = obj?.status.as_ref()?;
+            let ingress = status.load_balancer.as_ref()?.ingress.as_ref()?;
+            Some(ingress.iter().all(|ip| ip.ip.is_some() || ip.hostname.is_some()))
         }
     }
 
@@ -283,16 +253,9 @@ pub mod conditions {
     #[must_use]
     pub fn is_ingress_provisioned() -> impl Condition<Ingress> {
         |obj: Option<&Ingress>| {
-            if let Some(ing) = &obj {
-                if let Some(s) = &ing.status {
-                    if let Some(lbs) = &s.load_balancer {
-                        if let Some(ings) = &lbs.ingress {
-                            return ings.iter().all(|ip| ip.ip.is_some() || ip.hostname.is_some());
-                        }
-                    }
-                }
-            }
-            false
+            let status = obj?.status.as_ref()?;
+            let ingress = status.load_balancer.as_ref()?.ingress.as_ref()?;
+            Some(ingress.iter().all(|ip| ip.ip.is_some() || ip.hostname.is_some()))
         }
     }
 
@@ -887,7 +850,10 @@ pub mod conditions {
             ";
 
             let s = serde_yaml::from_str(service).unwrap();
-            assert!(is_service_loadbalancer_provisioned().matches_object(Some(&s)))
+            assert_eq!(
+                is_service_loadbalancer_provisioned().matches_object_option(Some(&s)),
+                None
+            )
         }
 
         #[test]
