@@ -12,10 +12,11 @@ keywords = ["kubernetes", "client",]
 categories = ["web-programming::http-client", "network-programming", "api-bindings"]
 
 [features]
-default = ["client"]
+default = ["client", "ring"]
 rustls-tls = ["rustls", "hyper-rustls", "hyper-http-proxy?/rustls-tls-native-roots"]
 webpki-roots = ["hyper-rustls/webpki-roots"]
-aws-lc-rs = ["rustls?/aws-lc-rs"]
+aws-lc-rs = ["hyper-rustls?/aws-lc-rs"]
+ring = ["hyper-rustls?/ring"]
 openssl-tls = ["openssl", "hyper-openssl"]
 ws = ["client", "tokio-tungstenite", "kube-core/ws", "tokio/macros"]
 kubelet-debug = ["ws", "kube-core/kubelet-debug"]
@@ -65,7 +66,7 @@ tokio-util = { workspace = true, features = ["io", "codec"], optional = true }
 hyper = { workspace = true, features = ["client", "http1"], optional = true }
 hyper-http-proxy = { version = "1", default-features = false, optional = true }
 hyper-util = { workspace = true, features = ["client", "client-legacy", "http1", "tokio"], optional = true }
-hyper-rustls = { workspace = true, features = ["http1", "logging", "native-tokio", "ring", "tls12"], optional = true }
+hyper-rustls = { workspace = true, features = ["http1", "logging", "native-tokio", "tls12"], optional = true }
 hyper-socks2 = { workspace = true, optional = true }
 tokio-tungstenite = { workspace = true, optional = true }
 tower = { workspace = true, features = ["buffer", "filter", "util"], optional = true }
@@ -80,7 +81,7 @@ k8s-openapi= { workspace = true, features = [] }
 
 [dev-dependencies]
 hyper = { workspace = true, features = ["server"] }
-kube = { path = "../kube", features = ["derive", "client", "ws"], version = "<1.0.0, >=0.61.0" }
+kube = { path = "../kube", features = ["derive", "client", "ws", "ring"], version = "<1.0.0, >=0.61.0" }
 tempfile.workspace = true
 futures = { workspace = true, features = ["async-await"] }
 tokio = { workspace = true, features = ["full"] }
