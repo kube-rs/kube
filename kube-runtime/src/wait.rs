@@ -56,7 +56,7 @@ where
 {
     // Skip updates until the condition is satisfied.
     let mut stream = pin!(watch_object(api, name).try_skip_while(|obj| {
-        let matches = cond.matches_ok(obj.as_ref());
+        let matches = cond.matches_object(obj.as_ref());
         future::ready(Ok(!matches))
     }));
 
@@ -90,7 +90,7 @@ pub trait Condition<K> {
     ///
     /// This function does NOT distinguish between a missing property and property found to be false.
     /// Use only whenever this distinction does not matter.
-    fn matches_ok(&self, obj: Option<&K>) -> bool {
+    fn matches_object(&self, obj: Option<&K>) -> bool {
         self.matches(obj).unwrap_or_default()
     }
 
@@ -109,8 +109,8 @@ pub trait Condition<K> {
     /// ```
     /// # use kube_runtime::wait::Condition;
     /// let condition: fn(Option<&()>) -> Option<bool> = |_| Some(true);
-    /// assert!(condition.matches_ok(None));
-    /// assert!(!condition.not().matches_ok(None));
+    /// assert!(condition.matches_object(None));
+    /// assert!(!condition.not().matches_object(None));
     /// ```
     fn not(self) -> conditions::Not<Self>
     where
@@ -127,10 +127,10 @@ pub trait Condition<K> {
     /// # use kube_runtime::wait::Condition;
     /// let cond_false: fn(Option<&()>) -> Option<bool> = |_| Some(false);
     /// let cond_true: fn(Option<&()>) -> Option<bool> = |_| Some(true);
-    /// assert!(!cond_false.and(cond_false).matches_ok(None));
-    /// assert!(!cond_false.and(cond_true).matches_ok(None));
-    /// assert!(!cond_true.and(cond_false).matches_ok(None));
-    /// assert!(cond_true.and(cond_true).matches_ok(None));
+    /// assert!(!cond_false.and(cond_false).matches_object(None));
+    /// assert!(!cond_false.and(cond_true).matches_object(None));
+    /// assert!(!cond_true.and(cond_false).matches_object(None));
+    /// assert!(cond_true.and(cond_true).matches_object(None));
     /// ```
     fn and<Other: Condition<K>>(self, other: Other) -> conditions::And<Self, Other>
     where
@@ -147,10 +147,10 @@ pub trait Condition<K> {
     /// # use kube_runtime::wait::Condition;
     /// let cond_false: fn(Option<&()>) -> Option<bool> = |_| Some(false);
     /// let cond_true: fn(Option<&()>) -> Option<bool> = |_| Some(true);
-    /// assert!(!cond_false.or(cond_false).matches_ok(None));
-    /// assert!(cond_false.or(cond_true).matches_ok(None));
-    /// assert!(cond_true.or(cond_false).matches_ok(None));
-    /// assert!(cond_true.or(cond_true).matches_ok(None));
+    /// assert!(!cond_false.or(cond_false).matches_object(None));
+    /// assert!(cond_false.or(cond_true).matches_object(None));
+    /// assert!(cond_true.or(cond_false).matches_object(None));
+    /// assert!(cond_true.or(cond_true).matches_object(None));
     /// ```
     fn or<Other: Condition<K>>(self, other: Other) -> conditions::Or<Self, Other>
     where
@@ -272,7 +272,7 @@ pub mod conditions {
     pub struct Not<A>(pub(super) A);
     impl<A: Condition<K>, K> Condition<K> for Not<A> {
         fn matches(&self, obj: Option<&K>) -> Option<bool> {
-            Some(!self.0.matches_ok(obj))
+            Some(!self.0.matches_object(obj))
         }
     }
 
@@ -285,7 +285,7 @@ pub mod conditions {
         B: Condition<K>,
     {
         fn matches(&self, obj: Option<&K>) -> Option<bool> {
-            Some(self.0.matches_ok(obj) && self.1.matches_ok(obj))
+            Some(self.0.matches_object(obj) && self.1.matches_object(obj))
         }
     }
 
@@ -298,7 +298,7 @@ pub mod conditions {
         B: Condition<K>,
     {
         fn matches(&self, obj: Option<&K>) -> Option<bool> {
-            Some(self.0.matches_ok(obj) || self.1.matches_ok(obj))
+            Some(self.0.matches_object(obj) || self.1.matches_object(obj))
         }
     }
 
@@ -353,7 +353,7 @@ pub mod conditions {
             "#;
 
             let c = serde_yaml::from_str(crd).unwrap();
-            assert!(is_crd_established().matches_ok(Some(&c)))
+            assert!(is_crd_established().matches_object(Some(&c)))
         }
 
         #[test]
@@ -406,7 +406,7 @@ pub mod conditions {
             "#;
 
             let c = serde_yaml::from_str(crd).unwrap();
-            assert!(!is_crd_established().matches_ok(Some(&c)))
+            assert!(!is_crd_established().matches_object(Some(&c)))
         }
 
         #[test]
@@ -414,7 +414,7 @@ pub mod conditions {
         fn crd_established_missing() {
             use super::{is_crd_established, Condition};
 
-            assert!(!is_crd_established().matches_ok(None))
+            assert!(!is_crd_established().matches_object(None))
         }
 
         #[test]
@@ -473,7 +473,7 @@ pub mod conditions {
             "#;
 
             let p = serde_yaml::from_str(pod).unwrap();
-            assert!(is_pod_running().matches_ok(Some(&p)))
+            assert!(is_pod_running().matches_object(Some(&p)))
         }
 
         #[test]
@@ -507,7 +507,7 @@ pub mod conditions {
             "#;
 
             let p = serde_yaml::from_str(pod).unwrap();
-            assert!(!is_pod_running().matches_ok(Some(&p)))
+            assert!(!is_pod_running().matches_object(Some(&p)))
         }
 
         #[test]
@@ -515,7 +515,7 @@ pub mod conditions {
         fn pod_running_missing() {
             use super::{is_pod_running, Condition};
 
-            assert!(!is_pod_running().matches_ok(None))
+            assert!(!is_pod_running().matches_object(None))
         }
 
         #[test]
@@ -564,7 +564,7 @@ pub mod conditions {
             "#;
 
             let j = serde_yaml::from_str(job).unwrap();
-            assert!(is_job_completed().matches_ok(Some(&j)))
+            assert!(is_job_completed().matches_object(Some(&j)))
         }
 
         #[test]
@@ -604,7 +604,7 @@ pub mod conditions {
             "#;
 
             let j = serde_yaml::from_str(job).unwrap();
-            assert!(!is_job_completed().matches_ok(Some(&j)))
+            assert!(!is_job_completed().matches_object(Some(&j)))
         }
 
         #[test]
@@ -612,7 +612,7 @@ pub mod conditions {
         fn job_completed_missing() {
             use super::{is_job_completed, Condition};
 
-            assert!(!is_job_completed().matches_ok(None))
+            assert!(!is_job_completed().matches_object(None))
         }
 
         #[test]
@@ -676,7 +676,7 @@ pub mod conditions {
             "#;
 
             let d = serde_yaml::from_str(depl).unwrap();
-            assert!(is_deployment_completed().matches_ok(Some(&d)))
+            assert!(is_deployment_completed().matches_object(Some(&d)))
         }
 
         #[test]
@@ -739,7 +739,7 @@ pub mod conditions {
             "#;
 
             let d = serde_yaml::from_str(depl).unwrap();
-            assert!(!is_deployment_completed().matches_ok(Some(&d)))
+            assert!(!is_deployment_completed().matches_object(Some(&d)))
         }
 
         #[test]
@@ -747,7 +747,7 @@ pub mod conditions {
         fn deployment_completed_missing() {
             use super::{is_deployment_completed, Condition};
 
-            assert!(!is_deployment_completed().matches_ok(None))
+            assert!(!is_deployment_completed().matches_object(None))
         }
 
         #[test]
@@ -776,7 +776,7 @@ pub mod conditions {
             ";
 
             let s = serde_yaml::from_str(service).unwrap();
-            assert!(is_service_loadbalancer_provisioned().matches_ok(Some(&s)))
+            assert!(is_service_loadbalancer_provisioned().matches_object(Some(&s)))
         }
 
         #[test]
@@ -805,7 +805,7 @@ pub mod conditions {
             ";
 
             let s = serde_yaml::from_str(service).unwrap();
-            assert!(is_service_loadbalancer_provisioned().matches_ok(Some(&s)))
+            assert!(is_service_loadbalancer_provisioned().matches_object(Some(&s)))
         }
 
         #[test]
@@ -833,7 +833,10 @@ pub mod conditions {
 
             let s = serde_yaml::from_str(service).unwrap();
             // returns false because it does not match the condition
-            assert_eq!(is_service_loadbalancer_provisioned().matches_ok(Some(&s)), false);
+            assert_eq!(
+                is_service_loadbalancer_provisioned().matches_object(Some(&s)),
+                false
+            );
             // but it's falsy because the properties we look for does not exist
             assert_eq!(is_service_loadbalancer_provisioned().matches(Some(&s)), None);
             // TODO: maybe the distinction is not valuable in this case, remove it?
@@ -875,7 +878,7 @@ pub mod conditions {
         fn service_lb_provisioned_missing() {
             use super::{is_service_loadbalancer_provisioned, Condition};
 
-            assert!(!is_service_loadbalancer_provisioned().matches_ok(None))
+            assert!(!is_service_loadbalancer_provisioned().matches_object(None))
         }
 
         #[test]
@@ -910,7 +913,7 @@ pub mod conditions {
             "#;
 
             let i = serde_yaml::from_str(ingress).unwrap();
-            assert!(is_ingress_provisioned().matches_ok(Some(&i)))
+            assert!(is_ingress_provisioned().matches_object(Some(&i)))
         }
 
         #[test]
@@ -945,7 +948,7 @@ pub mod conditions {
             "#;
 
             let i = serde_yaml::from_str(ingress).unwrap();
-            assert!(is_ingress_provisioned().matches_ok(Some(&i)))
+            assert!(is_ingress_provisioned().matches_object(Some(&i)))
         }
 
         #[test]
@@ -978,7 +981,7 @@ pub mod conditions {
             "#;
 
             let i = serde_yaml::from_str(ingress).unwrap();
-            assert!(!is_ingress_provisioned().matches_ok(Some(&i)))
+            assert!(!is_ingress_provisioned().matches_object(Some(&i)))
         }
 
         #[test]
@@ -986,7 +989,7 @@ pub mod conditions {
         fn ingress_provisioned_missing() {
             use super::{is_ingress_provisioned, Condition};
 
-            assert!(!is_ingress_provisioned().matches_ok(None))
+            assert!(!is_ingress_provisioned().matches_object(None))
         }
     }
 }
