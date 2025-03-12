@@ -20,14 +20,14 @@ path = "boot.rs"
 [features]
 latest = ["k8s-openapi/latest"]
 mk8sv = ["k8s-openapi/earliest"]
-rustls = ["kube/rustls-tls"]
+rustls = ["kube/rustls-tls", "kube/ring"]
 openssl = ["kube/openssl-tls"]
 
 [dependencies]
 anyhow.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
-kube = { path = "../kube", version = "^0.98.0", default-features = false, features = ["client", "runtime", "ws", "admission", "gzip"] }
+kube = { path = "../kube", version = "^0.99.0", default-features = false, features = ["client", "runtime", "ws", "admission", "gzip"] }
 k8s-openapi.workspace = true
 serde_json.workspace = true
 tokio = { workspace = true, features = ["full"] }

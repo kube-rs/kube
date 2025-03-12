@@ -254,6 +254,9 @@ struct TokenResponse {
     id_token: Option<String>,
 }
 
+#[cfg(all(feature = "rustls-tls", not(any(feature = "ring", feature = "aws-lc-rs"))))]
+compile_error!("At least one of ring or aws-lc-rs feature must be enabled to use rustls-tls feature");
+
 #[cfg(not(any(feature = "rustls-tls", feature = "openssl-tls")))]
 compile_error!(
     "At least one of rustls-tls or openssl-tls feature must be enabled to use refresh-oidc feature"

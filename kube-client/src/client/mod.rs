@@ -7,6 +7,7 @@
 //!
 //! The [`Client`] can also be used with [`Discovery`](crate::Discovery) to dynamically
 //! retrieve the resources served by the kubernetes API.
+use chrono::{DateTime, Utc};
 use either::{Either, Left, Right};
 use futures::{future::BoxFuture, AsyncBufRead, StreamExt, TryStream, TryStreamExt};
 use http::{self, Request, Response};
@@ -78,6 +79,7 @@ pub struct Client {
     // - `BoxFuture` for dynamic response future type
     inner: Buffer<Request<Body>, BoxFuture<'static, Result<Response<Body>, BoxError>>>,
     default_ns: String,
+    valid_until: Option<DateTime<Utc>>,
 }
 
 /// Represents a WebSocket connection.
@@ -154,7 +156,18 @@ impl Client {
         Self {
             inner: Buffer::new(BoxService::new(service), 1024),
             default_ns: default_namespace.into(),
+            valid_until: None,
         }
+    }
+
+    /// Sets an expiration timestamp to the client, which has to be checked by the user using [`Client::valid_until`] function.
+    pub fn with_valid_until(self, valid_until: Option<DateTime<Utc>>) -> Self {
+        Client { valid_until, ..self }
+    }
+
+    /// Get the expiration timestamp of the client, if it has been set.
+    pub fn valid_until(&self) -> &Option<DateTime<Utc>> {
+        &self.valid_until
     }
 
     /// Create and initialize a [`Client`] using the inferred configuration.

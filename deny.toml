@@ -13,7 +13,8 @@ db-urls = ["https://github.com/rustsec/advisory-db"]
 yanked = "warn"
 
 ignore = [
-    "RUSTSEC-2024-0384", # instant dep via unmaintained backoff dep
+    # paste unmaintained, no safe upgrade yet
+    "RUSTSEC-2024-0436"
 ]
 
 [licenses]
@@ -74,17 +75,8 @@ name = "rustls-native-certs"
 # base64 did some annoying breaking changes
 name = "base64"
 
-[[bans.skip]]
-# latest via openssl->hyper-openssl (we have latest)
-# newer via tower-http (we have latest)
-name = "bitflags"
-
 [[bans.skip-tree]]
 name = "windows-sys"
-
-[[bans.skip]]
-# different sources of miniz_oxide which users will not generally see
-name = "miniz_oxide"
 
 # currently multiple version of thiserror in flight due to its major bump
 [[bans.skip]]
@@ -98,13 +90,7 @@ name = "security-framework"
 [[bans.skip]]
 name = "core-foundation"
 
-# currently tungstenite hasn't upgraded rand to 0.9 yet, all these are related
-[[bans.skip]]
-name = "rand"
-[[bans.skip]]
-name = "rand_core"
-[[bans.skip]]
-name = "rand_chacha"
+# rand / ahash inconsistencies;
 [[bans.skip]]
 name = "getrandom"
 [[bans.skip]]

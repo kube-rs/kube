@@ -5,7 +5,44 @@
 <!-- next-header -->
 UNRELEASED
 ===================
- * see https://github.com/kube-rs/kube/compare/0.98.0...main
+ * see https://github.com/kube-rs/kube/compare/0.99.0...main
+
+[0.99.0](https://github.com/kube-rs/kube/releases/tag/0.99.0) / 2025-03-12
+===================
+<!-- Release notes generated using configuration in .github/release.yml at 0.99.0 -->
+## Highlights
+### Dependency Cleanups
+- `backoff` ([unmaintained](https://github.com/ihrwein/backoff)) replaced with `backon` in https://github.com/kube-rs/kube/pull/1653
+  * No change if you are using [`default_backoff`](https://docs.rs/kube/latest/kube/runtime/trait.WatchStreamExt.html#method.default_backoff) natively, or through `Controller`.
+  * Parameters configurable via [`ExponentialBackoff`](https://docs.rs/kube/latest/kube/runtime/watcher/struct.ExponentialBackoff.html) from [`backon::ExponentialBuilder`](https://docs.rs/backon/1.4.0/backon/struct.ExponentialBuilder.html) into [`WatchStreamExt::backoff`](https://docs.rs/kube/latest/kube/runtime/trait.WatchStreamExt.html#method.backoff)
+- `json-patch` bumped and uses [re-exported `jsonptr`](https://docs.rs/json-patch/4.0.0/json_patch/index.html#reexports) for less version clashes https://github.com/kube-rs/kube/pull/1718
+- `rand` dependency no longer explicit as only rng is under `ws` feature via `tungstenite`'s [`client::generate_key`](https://docs.rs/tungstenite/latest/tungstenite/handshake/client/fn.generate_key.html) https://github.com/kube-rs/kube/pull/1691
+- `ring` ([still maintained](https://github.com/briansmith/ring/discussions/2414)) now optional for `rustls-tls` feature (for alternate `aws-lc-rs`) https://github.com/kube-rs/kube/pull/1717
+
+### Features
+- Support for the `v5.channel.k8s.io` streaming `ws` protocol to allow closing streams properly ([kubernetes.io blog](https://kubernetes.io/blog/2024/08/20/websockets-transition/)) https://github.com/kube-rs/kube/pull/1693
+- `CustomResource` derive; typed attributes for [`#[kube(scale)]`](https://docs.rs/kube/latest/kube/derive.CustomResource.html#kubescale) and [`#[kube(deprecated)]`](https://docs.rs/kube/latest/kube/derive.CustomResource.html#kubedeprecated--warning) in https://github.com/kube-rs/kube/pull/1656 + https://github.com/kube-rs/kube/pull/1697
+- [`Client::with_valid_until`](https://docs.rs/kube/latest/kube/struct.Client.html#method.with_valid_until) to handle short lived local client certs https://github.com/kube-rs/kube/pull/1707
+- New common [`conditions`](https://docs.rs/kube/latest/kube/runtime/wait/conditions/index.html#functions) that can be [awaited](https://docs.rs/kube/latest/kube/runtime/wait/fn.await_condition.html) https://github.com/kube-rs/kube/pull/1710
+
+## What's Changed
+### Added
+* Add typed scale argument to derive macro by @Techassi in https://github.com/kube-rs/kube/pull/1656
+* Add deprecated argument to derive macro by @Techassi in https://github.com/kube-rs/kube/pull/1697
+* Add `Api::get_metadata_opt_with` by @sebsoto in https://github.com/kube-rs/kube/pull/1708
+* Add common wait conditions for Deployments, LoadBalancer Services, and Ingress by @detjensrobert in https://github.com/kube-rs/kube/pull/1710
+* Add `Client::with_valid_until` for client cert expiry by @goenning in https://github.com/kube-rs/kube/pull/1707
+* kube-runtime: make `ExponentialBackoff` public by @gdeleon2 in https://github.com/kube-rs/kube/pull/1716
+### Changed
+* Replace `backoff` with `backon` by @flavio in https://github.com/kube-rs/kube/pull/1653
+* Bump `rand` to 0.9 by @clux in https://github.com/kube-rs/kube/pull/1686
+* Remove `rand` dependency in favor of `tungstenite` fn by @clux in https://github.com/kube-rs/kube/pull/1691
+* Exec can return stdout data even after stdin is closed. by @esw-amzn in https://github.com/kube-rs/kube/pull/1693
+* Bump `json-patch` to 4 use bundled `jsonptr` to 0.7 by @clux in https://github.com/kube-rs/kube/pull/1718
+* Allow removing hyper-rustls/ring feature by @eliad-wiz in https://github.com/kube-rs/kube/pull/1717
+### Fixed
+* kube-runtime: fix exponential backoff max times by @eliad-wiz in https://github.com/kube-rs/kube/pull/1713
+* `CustomResource` derive; allow `status` attribute to take a path by @clux in https://github.com/kube-rs/kube/pull/1704
 
 [0.98.0](https://github.com/kube-rs/kube/releases/tag/0.98.0) / 2024-12-23
 ===================

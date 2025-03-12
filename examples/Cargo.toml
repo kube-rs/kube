@@ -13,7 +13,7 @@ release = false
 default = ["rustls-tls", "kubederive", "ws", "latest", "socks5", "runtime", "refresh"]
 kubederive = ["kube/derive"]
 openssl-tls = ["kube/client", "kube/openssl-tls", "kube/unstable-client"]
-rustls-tls = ["kube/client", "kube/rustls-tls", "kube/unstable-client"]
+rustls-tls = ["kube/client", "kube/rustls-tls", "kube/ring", "kube/unstable-client"]
 runtime = ["kube/runtime", "kube/unstable-runtime"]
 socks5 = ["kube/socks5"]
 refresh = ["kube/oauth", "kube/oidc"]
@@ -28,9 +28,8 @@ garde = { version = "0.22.0", default-features = false, features = ["derive"] }
 anyhow.workspace = true
 futures = { workspace = true, features = ["async-await"] }
 jsonpath-rust.workspace = true
-jsonptr.workspace = true
-kube = { path = "../kube", version = "^0.98.0", default-features = false, features = ["admission"] }
-kube-derive = { path = "../kube-derive", version = "^0.98.0", default-features = false } # only needed to opt out of schema
+kube = { path = "../kube", version = "^0.99.0", default-features = false, features = ["admission"] }
+kube-derive = { path = "../kube-derive", version = "^0.99.0", default-features = false } # only needed to opt out of schema
 k8s-openapi.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
