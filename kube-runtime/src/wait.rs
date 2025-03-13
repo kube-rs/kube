@@ -86,19 +86,18 @@ where
 /// }
 /// ```
 pub trait Condition<K> {
-    /// Condition function for general truthiness
+    /// Condition function with bool return
     ///
-    /// This function does NOT distinguish between a missing property and property found to be false.
-    /// Use only whenever this distinction does not matter.
+    /// This function does NOT distinguish between a missing property and property declared to be false.
     fn matches_object(&self, obj: Option<&K>) -> bool {
         self.matches(obj).unwrap_or_default()
     }
 
-    /// Condition function with a clear answer
+    /// Condition function with optional return
     ///
-    /// This function is the raw underlying fn used in an `impl Condition` distinguishing missing and false information.
+    /// This function is the raw underlying fn used in an `impl Condition` distinguishing missing and false conditions.
     ///
-    /// This function must return None when require properties are not found.
+    /// This function should return None when required properties are missing.
     /// If the properties are found, but the condition is not satisfied, it must return Some(false).
     fn matches(&self, _obj: Option<&K>) -> Option<bool>;
 
@@ -247,7 +246,7 @@ pub mod conditions {
     #[must_use]
     pub fn is_service_loadbalancer_provisioned() -> impl Condition<Service> {
         |obj: Option<&Service>| {
-            // ignore services that are not type LoadBalancer (return false)
+            // explicitly reject services that are not type LoadBalancer
             if obj?.spec.as_ref()?.type_.as_ref()? != "LoadBalancer" {
                 return Some(false);
             }
@@ -832,14 +831,10 @@ pub mod conditions {
             ";
 
             let s = serde_yaml::from_str(service).unwrap();
-            // returns false because it does not match the condition
-            assert_eq!(
-                is_service_loadbalancer_provisioned().matches_object(Some(&s)),
-                false
-            );
-            // but it's falsy because the properties we look for does not exist
+            // matches object is false because it does not match the condition
+            assert!(!is_service_loadbalancer_provisioned().matches_object(Some(&s)),);
+            // but via None because the underlying matches method is missing properties
             assert_eq!(is_service_loadbalancer_provisioned().matches(Some(&s)), None);
-            // TODO: maybe the distinction is not valuable in this case, remove it?
         }
 
         #[test]
@@ -865,12 +860,13 @@ pub mod conditions {
             ";
 
             let s = serde_yaml::from_str(service).unwrap();
-            // should return a definitive false because it's not a load balancer type
+            // false; not matching because it's not a load balancer
+            assert!(!is_service_loadbalancer_provisioned().matches_object(Some(&s)),);
+            // but via explicit false, because method rejected the value of the properties
             assert_eq!(
                 is_service_loadbalancer_provisioned().matches(Some(&s)),
                 Some(false)
             )
-            // TODO: maybe this is not valueable ?
         }
 
         #[test]
