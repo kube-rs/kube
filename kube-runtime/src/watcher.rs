@@ -4,7 +4,6 @@
 
 use crate::utils::{Backoff, ResetTimerBackoff};
 
-use async_trait::async_trait;
 use backon::BackoffBuilder;
 use educe::Educe;
 use futures::{stream::BoxStream, Stream, StreamExt};
@@ -164,7 +163,6 @@ enum State<K> {
 
 /// Used to control whether the watcher receives the full object, or only the
 /// metadata
-#[async_trait]
 trait ApiMode {
     type Value: Clone;
 
@@ -436,7 +434,6 @@ impl Config {
     }
 }
 
-#[async_trait]
 impl<K> ApiMode for FullObject<'_, K>
 where
     K: Clone + Debug + DeserializeOwned + Send + 'static,
@@ -462,7 +459,6 @@ struct MetaOnly<'a, K> {
     api: &'a Api<K>,
 }
 
-#[async_trait]
 impl<K> ApiMode for MetaOnly<'_, K>
 where
     K: Clone + Debug + DeserializeOwned + Send + 'static,
