@@ -17,6 +17,6 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - uses: taiki-e/install-action@cargo-hack
-      - uses: extractions/setup-just@v2
+      - uses: extractions/setup-just@v3
       - name: Run cargo-hack
         run: just hack
