@@ -12,11 +12,6 @@ db-urls = ["https://github.com/rustsec/advisory-db"]
 # remove them when we have to
 yanked = "warn"
 
-ignore = [
-    # paste unmaintained, no safe upgrade yet
-    "RUSTSEC-2024-0436"
-]
-
 [licenses]
 # See https://spdx.org/licenses/ for list of possible licenses
 # [possible values: any SPDX 3.11 short identifier (+ optional exception)].
@@ -28,7 +23,6 @@ allow = [
     "Apache-2.0",
     "BSD-3-Clause",
     "ISC",
-    "LicenseRef-ring",
     # Blanket addition for Unicode-3.0 libs for optional features (affects many deps, but it's a very clean license)
     # https://github.com/unicode-org/icu4x/blob/main/LICENSE
     "Unicode-3.0",
@@ -40,22 +34,9 @@ allow = [
 ]
 
 exceptions = [
-    # The Unicode-DFS--2016 license is necessary for unicode-ident because they
-    # use data from the unicode tables to generate the tables which are
-    # included in the application. We do not distribute those data files so
-    # this is not a problem for us. See https://github.com/dtolnay/unicode-ident/pull/9/files
-    # for more details.
-    { allow = ["Unicode-DFS-2016"], name = "unicode-ident" },
     # Pulled in via hyper-rustls when using the webpki-roots feature,
     # which is off by default.
     { allow = ["MPL-2.0"], name = "webpki-roots" },
-]
-
-[[licenses.clarify]]
-name = "ring"
-expression = "LicenseRef-ring"
-license-files = [
-    { path = "LICENSE", hash = 0xbd0eed23 },
 ]
 
 [sources]
