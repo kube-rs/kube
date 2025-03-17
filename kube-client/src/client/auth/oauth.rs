@@ -144,7 +144,7 @@ impl Gcp {
                 // Convert response body to `Vec<u8>` for parsing.
                 let (parts, body) = res.into_parts();
                 let bytes = body.collect().await.map_err(Error::ConcatBuffers)?.to_bytes();
-                let response = http::Response::from_parts(parts, bytes.to_vec());
+                let response = http::Response::from_parts(parts, bytes);
                 match self.provider.parse_token_response(scope_hash, response) {
                     Ok(token) => Ok(token),
 
