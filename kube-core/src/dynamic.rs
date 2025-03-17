@@ -5,6 +5,7 @@ pub use crate::discovery::ApiResource;
 use crate::{
     metadata::TypeMeta,
     resource::{DynamicResourceScope, Resource},
+    GroupVersionKind,
 };
 
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
@@ -72,6 +73,12 @@ impl DynamicObject {
         self,
     ) -> Result<K, ParseDynamicObjectError> {
         Ok(serde_json::from_value(serde_json::to_value(self)?)?)
+    }
+
+    /// Returns the group, version, and kind (GVK) of this resource.
+    pub fn gvk(&self) -> Option<GroupVersionKind> {
+        let gvk = self.types.clone()?;
+        gvk.try_into().ok()
     }
 }
 

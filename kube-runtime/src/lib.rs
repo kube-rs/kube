@@ -32,6 +32,7 @@ pub mod watcher;
 
 pub use controller::{applier, Config, Controller};
 pub use finalizer::finalizer;
+#[cfg(feature = "unstable-runtime-subscribe")] pub use reflector::broadcaster;
 pub use reflector::reflector;
 pub use scheduler::scheduler;
 pub use utils::WatchStreamExt;
