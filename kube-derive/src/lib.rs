@@ -137,9 +137,9 @@ mod resource;
 ///
 /// ```ignore
 /// #[kube(scale(
-///     specReplicasPath = ".spec.replicas",
-///     statusReplicaPath = ".status.replicas",
-///     labelSelectorPath = ".spec.labelSelector"
+///     spec_replicas_path = ".spec.replicas",
+///     status_replica_path = ".status.replicas",
+///     label_selector_path = ".spec.labelSelector"
 /// ))]
 /// ```
 ///
