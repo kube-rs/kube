@@ -67,39 +67,6 @@ pub enum Event<K> {
 }
 
 impl<K> Event<K> {
-    /// Flattens out all objects that were added or modified in the event.
-    ///
-    /// `Deleted` objects are ignored, all objects mentioned by `Restarted` events are
-    /// emitted individually.
-    #[deprecated(
-        since = "0.92.0",
-        note = "unnecessary to flatten a single object. This fn will be removed in 0.96.0."
-    )]
-    pub fn into_iter_applied(self) -> impl Iterator<Item = K> {
-        match self {
-            Self::Apply(obj) | Self::InitApply(obj) => Some(obj),
-            Self::Delete(_) | Self::Init | Self::InitDone => None,
-        }
-        .into_iter()
-    }
-
-    /// Flattens out all objects that were added, modified, or deleted in the event.
-    ///
-    /// Note that `Deleted` events may be missed when restarting the stream. Use finalizers
-    /// or owner references instead if you care about cleaning up external resources after
-    /// deleted objects.
-    #[deprecated(
-        since = "0.92.0",
-        note = "unnecessary to flatten a single object. This fn will be removed in 0.96.0."
-    )]
-    pub fn into_iter_touched(self) -> impl Iterator<Item = K> {
-        match self {
-            Self::Apply(obj) | Self::Delete(obj) | Self::InitApply(obj) => Some(obj),
-            Self::Init | Self::InitDone => None,
-        }
-        .into_iter()
-    }
-
     /// Map each object in an event through a mutator fn
     ///
     /// This allows for memory optimizations in watch streams.
