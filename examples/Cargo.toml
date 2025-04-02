@@ -49,7 +49,7 @@ json-patch.workspace = true
 tower = { workspace = true, features = ["limit"] }
 tower-http = { workspace = true, features = ["trace", "decompression-gzip"] }
 hyper = { workspace = true, features = ["client", "http1"] }
-hyper-util = { workspace = true, features = ["client-legacy", "http1", "tokio"] }
+hyper-util = { workspace = true, features = ["client-legacy", "http1", "tokio", "tracing"] }
 thiserror.workspace = true
 backon.workspace = true
 clap = { version = "4.0", default-features = false, features = ["std", "cargo", "derive"] }
