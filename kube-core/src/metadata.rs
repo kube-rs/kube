@@ -51,6 +51,22 @@ impl TypeMeta {
             kind: K::kind(&()).into(),
         }
     }
+
+    /// Construct a new `TypeMeta` for the object from the list `TypeMeta`.
+    ///
+    /// ```
+    /// # use k8s_openapi::api::core::v1::Pod;
+    /// # use kube_core::TypeMeta;
+    ///
+    /// let mut type_meta = TypeMeta::resource::<Pod>();
+    /// type_meta.kind = "PodList".to_string();
+    /// assert_eq!(type_meta.clone().singular_list().unwrap().kind, "Pod");
+    /// assert_eq!(type_meta.clone().singular_list().unwrap().api_version, "v1");
+    /// ```
+    pub fn singular_list(self) -> Option<Self> {
+        let kind = self.kind.strip_suffix("List")?.to_string();
+        (!kind.is_empty()).then_some(Self { kind, ..self })
+    }
 }
 
 /// A generic representation of any object with `ObjectMeta`.

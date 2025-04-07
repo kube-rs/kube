@@ -102,9 +102,32 @@ where
     pub fn apply_watcher_event(&mut self, event: &watcher::Event<K>) {
         match event {
             watcher::Event::Apply(obj) => {
-                let key = obj.to_object_ref(self.dyntype.clone());
                 let obj = Arc::new(obj.clone());
-                self.store.write().insert(key, obj);
+                self.apply_shared_watcher_event(&watcher::Event::Apply(obj));
+            }
+            watcher::Event::Delete(obj) => {
+                let obj = Arc::new(obj.clone());
+                self.apply_shared_watcher_event(&watcher::Event::Delete(obj));
+            }
+            watcher::Event::InitApply(obj) => {
+                let obj = Arc::new(obj.clone());
+                self.apply_shared_watcher_event(&watcher::Event::InitApply(obj));
+            }
+            watcher::Event::Init => {
+                self.apply_shared_watcher_event(&watcher::Event::Init);
+            }
+            watcher::Event::InitDone => {
+                self.apply_shared_watcher_event(&watcher::Event::InitDone);
+            }
+        }
+    }
+
+    /// Applies a single shared watcher event to the store
+    pub fn apply_shared_watcher_event(&mut self, event: &watcher::Event<Arc<K>>) {
+        match event {
+            watcher::Event::Apply(obj) => {
+                let key = obj.to_object_ref(self.dyntype.clone());
+                self.store.write().insert(key, obj.clone());
             }
             watcher::Event::Delete(obj) => {
                 let key = obj.to_object_ref(self.dyntype.clone());
@@ -115,8 +138,7 @@ where
             }
             watcher::Event::InitApply(obj) => {
                 let key = obj.to_object_ref(self.dyntype.clone());
-                let obj = Arc::new(obj.clone());
-                self.buffer.insert(key, obj);
+                self.buffer.insert(key, obj.clone());
             }
             watcher::Event::InitDone => {
                 let mut store = self.store.write();

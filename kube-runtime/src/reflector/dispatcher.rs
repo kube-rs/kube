@@ -6,12 +6,17 @@ use std::{fmt::Debug, sync::Arc};
 
 use educe::Educe;
 use futures::Stream;
+#[cfg(feature = "unstable-runtime-subscribe")]
+use kube_client::{api::DynamicObject, Resource};
 use pin_project::pin_project;
+#[cfg(feature = "unstable-runtime-subscribe")] use serde::de::DeserializeOwned;
 use std::task::ready;
 
 use crate::reflector::{ObjectRef, Store};
+#[cfg(feature = "unstable-runtime-subscribe")] use crate::watcher::Event;
 use async_broadcast::{InactiveReceiver, Receiver, Sender};
 
+#[cfg(feature = "unstable-runtime-subscribe")] use super::store::Writer;
 use super::Lookup;
 
 #[derive(Educe)]
@@ -125,7 +130,7 @@ where
 impl<K> Stream for ReflectHandle<K>
 where
     K: Lookup + Clone,
-    K::DynamicType: Eq + std::hash::Hash + Clone + Default,
+    K::DynamicType: Eq + std::hash::Hash + Clone,
 {
     type Item = Arc<K>;
 
@@ -137,6 +142,97 @@ where
                 .get(&obj_ref)
                 .map_or(Poll::Pending, |obj| Poll::Ready(Some(obj))),
             None => Poll::Ready(None),
+        }
+    }
+}
+
+/// A handle to a shared dynamic object stream
+///
+/// [`TypedReflectHandle`]s are created by calling [`subscribe()`] on a [`TypedDispatcher`],
+/// Each shared stream reader should be polled independently and driven to readiness
+/// to avoid deadlocks. When the [`TypedDispatcher`]'s buffer is filled, backpressure
+/// will be applied on the root stream side.
+///
+/// When the root stream is dropped, or it ends, all [`TypedReflectHandle`]s
+/// subscribed to the shared stream will also terminate after all events yielded by
+/// the root stream have been observed. This means [`TypedReflectHandle`] streams
+/// can still be polled after the root stream has been dropped.
+#[cfg(feature = "unstable-runtime-subscribe")]
+#[pin_project]
+pub struct TypedReflectHandle<K>
+where
+    K: Lookup + Clone + 'static,
+    K::DynamicType: Eq + std::hash::Hash + Clone,
+    K: DeserializeOwned,
+{
+    #[pin]
+    rx: Receiver<Event<DynamicObject>>,
+    store: Writer<K>,
+}
+
+#[cfg(feature = "unstable-runtime-subscribe")]
+impl<K> TypedReflectHandle<K>
+where
+    K: Lookup + Clone + 'static,
+    K::DynamicType: Eq + std::hash::Hash + Clone + Default,
+    K: DeserializeOwned,
+{
+    pub(super) fn new(rx: Receiver<Event<DynamicObject>>) -> TypedReflectHandle<K> {
+        Self {
+            rx,
+            // Initialize a ready store by default
+            store: {
+                let mut store: Writer<K> = Default::default();
+                store.apply_shared_watcher_event(&Event::InitDone);
+                store
+            },
+        }
+    }
+
+    pub fn reader(&self) -> Store<K> {
+        self.store.as_reader()
+    }
+}
+
+#[cfg(feature = "unstable-runtime-subscribe")]
+impl<K> Stream for TypedReflectHandle<K>
+where
+    K: Resource + Clone + 'static,
+    K::DynamicType: Eq + std::hash::Hash + Clone + Default,
+    K: DeserializeOwned,
+{
+    type Item = Arc<K>;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let mut this = self.project();
+        loop {
+            return match ready!(this.rx.as_mut().poll_next(cx)) {
+                Some(event) => {
+                    let obj = match event {
+                        Event::InitApply(obj) | Event::Apply(obj)
+                            if obj.gvk() == Some(K::gvk(&Default::default())) =>
+                        {
+                            obj.try_parse::<K>().ok().map(Arc::new).inspect(|o| {
+                                this.store.apply_shared_watcher_event(&Event::Apply(o.clone()));
+                            })
+                        }
+                        Event::Delete(obj) if obj.gvk() == Some(K::gvk(&Default::default())) => {
+                            obj.try_parse::<K>().ok().map(Arc::new).inspect(|o| {
+                                this.store.apply_shared_watcher_event(&Event::Delete(o.clone()));
+                            })
+                        }
+                        _ => None,
+                    };
+
+                    // Skip propagating all objects which do not belong to the cache
+                    if obj.is_none() {
+                        continue;
+                    }
+
+                    Poll::Ready(obj)
+                }
+                None => Poll::Ready(None),
+            };
         }
     }
 }

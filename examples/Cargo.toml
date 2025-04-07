@@ -130,6 +130,10 @@ name = "multi_watcher"
 path = "multi_watcher.rs"
 
 [[example]]
+name = "broadcast_reflector"
+path = "broadcast_reflector.rs"
+
+[[example]]
 name = "pod_api"
 path = "pod_api.rs"
 
