@@ -55,7 +55,7 @@ backon.workspace = true
 clap = { version = "4.0", default-features = false, features = ["std", "cargo", "derive"] }
 edit = "0.1.3"
 tokio-stream = { version = "0.1.9", features = ["net"] }
-crossterm = "0.28.1"
+crossterm = "0.29.0"
 
 [[example]]
 name = "configmapgen_controller"
