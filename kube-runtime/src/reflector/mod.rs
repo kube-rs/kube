@@ -186,7 +186,7 @@ mod tests {
             },
             ..ConfigMap::default()
         };
-        reflector(store_w, stream::iter(vec![Ok(watcher::Event::Apply(cm.clone()))]))
+        reflector(store_w, stream::iter(vec![Ok(watcher::Event::Apply(cm.clone(), None))]))
             .map(|_| ())
             .collect::<()>()
             .await;
@@ -215,8 +215,8 @@ mod tests {
         reflector(
             store_w,
             stream::iter(vec![
-                Ok(watcher::Event::Apply(cm.clone())),
-                Ok(watcher::Event::Apply(updated_cm.clone())),
+                Ok(watcher::Event::Apply(cm.clone(), None)),
+                Ok(watcher::Event::Apply(updated_cm.clone(), None)),
             ]),
         )
         .map(|_| ())
@@ -239,8 +239,8 @@ mod tests {
         reflector(
             store_w,
             stream::iter(vec![
-                Ok(watcher::Event::Apply(cm.clone())),
-                Ok(watcher::Event::Delete(cm.clone())),
+                Ok(watcher::Event::Apply(cm.clone(), None)),
+                Ok(watcher::Event::Delete(cm.clone(), None)),
             ]),
         )
         .map(|_| ())
@@ -270,10 +270,10 @@ mod tests {
         reflector(
             store_w,
             stream::iter(vec![
-                Ok(watcher::Event::Apply(cm_a.clone())),
-                Ok(watcher::Event::Init),
-                Ok(watcher::Event::InitApply(cm_b.clone())),
-                Ok(watcher::Event::InitDone),
+                Ok(watcher::Event::Apply(cm_a.clone(), None)),
+                Ok(watcher::Event::Init(None)),
+                Ok(watcher::Event::InitApply(cm_b.clone(), None)),
+                Ok(watcher::Event::InitDone(None)),
             ]),
         )
         .map(|_| ())
@@ -304,9 +304,9 @@ mod tests {
                     ..ConfigMap::default()
                 };
                 Ok(if deleted {
-                    watcher::Event::Delete(obj)
+                    watcher::Event::Delete(obj, None)
                 } else {
-                    watcher::Event::Apply(obj)
+                    watcher::Event::Apply(obj, None)
                 })
             })),
         )

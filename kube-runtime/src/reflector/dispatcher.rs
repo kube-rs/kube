@@ -183,7 +183,7 @@ where
             // Initialize a ready store by default
             store: {
                 let mut store: Writer<K> = Default::default();
-                store.apply_shared_watcher_event(&Event::InitDone);
+                store.apply_shared_watcher_event(&Event::InitDone(None));
                 store
             },
         }
@@ -209,16 +209,16 @@ where
             return match ready!(this.rx.as_mut().poll_next(cx)) {
                 Some(event) => {
                     let obj = match event {
-                        Event::InitApply(obj) | Event::Apply(obj)
+                        Event::InitApply(obj, id) | Event::Apply(obj, id)
                             if obj.gvk() == Some(K::gvk(&Default::default())) =>
                         {
                             obj.try_parse::<K>().ok().map(Arc::new).inspect(|o| {
-                                this.store.apply_shared_watcher_event(&Event::Apply(o.clone()));
+                                this.store.apply_shared_watcher_event(&Event::Apply(o.clone(), id));
                             })
                         }
-                        Event::Delete(obj) if obj.gvk() == Some(K::gvk(&Default::default())) => {
+                        Event::Delete(obj, id) if obj.gvk() == Some(K::gvk(&Default::default())) => {
                             obj.try_parse::<K>().ok().map(Arc::new).inspect(|o| {
-                                this.store.apply_shared_watcher_event(&Event::Delete(o.clone()));
+                                this.store.apply_shared_watcher_event(&Event::Delete(o.clone(), id));
                             })
                         }
                         _ => None,
@@ -261,12 +261,12 @@ pub(crate) mod test {
         let foo = testpod("foo");
         let bar = testpod("bar");
         let st = stream::iter([
-            Ok(Event::Apply(foo.clone())),
+            Ok(Event::Apply(foo.clone(), None)),
             Err(Error::NoResourceVersion),
-            Ok(Event::Init),
-            Ok(Event::InitApply(foo)),
-            Ok(Event::InitApply(bar)),
-            Ok(Event::InitDone),
+            Ok(Event::Init(None)),
+            Ok(Event::InitApply(foo, None)),
+            Ok(Event::InitApply(bar, None)),
+            Ok(Event::InitDone(None)),
         ]);
 
         let (reader, writer) = reflector::store_shared(10);
@@ -276,7 +276,7 @@ pub(crate) mod test {
         assert_eq!(reader.len(), 0);
         assert!(matches!(
             poll!(reflect.next()),
-            Poll::Ready(Some(Ok(Event::Apply(_))))
+            Poll::Ready(Some(Ok(Event::Apply(..))))
         ));
 
         // Make progress and assert all events are seen
@@ -288,19 +288,19 @@ pub(crate) mod test {
         assert_eq!(reader.len(), 1);
 
         let restarted = poll!(reflect.next());
-        assert!(matches!(restarted, Poll::Ready(Some(Ok(Event::Init)))));
+        assert!(matches!(restarted, Poll::Ready(Some(Ok(Event::Init(_))))));
         assert_eq!(reader.len(), 1);
 
         let restarted = poll!(reflect.next());
-        assert!(matches!(restarted, Poll::Ready(Some(Ok(Event::InitApply(_))))));
+        assert!(matches!(restarted, Poll::Ready(Some(Ok(Event::InitApply(..))))));
         assert_eq!(reader.len(), 1);
 
         let restarted = poll!(reflect.next());
-        assert!(matches!(restarted, Poll::Ready(Some(Ok(Event::InitApply(_))))));
+        assert!(matches!(restarted, Poll::Ready(Some(Ok(Event::InitApply(..))))));
         assert_eq!(reader.len(), 1);
 
         let restarted = poll!(reflect.next());
-        assert!(matches!(restarted, Poll::Ready(Some(Ok(Event::InitDone)))));
+        assert!(matches!(restarted, Poll::Ready(Some(Ok(Event::InitDone(_))))));
         assert_eq!(reader.len(), 2);
 
         assert!(matches!(poll!(reflect.next()), Poll::Ready(None)));
@@ -316,13 +316,13 @@ pub(crate) mod test {
         let foo = testpod("foo");
         let bar = testpod("bar");
         let st = stream::iter([
-            Ok(Event::Delete(foo.clone())),
-            Ok(Event::Apply(foo.clone())),
+            Ok(Event::Delete(foo.clone(), None)),
+            Ok(Event::Apply(foo.clone(), None)),
             Err(Error::NoResourceVersion),
-            Ok(Event::Init),
-            Ok(Event::InitApply(foo.clone())),
-            Ok(Event::InitApply(bar.clone())),
-            Ok(Event::InitDone),
+            Ok(Event::Init(None)),
+            Ok(Event::InitApply(foo.clone(), None)),
+            Ok(Event::InitApply(bar.clone(), None)),
+            Ok(Event::InitDone(None)),
         ]);
 
         let foo = Arc::new(foo);
@@ -335,13 +335,13 @@ pub(crate) mod test {
         // Deleted events should be skipped by subscriber.
         assert!(matches!(
             poll!(reflect.next()),
-            Poll::Ready(Some(Ok(Event::Delete(_))))
+            Poll::Ready(Some(Ok(Event::Delete(..))))
         ));
         assert_eq!(poll!(subscriber.next()), Poll::Pending);
 
         assert!(matches!(
             poll!(reflect.next()),
-            Poll::Ready(Some(Ok(Event::Apply(_))))
+            Poll::Ready(Some(Ok(Event::Apply(..))))
         ));
         assert_eq!(poll!(subscriber.next()), Poll::Ready(Some(foo.clone())));
 
@@ -356,21 +356,21 @@ pub(crate) mod test {
 
         assert!(matches!(
             poll!(reflect.next()),
-            Poll::Ready(Some(Ok(Event::Init)))
+            Poll::Ready(Some(Ok(Event::Init(_))))
         ));
 
         assert!(matches!(
             poll!(reflect.next()),
-            Poll::Ready(Some(Ok(Event::InitApply(_))))
+            Poll::Ready(Some(Ok(Event::InitApply(..))))
         ));
         assert!(matches!(
             poll!(reflect.next()),
-            Poll::Ready(Some(Ok(Event::InitApply(_))))
+            Poll::Ready(Some(Ok(Event::InitApply(..))))
         ));
 
         assert!(matches!(
             poll!(reflect.next()),
-            Poll::Ready(Some(Ok(Event::InitDone)))
+            Poll::Ready(Some(Ok(Event::InitDone(_))))
         ));
 
         // these don't come back in order atm:
@@ -389,11 +389,11 @@ pub(crate) mod test {
         let foo = testpod("foo");
         let bar = testpod("bar");
         let st = stream::iter([
-            Ok(Event::Apply(foo.clone())),
-            Ok(Event::Init),
-            Ok(Event::InitApply(foo.clone())),
-            Ok(Event::InitApply(bar.clone())),
-            Ok(Event::InitDone),
+            Ok(Event::Apply(foo.clone(), None)),
+            Ok(Event::Init(None)),
+            Ok(Event::InitApply(foo.clone(), None)),
+            Ok(Event::InitApply(bar.clone(), None)),
+            Ok(Event::InitDone(None)),
         ]);
 
         let foo = Arc::new(foo);
@@ -405,7 +405,7 @@ pub(crate) mod test {
 
         assert!(matches!(
             poll!(reflect.next()),
-            Poll::Ready(Some(Ok(Event::Apply(_))))
+            Poll::Ready(Some(Ok(Event::Apply(..))))
         ));
         assert_eq!(poll!(subscriber.next()), Poll::Ready(Some(foo.clone())));
 
@@ -417,25 +417,25 @@ pub(crate) mod test {
 
         assert!(matches!(
             poll!(reflect.next()),
-            Poll::Ready(Some(Ok(Event::Init)))
+            Poll::Ready(Some(Ok(Event::Init(_))))
         ));
         assert_eq!(poll!(subscriber.next()), Poll::Pending);
 
         assert!(matches!(
             poll!(reflect.next()),
-            Poll::Ready(Some(Ok(Event::InitApply(_))))
+            Poll::Ready(Some(Ok(Event::InitApply(..))))
         ));
         assert_eq!(poll!(subscriber.next()), Poll::Pending);
 
         assert!(matches!(
             poll!(reflect.next()),
-            Poll::Ready(Some(Ok(Event::InitApply(_))))
+            Poll::Ready(Some(Ok(Event::InitApply(..))))
         ));
         assert_eq!(poll!(subscriber.next()), Poll::Pending);
 
         assert!(matches!(
             poll!(reflect.next()),
-            Poll::Ready(Some(Ok(Event::InitDone)))
+            Poll::Ready(Some(Ok(Event::InitDone(_))))
         ));
         drop(reflect);
 
@@ -456,9 +456,9 @@ pub(crate) mod test {
         let bar = testpod("bar");
         let st = stream::iter([
             //TODO: include a ready event here to avoid dealing with Init?
-            Ok(Event::Apply(foo.clone())),
-            Ok(Event::Apply(bar.clone())),
-            Ok(Event::Apply(foo.clone())),
+            Ok(Event::Apply(foo.clone(), None)),
+            Ok(Event::Apply(bar.clone(), None)),
+            Ok(Event::Apply(foo.clone(), None)),
         ]);
 
         let foo = Arc::new(foo);
@@ -478,7 +478,7 @@ pub(crate) mod test {
         // we will still get an event from the root.
         assert!(matches!(
             poll!(reflect.next()),
-            Poll::Ready(Some(Ok(Event::Apply(_))))
+            Poll::Ready(Some(Ok(Event::Apply(..))))
         ));
         assert_eq!(poll!(subscriber.next()), Poll::Ready(Some(foo.clone())));
 
@@ -500,14 +500,14 @@ pub(crate) mod test {
         // had two. We repeat the same pattern.
         assert!(matches!(
             poll!(reflect.next()),
-            Poll::Ready(Some(Ok(Event::Apply(_))))
+            Poll::Ready(Some(Ok(Event::Apply(..))))
         ));
         assert_eq!(poll!(subscriber.next()), Poll::Ready(Some(bar.clone())));
         assert!(matches!(poll!(reflect.next()), Poll::Pending));
         assert_eq!(poll!(subscriber_slow.next()), Poll::Ready(Some(bar.clone())));
         assert!(matches!(
             poll!(reflect.next()),
-            Poll::Ready(Some(Ok(Event::Apply(_))))
+            Poll::Ready(Some(Ok(Event::Apply(..))))
         ));
         // Poll again to drain the queue.
         assert!(matches!(poll!(reflect.next()), Poll::Ready(None)));

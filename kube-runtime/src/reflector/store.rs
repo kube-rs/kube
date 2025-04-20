@@ -101,23 +101,23 @@ where
     /// Applies a single watcher event to the store
     pub fn apply_watcher_event(&mut self, event: &watcher::Event<K>) {
         match event {
-            watcher::Event::Apply(obj) => {
+            watcher::Event::Apply(obj, id) => {
                 let obj = Arc::new(obj.clone());
-                self.apply_shared_watcher_event(&watcher::Event::Apply(obj));
+                self.apply_shared_watcher_event(&watcher::Event::Apply(obj, *id));
             }
-            watcher::Event::Delete(obj) => {
+            watcher::Event::Delete(obj, id) => {
                 let obj = Arc::new(obj.clone());
-                self.apply_shared_watcher_event(&watcher::Event::Delete(obj));
+                self.apply_shared_watcher_event(&watcher::Event::Delete(obj, *id));
             }
-            watcher::Event::InitApply(obj) => {
+            watcher::Event::InitApply(obj, id) => {
                 let obj = Arc::new(obj.clone());
-                self.apply_shared_watcher_event(&watcher::Event::InitApply(obj));
+                self.apply_shared_watcher_event(&watcher::Event::InitApply(obj, *id));
             }
-            watcher::Event::Init => {
-                self.apply_shared_watcher_event(&watcher::Event::Init);
+            watcher::Event::Init(id) => {
+                self.apply_shared_watcher_event(&watcher::Event::Init(*id));
             }
-            watcher::Event::InitDone => {
-                self.apply_shared_watcher_event(&watcher::Event::InitDone);
+            watcher::Event::InitDone(id) => {
+                self.apply_shared_watcher_event(&watcher::Event::InitDone(*id));
             }
         }
     }
@@ -125,22 +125,22 @@ where
     /// Applies a single shared watcher event to the store
     pub fn apply_shared_watcher_event(&mut self, event: &watcher::Event<Arc<K>>) {
         match event {
-            watcher::Event::Apply(obj) => {
+            watcher::Event::Apply(obj, ..) => {
                 let key = obj.to_object_ref(self.dyntype.clone());
                 self.store.write().insert(key, obj.clone());
             }
-            watcher::Event::Delete(obj) => {
+            watcher::Event::Delete(obj, ..) => {
                 let key = obj.to_object_ref(self.dyntype.clone());
                 self.store.write().remove(&key);
             }
-            watcher::Event::Init => {
+            watcher::Event::Init(_) => {
                 self.buffer = AHashMap::new();
             }
-            watcher::Event::InitApply(obj) => {
+            watcher::Event::InitApply(obj, ..) => {
                 let key = obj.to_object_ref(self.dyntype.clone());
                 self.buffer.insert(key, obj.clone());
             }
-            watcher::Event::InitDone => {
+            watcher::Event::InitDone(_) => {
                 let mut store = self.store.write();
 
                 // Swap the buffer into the store
@@ -163,14 +163,14 @@ where
     pub(crate) async fn dispatch_event(&mut self, event: &watcher::Event<K>) {
         if let Some(ref mut dispatcher) = self.dispatcher {
             match event {
-                watcher::Event::Apply(obj) => {
+                watcher::Event::Apply(obj, id) => {
                     let obj_ref = obj.to_object_ref(self.dyntype.clone());
                     // TODO (matei): should this take a timeout to log when backpressure has
                     // been applied for too long, e.g. 10s
                     dispatcher.broadcast(obj_ref).await;
                 }
 
-                watcher::Event::InitDone => {
+                watcher::Event::InitDone(_) => {
                     let obj_refs: Vec<_> = {
                         let store = self.store.read();
                         store.keys().cloned().collect()
@@ -346,7 +346,7 @@ mod tests {
             ..ConfigMap::default()
         };
         let mut store_w = Writer::default();
-        store_w.apply_watcher_event(&watcher::Event::Apply(cm.clone()));
+        store_w.apply_watcher_event(&watcher::Event::Apply(cm.clone(), None));
         let store = store_w.as_reader();
         assert_eq!(store.get(&ObjectRef::from_obj(&cm)).as_deref(), Some(&cm));
     }
@@ -364,7 +364,7 @@ mod tests {
         let mut cluster_cm = cm.clone();
         cluster_cm.metadata.namespace = None;
         let mut store_w = Writer::default();
-        store_w.apply_watcher_event(&watcher::Event::Apply(cm));
+        store_w.apply_watcher_event(&watcher::Event::Apply(cm, None));
         let store = store_w.as_reader();
         assert_eq!(store.get(&ObjectRef::from_obj(&cluster_cm)), None);
     }
@@ -380,7 +380,7 @@ mod tests {
             ..ConfigMap::default()
         };
         let (store, mut writer) = store();
-        writer.apply_watcher_event(&watcher::Event::Apply(cm.clone()));
+        writer.apply_watcher_event(&watcher::Event::Apply(cm.clone(), None));
         assert_eq!(store.get(&ObjectRef::from_obj(&cm)).as_deref(), Some(&cm));
     }
 
@@ -398,7 +398,7 @@ mod tests {
         let mut nsed_cm = cm.clone();
         nsed_cm.metadata.namespace = Some("ns".to_string());
         let mut store_w = Writer::default();
-        store_w.apply_watcher_event(&watcher::Event::Apply(cm.clone()));
+        store_w.apply_watcher_event(&watcher::Event::Apply(cm.clone(), None));
         let store = store_w.as_reader();
         assert_eq!(store.get(&ObjectRef::from_obj(&nsed_cm)).as_deref(), Some(&cm));
     }
@@ -417,14 +417,14 @@ mod tests {
 
         let (reader, mut writer) = store::<ConfigMap>();
         assert!(reader.is_empty());
-        writer.apply_watcher_event(&watcher::Event::Apply(cm));
+        writer.apply_watcher_event(&watcher::Event::Apply(cm, None));
 
         assert_eq!(reader.len(), 1);
         assert!(reader.find(|k| k.metadata.generation == Some(1234)).is_none());
 
         target_cm.metadata.name = Some("obj1".to_string());
         target_cm.metadata.generation = Some(1234);
-        writer.apply_watcher_event(&watcher::Event::Apply(target_cm.clone()));
+        writer.apply_watcher_event(&watcher::Event::Apply(target_cm.clone(), None));
         assert!(!reader.is_empty());
         assert_eq!(reader.len(), 2);
         let found = reader.find(|k| k.metadata.generation == Some(1234));

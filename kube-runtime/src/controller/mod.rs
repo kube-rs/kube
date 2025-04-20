@@ -1766,7 +1766,7 @@ mod tests {
             queue_rx.map(Result::<_, Infallible>::Ok),
             Config::default(),
         ));
-        store_tx.apply_watcher_event(&watcher::Event::InitDone);
+        store_tx.apply_watcher_event(&watcher::Event::InitDone(None));
         for i in 0..items {
             let obj = ConfigMap {
                 metadata: ObjectMeta {
@@ -1776,7 +1776,7 @@ mod tests {
                 },
                 ..Default::default()
             };
-            store_tx.apply_watcher_event(&watcher::Event::Apply(obj.clone()));
+            store_tx.apply_watcher_event(&watcher::Event::Apply(obj.clone(), None));
             queue_tx.unbounded_send(ObjectRef::from_obj(&obj)).unwrap();
         }
 

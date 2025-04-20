@@ -54,9 +54,9 @@ pub(crate) mod test {
     #[tokio::test]
     async fn eventmodify_modifies_innner_value_of_event() {
         let st = stream::iter([
-            Ok(Event::Apply(0)),
+            Ok(Event::Apply(0, None)),
             Err(Error::NoResourceVersion),
-            Ok(Event::InitApply(10)),
+            Ok(Event::InitApply(10, None)),
         ]);
         let mut ev_modify = pin!(EventModify::new(st, |x| {
             *x += 1;
@@ -64,7 +64,7 @@ pub(crate) mod test {
 
         assert!(matches!(
             poll!(ev_modify.next()),
-            Poll::Ready(Some(Ok(Event::Apply(1))))
+            Poll::Ready(Some(Ok(Event::Apply(1, None))))
         ));
 
         assert!(matches!(
@@ -75,7 +75,7 @@ pub(crate) mod test {
         let restarted = poll!(ev_modify.next());
         assert!(matches!(
             restarted,
-            Poll::Ready(Some(Ok(Event::InitApply(x)))) if x == 11
+            Poll::Ready(Some(Ok(Event::InitApply(x, _)))) if x == 11
         ));
 
         assert!(matches!(poll!(ev_modify.next()), Poll::Ready(None)));

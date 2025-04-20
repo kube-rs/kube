@@ -60,7 +60,7 @@ impl MultiDispatcher {
     pub(crate) async fn broadcast_event(&mut self, event: &watcher::Event<DynamicObject>) {
         match event {
             // Broadcast stores are pre-initialized
-            watcher::Event::InitDone => {}
+            watcher::Event::InitDone(_) => {}
             ev => {
                 let _ = self.dispatch_tx.broadcast_direct(ev.clone()).await;
             }

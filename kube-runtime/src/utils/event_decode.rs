@@ -29,15 +29,15 @@ where
         let mut me = self.project();
         Poll::Ready(loop {
             let var_name = match ready!(me.stream.as_mut().poll_next(cx)) {
-                Some(Ok(Event::Apply(obj) | Event::InitApply(obj))) => Some(Ok(obj)),
-                Some(Ok(Event::Delete(obj))) => {
+                Some(Ok(Event::Apply(obj, ..) | Event::InitApply(obj, ..))) => Some(Ok(obj)),
+                Some(Ok(Event::Delete(obj, ..))) => {
                     if *me.emit_deleted {
                         Some(Ok(obj))
                     } else {
                         continue;
                     }
                 }
-                Some(Ok(Event::Init | Event::InitDone)) => continue,
+                Some(Ok(Event::Init(_) | Event::InitDone(_))) => continue,
                 Some(Err(err)) => Some(Err(err)),
                 None => return Poll::Ready(None),
             };
@@ -56,14 +56,14 @@ pub(crate) mod tests {
     #[tokio::test]
     async fn watches_applies_uses_correct_stream() {
         let data = stream::iter([
-            Ok(Event::Apply(0)),
-            Ok(Event::Apply(1)),
-            Ok(Event::Delete(0)),
-            Ok(Event::Apply(2)),
-            Ok(Event::InitApply(1)),
-            Ok(Event::InitApply(2)),
+            Ok(Event::Apply(0, None)),
+            Ok(Event::Apply(1, None)),
+            Ok(Event::Delete(0, None)),
+            Ok(Event::Apply(2, None)),
+            Ok(Event::InitApply(1, None)),
+            Ok(Event::InitApply(2, None)),
             Err(Error::NoResourceVersion),
-            Ok(Event::Apply(2)),
+            Ok(Event::Apply(2, None)),
         ]);
         let mut rx = pin!(EventDecode::new(data, false));
         assert!(matches!(poll!(rx.next()), Poll::Ready(Some(Ok(0)))));

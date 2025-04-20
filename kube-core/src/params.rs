@@ -8,7 +8,7 @@ use serde::Serialize;
 /// depending on what `resource_version`, `limit`, `continue_token` you include with the list request.
 ///
 /// See <https://kubernetes.io/docs/reference/using-api/api-concepts/#semantics-for-get-and-list> for details.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Hash)]
 pub enum VersionMatch {
     /// Returns data at least as new as the provided resource version.
     ///
@@ -36,7 +36,7 @@ pub enum VersionMatch {
 }
 
 /// Common query parameters used in list/delete calls on collections
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, Hash)]
 pub struct ListParams {
     /// A selector to restrict the list of returned objects by their labels.
     ///
@@ -305,7 +305,7 @@ impl ValidationDirective {
 }
 
 /// Common query parameters used in watch calls on collections
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Hash)]
 pub struct WatchParams {
     /// A selector to restrict returned objects by their labels.
     ///
