@@ -71,7 +71,7 @@ pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
     };
 
     // Collect global structure validation rules
-    let struct_name = IdentString::new(ident.clone()).map(|ident| format!("{ident}Validation"));
+    let struct_name = IdentString::new(ident.clone()).map(|ident| format!("{ident}Validated"));
     let struct_rules: Vec<TokenStream> = rules.iter().map(|r| quote! {#r,}).collect();
 
     // Modify generated struct name to avoid Struct::method conflicts in attributes
@@ -203,7 +203,7 @@ mod tests {
                     false
                 }
                 fn schema_name() -> String {
-                    "FooSpec".to_string() + "_kube_validation".into()
+                    "FooSpecValidated".to_string()
                 }
                 fn json_schema(
                     gen: &mut ::schemars::gen::SchemaGenerator,
@@ -211,11 +211,11 @@ mod tests {
                     #[derive(::serde::Serialize, ::schemars::JsonSchema)]
                     #[automatically_derived]
                     #[allow(missing_docs)]
-                    struct FooSpec {
+                    struct FooSpecValidated {
                         foo: String,
                     }
                     use ::kube::core::{Rule, Message, Reason};
-                    let s = &mut FooSpec::json_schema(gen);
+                    let s = &mut FooSpecValidated::json_schema(gen);
                     ::kube::core::validate(s, &["true".into()]).unwrap();
                     {
                         #[derive(::serde::Serialize, ::schemars::JsonSchema)]
