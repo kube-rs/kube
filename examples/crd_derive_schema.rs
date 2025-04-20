@@ -98,6 +98,9 @@ pub struct FooSpec {
 
     #[cel_validate(rule = Rule::new("self == oldSelf").message("is immutable"))]
     foo_sub_spec: Option<FooSubSpec>,
+
+    #[serde(default = "FooSpec::default_value")]
+    associated_default: bool,
 }
 
 #[derive(CELSchema, Serialize, Deserialize, Default, Debug, PartialEq, Eq, Clone)]
@@ -106,6 +109,12 @@ pub struct FooSubSpec {
     field: String,
 
     other: Option<String>,
+}
+
+impl FooSpec {
+    fn default_value() -> bool {
+        true
+    }
 }
 
 // https://kubernetes.io/docs/reference/using-api/server-side-apply/#merge-strategy
@@ -171,6 +180,7 @@ async fn main() -> Result<()> {
         set_listable: Default::default(),
         cel_validated: Default::default(),
         foo_sub_spec: Default::default(),
+        associated_default: Default::default(),
     });
 
     // Set up dynamic resource to test using raw values.
@@ -206,6 +216,7 @@ async fn main() -> Result<()> {
     assert_eq!(serde_json::to_string(&val["spec"]["defaultListable"])?, "[2]");
     assert_eq!(serde_json::to_string(&val["spec"]["setListable"])?, "[2]");
     assert_eq!(serde_json::to_string(&val["spec"]["celValidated"])?, "\"legal\"");
+    assert_eq!(serde_json::to_string(&val["spec"]["associatedDefault"])?, "true");
 
     // Missing required field (non-nullable without default) is an error
     let data = DynamicObject::new("qux", &api_resource).data(serde_json::json!({
