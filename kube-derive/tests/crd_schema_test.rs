@@ -68,6 +68,9 @@ struct FooSpec {
     untagged_enum_person: UntaggedEnumPerson,
 
     set: HashSet<String>,
+
+    #[serde(default = "FooSpec::default_value")]
+    associated_default: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize, JsonSchema)]
@@ -83,6 +86,12 @@ fn default_value() -> String {
 
 fn default_nullable() -> Option<String> {
     Some("default_nullable".into())
+}
+
+impl FooSpec {
+    fn default_value() -> bool {
+        true
+    }
 }
 
 #[derive(CustomResource, Deserialize, Serialize, Clone, Debug, JsonSchema)]
@@ -168,7 +177,8 @@ fn test_serialized_matches_expected() {
                 age: 42,
                 gender: Gender::Male,
             }),
-            set: HashSet::from(["foo".to_owned()])
+            set: HashSet::from(["foo".to_owned()]),
+            associated_default: false,
         }))
         .unwrap(),
         serde_json::json!({
@@ -200,7 +210,8 @@ fn test_serialized_matches_expected() {
                     "age": 42,
                     "gender": "Male"
                 },
-                "set": ["foo"]
+                "set": ["foo"],
+                "associatedDefault": false,
             }
         })
     )
@@ -371,6 +382,10 @@ fn test_crd_schema_matches_expected() {
                                                     "type": "string"
                                                 },
                                             },
+                                            "associatedDefault": {
+                                                "type": "boolean",
+                                                "default": true,
+                                            },
                                         },
                                         "required": [
                                             "complexEnum",
@@ -409,7 +424,7 @@ fn test_crd_schema_matches_expected() {
                                 "x-kubernetes-validations": [{
                                     "rule": "self.metadata.name == 'singleton'",
                                 }],
-                                "title": "Foo_kube_validation",
+                                "title": "FooValidated",
                                 "type": "object"
                             }
                         },
