@@ -67,6 +67,9 @@ struct FooSpec {
     /// This is a untagged enum with a description
     untagged_enum_person: UntaggedEnumPerson,
 
+    #[validate(length(min = 1))]
+    my_list: Vec<String>,
+
     set: HashSet<String>,
 
     #[serde(default = "FooSpec::default_value")]
@@ -177,8 +180,9 @@ fn test_serialized_matches_expected() {
                 age: 42,
                 gender: Gender::Male,
             }),
-            set: HashSet::from(["foo".to_owned()]),
             associated_default: false,
+            my_list: vec!["".into()],
+            set: HashSet::from(["foo".to_owned()])
         }))
         .unwrap(),
         serde_json::json!({
@@ -210,8 +214,9 @@ fn test_serialized_matches_expected() {
                     "age": 42,
                     "gender": "Male"
                 },
-                "set": ["foo"],
                 "associatedDefault": false,
+                "myList": [""],
+                "set": ["foo"]
             }
         })
     )
@@ -376,6 +381,13 @@ fn test_crd_schema_matches_expected() {
                                                 ],
                                                 "description": "This is a untagged enum with a description"
                                             },
+                                            "myList": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "string"
+                                                },
+                                                "minItems": 1,
+                                            },
                                             "set": {
                                                 "type": "array",
                                                 "items": {
@@ -389,6 +401,7 @@ fn test_crd_schema_matches_expected() {
                                         },
                                         "required": [
                                             "complexEnum",
+                                            "myList",
                                             "nonNullable",
                                             "set",
                                             "timestamp",
