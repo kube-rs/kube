@@ -393,7 +393,7 @@ pub fn derive_custom_resource(input: proc_macro::TokenStream) -> proc_macro::Tok
 /// assert!(serde_json::to_string(&Struct::crd()).unwrap().contains(r#""default":"value""#));
 /// assert!(serde_json::to_string(&Struct::crd()).unwrap().contains(r#""rule":"self.matadata.name == 'singleton'""#));
 /// ```
-#[proc_macro_derive(CELSchema, attributes(cel_validate, schemars))]
+#[proc_macro_derive(CELSchema, attributes(cel_validate, schemars, validate))]
 pub fn derive_schema_validation(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     cel_schema::derive_validated_schema(input.into()).into()
 }

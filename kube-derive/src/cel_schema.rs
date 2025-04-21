@@ -79,7 +79,7 @@ pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
 
     // Remove all unknown attributes from the original structure copy
     // Has to happen on the original definition at all times, as we don't have #[derive] stanzes.
-    let attribute_whitelist = ["serde", "schemars", "doc"];
+    let attribute_whitelist = ["serde", "schemars", "doc", "validate"];
     ast.attrs = remove_attributes(&ast.attrs, &attribute_whitelist);
 
     let struct_data = match ast.data {
