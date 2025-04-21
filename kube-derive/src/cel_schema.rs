@@ -1,4 +1,4 @@
-use darling::{FromDeriveInput, FromField, FromMeta};
+use darling::{util::IdentString, FromDeriveInput, FromField, FromMeta};
 use proc_macro2::TokenStream;
 use syn::{parse_quote, Attribute, DeriveInput, Expr, Ident, Path};
 
@@ -71,8 +71,11 @@ pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
     };
 
     // Collect global structure validation rules
-    let struct_name = ident.to_string();
+    let struct_name = IdentString::new(ident.clone()).map(|ident| format!("{ident}Validated"));
     let struct_rules: Vec<TokenStream> = rules.iter().map(|r| quote! {#r,}).collect();
+
+    // Modify generated struct name to avoid Struct::method conflicts in attributes
+    ast.ident = struct_name.as_ident().clone();
 
     // Remove all unknown attributes from the original structure copy
     // Has to happen on the original definition at all times, as we don't have #[derive] stanzes.
@@ -123,6 +126,9 @@ pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
         }
     }
 
+    let schema_name = struct_name.as_str();
+    let generated_struct_name = struct_name.as_ident();
+
     quote! {
         impl #schemars::JsonSchema for #ident {
             fn is_referenceable() -> bool {
@@ -130,7 +136,7 @@ pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
             }
 
             fn schema_name() -> String {
-                #struct_name.to_string() + "_kube_validation".into()
+                #schema_name.to_string()
             }
 
             fn json_schema(gen: &mut #schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
@@ -140,7 +146,7 @@ pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
                 #ast
 
                 use #kube_core::{Rule, Message, Reason};
-                let s = &mut #ident::json_schema(gen);
+                let s = &mut #generated_struct_name::json_schema(gen);
                 #kube_core::validate(s, &[#(#struct_rules)*]).unwrap();
                 #(#property_modifications)*
                 s.clone()
@@ -197,7 +203,7 @@ mod tests {
                     false
                 }
                 fn schema_name() -> String {
-                    "FooSpec".to_string() + "_kube_validation".into()
+                    "FooSpecValidated".to_string()
                 }
                 fn json_schema(
                     gen: &mut ::schemars::gen::SchemaGenerator,
@@ -205,11 +211,11 @@ mod tests {
                     #[derive(::serde::Serialize, ::schemars::JsonSchema)]
                     #[automatically_derived]
                     #[allow(missing_docs)]
-                    struct FooSpec {
+                    struct FooSpecValidated {
                         foo: String,
                     }
                     use ::kube::core::{Rule, Message, Reason};
-                    let s = &mut FooSpec::json_schema(gen);
+                    let s = &mut FooSpecValidated::json_schema(gen);
                     ::kube::core::validate(s, &["true".into()]).unwrap();
                     {
                         #[derive(::serde::Serialize, ::schemars::JsonSchema)]
