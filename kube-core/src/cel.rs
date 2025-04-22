@@ -1,9 +1,10 @@
 //! CEL validation for CRDs
 
-use std::str::FromStr;
+use std::{collections::BTreeMap, str::FromStr};
 
 #[cfg(feature = "schema")] use schemars::schema::Schema;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 /// Rule is a CEL validation rule for the CRD field
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
@@ -279,4 +280,157 @@ pub fn merge_properties(s: &mut Schema, merge: &mut Schema) {
             }
         }
     }
+}
+
+/// ListType represents x-kubernetes merge strategy for list.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum ListMerge {
+    /// Atomic represents a list, where entire list is replaced during merge. At any point in time, a single manager owns the list.
+    Atomic,
+    /// Set applies to lists that include only scalar elements. These elements must be unique.
+    Set,
+    /// Map applies to lists of nested types only. The key values must be unique in the list.
+    Map(Vec<String>),
+}
+
+/// MapMerge represents x-kubernetes merge strategy for map.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum MapMerge {
+    /// Atomic represents a map, which can only be entirely replaced by a single manager.
+    Atomic,
+    /// Granular represents a map, which supports separate managers updating individual fields.
+    Granular,
+}
+
+/// StructMerge represents x-kubernetes merge strategy for struct.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum StructMerge {
+    /// Atomic represents a struct, which can only be entirely replaced by a single manager.
+    Atomic,
+    /// Granular represents a struct, which supports separate managers updating individual fields.
+    Granular,
+}
+
+/// MergeStrategy represents set of options for a server-side merge strategy applied to a field.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub enum MergeStrategy {
+    /// ListType represents x-kubernetes merge strategy for list.
+    #[serde(rename = "x-kubernetes-list-type")]
+    ListType(ListMerge),
+    /// MapType represents x-kubernetes merge strategy for map.
+    #[serde(rename = "x-kubernetes-map-type")]
+    MapType(MapMerge),
+    /// StructType represents x-kubernetes merge strategy for struct.
+    #[serde(rename = "x-kubernetes-struct-type")]
+    StructType(StructMerge),
+}
+
+
+impl From<ListMerge> for MergeStrategy {
+    fn from(value: ListMerge) -> Self {
+        Self::ListType(value)
+    }
+}
+
+impl From<MapMerge> for MergeStrategy {
+    fn from(value: MapMerge) -> Self {
+        Self::MapType(value)
+    }
+}
+
+impl From<StructMerge> for MergeStrategy {
+    fn from(value: StructMerge) -> Self {
+        Self::StructType(value)
+    }
+}
+
+impl MergeStrategy {
+    fn keys(self) -> Result<BTreeMap<String, Value>, serde_json::Error> {
+        if let Self::ListType(ListMerge::Map(keys)) = self {
+            let mut data = BTreeMap::new();
+            data.insert("x-kubernetes-list-type".into(), "map".into());
+            data.insert("x-kubernetes-list-map-keys".into(), serde_json::to_value(&keys)?);
+
+            return Ok(data)
+        }
+
+        let value = serde_json::to_value(self)?;
+        Ok(serde_json::from_value(value)?)
+    }
+}
+
+/// Merge strategy property mutates property under property_index of the schema
+/// with the provided set of merge strategy rules.
+///
+/// ```rust
+/// use schemars::JsonSchema;
+/// use kube::core::{MapMerge, merge_strategy_property};
+///
+/// #[derive(JsonSchema)]
+/// struct MyStruct {
+///     field: Option<String>,
+/// }
+///
+/// let gen = &mut schemars::gen::SchemaSettings::openapi3().into_generator();
+/// let mut schema = MyStruct::json_schema(gen);
+/// merge_strategy_property(&mut schema, 0, MapMerge::Atomic)?;
+/// assert_eq!(
+///     serde_json::to_string(&schema).unwrap(),
+///     r#"{"type":"object","properties":{"field":{"type":"string","nullable":true,"x-kubernetes-map-type":"atomic"}}}"#
+/// );
+///
+/// # Ok::<(), serde_json::Error>(())
+///```
+#[cfg(feature = "schema")]
+#[cfg_attr(docsrs, doc(cfg(feature = "schema")))]
+pub fn merge_strategy_property(
+    s: &mut Schema,
+    property_index: usize,
+    strategy: impl Into<MergeStrategy>,
+) -> Result<(), serde_json::Error> {
+    match s {
+        Schema::Bool(_) => (),
+        Schema::Object(schema_object) => {
+            let obj = schema_object.object();
+            for (n, (_, schema)) in obj.properties.iter_mut().enumerate() {
+                if n == property_index {
+                    return merge_strategy(schema, strategy.into());
+                }
+            }
+        }
+    };
+
+    Ok(())
+}
+
+/// Merge strategy takes schema and applies a set of merge strategy x-kubernetes rules to it,
+/// such as "x-kubernetes-list-type" and "x-kubernetes-list-map-keys".
+///
+/// ```rust
+/// use schemars::schema::Schema;
+/// use kube::core::{ListMerge, Reason, Message, merge_strategy};
+///
+/// let mut schema = Schema::Object(Default::default());
+/// merge_strategy(&mut schema, ListMerge::Map(vec!["key".into(),"another".into()]).into())?;
+/// assert_eq!(
+///     serde_json::to_string(&schema).unwrap(),
+///     r#"{"x-kubernetes-list-map-keys":["key","another"],"x-kubernetes-list-type":"map"}"#,
+/// );
+///
+/// # Ok::<(), serde_json::Error>(())
+///```
+#[cfg(feature = "schema")]
+#[cfg_attr(docsrs, doc(cfg(feature = "schema")))]
+pub fn merge_strategy(s: &mut Schema, strategy: MergeStrategy) -> Result<(), serde_json::Error> {
+    match s {
+        Schema::Bool(_) => (),
+        Schema::Object(schema_object) => {
+            schema_object.extensions.append(&mut strategy.keys()?);
+        }
+    };
+
+    Ok(())
 }

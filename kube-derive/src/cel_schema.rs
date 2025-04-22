@@ -9,6 +9,13 @@ struct Rule {
     rules: Vec<Expr>,
 }
 
+#[derive(FromField)]
+#[darling(attributes(merge))]
+struct MergeStrategy {
+    #[darling(rename = "kind")]
+    merge_kind: Option<Expr>,
+}
+
 #[derive(FromDeriveInput)]
 #[darling(attributes(cel_validate), supports(struct_named))]
 struct CELSchema {
@@ -97,15 +104,22 @@ pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
                 Err(err) => return err.write_errors(),
             };
 
+            let MergeStrategy { merge_kind } = match MergeStrategy::from_field(field) {
+                Ok(merge_kind) => merge_kind,
+                Err(err) => return err.write_errors(),
+            };
+
             // Remove all unknown attributes from each field
             // Has to happen on the original definition at all times, as we don't have #[derive] stanzes.
             field.attrs = remove_attributes(&field.attrs, &attribute_whitelist);
 
-            if rules.is_empty() {
+            if rules.is_empty() && merge_kind.is_none() {
                 continue;
             }
 
             let rules: Vec<TokenStream> = rules.iter().map(|r| quote! {#r,}).collect();
+            let rules = (!rules.is_empty()).then_some(quote! {#kube_core::validate_property(merge, 0, &[#(#rules)*]).unwrap();});
+            let merge_strategy = merge_kind.map(|strategy| quote! {#kube_core::merge_strategy_property(merge, 0, #strategy).unwrap();});
 
             // We need to prepend derive macros, as they were consumed by this macro processing, being a derive by itself.
             property_modifications.push(quote! {
@@ -119,7 +133,8 @@ pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
                     }
 
                     let merge = &mut Validated::json_schema(gen);
-                    #kube_core::validate_property(merge, 0, &[#(#rules)*]).unwrap();
+                    #rules
+                    #merge_strategy
                     #kube_core::merge_properties(s, merge);
                 }
             });
@@ -145,7 +160,7 @@ pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
                 #[allow(missing_docs)]
                 #ast
 
-                use #kube_core::{Rule, Message, Reason};
+                use #kube_core::{Rule, Message, Reason, ListMerge, MapMerge, StructMerge};
                 let s = &mut #generated_struct_name::json_schema(gen);
                 #kube_core::validate(s, &[#(#struct_rules)*]).unwrap();
                 #(#property_modifications)*
@@ -193,7 +208,8 @@ mod tests {
             #[cel_validate(rule = "true".into())]
             struct FooSpec {
                 #[cel_validate(rule = "true".into())]
-                foo: String
+                #[merge(kind = ListMerge::Atomic)]
+                foo: Vec<String>
             }
         };
 
@@ -212,9 +228,9 @@ mod tests {
                     #[automatically_derived]
                     #[allow(missing_docs)]
                     struct FooSpecValidated {
-                        foo: String,
+                        foo: Vec<String>,
                     }
-                    use ::kube::core::{Rule, Message, Reason};
+                    use ::kube::core::{Rule, Message, Reason, ListMerge, MapMerge, StructMerge};
                     let s = &mut FooSpecValidated::json_schema(gen);
                     ::kube::core::validate(s, &["true".into()]).unwrap();
                     {
@@ -222,10 +238,11 @@ mod tests {
                         #[automatically_derived]
                         #[allow(missing_docs)]
                         struct Validated {
-                            foo: String,
+                            foo: Vec<String>,
                         }
                         let merge = &mut Validated::json_schema(gen);
                         ::kube::core::validate_property(merge, 0, &["true".into()]).unwrap();
+                        ::kube::core::merge_strategy_property(merge, 0, ListMerge::Atomic).unwrap();
                         ::kube::core::merge_properties(s, merge);
                     }
                     s.clone()

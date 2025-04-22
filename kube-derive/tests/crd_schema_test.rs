@@ -74,6 +74,9 @@ struct FooSpec {
 
     #[serde(default = "FooSpec::default_value")]
     associated_default: bool,
+
+    #[merge(kind = ListMerge::Set)]
+    x_kubernetes_set: Vec<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize, JsonSchema)]
@@ -167,23 +170,27 @@ fn test_shortnames() {
 #[test]
 fn test_serialized_matches_expected() {
     assert_json_eq!(
-        serde_json::to_value(Foo::new("bar", FooSpec {
-            non_nullable: "asdf".to_string(),
-            non_nullable_with_default: "asdf".to_string(),
-            nullable_skipped: None,
-            nullable: None,
-            nullable_skipped_with_default: None,
-            nullable_with_default: None,
-            timestamp: DateTime::from_timestamp(0, 0).unwrap(),
-            complex_enum: ComplexEnum::VariantOne { int: 23 },
-            untagged_enum_person: UntaggedEnumPerson::GenderAndAge(GenderAndAge {
-                age: 42,
-                gender: Gender::Male,
-            }),
-            associated_default: false,
-            my_list: vec!["".into()],
-            set: HashSet::from(["foo".to_owned()])
-        }))
+        serde_json::to_value(Foo::new(
+            "bar",
+            FooSpec {
+                non_nullable: "asdf".to_string(),
+                non_nullable_with_default: "asdf".to_string(),
+                nullable_skipped: None,
+                nullable: None,
+                nullable_skipped_with_default: None,
+                nullable_with_default: None,
+                timestamp: DateTime::from_timestamp(0, 0).unwrap(),
+                complex_enum: ComplexEnum::VariantOne { int: 23 },
+                untagged_enum_person: UntaggedEnumPerson::GenderAndAge(GenderAndAge {
+                    age: 42,
+                    gender: Gender::Male,
+                }),
+                associated_default: false,
+                my_list: vec!["".into()],
+                set: HashSet::from(["foo".to_owned()]),
+                x_kubernetes_set: vec![],
+            }
+        ))
         .unwrap(),
         serde_json::json!({
             "apiVersion": "clux.dev/v1",
@@ -216,7 +223,8 @@ fn test_serialized_matches_expected() {
                 },
                 "associatedDefault": false,
                 "myList": [""],
-                "set": ["foo"]
+                "set": ["foo"],
+                "xKubernetesSet": [],
             }
         })
     )
@@ -398,6 +406,13 @@ fn test_crd_schema_matches_expected() {
                                                 "type": "boolean",
                                                 "default": true,
                                             },
+                                            "xKubernetesSet": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "string"
+                                                },
+                                                "x-kubernetes-list-type": "set",
+                                            },
                                         },
                                         "required": [
                                             "complexEnum",
@@ -405,7 +420,8 @@ fn test_crd_schema_matches_expected() {
                                             "nonNullable",
                                             "set",
                                             "timestamp",
-                                            "untaggedEnumPerson"
+                                            "untaggedEnumPerson",
+                                            "xKubernetesSet"
                                         ],
                                         "x-kubernetes-validations": [{
                                             "rule": "has(self.nonNullable)",
