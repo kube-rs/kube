@@ -3,14 +3,14 @@
 
 use assert_json_diff::assert_json_eq;
 use chrono::{DateTime, Utc};
-use kube::CELSchema;
+use kube::KubeSchema;
 use kube_derive::CustomResource;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
 // See `crd_derive_schema` example for how the schema generated from this struct affects defaulting and validation.
-#[derive(CustomResource, Serialize, Deserialize, Debug, PartialEq, Clone, CELSchema)]
+#[derive(CustomResource, Serialize, Deserialize, Debug, PartialEq, Clone, KubeSchema)]
 #[kube(
     group = "clux.dev",
     version = "v1",

@@ -442,7 +442,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
     // schema for `metadata` (`ObjectMeta`) because it doesn't implement `JsonSchema`.
     let schemars_skip = schema_mode.derive().then_some(quote! { #[schemars(skip)] });
     if schema_mode.derive() && !rules.is_empty() {
-        derive_paths.push(syn::parse_quote! { #kube::CELSchema });
+        derive_paths.push(syn::parse_quote! { #kube::KubeSchema });
     } else if schema_mode.derive() {
         derive_paths.push(syn::parse_quote! { #schemars::JsonSchema });
     }

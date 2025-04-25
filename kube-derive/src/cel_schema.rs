@@ -17,7 +17,7 @@ struct MergeStrategy {
 
 #[derive(FromDeriveInput)]
 #[darling(attributes(cel_validate), supports(struct_named))]
-struct CELSchema {
+struct KubeSchema {
     #[darling(default)]
     crates: Crates,
     ident: Ident,
@@ -63,7 +63,7 @@ pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
         Ok(di) => di,
     };
 
-    let CELSchema {
+    let KubeSchema {
         crates: Crates {
             kube_core,
             schemars,
@@ -71,7 +71,7 @@ pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
         },
         ident,
         rules,
-    } = match CELSchema::from_derive_input(&ast) {
+    } = match KubeSchema::from_derive_input(&ast) {
         Err(err) => return err.write_errors(),
         Ok(attrs) => attrs,
     };
@@ -181,7 +181,7 @@ fn remove_attributes(attrs: &[Attribute], witelist: &[&str]) -> Vec<Attribute> {
 #[test]
 fn test_derive_validated() {
     let input = quote! {
-        #[derive(CustomResource, CELSchema, Serialize, Deserialize, Debug, PartialEq, Clone)]
+        #[derive(CustomResource, KubeSchema, Serialize, Deserialize, Debug, PartialEq, Clone)]
         #[kube(group = "clux.dev", version = "v1", kind = "Foo", namespaced)]
         #[cel_validate(rule = "self != ''".into())]
         struct FooSpec {
@@ -190,7 +190,7 @@ fn test_derive_validated() {
         }
     };
     let input = syn::parse2(input).unwrap();
-    let v = CELSchema::from_derive_input(&input).unwrap();
+    let v = KubeSchema::from_derive_input(&input).unwrap();
     assert_eq!(v.rules.len(), 1);
 }
 
@@ -203,7 +203,7 @@ mod tests {
     #[test]
     fn test_derive_validated_full() {
         let input = quote! {
-            #[derive(CELSchema)]
+            #[derive(KubeSchema)]
             #[cel_validate(rule = "true".into())]
             struct FooSpec {
                 #[cel_validate(rule = "true".into())]

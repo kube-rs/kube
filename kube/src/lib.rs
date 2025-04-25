@@ -170,7 +170,7 @@ pub use kube_derive::Resource;
 
 #[cfg(feature = "derive")]
 #[cfg_attr(docsrs, doc(cfg(feature = "derive")))]
-pub use kube_derive::CELSchema;
+pub use kube_derive::KubeSchema;
 
 #[cfg(feature = "runtime")]
 #[cfg_attr(docsrs, doc(cfg(feature = "runtime")))]
