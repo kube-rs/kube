@@ -672,7 +672,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
     let jsondata = quote! {
         #schemagen
 
-        let jsondata = #serde_json::json!({
+        let mut jsondata = #serde_json::json!({
             "metadata": {
                 #crd_meta
             },
@@ -680,11 +680,9 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
                 "group": #group,
                 "scope": #scope,
                 "names": {
-                    "categories": categories,
                     "plural": #plural,
                     "singular": #name,
                     "kind": #kind,
-                    "shortNames": shorts
                 },
                 "versions": [{
                     "name": #version,
@@ -694,7 +692,6 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
                     "schema": {
                         "openAPIV3Schema": schema,
                     },
-                    "additionalPrinterColumns": columns,
                     #selectable
                     "subresources": subres,
                 }],
@@ -707,13 +704,10 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         impl #extver::CustomResourceExt for #rootident {
 
             fn crd() -> #apiext::CustomResourceDefinition {
-                let columns : Vec<#apiext::CustomResourceColumnDefinition> = #serde_json::from_str(#printers).expect("valid printer column json");
                 #k8s_openapi::k8s_if_ge_1_30! {
                     let fields : Vec<#apiext::SelectableField> = #serde_json::from_str(#fields).expect("valid selectableField column json");
                 }
                 let scale: Option<#apiext::CustomResourceSubresourceScale> = #scale;
-                let categories: Vec<String> = #serde_json::from_str(#categories_json).expect("valid categories");
-                let shorts : Vec<String> = #serde_json::from_str(#short_json).expect("valid shortnames");
                 let subres = if #has_status {
                     if let Some(s) = &scale {
                         #serde_json::json!({
@@ -728,6 +722,24 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
                 };
 
                 #jsondata
+
+                // These fields should only be set if they are non-empty to avoid reconciliation issues as the kube
+                // server will omit them when empty.
+                let columns: Vec<#apiext::CustomResourceColumnDefinition> = #serde_json::from_str(#printers).expect("valid printer column json");
+                if !columns.is_empty() {
+                    jsondata["spec"]["versions"][0]["additionalPrinterColumns"] = #serde_json::json!(columns);
+                }
+
+                let categories: Vec<String> = #serde_json::from_str(#categories_json).expect("valid categories");
+                if !categories.is_empty() {
+                    jsondata["spec"]["names"]["categories"] = #serde_json::json!(categories);
+                }
+
+                let shorts: Vec<String> = #serde_json::from_str(#short_json).expect("valid shortnames");
+                if !shorts.is_empty() {
+                    jsondata["spec"]["names"]["shortNames"] = #serde_json::json!(shorts);
+                }
+
                 #serde_json::from_value(jsondata)
                     .expect("valid custom resource from #[kube(attrs..)]")
             }
