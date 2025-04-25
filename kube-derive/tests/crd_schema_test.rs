@@ -75,7 +75,7 @@ struct FooSpec {
     #[serde(default = "FooSpec::default_value")]
     associated_default: bool,
 
-    #[merge(kind = ListMerge::Set)]
+    #[merge_strategy(kind = ListMerge::Set)]
     x_kubernetes_set: Vec<String>,
 }
 

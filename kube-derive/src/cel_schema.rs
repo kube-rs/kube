@@ -10,10 +10,9 @@ struct Rule {
 }
 
 #[derive(FromField)]
-#[darling(attributes(merge))]
+#[darling(attributes(merge_strategy))]
 struct MergeStrategy {
-    #[darling(rename = "kind")]
-    merge_kind: Option<Expr>,
+    kind: Option<Expr>,
 }
 
 #[derive(FromDeriveInput)]
@@ -104,8 +103,8 @@ pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
                 Err(err) => return err.write_errors(),
             };
 
-            let MergeStrategy { merge_kind } = match MergeStrategy::from_field(field) {
-                Ok(merge_kind) => merge_kind,
+            let MergeStrategy { kind: merge_kind } = match MergeStrategy::from_field(field) {
+                Ok(kind) => kind,
                 Err(err) => return err.write_errors(),
             };
 
@@ -208,7 +207,7 @@ mod tests {
             #[cel_validate(rule = "true".into())]
             struct FooSpec {
                 #[cel_validate(rule = "true".into())]
-                #[merge(kind = ListMerge::Atomic)]
+                #[merge_strategy(kind = ListMerge::Atomic)]
                 foo: Vec<String>
             }
         };
