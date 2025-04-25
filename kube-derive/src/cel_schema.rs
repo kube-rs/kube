@@ -117,8 +117,10 @@ pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
             }
 
             let rules: Vec<TokenStream> = rules.iter().map(|r| quote! {#r,}).collect();
-            let rules = (!rules.is_empty()).then_some(quote! {#kube_core::validate_property(merge, 0, &[#(#rules)*]).unwrap();});
-            let merge_strategy = merge_kind.map(|strategy| quote! {#kube_core::merge_strategy_property(merge, 0, #strategy).unwrap();});
+            let rules = (!rules.is_empty())
+                .then_some(quote! {#kube_core::validate_property(merge, 0, &[#(#rules)*]).unwrap();});
+            let merge_strategy = merge_kind
+                .map(|strategy| quote! {#kube_core::merge_strategy_property(merge, 0, #strategy).unwrap();});
 
             // We need to prepend derive macros, as they were consumed by this macro processing, being a derive by itself.
             property_modifications.push(quote! {

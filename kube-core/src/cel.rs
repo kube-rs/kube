@@ -336,7 +336,7 @@ impl MergeStrategy {
             data.insert("x-kubernetes-list-type".into(), "map".into());
             data.insert("x-kubernetes-list-map-keys".into(), serde_json::to_value(&keys)?);
 
-            return Ok(data)
+            return Ok(data);
         }
 
         let value = serde_json::to_value(self)?;

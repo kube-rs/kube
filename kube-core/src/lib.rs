@@ -26,10 +26,10 @@ pub mod crd;
 pub use crd::CustomResourceExt;
 
 pub mod cel;
-pub use cel::{Message, Reason, Rule, ListMerge, MapMerge, StructMerge};
+pub use cel::{ListMerge, MapMerge, Message, Reason, Rule, StructMerge};
 
 #[cfg(feature = "schema")]
-pub use cel::{merge_properties, validate, validate_property, merge_strategy, merge_strategy_property};
+pub use cel::{merge_properties, merge_strategy, merge_strategy_property, validate, validate_property};
 
 pub mod gvk;
 pub use gvk::{GroupVersion, GroupVersionKind, GroupVersionResource};
