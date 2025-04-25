@@ -36,6 +36,7 @@ chrono = { workspace = true, features = ["now"] }
 schemars = { workspace = true, optional = true }
 k8s-openapi.workspace = true
 serde-value.workspace = true
+derive_more = { workspace = true, features = ["from"] }
 
 [dev-dependencies]
 k8s-openapi = { workspace = true, features = ["latest"] }

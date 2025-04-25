@@ -2,6 +2,7 @@
 
 use std::{collections::BTreeMap, str::FromStr};
 
+use derive_more::From;
 #[cfg(feature = "schema")] use schemars::schema::Schema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -315,7 +316,7 @@ pub enum StructMerge {
 }
 
 /// MergeStrategy represents set of options for a server-side merge strategy applied to a field.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(From, Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub enum MergeStrategy {
     /// ListType represents x-kubernetes merge strategy for list.
     #[serde(rename = "x-kubernetes-list-type")]
@@ -326,25 +327,6 @@ pub enum MergeStrategy {
     /// StructType represents x-kubernetes merge strategy for struct.
     #[serde(rename = "x-kubernetes-struct-type")]
     StructType(StructMerge),
-}
-
-
-impl From<ListMerge> for MergeStrategy {
-    fn from(value: ListMerge) -> Self {
-        Self::ListType(value)
-    }
-}
-
-impl From<MapMerge> for MergeStrategy {
-    fn from(value: MapMerge) -> Self {
-        Self::MapType(value)
-    }
-}
-
-impl From<StructMerge> for MergeStrategy {
-    fn from(value: StructMerge) -> Self {
-        Self::StructType(value)
-    }
 }
 
 impl MergeStrategy {
@@ -358,7 +340,7 @@ impl MergeStrategy {
         }
 
         let value = serde_json::to_value(self)?;
-        Ok(serde_json::from_value(value)?)
+        serde_json::from_value(value)
     }
 }
 
