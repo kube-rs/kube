@@ -56,7 +56,7 @@ hyper-openssl = "0.10.2"
 hyper-rustls = { version = "0.27.1", default-features = false }
 hyper-socks2 = { version = "0.9.0", default-features = false }
 hyper-timeout = "0.5.1"
-hyper-util = "0.1.9"
+hyper-util = "0.1.11"
 json-patch = "4"
 jsonpath-rust = "0.7.3"
 k8s-openapi = { version = "0.24.0", default-features = false }
