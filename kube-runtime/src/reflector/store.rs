@@ -251,8 +251,7 @@ where
     {
         self.store
             .read()
-            .iter()
-            .map(|(_, k)| k)
+            .values()
             .find(|k| predicate(k.as_ref()))
             .cloned()
     }
