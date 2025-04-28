@@ -36,7 +36,7 @@ allow = [
 exceptions = [
     # Pulled in via hyper-rustls when using the webpki-roots feature,
     # which is off by default.
-    { allow = ["MPL-2.0"], name = "webpki-roots" },
+    { allow = ["CDLA-Permissive-2.0"], crate = "webpki-roots" },
 ]
 
 [sources]
