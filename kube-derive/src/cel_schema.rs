@@ -3,20 +3,15 @@ use proc_macro2::TokenStream;
 use syn::{parse_quote, Attribute, DeriveInput, Expr, Ident, Path};
 
 #[derive(FromField)]
-#[darling(attributes(cel_validate))]
-struct Rule {
+#[darling(attributes(x_kube))]
+struct XKube {
     #[darling(multiple, rename = "rule")]
     rules: Vec<Expr>,
-}
-
-#[derive(FromField)]
-#[darling(attributes(merge_strategy))]
-struct MergeStrategy {
-    kind: Option<Expr>,
+    merge_strategy: Option<Expr>,
 }
 
 #[derive(FromDeriveInput)]
-#[darling(attributes(cel_validate), supports(struct_named))]
+#[darling(attributes(x_kube), supports(struct_named))]
 struct KubeSchema {
     #[darling(default)]
     crates: Crates,
@@ -98,13 +93,8 @@ pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
     let mut property_modifications = vec![];
     if let syn::Fields::Named(fields) = &mut struct_data.fields {
         for field in &mut fields.named {
-            let Rule { rules, .. } = match Rule::from_field(field) {
+            let XKube { rules, merge_strategy, .. } = match XKube::from_field(field) {
                 Ok(rule) => rule,
-                Err(err) => return err.write_errors(),
-            };
-
-            let MergeStrategy { kind: merge_kind } = match MergeStrategy::from_field(field) {
-                Ok(kind) => kind,
                 Err(err) => return err.write_errors(),
             };
 
@@ -112,14 +102,14 @@ pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
             // Has to happen on the original definition at all times, as we don't have #[derive] stanzes.
             field.attrs = remove_attributes(&field.attrs, &attribute_whitelist);
 
-            if rules.is_empty() && merge_kind.is_none() {
+            if rules.is_empty() && merge_strategy.is_none() {
                 continue;
             }
 
             let rules: Vec<TokenStream> = rules.iter().map(|r| quote! {#r,}).collect();
             let rules = (!rules.is_empty())
                 .then_some(quote! {#kube_core::validate_property(merge, 0, &[#(#rules)*]).unwrap();});
-            let merge_strategy = merge_kind
+            let merge_strategy = merge_strategy
                 .map(|strategy| quote! {#kube_core::merge_strategy_property(merge, 0, #strategy).unwrap();});
 
             // We need to prepend derive macros, as they were consumed by this macro processing, being a derive by itself.
@@ -185,9 +175,9 @@ fn test_derive_validated() {
     let input = quote! {
         #[derive(CustomResource, KubeSchema, Serialize, Deserialize, Debug, PartialEq, Clone)]
         #[kube(group = "clux.dev", version = "v1", kind = "Foo", namespaced)]
-        #[cel_validate(rule = "self != ''".into())]
+        #[x_kube(rule = "self != ''".into())]
         struct FooSpec {
-            #[cel_validate(rule = "self != ''".into())]
+            #[x_kube(rule = "self != ''".into())]
             foo: String
         }
     };
@@ -206,10 +196,10 @@ mod tests {
     fn test_derive_validated_full() {
         let input = quote! {
             #[derive(KubeSchema)]
-            #[cel_validate(rule = "true".into())]
+            #[x_kube(rule = "true".into())]
             struct FooSpec {
-                #[cel_validate(rule = "true".into())]
-                #[merge_strategy(kind = ListMerge::Atomic)]
+                #[x_kube(rule = "true".into())]
+                #[x_kube(merge_strategy = ListMerge::Atomic)]
                 foo: Vec<String>
             }
         };

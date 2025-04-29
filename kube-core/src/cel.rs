@@ -316,6 +316,8 @@ pub enum StructMerge {
 }
 
 /// MergeStrategy represents set of options for a server-side merge strategy applied to a field.
+///
+/// See upstream documentation of values at https://kubernetes.io/docs/reference/using-api/server-side-apply/#merge-strategy
 #[derive(From, Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub enum MergeStrategy {
     /// ListType represents x-kubernetes merge strategy for list.

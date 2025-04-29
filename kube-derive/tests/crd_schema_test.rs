@@ -38,7 +38,7 @@ use std::collections::{HashMap, HashSet};
         label_selector_path = ".status.labelSelector"
     ),
 )]
-#[cel_validate(rule = Rule::new("has(self.nonNullable)"))]
+#[x_kube(rule = Rule::new("has(self.nonNullable)"))]
 #[serde(rename_all = "camelCase")]
 struct FooSpec {
     non_nullable: String,
@@ -61,7 +61,7 @@ struct FooSpec {
     timestamp: DateTime<Utc>,
 
     /// This is a complex enum with a description
-    #[cel_validate(rule = Rule::new("!has(self.variantOne) || self.variantOne.int > 22"))]
+    #[x_kube(rule = Rule::new("!has(self.variantOne) || self.variantOne.int > 22"))]
     complex_enum: ComplexEnum,
 
     /// This is a untagged enum with a description
@@ -75,7 +75,7 @@ struct FooSpec {
     #[serde(default = "FooSpec::default_value")]
     associated_default: bool,
 
-    #[merge_strategy(kind = ListMerge::Set)]
+    #[x_kube(merge_strategy = ListMerge::Set)]
     x_kubernetes_set: Vec<String>,
 }
 

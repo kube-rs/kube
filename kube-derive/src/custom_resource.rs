@@ -449,7 +449,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
 
     let struct_rules: Option<Vec<TokenStream>> =
         (!rules.is_empty()).then(|| rules.iter().map(|r| quote! {rule = #r,}).collect());
-    let struct_rules = struct_rules.map(|r| quote! { #[cel_validate(#(#r)*)]});
+    let struct_rules = struct_rules.map(|r| quote! { #[x_kube(#(#r)*)]});
 
     let meta_annotations = if !annotations.is_empty() {
         quote! { Some(std::collections::BTreeMap::from([#((#annotations.0.to_string(), #annotations.1.to_string()),)*])) }
