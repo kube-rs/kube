@@ -188,7 +188,7 @@ mod resource;
 /// #[kube(deprecated = "Replaced by other CRD")]
 /// ```
 ///
-/// ## `#[kube(rule = Rule::new("self == oldSelf").message("field is immutable"))]`
+/// ## `#[kube(validation = Rule::new("self == oldSelf").message("field is immutable"))]`
 /// Inject a top level CEL validation rule for the top level generated struct.
 /// This attribute is for resources deriving [`KubeSchema`] instead of [`schemars::JsonSchema`].
 ///
@@ -373,12 +373,12 @@ pub fn derive_custom_resource(input: proc_macro::TokenStream) -> proc_macro::Tok
 ///     group = "kube.rs",
 ///     version = "v1",
 ///     kind = "Struct",
-///     rule = Rule::new("self.matadata.name == 'singleton'"),
+///     validation = Rule::new("self.matadata.name == 'singleton'"),
 /// )]
-/// #[x_kube(rule = Rule::new("self == oldSelf"))]
+/// #[x_kube(validation = Rule::new("self == oldSelf"))]
 /// struct MyStruct {
 ///     #[serde(default = "default")]
-///     #[x_kube(rule = Rule::new("self != ''").message("failure message"))]
+///     #[x_kube(validation = Rule::new("self != ''").message("failure message"))]
 ///     field: String,
 /// }
 ///

@@ -5,8 +5,8 @@ use syn::{parse_quote, Attribute, DeriveInput, Expr, Ident, Path};
 #[derive(FromField)]
 #[darling(attributes(x_kube))]
 struct XKube {
-    #[darling(multiple, rename = "rule")]
-    rules: Vec<Expr>,
+    #[darling(multiple, rename = "validation")]
+    validations: Vec<Expr>,
     merge_strategy: Option<Expr>,
 }
 
@@ -16,8 +16,8 @@ struct KubeSchema {
     #[darling(default)]
     crates: Crates,
     ident: Ident,
-    #[darling(multiple, rename = "rule")]
-    rules: Vec<Expr>,
+    #[darling(multiple, rename = "validation")]
+    validations: Vec<Expr>,
 }
 
 #[derive(Debug, FromMeta)]
@@ -65,7 +65,7 @@ pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
             serde,
         },
         ident,
-        rules,
+        validations,
     } = match KubeSchema::from_derive_input(&ast) {
         Err(err) => return err.write_errors(),
         Ok(attrs) => attrs,
@@ -73,7 +73,7 @@ pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
 
     // Collect global structure validation rules
     let struct_name = IdentString::new(ident.clone()).map(|ident| format!("{ident}Validated"));
-    let struct_rules: Vec<TokenStream> = rules.iter().map(|r| quote! {#r,}).collect();
+    let struct_rules: Vec<TokenStream> = validations.iter().map(|r| quote! {#r,}).collect();
 
     // Modify generated struct name to avoid Struct::method conflicts in attributes
     ast.ident = struct_name.as_ident().clone();
@@ -94,7 +94,7 @@ pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
     if let syn::Fields::Named(fields) = &mut struct_data.fields {
         for field in &mut fields.named {
             let XKube {
-                rules,
+                validations,
                 merge_strategy,
                 ..
             } = match XKube::from_field(field) {
@@ -106,11 +106,11 @@ pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
             // Has to happen on the original definition at all times, as we don't have #[derive] stanzes.
             field.attrs = remove_attributes(&field.attrs, &attribute_whitelist);
 
-            if rules.is_empty() && merge_strategy.is_none() {
+            if validations.is_empty() && merge_strategy.is_none() {
                 continue;
             }
 
-            let rules: Vec<TokenStream> = rules.iter().map(|r| quote! {#r,}).collect();
+            let rules: Vec<TokenStream> = validations.iter().map(|r| quote! {#r,}).collect();
             let rules = (!rules.is_empty())
                 .then_some(quote! {#kube_core::validate_property(merge, 0, &[#(#rules)*]).unwrap();});
             let merge_strategy = merge_strategy
@@ -179,15 +179,15 @@ fn test_derive_validated() {
     let input = quote! {
         #[derive(CustomResource, KubeSchema, Serialize, Deserialize, Debug, PartialEq, Clone)]
         #[kube(group = "clux.dev", version = "v1", kind = "Foo", namespaced)]
-        #[x_kube(rule = "self != ''".into())]
+        #[x_kube(validation = "self != ''".into())]
         struct FooSpec {
-            #[x_kube(rule = "self != ''".into())]
+            #[x_kube(validation = "self != ''".into())]
             foo: String
         }
     };
     let input = syn::parse2(input).unwrap();
     let v = KubeSchema::from_derive_input(&input).unwrap();
-    assert_eq!(v.rules.len(), 1);
+    assert_eq!(v.validations.len(), 1);
 }
 
 #[cfg(test)]
@@ -200,9 +200,9 @@ mod tests {
     fn test_derive_validated_full() {
         let input = quote! {
             #[derive(KubeSchema)]
-            #[x_kube(rule = "true".into())]
+            #[x_kube(validation = "true".into())]
             struct FooSpec {
-                #[x_kube(rule = "true".into())]
+                #[x_kube(validation = "true".into())]
                 #[x_kube(merge_strategy = ListMerge::Atomic)]
                 foo: Vec<String>
             }

@@ -30,7 +30,7 @@ use std::collections::{HashMap, HashSet};
     annotation("clux.dev/firewall", "enabled"),
     label("clux.dev", "cluxingv1"),
     label("clux.dev/persistence", "disabled"),
-    rule = Rule::new("self.metadata.name == 'singleton'"),
+    validation = Rule::new("self.metadata.name == 'singleton'"),
     status = "Status",
     scale(
         spec_replicas_path = ".spec.replicas",
@@ -38,7 +38,7 @@ use std::collections::{HashMap, HashSet};
         label_selector_path = ".status.labelSelector"
     ),
 )]
-#[x_kube(rule = Rule::new("has(self.nonNullable)"))]
+#[x_kube(validation = Rule::new("has(self.nonNullable)"))]
 #[serde(rename_all = "camelCase")]
 struct FooSpec {
     non_nullable: String,
@@ -61,7 +61,7 @@ struct FooSpec {
     timestamp: DateTime<Utc>,
 
     /// This is a complex enum with a description
-    #[x_kube(rule = Rule::new("!has(self.variantOne) || self.variantOne.int > 22"))]
+    #[x_kube(validation = Rule::new("!has(self.variantOne) || self.variantOne.int > 22"))]
     complex_enum: ComplexEnum,
 
     /// This is a untagged enum with a description

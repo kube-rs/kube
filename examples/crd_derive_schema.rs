@@ -26,10 +26,10 @@ use serde::{Deserialize, Serialize};
     namespaced,
     derive = "PartialEq",
     derive = "Default",
-    rule = Rule::new("self.metadata.name != 'forbidden'"),
+    validation = Rule::new("self.metadata.name != 'forbidden'"),
 )]
 #[serde(rename_all = "camelCase")]
-#[x_kube(rule = Rule::new("self.nonNullable == oldSelf.nonNullable"))]
+#[x_kube(validation = Rule::new("self.nonNullable == oldSelf.nonNullable"))]
 pub struct FooSpec {
     // Non-nullable without default is required.
     //
@@ -91,12 +91,12 @@ pub struct FooSpec {
     // Field with CEL validation
     #[serde(default = "default_legal")]
     #[x_kube(
-        rule = Rule::new("self != 'illegal'").message(Message::Expression("'string cannot be illegal'".into())).reason(Reason::FieldValueForbidden),
-        rule = Rule::new("self != 'not legal'").reason(Reason::FieldValueInvalid),
+        validation = Rule::new("self != 'illegal'").message(Message::Expression("'string cannot be illegal'".into())).reason(Reason::FieldValueForbidden),
+        validation = Rule::new("self != 'not legal'").reason(Reason::FieldValueInvalid),
     )]
     cel_validated: Option<String>,
 
-    #[x_kube(rule = Rule::new("self == oldSelf").message("is immutable"))]
+    #[x_kube(validation = Rule::new("self == oldSelf").message("is immutable"))]
     foo_sub_spec: Option<FooSubSpec>,
 
     #[serde(default = "FooSpec::default_value")]
@@ -105,7 +105,7 @@ pub struct FooSpec {
 
 #[derive(KubeSchema, Serialize, Deserialize, Default, Debug, PartialEq, Eq, Clone)]
 pub struct FooSubSpec {
-    #[x_kube(rule = "self != 'not legal'".into())]
+    #[x_kube(validation = "self != 'not legal'".into())]
     field: String,
 
     other: Option<String>,
