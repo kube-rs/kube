@@ -93,7 +93,11 @@ pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
     let mut property_modifications = vec![];
     if let syn::Fields::Named(fields) = &mut struct_data.fields {
         for field in &mut fields.named {
-            let XKube { rules, merge_strategy, .. } = match XKube::from_field(field) {
+            let XKube {
+                rules,
+                merge_strategy,
+                ..
+            } = match XKube::from_field(field) {
                 Ok(rule) => rule,
                 Err(err) => return err.write_errors(),
             };
