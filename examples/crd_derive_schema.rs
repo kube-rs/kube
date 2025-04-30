@@ -26,7 +26,7 @@ use serde::{Deserialize, Serialize};
     namespaced,
     derive = "PartialEq",
     derive = "Default",
-    validation = "self.metadata.name != 'forbidden'",
+    validation = "self.metadata.name != 'forbidden'"
 )]
 #[serde(rename_all = "camelCase")]
 #[x_kube(validation = "self.nonNullable == oldSelf.nonNullable")]
@@ -105,7 +105,9 @@ pub struct FooSpec {
 
 #[derive(KubeSchema, Serialize, Deserialize, Default, Debug, PartialEq, Eq, Clone)]
 pub struct FooSubSpec {
-    #[x_kube(validation = "self != 'not legal'")]
+    /// Heterogenous CEL rule set
+    #[x_kube(validation = "self != 'not legal'", validation = Rule::new("self != 'not that'"))]
+    #[x_kube(validation = ("self != 'also not that'", "some pretty good reason"))]
     field: String,
 
     other: Option<String>,
@@ -318,6 +320,29 @@ async fn main() -> Result<()> {
             assert!(err.message.contains("Foo.clux.dev \"baz\" is invalid"));
             assert!(err.message.contains("spec.fooSubSpec.field: Invalid value"));
             assert!(err.message.contains("failed rule: self != 'not legal'"));
+        }
+        _ => panic!(),
+    }
+
+    let cel_patch = serde_json::json!({
+        "apiVersion": "clux.dev/v1",
+        "kind": "Foo",
+        "spec": {
+            "fooSubSpec": {
+                "field": Some("also not that"),
+            }
+        }
+    });
+    let cel_res = foos.patch("baz", &ssapply, &Patch::Apply(cel_patch)).await;
+    assert!(cel_res.is_err());
+    match cel_res.err() {
+        Some(kube::Error::Api(err)) => {
+            assert_eq!(err.code, 422);
+            assert_eq!(err.reason, "Invalid");
+            assert_eq!(err.status, "Failure");
+            assert!(err.message.contains("Foo.clux.dev \"baz\" is invalid"));
+            assert!(err.message.contains("spec.fooSubSpec.field: Invalid value"));
+            assert!(err.message.contains("some pretty good reason"));
         }
         _ => panic!(),
     }

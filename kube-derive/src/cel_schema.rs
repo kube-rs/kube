@@ -76,9 +76,10 @@ pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
 
     // Collect global structure validation rules
     let struct_name = IdentString::new(ident.clone()).map(|ident| format!("{ident}Validated"));
-    let struct_rules: Vec<TokenStream> = validations.iter().map(|r| quote! {#r,}).collect();
-    let struct_rules = (!struct_rules.is_empty())
-        .then_some(quote! {#kube_core::validate(s, &[#(#struct_rules)*]).unwrap();});
+    let struct_rules: Vec<TokenStream> = validations
+        .iter()
+        .map(|rule| quote! {#kube_core::validate(s, #rule).unwrap();})
+        .collect();
 
     // Modify generated struct name to avoid Struct::method conflicts in attributes
     ast.ident = struct_name.as_ident().clone();
@@ -115,9 +116,10 @@ pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
                 continue;
             }
 
-            let rules: Vec<TokenStream> = validations.iter().map(|r| quote! {#r,}).collect();
-            let rules = (!rules.is_empty())
-                .then_some(quote! {#kube_core::validate_property(merge, 0, &[#(#rules)*]).unwrap();});
+            let rules: Vec<TokenStream> = validations
+                .iter()
+                .map(|rule| quote! {#kube_core::validate_property(merge, 0, #rule).unwrap();})
+                .collect();
             let merge_strategy = merge_strategy
                 .map(|strategy| quote! {#kube_core::merge_strategy_property(merge, 0, #strategy).unwrap();});
 
@@ -133,7 +135,7 @@ pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
                     }
 
                     let merge = &mut Validated::json_schema(gen);
-                    #rules
+                    #(#rules)*
                     #merge_strategy
                     #kube_core::merge_properties(s, merge);
                 }
@@ -162,7 +164,7 @@ pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
 
                 use #kube_core::{Rule, Message, Reason, ListMerge, MapMerge, StructMerge};
                 let s = &mut #generated_struct_name::json_schema(gen);
-                #struct_rules
+                #(#struct_rules)*
                 #(#property_modifications)*
                 s.clone()
             }
@@ -205,9 +207,9 @@ mod tests {
     fn test_derive_validated_full() {
         let input = quote! {
             #[derive(KubeSchema)]
-            #[x_kube(validation = "true")]
+            #[x_kube(validation = "true", validation = "false")]
             struct FooSpec {
-                #[x_kube(validation = "true")]
+                #[x_kube(validation = "true", validation = Rule::new("false"))]
                 #[x_kube(merge_strategy = ListMerge::Atomic)]
                 foo: Vec<String>
             }
@@ -232,7 +234,8 @@ mod tests {
                     }
                     use ::kube::core::{Rule, Message, Reason, ListMerge, MapMerge, StructMerge};
                     let s = &mut FooSpecValidated::json_schema(gen);
-                    ::kube::core::validate(s, &["true"]).unwrap();
+                    ::kube::core::validate(s, "true").unwrap();
+                    ::kube::core::validate(s, "false").unwrap();
                     {
                         #[derive(::serde::Serialize, ::schemars::JsonSchema)]
                         #[automatically_derived]
@@ -241,7 +244,8 @@ mod tests {
                             foo: Vec<String>,
                         }
                         let merge = &mut Validated::json_schema(gen);
-                        ::kube::core::validate_property(merge, 0, &["true"]).unwrap();
+                        ::kube::core::validate_property(merge, 0, "true").unwrap();
+                        ::kube::core::validate_property(merge, 0, Rule::new("false")).unwrap();
                         ::kube::core::merge_strategy_property(merge, 0, ListMerge::Atomic).unwrap();
                         ::kube::core::merge_properties(s, merge);
                     }

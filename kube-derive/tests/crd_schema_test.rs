@@ -36,7 +36,7 @@ use std::collections::{HashMap, HashSet};
         spec_replicas_path = ".spec.replicas",
         status_replicas_path = ".status.replicas",
         label_selector_path = ".status.labelSelector"
-    ),
+    )
 )]
 #[x_kube(validation = "has(self.nonNullable)")]
 #[serde(rename_all = "camelCase")]
