@@ -187,7 +187,8 @@ impl FromStr for Reason {
 ///```
 #[cfg(feature = "schema")]
 #[cfg_attr(docsrs, doc(cfg(feature = "schema")))]
-pub fn validate(s: &mut Schema, rules: &[Rule]) -> Result<(), serde_json::Error> {
+pub fn validate(s: &mut Schema, rules: &[impl Into<Rule> + Clone]) -> Result<(), serde_json::Error> {
+    let rules: Vec<Rule> = rules.iter().cloned().map(Into::into).collect();
     match s {
         Schema::Bool(_) => (),
         Schema::Object(schema_object) => {
@@ -226,7 +227,7 @@ pub fn validate(s: &mut Schema, rules: &[Rule]) -> Result<(), serde_json::Error>
 pub fn validate_property(
     s: &mut Schema,
     property_index: usize,
-    rules: &[Rule],
+    rules: &[impl Into<Rule> + Clone],
 ) -> Result<(), serde_json::Error> {
     match s {
         Schema::Bool(_) => (),

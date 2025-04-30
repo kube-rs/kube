@@ -26,10 +26,10 @@ use serde::{Deserialize, Serialize};
     namespaced,
     derive = "PartialEq",
     derive = "Default",
-    validation = Rule::new("self.metadata.name != 'forbidden'"),
+    validation = "self.metadata.name != 'forbidden'",
 )]
 #[serde(rename_all = "camelCase")]
-#[x_kube(validation = Rule::new("self.nonNullable == oldSelf.nonNullable"))]
+#[x_kube(validation = "self.nonNullable == oldSelf.nonNullable")]
 pub struct FooSpec {
     // Non-nullable without default is required.
     //
@@ -105,7 +105,7 @@ pub struct FooSpec {
 
 #[derive(KubeSchema, Serialize, Deserialize, Default, Debug, PartialEq, Eq, Clone)]
 pub struct FooSubSpec {
-    #[x_kube(validation = "self != 'not legal'".into())]
+    #[x_kube(validation = "self != 'not legal'")]
     field: String,
 
     other: Option<String>,
