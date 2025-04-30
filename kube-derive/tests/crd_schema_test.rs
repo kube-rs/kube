@@ -3,14 +3,14 @@
 
 use assert_json_diff::assert_json_eq;
 use chrono::{DateTime, Utc};
-use kube::CELSchema;
+use kube::KubeSchema;
 use kube_derive::CustomResource;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
 // See `crd_derive_schema` example for how the schema generated from this struct affects defaulting and validation.
-#[derive(CustomResource, Serialize, Deserialize, Debug, PartialEq, Clone, CELSchema)]
+#[derive(CustomResource, Serialize, Deserialize, Debug, PartialEq, Clone, KubeSchema)]
 #[kube(
     group = "clux.dev",
     version = "v1",
@@ -30,7 +30,7 @@ use std::collections::{HashMap, HashSet};
     annotation("clux.dev/firewall", "enabled"),
     label("clux.dev", "cluxingv1"),
     label("clux.dev/persistence", "disabled"),
-    rule = Rule::new("self.metadata.name == 'singleton'"),
+    validation = Rule::new("self.metadata.name == 'singleton'"),
     status = "Status",
     scale(
         spec_replicas_path = ".spec.replicas",
@@ -38,7 +38,7 @@ use std::collections::{HashMap, HashSet};
         label_selector_path = ".status.labelSelector"
     ),
 )]
-#[cel_validate(rule = Rule::new("has(self.nonNullable)"))]
+#[x_kube(validation = Rule::new("has(self.nonNullable)"))]
 #[serde(rename_all = "camelCase")]
 struct FooSpec {
     non_nullable: String,
@@ -61,7 +61,7 @@ struct FooSpec {
     timestamp: DateTime<Utc>,
 
     /// This is a complex enum with a description
-    #[cel_validate(rule = Rule::new("!has(self.variantOne) || self.variantOne.int > 22"))]
+    #[x_kube(validation = Rule::new("!has(self.variantOne) || self.variantOne.int > 22"))]
     complex_enum: ComplexEnum,
 
     /// This is a untagged enum with a description
@@ -74,6 +74,9 @@ struct FooSpec {
 
     #[serde(default = "FooSpec::default_value")]
     associated_default: bool,
+
+    #[x_kube(merge_strategy = ListMerge::Set)]
+    x_kubernetes_set: Vec<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize, JsonSchema)]
@@ -182,7 +185,8 @@ fn test_serialized_matches_expected() {
             }),
             associated_default: false,
             my_list: vec!["".into()],
-            set: HashSet::from(["foo".to_owned()])
+            set: HashSet::from(["foo".to_owned()]),
+            x_kubernetes_set: vec![],
         }))
         .unwrap(),
         serde_json::json!({
@@ -216,7 +220,8 @@ fn test_serialized_matches_expected() {
                 },
                 "associatedDefault": false,
                 "myList": [""],
-                "set": ["foo"]
+                "set": ["foo"],
+                "xKubernetesSet": [],
             }
         })
     )
@@ -398,6 +403,13 @@ fn test_crd_schema_matches_expected() {
                                                 "type": "boolean",
                                                 "default": true,
                                             },
+                                            "xKubernetesSet": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "string"
+                                                },
+                                                "x-kubernetes-list-type": "set",
+                                            },
                                         },
                                         "required": [
                                             "complexEnum",
@@ -405,7 +417,8 @@ fn test_crd_schema_matches_expected() {
                                             "nonNullable",
                                             "set",
                                             "timestamp",
-                                            "untaggedEnumPerson"
+                                            "untaggedEnumPerson",
+                                            "xKubernetesSet"
                                         ],
                                         "x-kubernetes-validations": [{
                                             "rule": "has(self.nonNullable)",

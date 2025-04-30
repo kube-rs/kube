@@ -3,20 +3,21 @@ use proc_macro2::TokenStream;
 use syn::{parse_quote, Attribute, DeriveInput, Expr, Ident, Path};
 
 #[derive(FromField)]
-#[darling(attributes(cel_validate))]
-struct Rule {
-    #[darling(multiple, rename = "rule")]
-    rules: Vec<Expr>,
+#[darling(attributes(x_kube))]
+struct XKube {
+    #[darling(multiple, rename = "validation")]
+    validations: Vec<Expr>,
+    merge_strategy: Option<Expr>,
 }
 
 #[derive(FromDeriveInput)]
-#[darling(attributes(cel_validate), supports(struct_named))]
-struct CELSchema {
+#[darling(attributes(x_kube), supports(struct_named))]
+struct KubeSchema {
     #[darling(default)]
     crates: Crates,
     ident: Ident,
-    #[darling(multiple, rename = "rule")]
-    rules: Vec<Expr>,
+    #[darling(multiple, rename = "validation")]
+    validations: Vec<Expr>,
 }
 
 #[derive(Debug, FromMeta)]
@@ -57,22 +58,22 @@ pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
         Ok(di) => di,
     };
 
-    let CELSchema {
+    let KubeSchema {
         crates: Crates {
             kube_core,
             schemars,
             serde,
         },
         ident,
-        rules,
-    } = match CELSchema::from_derive_input(&ast) {
+        validations,
+    } = match KubeSchema::from_derive_input(&ast) {
         Err(err) => return err.write_errors(),
         Ok(attrs) => attrs,
     };
 
     // Collect global structure validation rules
     let struct_name = IdentString::new(ident.clone()).map(|ident| format!("{ident}Validated"));
-    let struct_rules: Vec<TokenStream> = rules.iter().map(|r| quote! {#r,}).collect();
+    let struct_rules: Vec<TokenStream> = validations.iter().map(|r| quote! {#r,}).collect();
 
     // Modify generated struct name to avoid Struct::method conflicts in attributes
     ast.ident = struct_name.as_ident().clone();
@@ -92,7 +93,11 @@ pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
     let mut property_modifications = vec![];
     if let syn::Fields::Named(fields) = &mut struct_data.fields {
         for field in &mut fields.named {
-            let Rule { rules, .. } = match Rule::from_field(field) {
+            let XKube {
+                validations,
+                merge_strategy,
+                ..
+            } = match XKube::from_field(field) {
                 Ok(rule) => rule,
                 Err(err) => return err.write_errors(),
             };
@@ -101,11 +106,15 @@ pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
             // Has to happen on the original definition at all times, as we don't have #[derive] stanzes.
             field.attrs = remove_attributes(&field.attrs, &attribute_whitelist);
 
-            if rules.is_empty() {
+            if validations.is_empty() && merge_strategy.is_none() {
                 continue;
             }
 
-            let rules: Vec<TokenStream> = rules.iter().map(|r| quote! {#r,}).collect();
+            let rules: Vec<TokenStream> = validations.iter().map(|r| quote! {#r,}).collect();
+            let rules = (!rules.is_empty())
+                .then_some(quote! {#kube_core::validate_property(merge, 0, &[#(#rules)*]).unwrap();});
+            let merge_strategy = merge_strategy
+                .map(|strategy| quote! {#kube_core::merge_strategy_property(merge, 0, #strategy).unwrap();});
 
             // We need to prepend derive macros, as they were consumed by this macro processing, being a derive by itself.
             property_modifications.push(quote! {
@@ -119,7 +128,8 @@ pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
                     }
 
                     let merge = &mut Validated::json_schema(gen);
-                    #kube_core::validate_property(merge, 0, &[#(#rules)*]).unwrap();
+                    #rules
+                    #merge_strategy
                     #kube_core::merge_properties(s, merge);
                 }
             });
@@ -145,7 +155,7 @@ pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
                 #[allow(missing_docs)]
                 #ast
 
-                use #kube_core::{Rule, Message, Reason};
+                use #kube_core::{Rule, Message, Reason, ListMerge, MapMerge, StructMerge};
                 let s = &mut #generated_struct_name::json_schema(gen);
                 #kube_core::validate(s, &[#(#struct_rules)*]).unwrap();
                 #(#property_modifications)*
@@ -167,17 +177,17 @@ fn remove_attributes(attrs: &[Attribute], witelist: &[&str]) -> Vec<Attribute> {
 #[test]
 fn test_derive_validated() {
     let input = quote! {
-        #[derive(CustomResource, CELSchema, Serialize, Deserialize, Debug, PartialEq, Clone)]
+        #[derive(CustomResource, KubeSchema, Serialize, Deserialize, Debug, PartialEq, Clone)]
         #[kube(group = "clux.dev", version = "v1", kind = "Foo", namespaced)]
-        #[cel_validate(rule = "self != ''".into())]
+        #[x_kube(validation = "self != ''".into())]
         struct FooSpec {
-            #[cel_validate(rule = "self != ''".into())]
+            #[x_kube(validation = "self != ''".into())]
             foo: String
         }
     };
     let input = syn::parse2(input).unwrap();
-    let v = CELSchema::from_derive_input(&input).unwrap();
-    assert_eq!(v.rules.len(), 1);
+    let v = KubeSchema::from_derive_input(&input).unwrap();
+    assert_eq!(v.validations.len(), 1);
 }
 
 #[cfg(test)]
@@ -189,11 +199,12 @@ mod tests {
     #[test]
     fn test_derive_validated_full() {
         let input = quote! {
-            #[derive(CELSchema)]
-            #[cel_validate(rule = "true".into())]
+            #[derive(KubeSchema)]
+            #[x_kube(validation = "true".into())]
             struct FooSpec {
-                #[cel_validate(rule = "true".into())]
-                foo: String
+                #[x_kube(validation = "true".into())]
+                #[x_kube(merge_strategy = ListMerge::Atomic)]
+                foo: Vec<String>
             }
         };
 
@@ -212,9 +223,9 @@ mod tests {
                     #[automatically_derived]
                     #[allow(missing_docs)]
                     struct FooSpecValidated {
-                        foo: String,
+                        foo: Vec<String>,
                     }
-                    use ::kube::core::{Rule, Message, Reason};
+                    use ::kube::core::{Rule, Message, Reason, ListMerge, MapMerge, StructMerge};
                     let s = &mut FooSpecValidated::json_schema(gen);
                     ::kube::core::validate(s, &["true".into()]).unwrap();
                     {
@@ -222,10 +233,11 @@ mod tests {
                         #[automatically_derived]
                         #[allow(missing_docs)]
                         struct Validated {
-                            foo: String,
+                            foo: Vec<String>,
                         }
                         let merge = &mut Validated::json_schema(gen);
                         ::kube::core::validate_property(merge, 0, &["true".into()]).unwrap();
+                        ::kube::core::merge_strategy_property(merge, 0, ListMerge::Atomic).unwrap();
                         ::kube::core::merge_properties(s, merge);
                     }
                     s.clone()

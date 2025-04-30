@@ -46,8 +46,8 @@ struct KubeAttrs {
     annotations: Vec<KVTuple>,
     #[darling(multiple, rename = "label")]
     labels: Vec<KVTuple>,
-    #[darling(multiple, rename = "rule")]
-    rules: Vec<Expr>,
+    #[darling(multiple, rename = "validation")]
+    validations: Vec<Expr>,
 
     /// Sets the `storage` property to `true` or `false`.
     ///
@@ -358,7 +358,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         printcolums,
         selectable,
         scale,
-        rules,
+        validations,
         storage,
         served,
         deprecated,
@@ -441,15 +441,15 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
     // these are validated by the API server implicitly. Also, we can't generate the
     // schema for `metadata` (`ObjectMeta`) because it doesn't implement `JsonSchema`.
     let schemars_skip = schema_mode.derive().then_some(quote! { #[schemars(skip)] });
-    if schema_mode.derive() && !rules.is_empty() {
-        derive_paths.push(syn::parse_quote! { #kube::CELSchema });
+    if schema_mode.derive() && !validations.is_empty() {
+        derive_paths.push(syn::parse_quote! { #kube::KubeSchema });
     } else if schema_mode.derive() {
         derive_paths.push(syn::parse_quote! { #schemars::JsonSchema });
     }
 
     let struct_rules: Option<Vec<TokenStream>> =
-        (!rules.is_empty()).then(|| rules.iter().map(|r| quote! {rule = #r,}).collect());
-    let struct_rules = struct_rules.map(|r| quote! { #[cel_validate(#(#r)*)]});
+        (!validations.is_empty()).then(|| validations.iter().map(|r| quote! {validation = #r,}).collect());
+    let struct_rules = struct_rules.map(|r| quote! { #[x_kube(#(#r)*)]});
 
     let meta_annotations = if !annotations.is_empty() {
         quote! { Some(std::collections::BTreeMap::from([#((#annotations.0.to_string(), #annotations.1.to_string()),)*])) }

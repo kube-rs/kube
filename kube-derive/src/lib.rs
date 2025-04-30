@@ -188,9 +188,9 @@ mod resource;
 /// #[kube(deprecated = "Replaced by other CRD")]
 /// ```
 ///
-/// ## `#[kube(rule = Rule::new("self == oldSelf").message("field is immutable"))]`
+/// ## `#[kube(validation = Rule::new("self == oldSelf").message("field is immutable"))]`
 /// Inject a top level CEL validation rule for the top level generated struct.
-/// This attribute is for resources deriving [`CELSchema`] instead of [`schemars::JsonSchema`].
+/// This attribute is for resources deriving [`KubeSchema`] instead of [`schemars::JsonSchema`].
 ///
 /// ## Example with all properties
 ///
@@ -362,23 +362,23 @@ pub fn derive_custom_resource(input: proc_macro::TokenStream) -> proc_macro::Tok
 /// Generates a JsonSchema implementation a set of CEL validation rules applied on the CRD.
 ///
 /// ```rust
-/// use kube::CELSchema;
+/// use kube::KubeSchema;
 /// use kube::CustomResource;
 /// use serde::Deserialize;
 /// use serde::Serialize;
 /// use kube::core::crd::CustomResourceExt;
 ///
-/// #[derive(CustomResource, CELSchema, Serialize, Deserialize, Clone, Debug)]
+/// #[derive(CustomResource, KubeSchema, Serialize, Deserialize, Clone, Debug)]
 /// #[kube(
 ///     group = "kube.rs",
 ///     version = "v1",
 ///     kind = "Struct",
-///     rule = Rule::new("self.matadata.name == 'singleton'"),
+///     validation = Rule::new("self.matadata.name == 'singleton'"),
 /// )]
-/// #[cel_validate(rule = Rule::new("self == oldSelf"))]
+/// #[x_kube(validation = Rule::new("self == oldSelf"))]
 /// struct MyStruct {
 ///     #[serde(default = "default")]
-///     #[cel_validate(rule = Rule::new("self != ''").message("failure message"))]
+///     #[x_kube(validation = Rule::new("self != ''").message("failure message"))]
 ///     field: String,
 /// }
 ///
@@ -393,7 +393,7 @@ pub fn derive_custom_resource(input: proc_macro::TokenStream) -> proc_macro::Tok
 /// assert!(serde_json::to_string(&Struct::crd()).unwrap().contains(r#""default":"value""#));
 /// assert!(serde_json::to_string(&Struct::crd()).unwrap().contains(r#""rule":"self.matadata.name == 'singleton'""#));
 /// ```
-#[proc_macro_derive(CELSchema, attributes(cel_validate, schemars, validate))]
+#[proc_macro_derive(KubeSchema, attributes(x_kube, schemars, validate))]
 pub fn derive_schema_validation(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     cel_schema::derive_validated_schema(input.into()).into()
 }
