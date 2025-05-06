@@ -172,13 +172,13 @@ impl FromStr for Reason {
 /// use kube::core::{Rule, Reason, Message, validate};
 ///
 /// let mut schema = Schema::Object(Default::default());
-/// let rules = &[Rule{
+/// let rule = Rule{
 ///     rule: "self.spec.host == self.url.host".into(),
 ///     message: Some("must be a URL with the host matching spec.host".into()),
 ///     field_path: Some("spec.host".into()),
 ///     ..Default::default()
-/// }];
-/// validate(&mut schema, rules)?;
+/// };
+/// validate(&mut schema, rule)?;
 /// assert_eq!(
 ///     serde_json::to_string(&schema).unwrap(),
 ///     r#"{"x-kubernetes-validations":[{"fieldPath":"spec.host","message":"must be a URL with the host matching spec.host","rule":"self.spec.host == self.url.host"}]}"#,
@@ -187,13 +187,21 @@ impl FromStr for Reason {
 ///```
 #[cfg(feature = "schema")]
 #[cfg_attr(docsrs, doc(cfg(feature = "schema")))]
-pub fn validate(s: &mut Schema, rules: &[Rule]) -> Result<(), serde_json::Error> {
+pub fn validate(s: &mut Schema, rule: impl Into<Rule>) -> Result<(), serde_json::Error> {
+    let rule: Rule = rule.into();
     match s {
         Schema::Bool(_) => (),
         Schema::Object(schema_object) => {
+            let rule = serde_json::to_value(rule)?;
             schema_object
                 .extensions
-                .insert("x-kubernetes-validations".into(), serde_json::to_value(rules)?);
+                .entry("x-kubernetes-validations".into())
+                .and_modify(|rules| {
+                    if let Value::Array(rules) = rules {
+                        rules.push(rule.clone());
+                    }
+                })
+                .or_insert(serde_json::to_value(&[rule])?);
         }
     };
     Ok(())
@@ -213,8 +221,8 @@ pub fn validate(s: &mut Schema, rules: &[Rule]) -> Result<(), serde_json::Error>
 ///
 /// let gen = &mut schemars::gen::SchemaSettings::openapi3().into_generator();
 /// let mut schema = MyStruct::json_schema(gen);
-/// let rules = &[Rule::new("self != oldSelf")];
-/// validate_property(&mut schema, 0, rules)?;
+/// let rule = Rule::new("self != oldSelf");
+/// validate_property(&mut schema, 0, rule)?;
 /// assert_eq!(
 ///     serde_json::to_string(&schema).unwrap(),
 ///     r#"{"type":"object","properties":{"field":{"type":"string","nullable":true,"x-kubernetes-validations":[{"rule":"self != oldSelf"}]}}}"#
@@ -226,7 +234,7 @@ pub fn validate(s: &mut Schema, rules: &[Rule]) -> Result<(), serde_json::Error>
 pub fn validate_property(
     s: &mut Schema,
     property_index: usize,
-    rules: &[Rule],
+    rule: impl Into<Rule>,
 ) -> Result<(), serde_json::Error> {
     match s {
         Schema::Bool(_) => (),
@@ -234,7 +242,7 @@ pub fn validate_property(
             let obj = schema_object.object();
             for (n, (_, schema)) in obj.properties.iter_mut().enumerate() {
                 if n == property_index {
-                    return validate(schema, rules);
+                    return validate(schema, rule);
                 }
             }
         }

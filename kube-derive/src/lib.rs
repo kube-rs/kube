@@ -373,9 +373,9 @@ pub fn derive_custom_resource(input: proc_macro::TokenStream) -> proc_macro::Tok
 ///     group = "kube.rs",
 ///     version = "v1",
 ///     kind = "Struct",
-///     validation = Rule::new("self.matadata.name == 'singleton'"),
+///     validation = "self.matadata.name == 'singleton'",
 /// )]
-/// #[x_kube(validation = Rule::new("self == oldSelf"))]
+/// #[x_kube(validation = "self == oldSelf")]
 /// struct MyStruct {
 ///     #[serde(default = "default")]
 ///     #[x_kube(validation = Rule::new("self != ''").message("failure message"))]
