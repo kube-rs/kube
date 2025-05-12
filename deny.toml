@@ -36,7 +36,7 @@ allow = [
 exceptions = [
     # Pulled in via hyper-rustls when using the webpki-roots feature,
     # which is off by default.
-    { allow = ["CDLA-Permissive-2.0"], crate = "webpki-roots" },
+    { allow = ["CDLA-Permissive-2.0", "MPL-2.0"], crate = "webpki-roots" },
 ]
 
 [sources]
@@ -58,6 +58,10 @@ name = "base64"
 
 [[bans.skip-tree]]
 name = "windows-sys"
+
+[[bans.skip-tree]]
+# currently multiple versions while it's 1.0 is being rolled out
+name = "webpki-roots"
 
 # currently multiple version of thiserror in flight due to its major bump
 [[bans.skip]]
