@@ -181,9 +181,8 @@ pub mod conditions {
     #[must_use]
     pub fn is_deleted<K: Resource>(uid: &str) -> impl Condition<K> + '_ {
         move |obj: Option<&K>| {
-            obj.map_or(
-                // Object is not found, success!
-                true,
+            // NB: Object not found implies success.
+            obj.is_none_or(
                 // Object is found, but a changed uid would mean that it was deleted and recreated
                 |obj| obj.meta().uid.as_deref() != Some(uid),
             )
