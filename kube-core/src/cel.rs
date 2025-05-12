@@ -420,7 +420,9 @@ pub fn merge_strategy(s: &mut Schema, strategy: MergeStrategy) -> Result<(), ser
     match s {
         Schema::Bool(_) => (),
         Schema::Object(schema_object) => {
-            schema_object.extensions.append(&mut strategy.keys()?);
+            for (key, value) in strategy.keys()? {
+                schema_object.extensions.insert(key, value);
+            }
         }
     };
 
