@@ -36,6 +36,7 @@ test:
   cargo test --workspace --lib --all-features --exclude kube-examples --exclude e2e
   cargo test --workspace --doc --all-features --exclude kube-examples --exclude e2e
   cargo test -p kube-examples --examples
+  cargo test -p kube-examples --examples --all-features
 
 # Integration tests (will modify your current context's cluster)
 test-integration:
