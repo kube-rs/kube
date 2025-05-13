@@ -7,8 +7,58 @@ UNRELEASED
 ===================
  * see https://github.com/kube-rs/kube/compare/1.0.0...main
 
-1.0.0 / 2025-05-13
+[1.0.0](https://github.com/kube-rs/kube/releases/tag/1.0.0) / 2025-05-13
 ===================
+<!-- Release notes generated using configuration in .github/release.yml at 1.0.0 -->
+
+### A Major Version
+It's been a long time coming, but time has come to draw the line in the sand. No alphas, no betas. Hope it finds you all well. Thanks to everyone who has contributed over the years.
+
+This is a somewhat symbolic gesture, because semver-breaking changes are still hard to avoid with a large set of sub-1.0 dependencies we need to bump, as well as managing the large api surface of Kubernetes.
+
+Therefore, the plan is to align our breaking changes and major bumps with Kubernetes versions / k8s-openapi versions for now, and this should allow our other releases to stream in. See https://github.com/kube-rs/kube/issues/1688 for more information.
+
+## Kubernetes `v1_33` support via `k8s-openapi` [0.25](https://github.com/Arnavion/k8s-openapi/blob/master/CHANGELOG.md#v0250-2025-05-11)
+Please [upgrade k8s-openapi along with kube](https://kube.rs/upgrading/) to avoid conflicts.
+
+New minimum versions: [MSRV](https://kube.rs/rust-version/) 1.82.0, [MK8SV](https://kube.rs/kubernetes-version/): 1.30[*](https://github.com/kube-rs/kube/pull/1756)
+
+
+### KubeSchema
+The `CELSchema` alternate derive for `JsonSchema` has been renamed to `KubeSchema` to indicate the increased functionality.
+
+In addition to being able to inject CEL rules for validations, it can now also inject `x-kubernetes` properties such as [merge-strategy](https://kubernetes.io/docs/reference/using-api/server-side-apply/#merge-strategy) via https://github.com/kube-rs/kube/pull/1750, handle `#[validate]` attributes https://github.com/kube-rs/kube/pull/1749, and pass validation rules as string literals https://github.com/kube-rs/kube/pull/1754 :
+
+```rust
+#[derive(CustomResource, Serialize, Deserialize, Debug, PartialEq, Clone, KubeSchema)]
+#[kube(...properties)
+struct DocumentSpec {
+    /// New merge strategy support
+    #[x_kube(merge_strategy = ListMerge::Set)]
+    x_kubernetes_set: Vec<String>,
+
+    /// CEL Validation now lives on x_kube and supports literal Rules:
+    #[x_kube(validation = "!has(self.variantOne) || self.variantOne.int > 22")]
+    complex_enum: ComplexEnum,
+}
+```
+
+See [kube.rs docs on validation](https://kube.rs/controllers/admission/#validation-using-cel-validation) for more info. Huge thanks to @Danil-Grigorev.
+
+## What's Changed
+### Added
+* feat(deps): enable `hyper-util/tracing` feature flag by @cratelyn in https://github.com/kube-rs/kube/pull/1734
+* Permit literal string validation for CEL expressions by @Danil-Grigorev in https://github.com/kube-rs/kube/pull/1754
+### Changed
+* Support additional `x-kubernetes-*` schema extensions by @Danil-Grigorev in https://github.com/kube-rs/kube/pull/1750
+* Bump `k8s-openapi` to `0.25.0` by @clux in https://github.com/kube-rs/kube/pull/1756
+### Removed
+* Remove deprecated `watcher::Event` `into_iter_*` methods by @clux in https://github.com/kube-rs/kube/pull/1738
+### Fixed
+* docs: Adjust #[kube(scale(...)] doc example by @Techassi in https://github.com/kube-rs/kube/pull/1733
+* Add suffix to generated struct by `CELSchema` by @Danil-Grigorev in https://github.com/kube-rs/kube/pull/1747
+* Allow schemars validate attribute in `CELSchema` by @Danil-Grigorev in https://github.com/kube-rs/kube/pull/1749
+* fix: resolve conflict with schemars preserve_order feature by @HoKim98 in https://github.com/kube-rs/kube/pull/1758
 
 [0.99.0](https://github.com/kube-rs/kube/releases/tag/0.99.0) / 2025-03-12
 ===================
