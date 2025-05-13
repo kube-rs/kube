@@ -16,7 +16,7 @@ Select a version of `kube` along with the generated [k8s-openapi](https://github
 
 ```toml
 [dependencies]
-kube = { version = "0.99.0", features = ["runtime", "derive"] }
+kube = { version = "1.0.0", features = ["runtime", "derive"] }
 k8s-openapi = { version = "0.25.0", features = ["latest"] }
 ```
 
@@ -157,13 +157,13 @@ Uses [rustls](https://github.com/rustls/rustls) with `ring` provider (default) o
 To switch [rustls providers](https://docs.rs/rustls/latest/rustls/crypto/struct.CryptoProvider.html), turn off `default-features` and enable the `aws-lc-rs` feature:
 
 ```toml
-kube = { version = "0.99.0", default-features = false, features = ["client", "rustls-tls", "aws-lc-rs"] }
+kube = { version = "1.0.0", default-features = false, features = ["client", "rustls-tls", "aws-lc-rs"] }
 ```
 
 To switch to `openssl`, turn off `default-features`, and enable the `openssl-tls` feature:
 
 ```toml
-kube = { version = "0.99.0", default-features = false, features = ["client", "openssl-tls"] }
+kube = { version = "1.0.0", default-features = false, features = ["client", "openssl-tls"] }
 ```
 
 This will pull in `openssl` and `hyper-openssl`. If `default-features` is left enabled, you will pull in two TLS stacks, and the default will remain as `rustls`.
