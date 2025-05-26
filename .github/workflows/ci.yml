@@ -252,7 +252,7 @@ jobs:
               --mount type=bind,source=${{ github.workspace }},target=/volume \
               --mount type=bind,source=$HOME/.cargo/registry,target=/root/.cargo/registry \
               --mount type=bind,source=$HOME/.cargo/git,target=/root/.cargo/git \
-              clux/muslrust:stable \
+              clux/muslrust:1.86.0-stable \
               cargo build -p e2e --release --bin=job --features=latest,${{matrix.tls}} -v
           cp target/x86_64-unknown-linux-musl/release/job e2e/
 

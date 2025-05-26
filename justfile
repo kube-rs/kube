@@ -90,7 +90,7 @@ e2e-job-musl features:
   docker run \
     -v cargo-cache:/root/.cargo/registry \
     -v "$PWD:/volume" -w /volume \
-    --rm -it clux/muslrust:stable cargo build --release --features={{features}} -p e2e
+    --rm -it clux/muslrust:1.86.0-stable cargo build --release --features={{features}} -p e2e
   cp target/x86_64-unknown-linux-musl/release/job e2e/job
   chmod +x e2e/job
 
