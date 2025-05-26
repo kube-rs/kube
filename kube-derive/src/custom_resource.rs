@@ -469,7 +469,8 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
     let docstr =
         doc.unwrap_or_else(|| format!(" Auto-generated derived type for {ident} via `CustomResource`"));
     let quoted_serde = Literal::string(&serde.to_token_stream().to_string());
-    let quoted_schemars = Literal::string(&schemars.to_token_stream().to_string());
+    let schemars_attribute = generate_schemars_attribute(schema_mode, &schemars);
+
     let root_obj = quote! {
         #[doc = #docstr]
         #[automatically_derived]
@@ -477,7 +478,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         #[derive(#(#derive_paths),*)]
         #[serde(rename_all = "camelCase")]
         #[serde(crate = #quoted_serde)]
-        #[schemars(crate = #quoted_schemars)]
+        #schemars_attribute
         #struct_rules
         #visibility struct #rootident {
             #schemars_skip
@@ -780,6 +781,13 @@ fn generate_hasspec(spec_ident: &Ident, root_ident: &Ident, kube_core: &Path) ->
             }
         }
     }
+}
+
+fn generate_schemars_attribute(schema_mode: SchemaMode, schemars_path: &Path) -> Option<TokenStream> {
+    schema_mode.derive().then(|| {
+        let schemars_path = schemars_path.to_token_stream().to_string();
+        quote! { #[schemars(crate = #schemars_path)] }
+    })
 }
 
 struct StatusInformation {
