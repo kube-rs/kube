@@ -7,9 +7,20 @@ UNRELEASED
 ===================
  * see https://github.com/kube-rs/kube/compare/1.1.0...main
 
-1.1.0 / 2025-05-26
+[1.1.0](https://github.com/kube-rs/kube/releases/tag/1.1.0) / 2025-05-26
 ===================
+<!-- Release notes generated using configuration in .github/release.yml at 1.1.0 -->
 
+## What's Changed
+Missing attribute bugfix + extra standard derives on [core::conversion](https://docs.rs/kube/latest/kube/core/conversion/index.html) structs.
+
+### Added
+* Add missing derives on conversion types by @sbernauer in https://github.com/kube-rs/kube/pull/1759
+### Fixed
+* Emit `#[schemars(crate)]` attribute by @Techassi in https://github.com/kube-rs/kube/pull/1764
+
+
+**Full Changelog**: https://github.com/kube-rs/kube/compare/1.0.0...1.1.0
 [1.0.0](https://github.com/kube-rs/kube/releases/tag/1.0.0) / 2025-05-13
 ===================
 <!-- Release notes generated using configuration in .github/release.yml at 1.0.0 -->
