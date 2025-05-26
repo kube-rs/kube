@@ -469,6 +469,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
     let docstr =
         doc.unwrap_or_else(|| format!(" Auto-generated derived type for {ident} via `CustomResource`"));
     let quoted_serde = Literal::string(&serde.to_token_stream().to_string());
+    let quoted_schemars = Literal::string(&schemars.to_token_stream().to_string());
     let root_obj = quote! {
         #[doc = #docstr]
         #[automatically_derived]
@@ -476,6 +477,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         #[derive(#(#derive_paths),*)]
         #[serde(rename_all = "camelCase")]
         #[serde(crate = #quoted_serde)]
+        #[schemars(crate = #quoted_schemars)]
         #struct_rules
         #visibility struct #rootident {
             #schemars_skip
