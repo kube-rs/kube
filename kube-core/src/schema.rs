@@ -3,8 +3,7 @@
 //! [`CustomResourceDefinition`]: `k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition`
 
 // Used in docs
-#[allow(unused_imports)]
-use schemars::generate::SchemaSettings;
+#[allow(unused_imports)] use schemars::generate::SchemaSettings;
 
 // https://graham.cool/schemars/migrating/
 use schemars::{
