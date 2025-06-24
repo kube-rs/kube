@@ -3,12 +3,14 @@
 //! [`CustomResourceDefinition`]: `k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition`
 
 // Used in docs
-#[allow(unused_imports)] use schemars::gen::SchemaSettings;
+#[allow(unused_imports)]
+use schemars::generate::SchemaSettings;
 
+// https://graham.cool/schemars/migrating/
 use schemars::{
-    schema::{InstanceType, Metadata, ObjectValidation, Schema, SchemaObject, SingleOrVec},
-    visit::Visitor,
-    MapEntry,
+    /*schema::{InstanceType, Metadata, ObjectValidation, Schema, SchemaObject, SingleOrVec},*/
+    transform::{transform_subschemas, Transform},
+    /*MapEntry*/, Schema,
 };
 
 /// schemars [`Visitor`] that rewrites a [`Schema`] to conform to Kubernetes' "structural schema" rules
@@ -28,12 +30,12 @@ use schemars::{
 #[derive(Debug, Clone)]
 pub struct StructuralSchemaRewriter;
 
-impl Visitor for StructuralSchemaRewriter {
-    fn visit_schema_object(&mut self, schema: &mut schemars::schema::SchemaObject) {
-        schemars::visit::visit_schema_object(self, schema);
+impl Transform for StructuralSchemaRewriter {
+    fn transform(&mut self, schema: &mut Schema) {
+        transform_subschemas(self, schema);
 
-        if let Some(subschemas) = &mut schema.subschemas {
-            if let Some(one_of) = subschemas.one_of.as_mut() {
+        if let Some(subschemas) = &mut schema.get("subschemas") {
+            if let Some(one_of) = subschemas.get("oneOf").as_mut() {
                 // Tagged enums are serialized using `one_of`
                 hoist_subschema_properties(one_of, &mut schema.object, &mut schema.instance_type);
 

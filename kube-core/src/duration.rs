@@ -273,7 +273,7 @@ impl PartialOrd<time::Duration> for Duration {
 impl schemars::JsonSchema for Duration {
     // see
     // https://github.com/kubernetes/apimachinery/blob/756e2227bf3a486098f504af1a0ffb736ad16f4c/pkg/apis/meta/v1/duration.go#L61
-    fn schema_name() -> String {
+    fn schema_name() -> std::borrow::Cow<'static, str> {
         "Duration".to_owned()
     }
 
@@ -321,17 +321,23 @@ mod tests {
             ("1478s", time::Duration::from_secs(1478).into()),
             // 	// sign
             // 	{"-5s", -5 * Second},
-            ("-5s", Duration {
-                duration: time::Duration::from_secs(5),
-                is_negative: true,
-            }),
+            (
+                "-5s",
+                Duration {
+                    duration: time::Duration::from_secs(5),
+                    is_negative: true,
+                },
+            ),
             // 	{"+5s", 5 * Second},
             ("+5s", time::Duration::from_secs(5).into()),
             // 	{"-0", 0},
-            ("-0", Duration {
-                duration: time::Duration::from_secs(0),
-                is_negative: true,
-            }),
+            (
+                "-0",
+                Duration {
+                    duration: time::Duration::from_secs(0),
+                    is_negative: true,
+                },
+            ),
             // 	{"+0", 0},
             ("+0", time::Duration::from_secs(0).into()),
             // 	// decimal
@@ -391,10 +397,13 @@ mod tests {
                 (4 * MINUTE + time::Duration::from_secs(10) + time::Duration::from_millis(500)).into(),
             ),
             // 	{"-2m3.4s", -(2*Minute + 3*Second + 400*Millisecond)},
-            ("-2m3.4s", Duration {
-                duration: 2 * MINUTE + time::Duration::from_secs(3) + time::Duration::from_millis(400),
-                is_negative: true,
-            }),
+            (
+                "-2m3.4s",
+                Duration {
+                    duration: 2 * MINUTE + time::Duration::from_secs(3) + time::Duration::from_millis(400),
+                    is_negative: true,
+                },
+            ),
             // 	{"1h2m3s4ms5us6ns", 1*Hour + 2*Minute + 3*Second + 4*Millisecond + 5*Microsecond + 6*Nanosecond},
             (
                 "1h2m3s4ms5us6ns",
