@@ -8,9 +8,9 @@ use schemars::generate::SchemaSettings;
 
 // https://graham.cool/schemars/migrating/
 use schemars::{
-    /*schema::{InstanceType, Metadata, ObjectValidation, Schema, SchemaObject, SingleOrVec},*/
+    /*schema::{InstanceType, Metadata, ObjectValidation, Schema, SchemaObject, SingleOrVec},MapEntry*/
     transform::{transform_subschemas, Transform},
-    /*MapEntry*/, Schema,
+    Schema,
 };
 
 /// schemars [`Visitor`] that rewrites a [`Schema`] to conform to Kubernetes' "structural schema" rules
@@ -47,7 +47,7 @@ impl Transform for StructuralSchemaRewriter {
                 }
             }
 
-            if let Some(any_of) = &mut subschemas.any_of {
+            if let Some(any_of) = &mut subschemas.get("anyOf") {
                 // Untagged enums are serialized using `any_of`
                 hoist_subschema_properties(any_of, &mut schema.object, &mut schema.instance_type);
             }
