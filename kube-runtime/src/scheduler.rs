@@ -77,7 +77,7 @@ impl<T: Hash + Eq + Clone, R> SchedulerProj<'_, T, R> {
         let next_time = request
             .run_at
             .checked_add(*self.debounce)
-            .unwrap_or_else(far_future);
+            .map_or_else(max_schedule_time, |time| time.min(max_schedule_time()));
         match self.scheduled.raw_entry_mut().from_key(&request.message) {
             // If new request is supposed to be earlier than the current entry's scheduled
             // time (for eg: the new request is user triggered and the current entry is the
@@ -283,11 +283,9 @@ pub fn debounced_scheduler<T: Eq + Hash + Clone, S: Stream<Item = ScheduleReques
     Scheduler::new(requests, debounce)
 }
 
-// internal fallback for overflows in schedule times
-pub(crate) fn far_future() -> Instant {
-    // private method from tokio for convenience - remove if upstream becomes pub
-    // https://github.com/tokio-rs/tokio/blob/6fcd9c02176bf3cd570bc7de88edaa3b95ea480a/tokio/src/time/instant.rs#L57-L63
-    Instant::now() + Duration::from_secs(86400 * 365 * 30)
+// Define a maximum scheduling delay of about 6 months to prevent `DelayQueue::insert_at` and `DelayQueue::reset_at` from panicking
+pub(crate) fn max_schedule_time() -> Instant {
+    Instant::now() + Duration::from_secs(86400 * 30 * 6)
 }
 
 #[cfg(test)]

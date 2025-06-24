@@ -69,6 +69,8 @@ impl Action {
     /// even in the case of missed changes (which can happen).
     ///
     /// Watch events are not normally missed, so running this once per hour (`Default`) as a fallback is reasonable.
+    ///
+    /// The duration is clamped to a maximum of 6 months.
     #[must_use]
     pub fn requeue(duration: Duration) -> Self {
         Self {
@@ -477,7 +479,7 @@ where
                 },
                 run_at: reconciler_finished_at
                     .checked_add(requeue_after)
-                    .unwrap_or_else(crate::scheduler::far_future),
+                    .unwrap_or_else(crate::scheduler::max_schedule_time),
             }),
             result: Some(result),
         }
