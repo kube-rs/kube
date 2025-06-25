@@ -8,7 +8,10 @@
 use schemars::{transform::Transform, JsonSchema};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::{collections::{btree_map::Entry, BTreeMap, BTreeSet}, ops::Deref};
+use std::{
+    collections::{btree_map::Entry, BTreeMap, BTreeSet},
+    ops::Deref,
+};
 
 /// schemars [`Visitor`] that rewrites a [`Schema`] to conform to Kubernetes' "structural schema" rules
 ///
@@ -203,6 +206,18 @@ macro_rules! get_or_insert_default_fn {
 }
 
 impl SchemaObject {
+    get_or_insert_default_fn!(metadata, Metadata);
+
+    get_or_insert_default_fn!(subschemas, SubschemaValidation);
+
+    get_or_insert_default_fn!(number, NumberValidation);
+
+    get_or_insert_default_fn!(string, StringValidation);
+
+    get_or_insert_default_fn!(array, ArrayValidation);
+
+    get_or_insert_default_fn!(object, ObjectValidation);
+
     /// Creates a new `$ref` schema.
     ///
     /// The given reference string should be a URI reference. This will usually be a JSON Pointer
@@ -228,17 +243,8 @@ impl SchemaObject {
     /// and does not check any subschemas. Because of this, both `{}` and  `{"not": {}}` accept any type according
     /// to this method.
     pub fn has_type(&self, ty: InstanceType) -> bool {
-        self.instance_type
-            .as_ref()
-            .map_or(true, |x| x.contains(&ty))
+        self.instance_type.as_ref().is_none_or(|x| x.contains(&ty))
     }
-
-    get_or_insert_default_fn!(metadata, Metadata);
-    get_or_insert_default_fn!(subschemas, SubschemaValidation);
-    get_or_insert_default_fn!(number, NumberValidation);
-    get_or_insert_default_fn!(string, StringValidation);
-    get_or_insert_default_fn!(array, ArrayValidation);
-    get_or_insert_default_fn!(object, ObjectValidation);
 }
 
 impl From<Schema> for SchemaObject {
@@ -269,10 +275,7 @@ pub struct Metadata {
     /// The `default` keyword.
     ///
     /// See [JSON Schema Validation 9.2. "default"](https://tools.ietf.org/html/draft-handrews-json-schema-validation-02#section-9.2).
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "allow_null"
-    )]
+    #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "allow_null")]
     pub default: Option<Value>,
     /// The `deprecated` keyword.
     ///
@@ -546,7 +549,8 @@ impl Transform for StructuralSchemaRewriter {
     fn transform(&mut self, transform_schema: &mut schemars::Schema) {
         schemars::transform::transform_subschemas(self, transform_schema);
 
-        let mut schema: SchemaObject = match serde_json::from_value(transform_schema.clone().to_value()).ok(){
+        let mut schema: SchemaObject = match serde_json::from_value(transform_schema.clone().to_value()).ok()
+        {
             Some(schema) => schema,
             None => return,
         };
@@ -592,8 +596,8 @@ impl Transform for StructuralSchemaRewriter {
             array.unique_items = None;
         }
 
-        if let Some(schema) = serde_json::to_value(schema).ok() {
-            if let Some(transformed) = serde_json::from_value(schema).ok() {
+        if let Ok(schema) = serde_json::to_value(schema) {
+            if let Ok(transformed) = serde_json::from_value(schema) {
                 *transform_schema = transformed;
             }
         }

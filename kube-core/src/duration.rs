@@ -1,7 +1,6 @@
 //! Kubernetes [`Duration`]s.
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
-#[cfg(feature = "schema")]
-use std::borrow::Cow;
+#[cfg(feature = "schema")] use std::borrow::Cow;
 use std::{cmp::Ordering, fmt, str::FromStr, time};
 
 /// A Kubernetes duration.

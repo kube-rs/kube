@@ -2,8 +2,7 @@ use std::borrow::Cow;
 
 use kube::CustomResourceExt;
 use kube_derive::CustomResource;
-use schemars::json_schema;
-use schemars::JsonSchema;
+use schemars::{json_schema, JsonSchema};
 use serde::{Deserialize, Serialize};
 
 /// CustomResource with manually implemented `JsonSchema`

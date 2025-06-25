@@ -68,12 +68,13 @@ pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
     };
 
     let KubeSchema {
-        crates: Crates {
-            kube_core,
-            schemars,
-            serde,
-            std,
-        },
+        crates:
+            Crates {
+                kube_core,
+                schemars,
+                serde,
+                std,
+            },
         ident,
         validations,
     } = match KubeSchema::from_derive_input(&ast) {
