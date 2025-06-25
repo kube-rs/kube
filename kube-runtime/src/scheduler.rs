@@ -283,7 +283,9 @@ pub fn debounced_scheduler<T: Eq + Hash + Clone, S: Stream<Item = ScheduleReques
     Scheduler::new(requests, debounce)
 }
 
-// Define a maximum scheduling delay of about 6 months to prevent `DelayQueue::insert_at` and `DelayQueue::reset_at` from panicking
+// [`DelayQueue`] panics when trying to schedule an event further than 2 years into the future.
+// (See <https://github.com/kube-rs/kube/issues/1772>.)
+// We limit all scheduled durations to 6 months to stay well clear of that limit.
 pub(crate) fn max_schedule_time() -> Instant {
     Instant::now() + Duration::from_secs(86400 * 30 * 6)
 }
