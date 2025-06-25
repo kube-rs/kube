@@ -77,7 +77,9 @@ impl<T: Hash + Eq + Clone, R> SchedulerProj<'_, T, R> {
         let next_time = request
             .run_at
             .checked_add(*self.debounce)
-            .map_or_else(max_schedule_time, |time| time.min(max_schedule_time()));
+            .map_or_else(max_schedule_time, |time|
+                // Clamp `time` to avoid [`DelayQueue`] panic (see <https://github.com/kube-rs/kube/issues/1772>)
+                time.min(max_schedule_time()));
         match self.scheduled.raw_entry_mut().from_key(&request.message) {
             // If new request is supposed to be earlier than the current entry's scheduled
             // time (for eg: the new request is user triggered and the current entry is the
