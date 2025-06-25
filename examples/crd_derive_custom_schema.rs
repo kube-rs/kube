@@ -1,9 +1,9 @@
+use std::borrow::Cow;
+
 use kube::CustomResourceExt;
 use kube_derive::CustomResource;
-use schemars::{
-    schema::{InstanceType, ObjectValidation, Schema, SchemaObject},
-    JsonSchema,
-};
+use schemars::json_schema;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// CustomResource with manually implemented `JsonSchema`
@@ -20,44 +20,36 @@ pub struct MyBar {
 }
 
 impl JsonSchema for Bar {
-    fn schema_name() -> String {
-        "Bar".to_string()
+    fn schema_name() -> Cow<'static, str> {
+        "Bar".into()
     }
 
-    fn json_schema(__gen: &mut schemars::gen::SchemaGenerator) -> Schema {
-        Schema::Object(SchemaObject {
-            object: Some(Box::new(ObjectValidation {
-                required: ["spec".to_string()].into(),
-                properties: [(
-                    "spec".to_string(),
-                    Schema::Object(SchemaObject {
-                        instance_type: Some(InstanceType::Object.into()),
-                        object: Some(Box::new(ObjectValidation {
-                            required: ["bars".to_string()].into(),
-                            properties: [(
-                                "bars".to_string(),
-                                Schema::Object(SchemaObject {
-                                    instance_type: Some(InstanceType::Integer.into()),
-                                    ..SchemaObject::default()
-                                }),
-                            )]
-                            .into(),
-                            ..ObjectValidation::default()
-                        })),
-                        ..SchemaObject::default()
-                    }),
-                )]
-                .into(),
-                ..ObjectValidation::default()
-            })),
-            ..SchemaObject::default()
+    fn json_schema(__gen: &mut schemars::generate::SchemaGenerator) -> schemars::Schema {
+        json_schema!({
+            "properties": {
+                "spec": {
+                    "properties": {
+                        "bars": {
+                            "type": "integer"
+                        }
+                    },
+                    "required": [
+                        "bars"
+                    ],
+                    "type": "object"
+                }
+            },
+            "required": [
+                "spec"
+            ],
+            "title": "Bar"
         })
     }
 }
 
 fn main() {
     let crd = Bar::crd();
-    println!("{}", serde_yaml::to_string(&crd).unwrap());
+    println!("{}", serde_json::to_string(&crd).unwrap());
 }
 
 // Verify CustomResource derivable still

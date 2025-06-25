@@ -1,5 +1,7 @@
 //! Kubernetes [`Duration`]s.
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
+#[cfg(feature = "schema")]
+use std::borrow::Cow;
 use std::{cmp::Ordering, fmt, str::FromStr, time};
 
 /// A Kubernetes duration.
@@ -273,24 +275,23 @@ impl PartialOrd<time::Duration> for Duration {
 impl schemars::JsonSchema for Duration {
     // see
     // https://github.com/kubernetes/apimachinery/blob/756e2227bf3a486098f504af1a0ffb736ad16f4c/pkg/apis/meta/v1/duration.go#L61
-    fn schema_name() -> String {
-        "Duration".to_owned()
+    fn schema_name() -> Cow<'static, str> {
+        "Duration".into()
     }
 
-    fn is_referenceable() -> bool {
-        false
+    fn inline_schema() -> bool {
+        true
     }
 
-    fn json_schema(_: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
-        schemars::schema::SchemaObject {
-            instance_type: Some(schemars::schema::InstanceType::String.into()),
-            // the format should *not* be "duration", because "duration" means
-            // the duration is formatted in ISO 8601, as described here:
-            // https://datatracker.ietf.org/doc/html/draft-handrews-json-schema-validation-02#section-7.3.1
-            format: None,
-            ..Default::default()
-        }
-        .into()
+    fn json_schema(_: &mut schemars::generate::SchemaGenerator) -> schemars::Schema {
+        use schemars::json_schema;
+
+        // the format should *not* be "duration", because "duration" means
+        // the duration is formatted in ISO 8601, as described here:
+        // https://datatracker.ietf.org/doc/html/draft-handrews-json-schema-validation-02#section-7.3.1
+        json_schema!({
+            "type": "string",
+        })
     }
 }
 

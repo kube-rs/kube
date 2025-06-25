@@ -3,7 +3,8 @@
 use std::{collections::BTreeMap, str::FromStr};
 
 use derive_more::From;
-#[cfg(feature = "schema")] use schemars::schema::Schema;
+#[cfg(feature = "schema")]
+use schemars::Schema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -168,10 +169,10 @@ impl FromStr for Reason {
 /// on the top level under the "x-kubernetes-validations".
 ///
 /// ```rust
-/// use schemars::schema::Schema;
+/// use schemars::Schema;
 /// use kube::core::{Rule, Reason, Message, validate};
 ///
-/// let mut schema = Schema::Object(Default::default());
+/// let mut schema = Schema::default();
 /// let rule = Rule{
 ///     rule: "self.spec.host == self.url.host".into(),
 ///     message: Some("must be a URL with the host matching spec.host".into()),
@@ -189,21 +190,15 @@ impl FromStr for Reason {
 #[cfg_attr(docsrs, doc(cfg(feature = "schema")))]
 pub fn validate(s: &mut Schema, rule: impl Into<Rule>) -> Result<(), serde_json::Error> {
     let rule: Rule = rule.into();
-    match s {
-        Schema::Bool(_) => (),
-        Schema::Object(schema_object) => {
-            let rule = serde_json::to_value(rule)?;
-            schema_object
-                .extensions
-                .entry("x-kubernetes-validations".into())
-                .and_modify(|rules| {
-                    if let Value::Array(rules) = rules {
-                        rules.push(rule.clone());
-                    }
-                })
-                .or_insert(serde_json::to_value(&[rule])?);
-        }
-    };
+    let rule = serde_json::to_value(rule)?;
+    s.ensure_object()
+        .entry("x-kubernetes-validations")
+        .and_modify(|rules| {
+            if let Value::Array(rules) = rules {
+                rules.push(rule.clone());
+            }
+        })
+        .or_insert(serde_json::to_value(&[rule])?);
     Ok(())
 }
 
@@ -219,13 +214,13 @@ pub fn validate(s: &mut Schema, rule: impl Into<Rule>) -> Result<(), serde_json:
 ///     field: Option<String>,
 /// }
 ///
-/// let gen = &mut schemars::gen::SchemaSettings::openapi3().into_generator();
-/// let mut schema = MyStruct::json_schema(gen);
+/// let generate = &mut schemars::generate::SchemaSettings::openapi3().into_generator();
+/// let mut schema = MyStruct::json_schema(generate);
 /// let rule = Rule::new("self != oldSelf");
 /// validate_property(&mut schema, 0, rule)?;
 /// assert_eq!(
 ///     serde_json::to_string(&schema).unwrap(),
-///     r#"{"type":"object","properties":{"field":{"type":"string","nullable":true,"x-kubernetes-validations":[{"rule":"self != oldSelf"}]}}}"#
+///     r#"{"type":"object","properties":{"field":{"type":["string","null"],"x-kubernetes-validations":[{"rule":"self != oldSelf"}]}}}"#
 /// );
 /// # Ok::<(), serde_json::Error>(())
 ///```
@@ -234,20 +229,22 @@ pub fn validate(s: &mut Schema, rule: impl Into<Rule>) -> Result<(), serde_json:
 pub fn validate_property(
     s: &mut Schema,
     property_index: usize,
-    rule: impl Into<Rule>,
+    rule: impl Into<Rule> + Clone,
 ) -> Result<(), serde_json::Error> {
-    match s {
-        Schema::Bool(_) => (),
-        Schema::Object(schema_object) => {
-            let obj = schema_object.object();
-            for (n, (_, schema)) in obj.properties.iter_mut().enumerate() {
-                if n == property_index {
-                    return validate(schema, rule);
-                }
+    let obj = s.ensure_object();
+    if let Some(properties) = obj
+        .entry("properties")
+        .or_insert(serde_json::Value::Object(Default::default()))
+        .as_object_mut()
+    {
+        for (n, (_, schema)) in properties.iter_mut().enumerate() {
+            if n == property_index {
+                let mut prop = Schema::try_from(schema.clone())?;
+                validate(&mut prop, rule.clone())?;
+                *schema = prop.to_value();
             }
         }
-    };
-
+    }
     Ok(())
 }
 
@@ -267,25 +264,33 @@ pub fn validate_property(
 ///     a: bool,
 ///     b: Option<bool>,
 /// }
-/// let gen = &mut schemars::gen::SchemaSettings::openapi3().into_generator();
-/// let mut first = MyStruct::json_schema(gen);
-/// let mut second = MySecondStruct::json_schema(gen);
+/// let generate = &mut schemars::generate::SchemaSettings::openapi3().into_generator();
+/// let mut first = MyStruct::json_schema(generate);
+/// let mut second = MySecondStruct::json_schema(generate);
 /// merge_properties(&mut first, &mut second);
 ///
 /// assert_eq!(
 ///     serde_json::to_string(&first).unwrap(),
-///     r#"{"type":"object","properties":{"a":{"type":"boolean"},"b":{"type":"boolean","nullable":true}}}"#
+///     r#"{"type":"object","properties":{"a":{"type":"boolean"},"b":{"type":["boolean","null"]}}}"#
 /// );
 /// # Ok::<(), serde_json::Error>(())
 #[cfg(feature = "schema")]
 #[cfg_attr(docsrs, doc(cfg(feature = "schema")))]
 pub fn merge_properties(s: &mut Schema, merge: &mut Schema) {
-    match s {
-        schemars::schema::Schema::Bool(_) => (),
-        schemars::schema::Schema::Object(schema_object) => {
-            let obj = schema_object.object();
-            for (k, v) in &merge.clone().into_object().object().properties {
-                obj.properties.insert(k.clone(), v.clone());
+    if let Some(properties) = s
+        .ensure_object()
+        .entry("properties")
+        .or_insert(serde_json::Value::Object(Default::default()))
+        .as_object_mut()
+    {
+        if let Some(merge_properties) = merge
+            .ensure_object()
+            .entry("properties")
+            .or_insert(serde_json::Value::Object(Default::default()))
+            .as_object_mut()
+        {
+            for (k, v) in merge_properties {
+                properties.insert(k.clone(), v.clone());
             }
         }
     }
@@ -366,12 +371,12 @@ impl MergeStrategy {
 ///     field: Option<String>,
 /// }
 ///
-/// let gen = &mut schemars::gen::SchemaSettings::openapi3().into_generator();
-/// let mut schema = MyStruct::json_schema(gen);
+/// let generate = &mut schemars::generate::SchemaSettings::openapi3().into_generator();
+/// let mut schema = MyStruct::json_schema(generate);
 /// merge_strategy_property(&mut schema, 0, MapMerge::Atomic)?;
 /// assert_eq!(
 ///     serde_json::to_string(&schema).unwrap(),
-///     r#"{"type":"object","properties":{"field":{"type":"string","nullable":true,"x-kubernetes-map-type":"atomic"}}}"#
+///     r#"{"type":"object","properties":{"field":{"type":["string","null"],"x-kubernetes-map-type":"atomic"}}}"#
 /// );
 ///
 /// # Ok::<(), serde_json::Error>(())
@@ -383,17 +388,18 @@ pub fn merge_strategy_property(
     property_index: usize,
     strategy: impl Into<MergeStrategy>,
 ) -> Result<(), serde_json::Error> {
-    match s {
-        Schema::Bool(_) => (),
-        Schema::Object(schema_object) => {
-            let obj = schema_object.object();
-            for (n, (_, schema)) in obj.properties.iter_mut().enumerate() {
-                if n == property_index {
-                    return merge_strategy(schema, strategy.into());
-                }
+    if let Some(properties) = s
+        .ensure_object()
+        .entry("properties")
+        .or_insert(serde_json::Value::Object(Default::default()))
+        .as_object_mut()
+    {
+        for (n, (_, schema)) in properties.iter_mut().enumerate() {
+            if n == property_index {
+                return merge_strategy(schema, strategy.into());
             }
         }
-    };
+    }
 
     Ok(())
 }
@@ -402,10 +408,9 @@ pub fn merge_strategy_property(
 /// such as "x-kubernetes-list-type" and "x-kubernetes-list-map-keys".
 ///
 /// ```rust
-/// use schemars::schema::Schema;
 /// use kube::core::{ListMerge, Reason, Message, merge_strategy};
 ///
-/// let mut schema = Schema::Object(Default::default());
+/// let mut schema = serde_json::Value::Object(Default::default());
 /// merge_strategy(&mut schema, ListMerge::Map(vec!["key".into(),"another".into()]).into())?;
 /// assert_eq!(
 ///     serde_json::to_string(&schema).unwrap(),
@@ -416,15 +421,11 @@ pub fn merge_strategy_property(
 ///```
 #[cfg(feature = "schema")]
 #[cfg_attr(docsrs, doc(cfg(feature = "schema")))]
-pub fn merge_strategy(s: &mut Schema, strategy: MergeStrategy) -> Result<(), serde_json::Error> {
-    match s {
-        Schema::Bool(_) => (),
-        Schema::Object(schema_object) => {
-            for (key, value) in strategy.keys()? {
-                schema_object.extensions.insert(key, value);
-            }
+pub fn merge_strategy(s: &mut Value, strategy: MergeStrategy) -> Result<(), serde_json::Error> {
+    for (key, value) in strategy.keys()? {
+        if let Some(s) = s.as_object_mut() {
+            s.insert(key, value);
         }
-    };
-
+    }
     Ok(())
 }
