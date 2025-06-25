@@ -69,8 +69,6 @@ impl Action {
     /// even in the case of missed changes (which can happen).
     ///
     /// Watch events are not normally missed, so running this once per hour (`Default`) as a fallback is reasonable.
-    ///
-    /// The duration is clamped to a maximum of 6 months.
     #[must_use]
     pub fn requeue(duration: Duration) -> Self {
         Self {
