@@ -1,5 +1,5 @@
 ---
-apiVersion: admissionregistration.k8s.io/v1beta1
+apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
 metadata:
   name: admission-controller-demo
@@ -19,10 +19,10 @@ webhooks:
       #  path: "/mutate"
     rules:
       - operations: ["CREATE", "UPDATE"]
-        apiGroups: ["clux.dev"]
+        apiGroups: ["kube.rs"]
         apiVersions: ["v1"]
-        resources: ["foos"]
+        resources: ["admittests"]
     failurePolicy: Fail
-    admissionReviewVersions: ["v1", "v1beta1"]
+    admissionReviewVersions: ["v1"]
     sideEffects: None
     timeoutSeconds: 5
