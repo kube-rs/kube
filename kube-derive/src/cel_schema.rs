@@ -31,6 +31,8 @@ struct Crates {
     schemars: Path,
     #[darling(default = "Self::default_serde")]
     serde: Path,
+    #[darling(default = "Self::default_std")]
+    std: Path,
 }
 
 // Default is required when the subattribute isn't mentioned at all
@@ -53,6 +55,10 @@ impl Crates {
     fn default_serde() -> Path {
         parse_quote! { ::serde }
     }
+
+    fn default_std() -> Path {
+        parse_quote! { ::std }
+    }
 }
 
 pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
@@ -62,11 +68,13 @@ pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
     };
 
     let KubeSchema {
-        crates: Crates {
-            kube_core,
-            schemars,
-            serde,
-        },
+        crates:
+            Crates {
+                kube_core,
+                schemars,
+                serde,
+                std,
+            },
         ident,
         validations,
     } = match KubeSchema::from_derive_input(&ast) {
@@ -134,7 +142,7 @@ pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
                         #field
                     }
 
-                    let merge = &mut Validated::json_schema(gen);
+                    let merge = &mut Validated::json_schema(generate);
                     #(#rules)*
                     #merge_strategy
                     #kube_core::merge_properties(s, merge);
@@ -148,22 +156,22 @@ pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
 
     quote! {
         impl #schemars::JsonSchema for #ident {
-            fn is_referenceable() -> bool {
-                false
+            fn inline_schema() -> bool {
+                true
             }
 
-            fn schema_name() -> String {
-                #schema_name.to_string()
+            fn schema_name() -> #std::borrow::Cow<'static, str> {
+                #schema_name.into()
             }
 
-            fn json_schema(gen: &mut #schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+            fn json_schema(generate: &mut #schemars::generate::SchemaGenerator) -> schemars::Schema {
                 #[derive(#serde::Serialize, #schemars::JsonSchema)]
                 #[automatically_derived]
                 #[allow(missing_docs)]
                 #ast
 
                 use #kube_core::{Rule, Message, Reason, ListMerge, MapMerge, StructMerge};
-                let s = &mut #generated_struct_name::json_schema(gen);
+                let s = &mut #generated_struct_name::json_schema(generate);
                 #(#struct_rules)*
                 #(#property_modifications)*
                 s.clone()
@@ -217,15 +225,15 @@ mod tests {
 
         let expected = quote! {
             impl ::schemars::JsonSchema for FooSpec {
-                fn is_referenceable() -> bool {
-                    false
+                fn inline_schema() -> bool {
+                    true
                 }
-                fn schema_name() -> String {
-                    "FooSpecValidated".to_string()
+                fn schema_name() -> ::std::borrow::Cow<'static, str> {
+                    "FooSpecValidated".into()
                 }
                 fn json_schema(
-                    gen: &mut ::schemars::gen::SchemaGenerator,
-                ) -> schemars::schema::Schema {
+                    generate: &mut ::schemars::generate::SchemaGenerator,
+                ) -> schemars::Schema {
                     #[derive(::serde::Serialize, ::schemars::JsonSchema)]
                     #[automatically_derived]
                     #[allow(missing_docs)]
@@ -233,7 +241,7 @@ mod tests {
                         foo: Vec<String>,
                     }
                     use ::kube::core::{Rule, Message, Reason, ListMerge, MapMerge, StructMerge};
-                    let s = &mut FooSpecValidated::json_schema(gen);
+                    let s = &mut FooSpecValidated::json_schema(generate);
                     ::kube::core::validate(s, "true").unwrap();
                     ::kube::core::validate(s, "false").unwrap();
                     {
@@ -243,7 +251,7 @@ mod tests {
                         struct Validated {
                             foo: Vec<String>,
                         }
-                        let merge = &mut Validated::json_schema(gen);
+                        let merge = &mut Validated::json_schema(generate);
                         ::kube::core::validate_property(merge, 0, "true").unwrap();
                         ::kube::core::validate_property(merge, 0, Rule::new("false")).unwrap();
                         ::kube::core::merge_strategy_property(merge, 0, ListMerge::Atomic).unwrap();

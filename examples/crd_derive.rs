@@ -62,7 +62,7 @@ fn main() {
     println!("Status (via HasStatus): {:?}", foo.status());
 }
 
-fn conditions(_: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+fn conditions(_: &mut schemars::generate::SchemaGenerator) -> schemars::Schema {
     serde_json::from_value(serde_json::json!({
         "type": "array",
         "x-kubernetes-list-type": "map",

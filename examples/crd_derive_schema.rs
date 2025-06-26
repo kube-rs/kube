@@ -120,7 +120,7 @@ impl FooSpec {
 }
 
 // https://kubernetes.io/docs/reference/using-api/server-side-apply/#merge-strategy
-fn set_listable_schema(_: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+fn set_listable_schema(_: &mut schemars::generate::SchemaGenerator) -> schemars::Schema {
     serde_json::from_value(serde_json::json!({
         "type": "array",
         "items": {
