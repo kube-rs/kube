@@ -1,5 +1,5 @@
-apiVersion: clux.dev/v1
-kind: Foo
+apiVersion: kube.rs/v1
+kind: AdmitTest
 metadata:
   name: reject
   labels:
