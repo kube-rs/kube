@@ -54,48 +54,26 @@ struct SchemaObject {
     /// and [JSON Schema 4.2.1. Instance Data Model](https://tools.ietf.org/html/draft-handrews-json-schema-02#section-4.2.1).
     #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
     instance_type: Option<SingleOrVec<InstanceType>>,
-    /// The `format` keyword.
-    ///
-    /// See [JSON Schema Validation 7. A Vocabulary for Semantic Content With "format"](https://tools.ietf.org/html/draft-handrews-json-schema-validation-02#section-7).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    format: Option<String>,
     /// The `enum` keyword.
     ///
     /// See [JSON Schema Validation 6.1.2. "enum"](https://tools.ietf.org/html/draft-handrews-json-schema-validation-02#section-6.1.2)
     #[serde(rename = "enum", skip_serializing_if = "Option::is_none")]
     enum_values: Option<Vec<Value>>,
-    /// The `const` keyword.
-    ///
-    /// See [JSON Schema Validation 6.1.3. "const"](https://tools.ietf.org/html/draft-handrews-json-schema-validation-02#section-6.1.3)
-    #[serde(
-        rename = "const",
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "allow_null"
-    )]
-    const_value: Option<Value>,
     /// Properties of the [`SchemaObject`] which define validation assertions in terms of other schemas.
     #[serde(flatten, deserialize_with = "skip_if_default")]
     subschemas: Option<Box<SubschemaValidation>>,
-    /// Properties of the [`SchemaObject`] which define validation assertions for numbers.
-    #[serde(flatten, deserialize_with = "skip_if_default")]
-    number: Option<Box<NumberValidation>>,
-    /// Properties of the [`SchemaObject`] which define validation assertions for strings.
-    #[serde(flatten, deserialize_with = "skip_if_default")]
-    string: Option<Box<StringValidation>>,
     /// Properties of the [`SchemaObject`] which define validation assertions for arrays.
     #[serde(flatten, deserialize_with = "skip_if_default")]
     array: Option<Box<ArrayValidation>>,
     /// Properties of the [`SchemaObject`] which define validation assertions for objects.
     #[serde(flatten, deserialize_with = "skip_if_default")]
     object: Option<Box<ObjectValidation>>,
-    /// The `$ref` keyword.
-    ///
-    /// See [JSON Schema 8.2.4.1. Direct References with "$ref"](https://tools.ietf.org/html/draft-handrews-json-schema-02#section-8.2.4.1).
-    #[serde(rename = "$ref", skip_serializing_if = "Option::is_none")]
-    reference: Option<String>,
     /// Arbitrary extra properties which are not part of the JSON Schema specification, or which `schemars` does not support.
     #[serde(flatten)]
     extensions: BTreeMap<String, Value>,
+    /// Arbitrary data.
+    #[serde(flatten)]
+    other: Value,
 }
 
 // Deserializing "null" to `Option<Value>` directly results in `None`,
@@ -124,16 +102,6 @@ where
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default, JsonSchema)]
 #[serde(rename_all = "camelCase", default)]
 struct Metadata {
-    /// The `$id` keyword.
-    ///
-    /// See [JSON Schema 8.2.2. The "$id" Keyword](https://tools.ietf.org/html/draft-handrews-json-schema-02#section-8.2.2).
-    #[serde(rename = "$id", skip_serializing_if = "Option::is_none")]
-    id: Option<String>,
-    /// The `title` keyword.
-    ///
-    /// See [JSON Schema Validation 9.1. "title" and "description"](https://tools.ietf.org/html/draft-handrews-json-schema-validation-02#section-9.1).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    title: Option<String>,
     /// The `description` keyword.
     ///
     /// See [JSON Schema Validation 9.1. "title" and "description"](https://tools.ietf.org/html/draft-handrews-json-schema-validation-02#section-9.1).
@@ -144,42 +112,15 @@ struct Metadata {
     /// See [JSON Schema Validation 9.2. "default"](https://tools.ietf.org/html/draft-handrews-json-schema-validation-02#section-9.2).
     #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "allow_null")]
     default: Option<Value>,
-    /// The `deprecated` keyword.
-    ///
-    /// See [JSON Schema Validation 9.3. "deprecated"](https://tools.ietf.org/html/draft-handrews-json-schema-validation-02#section-9.3).
-    #[serde(skip_serializing_if = "is_false")]
-    deprecated: bool,
-    /// The `readOnly` keyword.
-    ///
-    /// See [JSON Schema Validation 9.4. "readOnly" and "writeOnly"](https://tools.ietf.org/html/draft-handrews-json-schema-validation-02#section-9.4).
-    #[serde(skip_serializing_if = "is_false")]
-    read_only: bool,
-    /// The `writeOnly` keyword.
-    ///
-    /// See [JSON Schema Validation 9.4. "readOnly" and "writeOnly"](https://tools.ietf.org/html/draft-handrews-json-schema-validation-02#section-9.4).
-    #[serde(skip_serializing_if = "is_false")]
-    write_only: bool,
-    /// The `examples` keyword.
-    ///
-    /// See [JSON Schema Validation 9.5. "examples"](https://tools.ietf.org/html/draft-handrews-json-schema-validation-02#section-9.5).
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    examples: Vec<Value>,
-}
-
-#[allow(clippy::trivially_copy_pass_by_ref)]
-fn is_false(b: &bool) -> bool {
-    !b
+    /// Arbitrary data.
+    #[serde(flatten)]
+    other: Value,
 }
 
 /// Properties of a [`SchemaObject`] which define validation assertions in terms of other schemas.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default, JsonSchema)]
 #[serde(rename_all = "camelCase", default)]
 struct SubschemaValidation {
-    /// The `allOf` keyword.
-    ///
-    /// See [JSON Schema 9.2.1.1. "allOf"](https://tools.ietf.org/html/draft-handrews-json-schema-02#section-9.2.1.1).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    all_of: Option<Vec<Schema>>,
     /// The `anyOf` keyword.
     ///
     /// See [JSON Schema 9.2.1.2. "anyOf"](https://tools.ietf.org/html/draft-handrews-json-schema-02#section-9.2.1.2).
@@ -190,78 +131,9 @@ struct SubschemaValidation {
     /// See [JSON Schema 9.2.1.3. "oneOf"](https://tools.ietf.org/html/draft-handrews-json-schema-02#section-9.2.1.3).
     #[serde(skip_serializing_if = "Option::is_none")]
     one_of: Option<Vec<Schema>>,
-    /// The `not` keyword.
-    ///
-    /// See [JSON Schema 9.2.1.4. "not"](https://tools.ietf.org/html/draft-handrews-json-schema-02#section-9.2.1.4).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    not: Option<Box<Schema>>,
-    /// The `if` keyword.
-    ///
-    /// See [JSON Schema 9.2.2.1. "if"](https://tools.ietf.org/html/draft-handrews-json-schema-02#section-9.2.2.1).
-    #[serde(rename = "if", skip_serializing_if = "Option::is_none")]
-    if_schema: Option<Box<Schema>>,
-    /// The `then` keyword.
-    ///
-    /// See [JSON Schema 9.2.2.2. "then"](https://tools.ietf.org/html/draft-handrews-json-schema-02#section-9.2.2.2).
-    #[serde(rename = "then", skip_serializing_if = "Option::is_none")]
-    then_schema: Option<Box<Schema>>,
-    /// The `else` keyword.
-    ///
-    /// See [JSON Schema 9.2.2.3. "else"](https://tools.ietf.org/html/draft-handrews-json-schema-02#section-9.2.2.3).
-    #[serde(rename = "else", skip_serializing_if = "Option::is_none")]
-    else_schema: Option<Box<Schema>>,
-}
-
-/// Properties of a [`SchemaObject`] which define validation assertions for numbers.
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default, JsonSchema)]
-#[serde(rename_all = "camelCase", default)]
-struct NumberValidation {
-    /// The `multipleOf` keyword.
-    ///
-    /// See [JSON Schema Validation 6.2.1. "multipleOf"](https://tools.ietf.org/html/draft-handrews-json-schema-validation-02#section-6.2.1).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    multiple_of: Option<f64>,
-    /// The `maximum` keyword.
-    ///
-    /// See [JSON Schema Validation 6.2.2. "maximum"](https://tools.ietf.org/html/draft-handrews-json-schema-validation-02#section-6.2.2).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    maximum: Option<f64>,
-    /// The `exclusiveMaximum` keyword.
-    ///
-    /// See [JSON Schema Validation 6.2.3. "exclusiveMaximum"](https://tools.ietf.org/html/draft-handrews-json-schema-validation-02#section-6.2.3).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    exclusive_maximum: Option<f64>,
-    /// The `minimum` keyword.
-    ///
-    /// See [JSON Schema Validation 6.2.4. "minimum"](https://tools.ietf.org/html/draft-handrews-json-schema-validation-02#section-6.2.4).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    minimum: Option<f64>,
-    /// The `exclusiveMinimum` keyword.
-    ///
-    /// See [JSON Schema Validation 6.2.5. "exclusiveMinimum"](https://tools.ietf.org/html/draft-handrews-json-schema-validation-02#section-6.2.5).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    exclusive_minimum: Option<f64>,
-}
-
-/// Properties of a [`SchemaObject`] which define validation assertions for strings.
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default, JsonSchema)]
-#[serde(rename_all = "camelCase", default)]
-struct StringValidation {
-    /// The `maxLength` keyword.
-    ///
-    /// See [JSON Schema Validation 6.3.1. "maxLength"](https://tools.ietf.org/html/draft-handrews-json-schema-validation-02#section-6.3.1).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    max_length: Option<u32>,
-    /// The `minLength` keyword.
-    ///
-    /// See [JSON Schema Validation 6.3.2. "minLength"](https://tools.ietf.org/html/draft-handrews-json-schema-validation-02#section-6.3.2).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    min_length: Option<u32>,
-    /// The `pattern` keyword.
-    ///
-    /// See [JSON Schema Validation 6.3.3. "pattern"](https://tools.ietf.org/html/draft-handrews-json-schema-validation-02#section-6.3.3).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pattern: Option<String>,
+    /// Arbitrary data.
+    #[serde(flatten)]
+    other: Value,
 }
 
 /// Properties of a [`SchemaObject`] which define validation assertions for arrays.
@@ -373,18 +245,6 @@ enum SingleOrVec<T> {
     Single(Box<T>),
     /// Represents a vector of items.
     Vec(Vec<T>),
-}
-
-impl<T> From<T> for SingleOrVec<T> {
-    fn from(single: T) -> Self {
-        SingleOrVec::Single(Box::new(single))
-    }
-}
-
-impl<T> From<Vec<T>> for SingleOrVec<T> {
-    fn from(vec: Vec<T>) -> Self {
-        SingleOrVec::Vec(vec)
-    }
 }
 
 impl Transform for StructuralSchemaRewriter {
