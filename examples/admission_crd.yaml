@@ -1,0 +1,37 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: admittests.kube.rs
+spec:
+  group: kube.rs
+  names:
+    categories: []
+    kind: AdmitTest
+    plural: admittests
+    shortNames: []
+    singular: admittest
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns: []
+    name: v1
+    schema:
+      openAPIV3Schema:
+        description: Auto-generated derived type for AdmitSpec via `CustomResource`
+        properties:
+          spec:
+            properties:
+              info:
+                nullable: true
+                type: string
+              name:
+                nullable: true
+                type: string
+            type: object
+        required:
+        - spec
+        title: AdmitTest
+        type: object
+    served: true
+    storage: true
+    subresources: {}
