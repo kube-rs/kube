@@ -54,6 +54,11 @@ struct SchemaObject {
     /// and [JSON Schema 4.2.1. Instance Data Model](https://tools.ietf.org/html/draft-handrews-json-schema-02#section-4.2.1).
     #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
     instance_type: Option<SingleOrVec<InstanceType>>,
+    /// The `format` keyword.
+    ///
+    /// See [JSON Schema Validation 7. A Vocabulary for Semantic Content With "format"](https://tools.ietf.org/html/draft-handrews-json-schema-validation-02#section-7).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    format: Option<String>,
     /// The `enum` keyword.
     ///
     /// See [JSON Schema Validation 6.1.2. "enum"](https://tools.ietf.org/html/draft-handrews-json-schema-validation-02#section-6.1.2)
@@ -112,9 +117,6 @@ struct Metadata {
     /// See [JSON Schema Validation 9.2. "default"](https://tools.ietf.org/html/draft-handrews-json-schema-validation-02#section-9.2).
     #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "allow_null")]
     default: Option<Value>,
-    /// Arbitrary data.
-    #[serde(flatten)]
-    other: Value,
 }
 
 /// Properties of a [`SchemaObject`] which define validation assertions in terms of other schemas.
@@ -131,9 +133,6 @@ struct SubschemaValidation {
     /// See [JSON Schema 9.2.1.3. "oneOf"](https://tools.ietf.org/html/draft-handrews-json-schema-02#section-9.2.1.3).
     #[serde(skip_serializing_if = "Option::is_none")]
     one_of: Option<Vec<Schema>>,
-    /// Arbitrary data.
-    #[serde(flatten)]
-    other: Value,
 }
 
 /// Properties of a [`SchemaObject`] which define validation assertions for arrays.
