@@ -628,14 +628,15 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
     let schemagen = if schema_mode.use_in_crd() {
         quote! {
             // Don't use definitions and don't include `$schema` because these are not allowed.
-            let gen = #schemars::gen::SchemaSettings::openapi3()
+            let generate = #schemars::generate::SchemaSettings::openapi3()
                 .with(|s| {
                     s.inline_subschemas = true;
                     s.meta_schema = None;
                 })
-                .with_visitor(#kube_core::schema::StructuralSchemaRewriter)
+                .with_transform(#schemars::transform::AddNullable::default())
+                .with_transform(#kube_core::schema::StructuralSchemaRewriter)
                 .into_generator();
-            let schema = gen.into_root_schema_for::<Self>();
+            let schema = generate.into_root_schema_for::<Self>();
         }
     } else {
         // we could issue a compile time warning for this, but it would hit EVERY compile, which would be noisy
