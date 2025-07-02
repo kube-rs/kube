@@ -158,26 +158,26 @@ impl Version {
     ///
     /// `Nonconformant` versions are ordered alphabetically.
     pub fn priority(&self) -> impl Ord + use<> {
-        match self {
-            &Self::Stable(major) => Priority {
+        match *self {
+            Self::Stable(major) => Priority {
                 stability: Stability::Stable,
                 major,
                 minor: None,
                 nonconformant: None,
             },
-            &Self::Beta(major, minor) => Priority {
+            Self::Beta(major, minor) => Priority {
                 stability: Stability::Beta,
                 major,
                 minor,
                 nonconformant: None,
             },
-            &Self::Alpha(major, minor) => Priority {
+            Self::Alpha(major, minor) => Priority {
                 stability: Stability::Alpha,
                 major,
                 minor,
                 nonconformant: None,
             },
-            &Self::Nonconformant(ref nonconformant) => Priority {
+            Self::Nonconformant(ref nonconformant) => Priority {
                 stability: Stability::Nonconformant,
                 major: 0,
                 minor: None,
@@ -202,26 +202,26 @@ impl Version {
     /// assert!(Version::Beta(1, None).generation() > Version::Nonconformant("ver3".into()).generation());
     /// ```
     pub fn generation(&self) -> impl Ord {
-        match self {
-            &Self::Stable(major) => Generation {
+        match *self {
+            Self::Stable(major) => Generation {
                 stability: Stability::Stable,
                 major,
                 minor: None,
                 nonconformant: None,
             },
-            &Self::Beta(major, minor) => Generation {
+            Self::Beta(major, minor) => Generation {
                 stability: Stability::Beta,
                 major,
                 minor,
                 nonconformant: None,
             },
-            &Self::Alpha(major, minor) => Generation {
+            Self::Alpha(major, minor) => Generation {
                 stability: Stability::Alpha,
                 major,
                 minor,
                 nonconformant: None,
             },
-            Self::Nonconformant(nonconformant) => Generation {
+            Self::Nonconformant(ref nonconformant) => Generation {
                 stability: Stability::Nonconformant,
                 major: 0,
                 minor: None,
