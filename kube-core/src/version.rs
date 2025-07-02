@@ -157,7 +157,7 @@ impl Version {
     /// `Stable(x)` > `Beta(y)` > `Alpha(z)` > `Nonconformant(w)` for all `x`,`y`,`z`,`w`
     ///
     /// `Nonconformant` versions are ordered alphabetically.
-    pub fn priority(&self) -> impl Ord {
+    pub fn priority(&self) -> impl Ord + use<> {
         match self {
             &Self::Stable(major) => Priority {
                 stability: Stability::Stable,
@@ -177,7 +177,7 @@ impl Version {
                 minor,
                 nonconformant: None,
             },
-            Self::Nonconformant(nonconformant) => Priority {
+            &Self::Nonconformant(ref nonconformant) => Priority {
                 stability: Stability::Nonconformant,
                 major: 0,
                 minor: None,
