@@ -17,13 +17,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install stable toolchain
-        # tarpaulin is currently broken for Rust 1.83, see #1657
-        uses: dtolnay/rust-toolchain@1.82.0
+        uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Install tarpaulin
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-tarpaulin@0.28.0
+          tool: cargo-tarpaulin@0.32.8
       - uses: nolar/setup-k3d-k3s@v1
         with:
           version: "v1.30" # MK8SV
@@ -36,8 +35,7 @@ jobs:
 
       - name: Run cargo-tarpaulin
         run: |
-          # tarpaulin is currently broken for Rust 1.83, see #1657
-          rustup run 1.82.0 cargo tarpaulin -o xml --skip-clean
+          rustup run stable cargo tarpaulin -o xml --skip-clean
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
         with:

@@ -329,7 +329,7 @@ impl Client {
     pub async fn request_events<T>(
         &self,
         request: Request<Vec<u8>>,
-    ) -> Result<impl TryStream<Item = Result<WatchEvent<T>>>>
+    ) -> Result<impl TryStream<Item = Result<WatchEvent<T>>> + use<T>>
     where
         T: Clone + DeserializeOwned,
     {

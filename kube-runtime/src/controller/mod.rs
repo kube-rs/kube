@@ -395,23 +395,23 @@ where
                                 "object.ref" = %request.obj_ref,
                                 object.reason = %request.reason
                             );
-                            reconciler_span
-                                .in_scope(|| reconciler(Arc::clone(&obj), context.clone()))
-                                .into_future()
-                                .then(move |res| {
-                                    let error_policy = error_policy;
-                                    RescheduleReconciliation::new(
-                                        res,
-                                        |err| error_policy(obj, err, error_policy_ctx),
-                                        request.obj_ref.clone(),
-                                        scheduler_tx,
-                                    )
-                                    // Reconciler errors are OK from the applier's PoV, we need to apply the error policy
-                                    // to them separately
-                                    .map(|res| Ok((request.obj_ref, res)))
-                                })
-                                .instrument(reconciler_span)
-                                .left_future()
+                            TryFutureExt::into_future(
+                                reconciler_span.in_scope(|| reconciler(Arc::clone(&obj), context.clone())),
+                            )
+                            .then(move |res| {
+                                let error_policy = error_policy;
+                                RescheduleReconciliation::new(
+                                    res,
+                                    |err| error_policy(obj, err, error_policy_ctx),
+                                    request.obj_ref.clone(),
+                                    scheduler_tx,
+                                )
+                                // Reconciler errors are OK from the applier's PoV, we need to apply the error policy
+                                // to them separately
+                                .map(|res| Ok((request.obj_ref, res)))
+                            })
+                            .instrument(reconciler_span)
+                            .left_future()
                         }
                         None => std::future::ready(Err(Error::ObjectNotFound(request.obj_ref.erase())))
                             .right_future(),
@@ -1661,7 +1661,7 @@ where
         applier(
             move |obj, ctx| {
                 CancelableJoinHandle::spawn(
-                    reconciler(obj, ctx).into_future().in_current_span(),
+                    TryFutureExt::into_future(reconciler(obj, ctx)).in_current_span(),
                     &Handle::current(),
                 )
             },

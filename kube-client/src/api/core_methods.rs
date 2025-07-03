@@ -539,7 +539,7 @@ where
         &self,
         wp: &WatchParams,
         version: &str,
-    ) -> Result<impl Stream<Item = Result<WatchEvent<K>>>> {
+    ) -> Result<impl Stream<Item = Result<WatchEvent<K>>> + use<K>> {
         let mut req = self.request.watch(wp, version).map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("watch");
         self.client.request_events::<K>(req).await
@@ -588,7 +588,7 @@ where
         &self,
         wp: &WatchParams,
         version: &str,
-    ) -> Result<impl Stream<Item = Result<WatchEvent<PartialObjectMeta<K>>>>> {
+    ) -> Result<impl Stream<Item = Result<WatchEvent<PartialObjectMeta<K>>>> + use<K>> {
         let mut req = self
             .request
             .watch_metadata(wp, version)

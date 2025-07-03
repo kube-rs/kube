@@ -428,7 +428,7 @@ where
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn log_stream(&self, name: &str, lp: &LogParams) -> Result<impl AsyncBufRead> {
+    pub async fn log_stream(&self, name: &str, lp: &LogParams) -> Result<impl AsyncBufRead + use<'_, K>> {
         let mut req = self.request.logs(name, lp).map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("log_stream");
         self.client.request_stream(req).await
