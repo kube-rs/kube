@@ -169,7 +169,7 @@ impl AttachedProcess {
     /// # }
     /// ```
     /// Only available if [`AttachParams`](super::AttachParams) had `stdin`.
-    pub fn stdin(&mut self) -> Option<impl AsyncWrite + Unpin> {
+    pub fn stdin(&mut self) -> Option<impl AsyncWrite + Unpin + use<>> {
         if !self.has_stdin {
             return None;
         }
@@ -189,7 +189,7 @@ impl AttachedProcess {
     /// # }
     /// ```
     /// Only available if [`AttachParams`](super::AttachParams) had `stdout`.
-    pub fn stdout(&mut self) -> Option<impl AsyncRead + Unpin> {
+    pub fn stdout(&mut self) -> Option<impl AsyncRead + Unpin + use<>> {
         if !self.has_stdout {
             return None;
         }
@@ -209,7 +209,7 @@ impl AttachedProcess {
     /// # }
     /// ```
     /// Only available if [`AttachParams`](super::AttachParams) had `stderr`.
-    pub fn stderr(&mut self) -> Option<impl AsyncRead + Unpin> {
+    pub fn stderr(&mut self) -> Option<impl AsyncRead + Unpin + use<>> {
         if !self.has_stderr {
             return None;
         }
