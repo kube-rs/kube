@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 use kube_derive::CustomResource;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
