@@ -201,7 +201,7 @@ impl Version {
     /// assert!(Version::Alpha(2, Some(2)).generation() > Version::Stable(1).generation());
     /// assert!(Version::Beta(1, None).generation() > Version::Nonconformant("ver3".into()).generation());
     /// ```
-    pub fn generation(&self) -> impl Ord {
+    pub fn generation(&self) -> impl Ord + use<> {
         match *self {
             Self::Stable(major) => Generation {
                 stability: Stability::Stable,
