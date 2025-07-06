@@ -77,13 +77,16 @@ where
         match &mut *state {
             ReceiverState::Waiting(rx) => {
                 trace!("channel still active, polling");
-                if let Poll::Ready(value) = rx.poll_unpin(cx).map_err(|_| InitDropped) {
-                    trace!("got value on slow path, memoizing");
-                    *state = ReceiverState::Ready(value.clone());
-                    Poll::Ready(value)
-                } else {
-                    trace!("channel is still pending");
-                    Poll::Pending
+                match rx.poll_unpin(cx).map_err(|_| InitDropped) {
+                    Poll::Ready(value) => {
+                        trace!("got value on slow path, memoizing");
+                        *state = ReceiverState::Ready(value.clone());
+                        Poll::Ready(value)
+                    }
+                    _ => {
+                        trace!("channel is still pending");
+                        Poll::Pending
+                    }
                 }
             }
             ReceiverState::Ready(v) => {

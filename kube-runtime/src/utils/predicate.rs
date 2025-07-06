@@ -210,13 +210,13 @@ pub(crate) mod tests {
     #[tokio::test]
     async fn predicate_filtering_hides_equal_predicate_values() {
         use k8s_openapi::api::core::v1::Pod;
-        let mkobj = |gen: i32| {
+        let mkobj = |r#gen: i32| {
             let p: Pod = serde_json::from_value(json!({
                 "apiVersion": "v1",
                 "kind": "Pod",
                 "metadata": {
                     "name": "blog",
-                    "generation": Some(gen),
+                    "generation": Some(r#gen),
                 },
                 "spec": {
                     "containers": [{

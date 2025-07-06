@@ -810,7 +810,7 @@ pub fn metadata_watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 
 pub fn watch_object<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
     api: Api<K>,
     name: &str,
-) -> impl Stream<Item = Result<Option<K>>> + Send {
+) -> impl Stream<Item = Result<Option<K>>> + Send + use<K> {
     // filtering by object name in given scope, so there's at most one matching object
     // footgun: Api::all may generate events from namespaced objects with the same name in different namespaces
     let fields = format!("metadata.name={name}");

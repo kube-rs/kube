@@ -263,13 +263,13 @@ mod tests {
         let store = store_w.as_reader();
         reflector(
             store_w,
-            stream::iter((0_u32..100_000).map(|gen| {
+            stream::iter((0_u32..100_000).map(|r#gen| {
                 let item = rng.sample(item_dist);
                 let deleted = rng.sample(deleted_dist);
                 let obj = ConfigMap {
                     metadata: ObjectMeta {
                         name: Some(item.to_string()),
-                        resource_version: Some(gen.to_string()),
+                        resource_version: Some(r#gen.to_string()),
                         ..ObjectMeta::default()
                     },
                     ..ConfigMap::default()

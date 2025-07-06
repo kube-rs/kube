@@ -165,7 +165,7 @@ impl TokenFile {
 
 // Questionable decisions by chrono: https://github.com/chronotope/chrono/issues/1491
 macro_rules! const_unwrap {
-    ($e:expr) => {
+    ($e:expr_2021) => {
         match $e {
             Some(v) => v,
             None => panic!(),
