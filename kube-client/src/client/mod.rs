@@ -293,7 +293,7 @@ impl Client {
     ///
     /// The response can be processed using [`AsyncReadExt`](futures::AsyncReadExt)
     /// and [`AsyncBufReadExt`](futures::AsyncBufReadExt).
-    pub async fn request_stream(&self, request: Request<Vec<u8>>) -> Result<impl AsyncBufRead> {
+    pub async fn request_stream(&self, request: Request<Vec<u8>>) -> Result<impl AsyncBufRead + use<>> {
         let res = self.send(request.map(Body::from)).await?;
         let res = handle_api_errors(res).await?;
         // Map the error, since we want to convert this into an `AsyncBufReader` using

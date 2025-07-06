@@ -230,7 +230,7 @@ impl AttachedProcess {
     /// Take a future that resolves with any status object or when the sender is dropped.
     ///
     /// Returns `None` if called more than once.
-    pub fn take_status(&mut self) -> Option<impl Future<Output = Option<Status>>> {
+    pub fn take_status(&mut self) -> Option<impl Future<Output = Option<Status>> + use<>> {
         self.status_rx.take().map(|recv| recv.map(|res| res.ok()))
     }
 
