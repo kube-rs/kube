@@ -47,8 +47,7 @@ test-integration:
   cargo run -p kube-examples --example crd_api
 
 coverage:
-  # tarpaulin is currently broken for Rust 1.83, see #1657
-  cargo +1.82.0 tarpaulin --out=Html --output-dir=.
+  cargo tarpaulin --out=Html --output-dir=.
   {{open}} tarpaulin-report.html
 
 hack:

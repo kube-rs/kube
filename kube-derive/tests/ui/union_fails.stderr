@@ -1,13 +1,13 @@
 error: Unions can not #[derive(CustomResource)]
- --> tests/ui/union_fails.rs:6:7
+ --> tests/ui/union_fails.rs:8:7
   |
-6 | union FooSpec {
+8 | union FooSpec {
   |       ^^^^^^^
 
 error: Serde does not support derive for unions
- --> tests/ui/union_fails.rs:6:1
-  |
-6 | / union FooSpec {
-7 | |     int: u32,
-8 | | }
-  | |_^
+  --> tests/ui/union_fails.rs:8:1
+   |
+8  | / union FooSpec {
+9  | |     int: u32,
+10 | | }
+   | |_^

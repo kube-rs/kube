@@ -124,7 +124,7 @@ impl Portforwarder {
     ///
     /// A value is returned at most once per port.
     #[inline]
-    pub fn take_stream(&mut self, port: u16) -> Option<impl AsyncRead + AsyncWrite + Unpin> {
+    pub fn take_stream(&mut self, port: u16) -> Option<impl AsyncRead + AsyncWrite + Unpin + use<>> {
         self.ports.remove(&port)
     }
 
@@ -133,7 +133,7 @@ impl Portforwarder {
     ///
     /// A value is returned at most once per port.
     #[inline]
-    pub fn take_error(&mut self, port: u16) -> Option<impl Future<Output = Option<String>>> {
+    pub fn take_error(&mut self, port: u16) -> Option<impl Future<Output = Option<String>> + use<>> {
         self.errors.remove(&port).map(|recv| recv.map(|res| res.ok()))
     }
 

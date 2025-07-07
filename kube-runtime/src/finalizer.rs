@@ -116,8 +116,7 @@ where
         FinalizerState {
             finalizer_index: Some(_),
             is_deleting: false,
-        } => reconcile(Event::Apply(obj))
-            .into_future()
+        } => TryFutureExt::into_future(reconcile(Event::Apply(obj)))
             .await
             .map_err(Error::ApplyFailed),
         FinalizerState {
@@ -126,8 +125,7 @@ where
         } => {
             // Cleanup reconciliation must succeed before it's safe to remove the finalizer
             let name = obj.meta().name.clone().ok_or(Error::UnnamedObject)?;
-            let action = reconcile(Event::Cleanup(obj))
-                .into_future()
+            let action = TryFutureExt::into_future(reconcile(Event::Cleanup(obj)))
                 .await
                 // Short-circuit, so that we keep the finalizer if cleanup fails
                 .map_err(Error::CleanupFailed)?;
