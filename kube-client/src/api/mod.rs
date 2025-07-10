@@ -62,6 +62,11 @@ pub struct Api<K> {
 ///
 /// This generally means resources created via [`DynamicObject`](crate::api::DynamicObject).
 impl<K: Resource> Api<K> {
+    /// Return a reference to the namespace of this [`Api`] instance, if any
+    pub fn namespace(&self) -> Option<&str> {
+        self.namespace.as_deref()
+    }
+
     /// Cluster level resources, or resources viewed across all namespaces
     ///
     /// This function accepts `K::DynamicType` so it can be used with dynamic resources.
