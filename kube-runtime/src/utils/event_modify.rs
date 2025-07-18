@@ -49,7 +49,7 @@ pub(crate) mod test {
     use std::{pin::pin, task::Poll};
 
     use super::{Error, Event, EventModify};
-    use futures::{poll, stream, StreamExt};
+    use futures::{StreamExt, poll, stream};
 
     #[tokio::test]
     async fn eventmodify_modifies_innner_value_of_event() {

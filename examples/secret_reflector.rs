@@ -1,9 +1,9 @@
 use futures::TryStreamExt;
 use k8s_openapi::api::core::v1::Secret;
 use kube::{
-    api::{Api, ResourceExt},
-    runtime::{reflector, reflector::Store, watcher, WatchStreamExt},
     Client,
+    api::{Api, ResourceExt},
+    runtime::{WatchStreamExt, reflector, reflector::Store, watcher},
 };
 use std::collections::BTreeMap;
 use tracing::*;

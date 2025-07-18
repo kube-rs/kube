@@ -3,9 +3,9 @@ use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomRe
 use tracing::*;
 
 use kube::{
-    api::{Api, Patch, PatchParams, ResourceExt},
-    runtime::{reflector, watcher, WatchStreamExt},
     Client, CustomResource, CustomResourceExt,
+    api::{Api, Patch, PatchParams, ResourceExt},
+    runtime::{WatchStreamExt, reflector, watcher},
 };
 
 use schemars::JsonSchema;

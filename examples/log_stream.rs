@@ -4,8 +4,8 @@ use k8s_openapi::{
     chrono::{DateTime, Utc},
 };
 use kube::{
-    api::{Api, LogParams},
     Client,
+    api::{Api, LogParams},
 };
 use tracing::*;
 

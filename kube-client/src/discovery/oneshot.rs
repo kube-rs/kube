@@ -12,7 +12,7 @@
 //! [`oneshot::pinned_kind`]: crate::discovery::pinned_kind
 
 use super::ApiGroup;
-use crate::{error::DiscoveryError, Client, Error, Result};
+use crate::{Client, Error, Result, error::DiscoveryError};
 use kube_core::{
     discovery::{ApiCapabilities, ApiResource},
     gvk::{GroupVersion, GroupVersionKind},

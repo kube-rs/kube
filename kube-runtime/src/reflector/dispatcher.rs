@@ -145,13 +145,13 @@ where
 #[cfg(test)]
 pub(crate) mod test {
     use crate::{
-        watcher::{Error, Event},
         WatchStreamExt,
+        watcher::{Error, Event},
     };
     use std::{pin::pin, sync::Arc, task::Poll};
 
     use crate::reflector;
-    use futures::{poll, stream, StreamExt};
+    use futures::{StreamExt, poll, stream};
     use k8s_openapi::api::core::v1::Pod;
 
     fn testpod(name: &str) -> Pod {

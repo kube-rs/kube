@@ -7,8 +7,8 @@ use k8s_openapi::{
     chrono::Utc,
 };
 use kube::{
-    runtime::{watcher, WatchStreamExt},
     Api, Client, ResourceExt,
+    runtime::{WatchStreamExt, watcher},
 };
 
 /// limited variant of `kubectl events` that works on current context's namespace

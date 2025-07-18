@@ -1,6 +1,6 @@
 use crate::{
-    api::{Api, Resource},
     Error, Result,
+    api::{Api, Resource},
 };
 use k8s_openapi::api::{
     authentication::v1::TokenRequest,
@@ -63,8 +63,8 @@ impl Api<ServiceAccount> {
 #[cfg(feature = "client")]
 mod test {
     use crate::{
-        api::{Api, DeleteParams, ListParams, PostParams},
         Client,
+        api::{Api, DeleteParams, ListParams, PostParams},
     };
     use k8s_openapi::api::{
         authentication::v1::{TokenRequest, TokenRequestSpec, TokenReview, TokenReviewSpec},

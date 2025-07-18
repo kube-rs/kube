@@ -1,8 +1,8 @@
 use http_body_util::BodyExt;
 use hyper_util::rt::TokioExecutor;
 use tame_oauth::{
-    gcp::{TokenOrRequest, TokenProvider, TokenProviderWrapper},
     Token,
+    gcp::{TokenOrRequest, TokenProvider, TokenProviderWrapper},
 };
 use thiserror::Error;
 

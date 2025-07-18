@@ -10,7 +10,7 @@ use kube::{
     error::ErrorResponse,
     runtime::{
         controller::{Action, Controller},
-        finalizer::{finalizer, Event},
+        finalizer::{Event, finalizer},
         watcher,
     },
 };

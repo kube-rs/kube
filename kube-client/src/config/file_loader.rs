@@ -1,6 +1,6 @@
 use super::{
-    file_config::{AuthInfo, Cluster, Context, Kubeconfig},
     KubeconfigError,
+    file_config::{AuthInfo, Cluster, Context, Kubeconfig},
 };
 
 /// KubeConfigOptions stores options used when loading kubeconfig file.

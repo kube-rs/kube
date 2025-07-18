@@ -4,8 +4,8 @@ use serde_json::json;
 use tracing::*;
 
 use kube::{
-    api::{Api, EvictParams, PostParams, ResourceExt, WatchEvent, WatchParams},
     Client,
+    api::{Api, EvictParams, PostParams, ResourceExt, WatchEvent, WatchParams},
 };
 
 #[tokio::main]

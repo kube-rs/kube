@@ -130,9 +130,9 @@ pub use kube_core as core;
 #[allow(unused_imports)] // varying test imports depending on feature
 mod test {
     use crate::{
+        Api, Client, Config, ResourceExt,
         api::{AttachParams, AttachedProcess},
         client::ConfigExt,
-        Api, Client, Config, ResourceExt,
     };
     use futures::{AsyncBufRead, AsyncBufReadExt, StreamExt, TryStreamExt};
     use hyper::Uri;

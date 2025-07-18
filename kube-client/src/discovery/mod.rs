@@ -1,7 +1,7 @@
 //! High-level utilities for runtime API discovery.
 
 use crate::{Client, Result};
-pub use kube_core::discovery::{verbs, ApiCapabilities, ApiResource, Scope};
+pub use kube_core::discovery::{ApiCapabilities, ApiResource, Scope, verbs};
 use kube_core::gvk::GroupVersionKind;
 use std::collections::HashMap;
 mod apigroup;

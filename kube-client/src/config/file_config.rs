@@ -695,7 +695,7 @@ mod tests {
     use crate::config::file_loader::ConfigLoader;
 
     use super::*;
-    use serde_json::{json, Value};
+    use serde_json::{Value, json};
 
     #[test]
     fn kubeconfig_merge() {

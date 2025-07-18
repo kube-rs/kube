@@ -1,4 +1,4 @@
-use super::{dispatcher::Dispatcher, Lookup, ObjectRef};
+use super::{Lookup, ObjectRef, dispatcher::Dispatcher};
 #[cfg(feature = "unstable-runtime-subscribe")]
 use crate::reflector::ReflectHandle;
 use crate::{
@@ -307,7 +307,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{store, Writer};
+    use super::{Writer, store};
     use crate::{reflector::ObjectRef, watcher};
     use k8s_openapi::api::core::v1::ConfigMap;
     use kube_client::api::ObjectMeta;
