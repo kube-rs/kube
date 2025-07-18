@@ -356,7 +356,6 @@ impl TryFrom<&AuthInfo> for Auth {
                 .transpose()
                 .map_err(Error::MalformedTokenExpirationDate)?;
 
-
             if let (Some(client_certificate_data), Some(client_key_data)) =
                 (status.client_certificate_data, status.client_key_data)
             {
@@ -431,14 +430,14 @@ fn token_from_gcp_provider(provider: &AuthProviderConfig) -> Result<ProviderToke
     }
 
     // Return cached access token if it's still valid
-    if let Some(access_token) = provider.config.get("access-token") {
-        if let Some(expiry) = provider.config.get("expiry") {
-            let expiry_date = expiry
-                .parse::<DateTime<Utc>>()
-                .map_err(Error::MalformedTokenExpirationDate)?;
-            if Utc::now() + SIXTY_SEC < expiry_date {
-                return Ok(ProviderToken::GcpCommand(access_token.clone(), Some(expiry_date)));
-            }
+    if let Some(access_token) = provider.config.get("access-token")
+        && let Some(expiry) = provider.config.get("expiry")
+    {
+        let expiry_date = expiry
+            .parse::<DateTime<Utc>>()
+            .map_err(Error::MalformedTokenExpirationDate)?;
+        if Utc::now() + SIXTY_SEC < expiry_date {
+            return Ok(ProviderToken::GcpCommand(access_token.clone(), Some(expiry_date)));
         }
     }
 
