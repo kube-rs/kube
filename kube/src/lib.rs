@@ -526,14 +526,12 @@ mod test {
         // TODO: remove these once we can write these functions generically
         fn is_each_container_ready() -> impl Condition<Pod> {
             |obj: Option<&Pod>| {
-                if let Some(o) = obj {
-                    if let Some(s) = &o.status {
-                        if let Some(conds) = &s.conditions {
-                            if let Some(pcond) = conds.iter().find(|c| c.type_ == "ContainersReady") {
-                                return pcond.status == "True";
-                            }
-                        }
-                    }
+                if let Some(o) = obj
+                    && let Some(s) = &o.status
+                    && let Some(conds) = &s.conditions
+                    && let Some(pcond) = conds.iter().find(|c| c.type_ == "ContainersReady")
+                {
+                    return pcond.status == "True";
                 }
                 false
             }
