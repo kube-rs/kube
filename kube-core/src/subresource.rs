@@ -406,6 +406,23 @@ impl Request {
 }
 
 // ----------------------------------------------------------------------------
+// Resize subresource
+// ----------------------------------------------------------------------------
+
+impl Request {
+    /// Resize a pod's resources
+    pub fn resize(&self, name: &str, data: Vec<u8>, pp: &PostParams) -> Result<http::Request<Vec<u8>>, Error> {
+        let target = format!("{}/{}/resize?", self.url_path, name);
+        pp.validate()?;
+        let mut qp = form_urlencoded::Serializer::new(target);
+        pp.populate_qp(&mut qp);
+        let urlstr = qp.finish();
+        let req = http::Request::patch(urlstr).header(http::header::CONTENT_TYPE, JSON_MIME);
+        req.body(data).map_err(Error::BuildRequest)
+    }
+}
+
+// ----------------------------------------------------------------------------
 // tests
 // ----------------------------------------------------------------------------
 

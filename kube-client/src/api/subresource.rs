@@ -610,3 +610,78 @@ where
         Ok(Portforwarder::new(connection.into_stream(), ports))
     }
 }
+
+// ----------------------------------------------------------------------------
+// Resize subresource
+// ----------------------------------------------------------------------------
+
+#[test]
+fn resize_path() {
+    k8s_openapi::k8s_if_ge_1_33! {
+        use kube_core::{request::Request, Resource, params::PostParams};
+        use k8s_openapi::api::core::v1 as corev1;
+        let pp = PostParams::default();
+        let url = corev1::Pod::url_path(&(), Some("ns"));
+        let req = Request::new(url).resize("foo", vec![], &pp).unwrap();
+        assert_eq!(req.uri(), "/api/v1/namespaces/ns/pods/foo/resize?");
+    }
+}
+
+/// Marker trait for objects that can be resized
+///
+/// See [`Api::resize`] for usage
+pub trait Resize {}
+
+k8s_openapi::k8s_if_ge_1_33! {
+    impl Resize for k8s_openapi::api::core::v1::Pod {}
+}
+
+impl<K> Api<K>
+where
+    K: DeserializeOwned + Resize,
+{
+    /// Resize a resource
+    ///
+    /// This works similarly to [`Api::replace`] but uses the resize subresource.
+    /// Takes a full Pod object to specify the new resource requirements.
+    ///
+    /// ```no_run
+    /// use kube::api::{Api, PostParams};
+    /// use k8s_openapi::api::core::v1::Pod;
+    /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
+    /// #   let client = kube::Client::try_default().await?;
+    /// let pods: Api<Pod> = Api::namespaced(client, "apps");
+    /// let mut pod = pods.get("mypod").await?;
+    /// 
+    /// // Modify the pod's resource requirements
+    /// if let Some(ref mut spec) = pod.spec {
+    ///     if let Some(ref mut containers) = spec.containers.first_mut() {
+    ///         if let Some(ref mut resources) = containers.resources {
+    ///             // Update CPU/memory limits
+    ///         }
+    ///     }
+    /// }
+    /// 
+    /// let pp = PostParams::default();
+    /// let resized_pod = pods.resize("mypod", &pp, &pod).await?;
+    /// #    Ok(())
+    /// # }
+    /// ```
+    pub async fn resize(&self, name: &str, pp: &PostParams, data: &K) -> Result<K>
+    where
+        K: serde::Serialize,
+    {
+        let mut req = self
+            .request
+            .resize(
+                name,
+                serde_json::to_vec(data).map_err(Error::SerdeError)?,
+                pp,
+            )
+            .map_err(Error::BuildRequest)?;
+        req.extensions_mut().insert("resize");
+        self.client.request::<K>(req).await
+    }
+}
+
+// ----------------------------------------------------------------------------
