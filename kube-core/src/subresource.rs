@@ -3,7 +3,7 @@ use std::fmt::Debug;
 
 use crate::{
     params::{DeleteParams, PostParams},
-    request::{Error, Request, JSON_MIME},
+    request::{Error, JSON_MIME, Request},
 };
 
 pub use k8s_openapi::api::autoscaling::v1::{Scale, ScaleSpec, ScaleStatus};
@@ -411,7 +411,12 @@ impl Request {
 
 impl Request {
     /// Resize a pod's resources
-    pub fn resize(&self, name: &str, data: Vec<u8>, pp: &PostParams) -> Result<http::Request<Vec<u8>>, Error> {
+    pub fn resize(
+        &self,
+        name: &str,
+        data: Vec<u8>,
+        pp: &PostParams,
+    ) -> Result<http::Request<Vec<u8>>, Error> {
         let target = format!("{}/{}/resize?", self.url_path, name);
         pp.validate()?;
         let mut qp = form_urlencoded::Serializer::new(target);
@@ -451,7 +456,10 @@ mod test {
             timestamps: true,
         };
         let req = Request::new(url).logs("mypod", &lp).unwrap();
-        assert_eq!(req.uri(), "/api/v1/namespaces/ns/pods/mypod/log?&container=nginx&follow=true&limitBytes=10485760&pretty=true&previous=true&sinceSeconds=3600&tailLines=4096&timestamps=true");
+        assert_eq!(
+            req.uri(),
+            "/api/v1/namespaces/ns/pods/mypod/log?&container=nginx&follow=true&limitBytes=10485760&pretty=true&previous=true&sinceSeconds=3600&tailLines=4096&timestamps=true"
+        );
     }
 
     #[test]

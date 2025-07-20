@@ -1,12 +1,14 @@
 use k8s_openapi::api::core::v1::Pod;
 use kube::{
-    api::{Api, PostParams, ResourceExt},
     Client, Result,
+    api::{Api, PostParams, ResourceExt},
 };
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    unsafe { std::env::set_var("RUST_LOG", "info,kube=debug"); }
+    unsafe {
+        std::env::set_var("RUST_LOG", "info,kube=debug");
+    }
     tracing_subscriber::fmt::init();
     let client = Client::try_default().await?;
 
