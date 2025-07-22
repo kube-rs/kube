@@ -50,30 +50,17 @@ allow-git = ["https://github.com/tyrone-wu/runtime-macros.git"]
 multiple-versions = "deny"
 
 [[bans.skip]]
-name = "rustls-native-certs"
-
-[[bans.skip]]
 # base64 did some annoying breaking changes
 name = "base64"
 
 [[bans.skip-tree]]
 name = "windows-sys"
 
-[[bans.skip-tree]]
-# currently multiple versions while it's 1.0 is being rolled out
-name = "webpki-roots"
-
 # currently multiple version of thiserror in flight due to its major bump
 [[bans.skip]]
 name = "thiserror"
 [[bans.skip]]
 name = "thiserror-impl"
-
-# 2 deps from 2 different version of rustls-native-certs not fully upgradeable yet
-[[bans.skip]]
-name = "security-framework"
-[[bans.skip]]
-name = "core-foundation"
 
 # rand / ahash inconsistencies;
 [[bans.skip]]
