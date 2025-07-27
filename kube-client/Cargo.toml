@@ -13,7 +13,7 @@ categories = ["web-programming::http-client", "network-programming", "api-bindin
 
 [features]
 default = ["client", "ring"]
-rustls-tls = ["rustls", "hyper-rustls", "hyper-http-proxy?/rustls-tls-native-roots"]
+rustls-tls = ["rustls", "hyper-rustls"]
 webpki-roots = ["hyper-rustls/webpki-roots"]
 aws-lc-rs = ["hyper-rustls?/aws-lc-rs"]
 ring = ["hyper-rustls?/ring"]
@@ -27,8 +27,8 @@ client = ["config", "__non_core", "hyper", "hyper-util", "http-body", "http-body
 jsonpatch = ["kube-core/jsonpatch"]
 admission = ["kube-core/admission"]
 config = ["__non_core", "pem", "home"]
-socks5 = ["hyper-socks2"]
-http-proxy = ["hyper-http-proxy"]
+socks5 = ["hyper-util/client-proxy"]
+http-proxy = ["hyper-util/client-proxy"]
 unstable-client = []
 
 # private feature sets; do not use
@@ -64,10 +64,8 @@ kube-core = { path = "../kube-core", version = "=1.1.0" }
 jsonpath-rust = { workspace = true, optional = true }
 tokio-util = { workspace = true, features = ["io", "codec"], optional = true }
 hyper = { workspace = true, features = ["client", "http1"], optional = true }
-hyper-http-proxy = { version = "1", default-features = false, optional = true }
 hyper-util = { workspace = true, features = ["client", "client-legacy", "http1", "tokio", "tracing"], optional = true }
 hyper-rustls = { workspace = true, features = ["http1", "logging", "native-tokio", "tls12"], optional = true }
-hyper-socks2 = { workspace = true, optional = true }
 tokio-tungstenite = { workspace = true, optional = true }
 tower = { workspace = true, features = ["buffer", "filter", "util"], optional = true }
 tower-http = { workspace = true, features = ["auth", "map-response-body", "trace"], optional = true }

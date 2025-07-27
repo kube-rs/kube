@@ -109,11 +109,10 @@ impl TryFrom<Config> for ClientBuilder<GenericService> {
             Some(proxy_url) if proxy_url.scheme_str() == Some("socks5") => {
                 #[cfg(feature = "socks5")]
                 {
-                    let connector = hyper_socks2::SocksConnector {
-                        proxy_addr: proxy_url.clone(),
-                        auth: None,
+                    let connector = hyper_util::client::legacy::connect::proxy::SocksV5::new(
+                        proxy_url.clone(),
                         connector,
-                    };
+                    );
                     make_generic_builder(connector, config)
                 }
 
@@ -127,10 +126,8 @@ impl TryFrom<Config> for ClientBuilder<GenericService> {
             Some(proxy_url) if proxy_url.scheme_str() == Some("http") => {
                 #[cfg(feature = "http-proxy")]
                 {
-                    let proxy =
-                        hyper_http_proxy::Proxy::new(hyper_http_proxy::Intercept::All, proxy_url.clone());
-                    let connector = hyper_http_proxy::ProxyConnector::from_proxy_unsecured(connector, proxy);
-
+                    let connector =
+                        hyper_util::client::legacy::connect::proxy::Tunnel::new(proxy_url.clone(), connector);
                     make_generic_builder(connector, config)
                 }
 
@@ -255,7 +252,6 @@ where
         )
         .map_err(BoxError::from)
         .service(client);
-
 
     let (_, expiration) = config.exec_identity_pem();
 
