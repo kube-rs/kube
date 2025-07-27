@@ -79,14 +79,12 @@ where
 /// use k8s_openapi::api::core::v1::Pod;
 /// fn my_custom_condition(my_cond: &str) -> impl Condition<Pod> + '_ {
 ///     move |obj: Option<&Pod>| {
-///         if let Some(pod) = &obj {
-///             if let Some(status) = &pod.status {
-///                 if let Some(conds) = &status.conditions {
-///                     if let Some(pcond) = conds.iter().find(|c| c.type_ == my_cond) {
-///                         return pcond.status == "True";
-///                     }
-///                 }
-///             }
+///         if let Some(pod) = &obj
+///             && let Some(status) = &pod.status
+///             && let Some(conds) = &status.conditions
+///             && let Some(pcond) = conds.iter().find(|c| c.type_ == my_cond)
+///         {
+///             return pcond.status == "True";
 ///         }
 ///         false
 ///     }
@@ -196,14 +194,12 @@ pub mod conditions {
     #[must_use]
     pub fn is_crd_established() -> impl Condition<CustomResourceDefinition> {
         |obj: Option<&CustomResourceDefinition>| {
-            if let Some(o) = obj {
-                if let Some(s) = &o.status {
-                    if let Some(conds) = &s.conditions {
-                        if let Some(pcond) = conds.iter().find(|c| c.type_ == "Established") {
-                            return pcond.status == "True";
-                        }
-                    }
-                }
+            if let Some(o) = obj
+                && let Some(s) = &o.status
+                && let Some(conds) = &s.conditions
+                && let Some(pcond) = conds.iter().find(|c| c.type_ == "Established")
+            {
+                return pcond.status == "True";
             }
             false
         }
@@ -213,12 +209,11 @@ pub mod conditions {
     #[must_use]
     pub fn is_pod_running() -> impl Condition<Pod> {
         |obj: Option<&Pod>| {
-            if let Some(pod) = &obj {
-                if let Some(status) = &pod.status {
-                    if let Some(phase) = &status.phase {
-                        return phase == "Running";
-                    }
-                }
+            if let Some(pod) = &obj
+                && let Some(status) = &pod.status
+                && let Some(phase) = &status.phase
+            {
+                return phase == "Running";
             }
             false
         }
@@ -228,14 +223,12 @@ pub mod conditions {
     #[must_use]
     pub fn is_job_completed() -> impl Condition<Job> {
         |obj: Option<&Job>| {
-            if let Some(job) = &obj {
-                if let Some(s) = &job.status {
-                    if let Some(conds) = &s.conditions {
-                        if let Some(pcond) = conds.iter().find(|c| c.type_ == "Complete") {
-                            return pcond.status == "True";
-                        }
-                    }
-                }
+            if let Some(job) = &obj
+                && let Some(s) = &job.status
+                && let Some(conds) = &s.conditions
+                && let Some(pcond) = conds.iter().find(|c| c.type_ == "Complete")
+            {
+                return pcond.status == "True";
             }
             false
         }
@@ -248,16 +241,14 @@ pub mod conditions {
     #[must_use]
     pub fn is_deployment_completed() -> impl Condition<Deployment> {
         |obj: Option<&Deployment>| {
-            if let Some(depl) = &obj {
-                if let Some(s) = &depl.status {
-                    if let Some(conds) = &s.conditions {
-                        if let Some(dcond) = conds.iter().find(|c| {
-                            c.type_ == "Progressing" && c.reason == Some("NewReplicaSetAvailable".to_string())
-                        }) {
-                            return dcond.status == "True";
-                        }
-                    }
-                }
+            if let Some(depl) = &obj
+                && let Some(s) = &depl.status
+                && let Some(conds) = &s.conditions
+                && let Some(dcond) = conds.iter().find(|c| {
+                    c.type_ == "Progressing" && c.reason == Some("NewReplicaSetAvailable".to_string())
+                })
+            {
+                return dcond.status == "True";
             }
             false
         }
@@ -267,20 +258,19 @@ pub mod conditions {
     #[must_use]
     pub fn is_service_loadbalancer_provisioned() -> impl Condition<Service> {
         |obj: Option<&Service>| {
-            if let Some(svc) = &obj {
+            if let Some(svc) = &obj
+                && let Some(spec) = &svc.spec
+            {
                 // ignore services that are not type LoadBalancer (return true immediately)
-                if let Some(spec) = &svc.spec {
-                    if spec.type_ != Some("LoadBalancer".to_string()) {
-                        return true;
-                    }
-                    // carry on if this is a LoadBalancer service
-                    if let Some(s) = &svc.status {
-                        if let Some(lbs) = &s.load_balancer {
-                            if let Some(ings) = &lbs.ingress {
-                                return ings.iter().all(|ip| ip.ip.is_some() || ip.hostname.is_some());
-                            }
-                        }
-                    }
+                if spec.type_ != Some("LoadBalancer".to_string()) {
+                    return true;
+                }
+                // carry on if this is a LoadBalancer service
+                if let Some(s) = &svc.status
+                    && let Some(lbs) = &s.load_balancer
+                    && let Some(ings) = &lbs.ingress
+                {
+                    return ings.iter().all(|ip| ip.ip.is_some() || ip.hostname.is_some());
                 }
             }
             false
@@ -291,14 +281,12 @@ pub mod conditions {
     #[must_use]
     pub fn is_ingress_provisioned() -> impl Condition<Ingress> {
         |obj: Option<&Ingress>| {
-            if let Some(ing) = &obj {
-                if let Some(s) = &ing.status {
-                    if let Some(lbs) = &s.load_balancer {
-                        if let Some(ings) = &lbs.ingress {
-                            return ings.iter().all(|ip| ip.ip.is_some() || ip.hostname.is_some());
-                        }
-                    }
-                }
+            if let Some(ing) = &obj
+                && let Some(s) = &ing.status
+                && let Some(lbs) = &s.load_balancer
+                && let Some(ings) = &lbs.ingress
+            {
+                return ings.iter().all(|ip| ip.ip.is_some() || ip.hostname.is_some());
             }
             false
         }
@@ -343,7 +331,7 @@ pub mod conditions {
         #[test]
         /// pass when CRD is established
         fn crd_established_ok() {
-            use super::{is_crd_established, Condition};
+            use super::{Condition, is_crd_established};
 
             let crd = r#"
                 apiVersion: apiextensions.k8s.io/v1
@@ -396,7 +384,7 @@ pub mod conditions {
         #[test]
         /// fail when CRD is not yet ready
         fn crd_established_fail() {
-            use super::{is_crd_established, Condition};
+            use super::{Condition, is_crd_established};
 
             let crd = r#"
                 apiVersion: apiextensions.k8s.io/v1
@@ -449,7 +437,7 @@ pub mod conditions {
         #[test]
         /// fail when CRD does not exist
         fn crd_established_missing() {
-            use super::{is_crd_established, Condition};
+            use super::{Condition, is_crd_established};
 
             assert!(!is_crd_established().matches_object(None))
         }
@@ -457,7 +445,7 @@ pub mod conditions {
         #[test]
         /// pass when pod is running
         fn pod_running_ok() {
-            use super::{is_pod_running, Condition};
+            use super::{Condition, is_pod_running};
 
             let pod = r#"
                 apiVersion: v1
@@ -516,7 +504,7 @@ pub mod conditions {
         #[test]
         /// fail if pod is unschedulable
         fn pod_running_unschedulable() {
-            use super::{is_pod_running, Condition};
+            use super::{Condition, is_pod_running};
 
             let pod = r#"
                 apiVersion: v1
@@ -550,7 +538,7 @@ pub mod conditions {
         #[test]
         /// fail if pod does not exist
         fn pod_running_missing() {
-            use super::{is_pod_running, Condition};
+            use super::{Condition, is_pod_running};
 
             assert!(!is_pod_running().matches_object(None))
         }
@@ -558,7 +546,7 @@ pub mod conditions {
         #[test]
         /// pass if job completed
         fn job_completed_ok() {
-            use super::{is_job_completed, Condition};
+            use super::{Condition, is_job_completed};
 
             let job = r#"
                 apiVersion: batch/v1
@@ -607,7 +595,7 @@ pub mod conditions {
         #[test]
         /// fail if job is still in progress
         fn job_completed_running() {
-            use super::{is_job_completed, Condition};
+            use super::{Condition, is_job_completed};
 
             let job = r#"
                 apiVersion: batch/v1
@@ -647,7 +635,7 @@ pub mod conditions {
         #[test]
         /// fail if job does not exist
         fn job_completed_missing() {
-            use super::{is_job_completed, Condition};
+            use super::{Condition, is_job_completed};
 
             assert!(!is_job_completed().matches_object(None))
         }
@@ -655,7 +643,7 @@ pub mod conditions {
         #[test]
         /// pass when deployment has been fully rolled out
         fn deployment_completed_ok() {
-            use super::{is_deployment_completed, Condition};
+            use super::{Condition, is_deployment_completed};
 
             let depl = r#"
                 apiVersion: apps/v1
@@ -719,7 +707,7 @@ pub mod conditions {
         #[test]
         /// fail if deployment update is still rolling out
         fn deployment_completed_pending() {
-            use super::{is_deployment_completed, Condition};
+            use super::{Condition, is_deployment_completed};
 
             let depl = r#"
                 apiVersion: apps/v1
@@ -782,7 +770,7 @@ pub mod conditions {
         #[test]
         /// fail if deployment does not exist
         fn deployment_completed_missing() {
-            use super::{is_deployment_completed, Condition};
+            use super::{Condition, is_deployment_completed};
 
             assert!(!is_deployment_completed().matches_object(None))
         }
@@ -790,7 +778,7 @@ pub mod conditions {
         #[test]
         /// pass if loadbalancer service has recieved a loadbalancer IP
         fn service_lb_provisioned_ok_ip() {
-            use super::{is_service_loadbalancer_provisioned, Condition};
+            use super::{Condition, is_service_loadbalancer_provisioned};
 
             let service = r"
                 apiVersion: v1
@@ -819,7 +807,7 @@ pub mod conditions {
         #[test]
         /// pass if loadbalancer service has recieved a loadbalancer hostname
         fn service_lb_provisioned_ok_hostname() {
-            use super::{is_service_loadbalancer_provisioned, Condition};
+            use super::{Condition, is_service_loadbalancer_provisioned};
 
             let service = r"
                 apiVersion: v1
@@ -848,7 +836,7 @@ pub mod conditions {
         #[test]
         /// fail if loadbalancer service is still waiting for a LB
         fn service_lb_provisioned_pending() {
-            use super::{is_service_loadbalancer_provisioned, Condition};
+            use super::{Condition, is_service_loadbalancer_provisioned};
 
             let service = r"
                 apiVersion: v1
@@ -875,7 +863,7 @@ pub mod conditions {
         #[test]
         /// pass if service is not a loadbalancer
         fn service_lb_provisioned_not_loadbalancer() {
-            use super::{is_service_loadbalancer_provisioned, Condition};
+            use super::{Condition, is_service_loadbalancer_provisioned};
 
             let service = r"
                 apiVersion: v1
@@ -901,7 +889,7 @@ pub mod conditions {
         #[test]
         /// fail if service does not exist
         fn service_lb_provisioned_missing() {
-            use super::{is_service_loadbalancer_provisioned, Condition};
+            use super::{Condition, is_service_loadbalancer_provisioned};
 
             assert!(!is_service_loadbalancer_provisioned().matches_object(None))
         }
@@ -909,7 +897,7 @@ pub mod conditions {
         #[test]
         /// pass when ingress has recieved a loadbalancer IP
         fn ingress_provisioned_ok_ip() {
-            use super::{is_ingress_provisioned, Condition};
+            use super::{Condition, is_ingress_provisioned};
 
             let ingress = r#"
                 apiVersion: networking.k8s.io/v1
@@ -944,7 +932,7 @@ pub mod conditions {
         #[test]
         /// pass when ingress has recieved a loadbalancer hostname
         fn ingress_provisioned_ok_hostname() {
-            use super::{is_ingress_provisioned, Condition};
+            use super::{Condition, is_ingress_provisioned};
 
             let ingress = r#"
                 apiVersion: networking.k8s.io/v1
@@ -979,7 +967,7 @@ pub mod conditions {
         #[test]
         /// fail if ingress is still waiting for a LB
         fn ingress_provisioned_pending() {
-            use super::{is_ingress_provisioned, Condition};
+            use super::{Condition, is_ingress_provisioned};
 
             let ingress = r#"
                 apiVersion: networking.k8s.io/v1
@@ -1012,7 +1000,7 @@ pub mod conditions {
         #[test]
         /// fail if ingress does not exist
         fn ingress_provisioned_missing() {
-            use super::{is_ingress_provisioned, Condition};
+            use super::{Condition, is_ingress_provisioned};
 
             assert!(!is_ingress_provisioned().matches_object(None))
         }
@@ -1022,7 +1010,7 @@ pub mod conditions {
 /// Utilities for deleting objects
 pub mod delete {
     use super::{await_condition, conditions};
-    use kube_client::{api::DeleteParams, Api, Resource};
+    use kube_client::{Api, Resource, api::DeleteParams};
     use serde::de::DeserializeOwned;
     use std::fmt::Debug;
     use thiserror::Error;

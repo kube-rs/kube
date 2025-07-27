@@ -1,7 +1,7 @@
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::Condition;
 use kube::{
-    core::object::{HasSpec, HasStatus},
     CustomResource, CustomResourceExt, Resource,
+    core::object::{HasSpec, HasStatus},
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};

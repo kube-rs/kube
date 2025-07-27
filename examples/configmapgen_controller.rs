@@ -5,12 +5,12 @@ use anyhow::Result;
 use futures::StreamExt;
 use k8s_openapi::api::core::v1::ConfigMap;
 use kube::{
+    Client, CustomResource,
     api::{Api, ObjectMeta, Patch, PatchParams, Resource},
     runtime::{
         controller::{Action, Config, Controller},
         watcher,
     },
-    Client, CustomResource,
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};

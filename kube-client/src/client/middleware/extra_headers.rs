@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use http::{header::HeaderName, request::Request, HeaderValue};
+use http::{HeaderValue, header::HeaderName, request::Request};
 use tower::{Layer, Service};
 
 #[derive(Clone)]

@@ -1,5 +1,5 @@
 //! Middleware types returned from `ConfigExt` methods.
-use tower::{filter::AsyncFilterLayer, util::Either, Layer};
+use tower::{Layer, filter::AsyncFilterLayer, util::Either};
 pub(crate) use tower_http::auth::AddAuthorizationLayer;
 
 mod base_uri;
@@ -30,7 +30,7 @@ mod tests {
     use std::{matches, pin::pin, sync::Arc};
 
     use chrono::{Duration, Utc};
-    use http::{header::AUTHORIZATION, HeaderValue, Request, Response};
+    use http::{HeaderValue, Request, Response, header::AUTHORIZATION};
     use secrecy::SecretString;
     use tokio::sync::Mutex;
     use tokio_test::assert_ready_ok;

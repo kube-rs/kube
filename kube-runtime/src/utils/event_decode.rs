@@ -1,7 +1,7 @@
 use crate::watcher::{Error, Event};
 use core::{
     pin::Pin,
-    task::{ready, Context, Poll},
+    task::{Context, Poll, ready},
 };
 use futures::{Stream, TryStream};
 use pin_project::pin_project;
@@ -51,7 +51,7 @@ pub(crate) mod tests {
     use std::{pin::pin, task::Poll};
 
     use super::{Error, Event, EventDecode};
-    use futures::{poll, stream, StreamExt};
+    use futures::{StreamExt, poll, stream};
 
     #[tokio::test]
     async fn watches_applies_uses_correct_stream() {

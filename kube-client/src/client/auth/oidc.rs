@@ -4,12 +4,12 @@ use super::TEN_SEC;
 use chrono::{TimeZone, Utc};
 use form_urlencoded::Serializer;
 use http::{
-    header::{HeaderValue, AUTHORIZATION, CONTENT_TYPE},
     Method, Request, Uri, Version,
+    header::{AUTHORIZATION, CONTENT_TYPE, HeaderValue},
 };
 use http_body_util::BodyExt;
 use hyper_util::{
-    client::legacy::{connect::HttpConnector, Client},
+    client::legacy::{Client, connect::HttpConnector},
     rt::TokioExecutor,
 };
 use secrecy::{ExposeSecret, SecretString};
@@ -19,7 +19,7 @@ use serde_json::Number;
 /// Possible errors when handling OIDC authentication.
 pub mod errors {
     use super::Oidc;
-    use http::{uri::InvalidUri, StatusCode};
+    use http::{StatusCode, uri::InvalidUri};
     use thiserror::Error;
 
     /// Possible errors when extracting expiration time from an ID token.

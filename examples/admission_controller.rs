@@ -1,11 +1,11 @@
 use json_patch::jsonptr::PointerBuf;
 use kube::core::{
-    admission::{AdmissionRequest, AdmissionResponse, AdmissionReview},
     DynamicObject, Resource, ResourceExt,
+    admission::{AdmissionRequest, AdmissionResponse, AdmissionReview},
 };
 use std::{convert::Infallible, error::Error};
 use tracing::*;
-use warp::{reply, Filter, Reply};
+use warp::{Filter, Reply, reply};
 
 #[tokio::main]
 async fn main() {

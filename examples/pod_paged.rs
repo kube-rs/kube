@@ -1,7 +1,7 @@
 use k8s_openapi::api::core::v1::Pod;
 use kube::{
-    api::{Api, ListParams, ResourceExt},
     Client,
+    api::{Api, ListParams, ResourceExt},
 };
 use tracing::*;
 

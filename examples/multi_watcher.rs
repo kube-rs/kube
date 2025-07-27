@@ -1,12 +1,12 @@
-use futures::{stream, StreamExt, TryStreamExt};
+use futures::{StreamExt, TryStreamExt, stream};
 use k8s_openapi::api::{
     apps::v1::Deployment,
     core::v1::{ConfigMap, Secret},
 };
 use kube::{
-    api::{Api, ResourceExt},
-    runtime::{watcher, WatchStreamExt},
     Client,
+    api::{Api, ResourceExt},
+    runtime::{WatchStreamExt, watcher},
 };
 use tracing::*;
 

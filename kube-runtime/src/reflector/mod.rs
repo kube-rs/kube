@@ -13,7 +13,7 @@ use async_stream::stream;
 use futures::{Stream, StreamExt};
 use std::hash::Hash;
 #[cfg(feature = "unstable-runtime-subscribe")] pub use store::store_shared;
-pub use store::{store, Store};
+pub use store::{Store, store};
 
 /// Cache objects from a [`watcher()`] stream into a local [`Store`]
 ///
@@ -136,13 +136,13 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{reflector, store, ObjectRef};
+    use super::{ObjectRef, reflector, store};
     use crate::watcher;
-    use futures::{stream, StreamExt, TryStreamExt};
+    use futures::{StreamExt, TryStreamExt, stream};
     use k8s_openapi::{api::core::v1::ConfigMap, apimachinery::pkg::apis::meta::v1::ObjectMeta};
     use rand::{
-        distr::{Bernoulli, Uniform},
         Rng,
+        distr::{Bernoulli, Uniform},
     };
     use std::collections::{BTreeMap, HashMap};
 

@@ -1,13 +1,13 @@
 use crate::{reflector::ObjectRef, watcher::Error};
 use core::{
     pin::Pin,
-    task::{ready, Context, Poll},
+    task::{Context, Poll, ready},
 };
 use futures::Stream;
 use kube_client::Resource;
 use pin_project::pin_project;
 use std::{
-    collections::{hash_map::DefaultHasher, HashMap},
+    collections::{HashMap, hash_map::DefaultHasher},
     hash::{Hash, Hasher},
 };
 
@@ -202,8 +202,8 @@ pub mod predicates {
 pub(crate) mod tests {
     use std::{pin::pin, task::Poll};
 
-    use super::{predicates, Error, PredicateFilter};
-    use futures::{poll, stream, FutureExt, StreamExt};
+    use super::{Error, PredicateFilter, predicates};
+    use futures::{FutureExt, StreamExt, poll, stream};
     use kube_client::Resource;
     use serde_json::json;
 

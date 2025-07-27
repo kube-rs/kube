@@ -3,9 +3,9 @@ use std::pin::pin;
 use futures::TryStreamExt;
 use k8s_openapi::api::core::v1::Pod;
 use kube::{
-    api::Api,
-    runtime::{predicates, reflector, watcher, WatchStreamExt},
     Client, ResourceExt,
+    api::Api,
+    runtime::{WatchStreamExt, predicates, reflector, watcher},
 };
 use tracing::*;
 
