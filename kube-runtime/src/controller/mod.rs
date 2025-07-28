@@ -24,7 +24,6 @@ use pin_project::pin_project;
 use serde::de::DeserializeOwned;
 use std::{
     fmt::{Debug, Display},
-    future::Future,
     hash::Hash,
     sync::Arc,
     task::{ready, Poll},

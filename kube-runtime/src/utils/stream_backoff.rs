@@ -1,4 +1,4 @@
-use std::{future::Future, pin::Pin, task::Poll};
+use std::{pin::Pin, task::Poll};
 
 use futures::{Stream, TryStream};
 use pin_project::pin_project;

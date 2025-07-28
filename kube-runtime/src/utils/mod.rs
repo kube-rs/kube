@@ -25,7 +25,7 @@ pub use EventDecode as EventFlatten;
 
 use futures::{
     stream::{self, Peekable},
-    Future, FutureExt, Stream, StreamExt, TryStream, TryStreamExt,
+    FutureExt, Stream, StreamExt, TryStream, TryStreamExt,
 };
 use pin_project::pin_project;
 use std::{
