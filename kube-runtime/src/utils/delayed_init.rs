@@ -1,6 +1,6 @@
 use std::{fmt::Debug, sync::Mutex, task::Poll};
 
-use futures::{channel, Future, FutureExt};
+use futures::{channel, FutureExt};
 use thiserror::Error;
 use tracing::trace;
 

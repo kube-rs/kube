@@ -1,4 +1,4 @@
-use futures::{Future, FutureExt, Stream};
+use futures::{FutureExt, Stream};
 use std::{
     collections::HashMap,
     hash::Hash,

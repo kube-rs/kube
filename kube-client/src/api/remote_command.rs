@@ -1,5 +1,3 @@
-use std::future::Future;
-
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::Status;
 
 use futures::{

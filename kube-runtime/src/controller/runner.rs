@@ -4,7 +4,7 @@ use futures::{FutureExt, Stream, StreamExt};
 use pin_project::pin_project;
 use std::{
     convert::Infallible,
-    future::{self, Future},
+    future,
     hash::Hash,
     pin::Pin,
     task::{Context, Poll},
@@ -164,7 +164,7 @@ mod tests {
     };
     use futures::{
         channel::{mpsc, oneshot},
-        future, poll, stream, Future, SinkExt, StreamExt, TryStreamExt,
+        future, poll, stream, SinkExt, StreamExt, TryStreamExt,
     };
     use std::{
         cell::RefCell,

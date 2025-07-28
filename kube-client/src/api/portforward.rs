@@ -1,4 +1,4 @@
-use std::{collections::HashMap, future::Future};
+use std::collections::HashMap;
 
 use bytes::{Buf, Bytes};
 use futures::{
