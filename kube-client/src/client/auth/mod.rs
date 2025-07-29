@@ -588,6 +588,7 @@ fn auth_exec(auth: &ExecConfig) -> Result<ExecCredential, Error> {
     let interactive = auth.interactive_mode != Some(ExecInteractiveMode::Never);
     if interactive {
         cmd.stdin(std::process::Stdio::inherit());
+        cmd.stderr(std::process::Stdio::inherit());
     } else {
         cmd.stdin(std::process::Stdio::piped());
     }
