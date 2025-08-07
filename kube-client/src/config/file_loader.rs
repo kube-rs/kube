@@ -53,7 +53,7 @@ impl ConfigLoader {
         Ok(loader)
     }
 
-    pub async fn load(
+    fn load_from_kubeconfig(
         config: Kubeconfig,
         context: Option<&String>,
         cluster: Option<&String>,
@@ -110,6 +110,15 @@ impl ConfigLoader {
         })
     }
 
+    pub async fn load(
+        config: Kubeconfig,
+        context: Option<&String>,
+        cluster: Option<&String>,
+        user: Option<&String>,
+    ) -> Result<Self, KubeconfigError> {
+        Self::load_from_kubeconfig(config, context, cluster, user)
+    }
+
     pub fn ca_bundle(&self) -> Result<Option<Vec<Vec<u8>>>, KubeconfigError> {
         if let Some(bundle) = self.cluster.load_certificate_authority()? {
             Ok(Some(
@@ -135,5 +144,13 @@ impl ConfigLoader {
         } else {
             Ok(None)
         }
+    }
+}
+
+impl TryFrom<Kubeconfig> for ConfigLoader {
+    type Error = KubeconfigError;
+
+    fn try_from(kubeconfig: Kubeconfig) -> Result<Self, KubeconfigError> {
+        Self::load_from_kubeconfig(kubeconfig, None, None, None)
     }
 }
