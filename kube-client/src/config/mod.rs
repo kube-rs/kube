@@ -276,7 +276,7 @@ impl Config {
     /// but it will default to the current-context.
     pub async fn from_kubeconfig(options: &KubeConfigOptions) -> Result<Self, KubeconfigError> {
         let loader = ConfigLoader::new_from_options(options).await?;
-        Self::new_from_loader(loader).await
+        Self::new_from_loader(loader)
     }
 
     /// Create configuration from a [`Kubeconfig`] struct
@@ -287,10 +287,10 @@ impl Config {
         options: &KubeConfigOptions,
     ) -> Result<Self, KubeconfigError> {
         let loader = ConfigLoader::new_from_kubeconfig(kubeconfig, options).await?;
-        Self::new_from_loader(loader).await
+        Self::new_from_loader(loader)
     }
 
-    async fn new_from_loader(loader: ConfigLoader) -> Result<Self, KubeconfigError> {
+    fn new_from_loader(loader: ConfigLoader) -> Result<Self, KubeconfigError> {
         let cluster_url = loader
             .cluster
             .server
@@ -385,6 +385,15 @@ fn certs(data: &[u8]) -> Result<Vec<Vec<u8>>, pem::PemError> {
             }
         })
         .collect::<Vec<_>>())
+}
+
+impl TryFrom<Kubeconfig> for Config {
+    type Error = KubeconfigError;
+
+    fn try_from(kubeconfig: Kubeconfig) -> Result<Self, KubeconfigError> {
+        let loader = ConfigLoader::try_from(kubeconfig)?;
+        Self::new_from_loader(loader)
+    }
 }
 
 // https://github.com/kube-rs/kube/issues/146#issuecomment-590924397

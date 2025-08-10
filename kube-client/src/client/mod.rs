@@ -27,7 +27,7 @@ use tower::{buffer::Buffer, util::BoxService, BoxError, Layer, Service, ServiceE
 use tower_http::map_response_body::MapResponseBodyLayer;
 
 pub use self::body::Body;
-use crate::{api::WatchEvent, error::ErrorResponse, Config, Error, Result};
+use crate::{api::WatchEvent, config::Kubeconfig, error::ErrorResponse, Config, Error, Result};
 
 mod auth;
 mod body;
@@ -519,11 +519,24 @@ impl TryFrom<Config> for Client {
     }
 }
 
+impl TryFrom<Kubeconfig> for Client {
+    type Error = Error;
+
+    fn try_from(kubeconfig: Kubeconfig) -> Result<Self> {
+        let config = Config::try_from(kubeconfig)?;
+        Ok(ClientBuilder::try_from(config)?.build())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::pin::pin;
 
-    use crate::{client::Body, Api, Client};
+    use crate::{
+        client::Body,
+        config::{AuthInfo, Cluster, Context, Kubeconfig, NamedAuthInfo, NamedCluster, NamedContext},
+        Api, Client,
+    };
 
     use http::{Request, Response};
     use k8s_openapi::api::core::v1::Pod;
@@ -533,6 +546,36 @@ mod tests {
     async fn test_default_ns() {
         let (mock_service, _) = mock::pair::<Request<Body>, Response<Body>>();
         let client = Client::new(mock_service, "test-namespace");
+        assert_eq!(client.default_namespace(), "test-namespace");
+    }
+
+    #[tokio::test]
+    async fn test_try_from_kubeconfig() {
+        let config = Kubeconfig {
+            current_context: Some("test-context".to_string()),
+            auth_infos: vec![NamedAuthInfo {
+                name: "test-user".to_string(),
+                auth_info: Some(AuthInfo::default()), // <-- empty but valid
+            }],
+            contexts: vec![NamedContext {
+                name: "test-context".to_string(),
+                context: Some(Context {
+                    cluster: "test-cluster".to_string(),
+                    user: Some("test-user".to_string()),
+                    namespace: Some("test-namespace".to_string()),
+                    ..Default::default()
+                }),
+            }],
+            clusters: vec![NamedCluster {
+                name: "test-cluster".to_string(),
+                cluster: Some(Cluster {
+                    server: Some("http://localhost:8080".to_string()),
+                    ..Default::default()
+                }),
+            }],
+            ..Default::default()
+        };
+        let client = Client::try_from(config).expect("Failed to create client from kubeconfig");
         assert_eq!(client.default_namespace(), "test-namespace");
     }
 

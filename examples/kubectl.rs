@@ -27,8 +27,6 @@ struct App {
     selector: Option<String>,
     #[arg(long, short)]
     namespace: Option<String>,
-    #[arg(long, short)]
-    context: Option<String>,
     #[arg(long, short = 'A')]
     all: bool,
     verb: Verb,
@@ -189,13 +187,8 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
     let app: App = clap::Parser::parse();
 
-    let options = KubeConfigOptions {
-        context: app.context.clone(),
-        cluster: None,
-        user: None,
-    };
-    let config = kube::Config::from_kubeconfig(&options).await?;
-    let client = Client::try_from(config)?;
+    let kubeconfig = kube::config::Kubeconfig::read()?;
+    let client = Client::try_from(kubeconfig)?;
 
     // discovery (to be able to infer apis from kind/plural only)
     let discovery = Discovery::new(client.clone()).run().await?;

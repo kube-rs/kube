@@ -108,6 +108,10 @@ pub enum Error {
     #[cfg_attr(docsrs, doc(cfg(feature = "unstable-client")))]
     #[error("Reference resolve error: {0}")]
     RefResolve(String),
+
+    /// Failed to infer custom configuration
+    #[error("Failed to infer provided configuration: {0}")]
+    InferKubeconfig(#[from] crate::config::KubeconfigError),
 }
 
 #[derive(Error, Debug)]
