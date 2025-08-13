@@ -69,7 +69,7 @@ impl Action {
     ///
     /// Watch events are not normally missed, so running this once per hour (`Default`) as a fallback is reasonable.
     #[must_use]
-    pub fn requeue(duration: Duration) -> Self {
+    pub const fn requeue(duration: Duration) -> Self {
         Self {
             requeue_after: Some(duration),
         }
@@ -84,7 +84,7 @@ impl Action {
     /// It is therefore not recommended to disable requeuing this way, unless you have
     /// frequent changes to the underlying object, or some other hook to retain eventual consistency.
     #[must_use]
-    pub fn await_change() -> Self {
+    pub const fn await_change() -> Self {
         Self { requeue_after: None }
     }
 }
