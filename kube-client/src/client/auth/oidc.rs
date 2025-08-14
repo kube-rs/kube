@@ -267,7 +267,7 @@ compile_error!(
 #[cfg(feature = "rustls-tls")]
 type HttpsConnector = hyper_rustls::HttpsConnector<HttpConnector>;
 #[cfg(all(not(feature = "rustls-tls"), feature = "openssl-tls"))]
-type HttpsConnector = hyper_openssl::HttpsConnector<HttpConnector>;
+type HttpsConnector = hyper_openssl::client::legacy::HttpsConnector<HttpConnector>;
 
 /// Struct for refreshing the ID token with the refresh token.
 #[derive(Debug)]
@@ -334,7 +334,7 @@ impl Refresher {
             .enable_http1()
             .build();
         #[cfg(all(not(feature = "rustls-tls"), feature = "openssl-tls"))]
-        let https = hyper_openssl::HttpsConnector::new()?;
+        let https = hyper_openssl::client::legacy::HttpsConnector::new()?;
 
         let https_client = hyper_util::client::legacy::Client::builder(TokioExecutor::new()).build(https);
 
