@@ -73,7 +73,7 @@ hyper-timeout = { workspace = true, optional = true }
 tame-oauth = { workspace = true, features = ["gcp"], optional = true }
 secrecy = { workspace = true }
 tracing = { workspace = true, features = ["log"], optional = true }
-hyper-openssl = { workspace = true, features = ["client-legacy"], optional = true }
+hyper-openssl = { workspace = true, features = ["client-legacy", "tokio"], optional = true }
 form_urlencoded = { workspace = true, optional = true }
 k8s-openapi= { workspace = true, features = [] }
 
