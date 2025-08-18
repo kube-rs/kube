@@ -12,15 +12,16 @@ These crates build upon Kubernetes [apimachinery](https://github.com/kubernetes/
 
 ## Installation
 
-Select a version of `kube` along with the generated [k8s-openapi](https://github.com/Arnavion/k8s-openapi) structs at your chosen [Kubernetes version](https://kube.rs/kubernetes-version/):
+Select a version of `kube` along matching versions of [k8s-openapi](https://github.com/Arnavion/k8s-openapi) and [schemars](https://github.com/GREsau/schemars) for Kubernetes structs and matching schemas. See also historical [Kubernetes versions](https://kube.rs/kubernetes-version/).
 
 ```toml
 [dependencies]
-kube = { version = "1.1.0", features = ["runtime", "derive"] }
-k8s-openapi = { version = "0.25.0", features = ["latest"] }
+kube = { version = "1", features = ["runtime", "derive"] }
+schemars = { version = "0.8" }
+k8s-openapi = { version = "0.25", features = ["latest", "schemars"] }
 ```
 
-See [features](https://kube.rs/features/) for a quick overview of default-enabled / opt-in functionality.
+See [features](https://kube.rs/features/) for a quick overview of default-enabled / opt-in functionality. You can remove `schemars` and the `schemars` feature if you do not need the `kube/derive` feature.
 
 ## Upgrading
 
