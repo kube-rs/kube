@@ -19,7 +19,7 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
       - uses: taiki-e/install-action@v2
         with:
@@ -83,7 +83,7 @@ jobs:
     runs-on: ubuntu-latest
     name: doc
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Install nightly
         uses: dtolnay/rust-toolchain@nightly
       - name: cargo doc
@@ -95,7 +95,7 @@ jobs:
     # Run `cargo check` on our minimum supported Rust version
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Find MSRV
         id: msrv
         run: |
@@ -136,7 +136,7 @@ jobs:
         - "v1.30" # MK8SV
         - "latest"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
       # Smart caching for Rust projects.
       # Includes workaround for macos cache corruption.
@@ -170,7 +170,7 @@ jobs:
     # comile check e2e tests against mk8sv
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Find MK8SV
         id: mk8sv
@@ -226,7 +226,7 @@ jobs:
       matrix:
         tls: [openssl, rustls]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/cache@v4
         with:
           path: |
