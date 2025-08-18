@@ -21,7 +21,7 @@ schemars = { version = "0.8" }
 k8s-openapi = { version = "0.25", features = ["latest", "schemars"] }
 ```
 
-See [features](https://kube.rs/features/) for a quick overview of default-enabled / opt-in functionality. You can remove `schemars` and the `schemars` feature if you do not need the `kube/derive` feature.
+See [features](https://kube.rs/features/) for a quick overview of default-enabled / opt-in functionality. You can remove `schemars` parts if you do not need the `kube/derive` feature.
 
 ## Upgrading
 
