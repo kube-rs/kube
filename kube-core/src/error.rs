@@ -15,4 +15,7 @@ pub struct ErrorResponse {
     pub reason: String,
     /// The error code
     pub code: u16,
+    /// Optional metadata, present on at least some list api errors
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<serde_json::Value>,
 }
