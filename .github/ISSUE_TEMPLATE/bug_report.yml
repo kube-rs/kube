@@ -46,6 +46,14 @@ body:
         k8s-openapi = { version = "0.13.0", features = ["v1_21"], default-features = false }
         ```
 
+  - type: textarea
+    attributes:
+      label: YAML
+      description: |
+        Do you have kubeconfig snippet or resource YAML that would be relevant?
+    validations:
+      required: false
+
   - type: dropdown
     attributes:
       label: Affected crates
