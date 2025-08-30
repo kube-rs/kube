@@ -50,7 +50,7 @@ body:
     attributes:
       label: YAML
       description: |
-        Do you have kubeconfig snippet or resource YAML that would be relevant?
+        Do you have resource YAML that would be relevant?
     validations:
       required: false
 
