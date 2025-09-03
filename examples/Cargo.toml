@@ -236,3 +236,8 @@ path = "secret_syncer.rs"
 name = "pod_shell_crossterm"
 path = "pod_shell_crossterm.rs"
 required-features = ["ws"]
+
+[[example]]
+name = "pod_resize"
+path = "pod_resize.rs"
+required-features = ["latest"]
