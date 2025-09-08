@@ -12,15 +12,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
-      - name: Generate release info
-        run: ./scripts/release-gh.sh
+      # - name: Generate release info
+        # run: ./scripts/release-gh.sh
       - name: Release
         uses: softprops/action-gh-release@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           # Note: body is pre-pended to generated release notes
-          body_path: release.txt
+          #body_path: release.txt
           # github generated notes based on changelog-* tags
           # the format of this is configured in the github native: .github/release.yml
           generate_release_notes: true
