@@ -5,7 +5,44 @@
 <!-- next-header -->
 UNRELEASED
 ===================
- * see https://github.com/kube-rs/kube/compare/1.1.0...main
+ * see https://github.com/kube-rs/kube/compare/2.0.0...main
+
+[2.0.0](https://github.com/kube-rs/kube/releases/tag/2.0.0) / 2025-09-08
+===================
+<!-- Release notes generated using configuration in .github/release.yml at 2.0.0 -->
+## Kubernetes `v1_34` support via `k8s-openapi` [0.26](https://github.com/Arnavion/k8s-openapi/blob/master/CHANGELOG.md#v0260-2025-09-06)
+Please [upgrade k8s-openapi along with kube](https://kube.rs/upgrading/) to avoid conflicts.
+
+## Schemars [1.0](https://github.com/GREsau/schemars/releases/tag/v1.0.0)
+A fairly significant upgrade in https://github.com/kube-rs/kube/pull/1780. Our external facing API should be unchanged, although some schemars public import paths have changed. Note that **if** you are implementing `schemars` traits directly, then see the upstream [schemars/migrating](https://graham.cool/schemars/migrating/) (and maybe consider using [`KubeSchema`](https://docs.rs/kube/latest/kube/derive.KubeSchema.html) for relevant [schema overrides](https://kube.rs/controllers/admission/#x_kube-validation)).
+
+Please [upgrade schemars along with kube](https://kube.rs/upgrading/) for this version to avoid conflicts.
+
+## New Minimums
+Minimum versions: [MSRV](https://kube.rs/rust-version/) 1.85.0 (for [edition 2024](https://github.com/kube-rs/kube/pull/1785)), [MK8SV](https://kube.rs/kubernetes-version/): 1.30 ([unchanged](https://github.com/kube-rs/kube/pull/1756)).
+
+## Highlights
+This version is contains fixes, dependency clearups, and dependency updates. Noteworthy additions are `TryFrom` impls for `Kubeconfig` users in #1801, and a namespace accessor in `Api` in #1788
+
+## New Major
+A new semver major for unstable, public facing dependency updates. As per the new [release cycle](https://kube.rs/stability/#major-release-cycle), it is aligned with the Kubernetes release.
+
+## What's Changed
+### Added
+* Add `TryFrom` conversions for `Kubeconfig` -> `Config` -> `Client` by @Danil-Grigorev in https://github.com/kube-rs/kube/pull/1801
+* Add pub fn namespace(&self) -> Option<&str> to Api by @tgrushka in https://github.com/kube-rs/kube/pull/1788
+### Changed
+* Update to schemars 1.0 by @Danil-Grigorev in https://github.com/kube-rs/kube/pull/1780
+* Bump Rust Edition to 2024 and MSRV to 1.85 by @clux in https://github.com/kube-rs/kube/pull/1785
+* Replace `hyper-socks2` with `hyper-util` client-proxy feature by @tottoto in https://github.com/kube-rs/kube/pull/1795
+* Bump k8s-openapi to 0.26.0 by @clux in https://github.com/kube-rs/kube/pull/1817
+### Fixed
+* Clamp scheduling delay to 6 months by @dervoeti in https://github.com/kube-rs/kube/pull/1779
+* Update admission example and pin to a local crd by @clux in https://github.com/kube-rs/kube/pull/1782
+* Fix interactive auth mode to allow prompt messages by @gememma in https://github.com/kube-rs/kube/pull/1800
+* Make kube::runtime::controller::Action ctors const by @imp in https://github.com/kube-rs/kube/pull/1804
+* Fix oidc with openssl by @saif-88 in https://github.com/kube-rs/kube/pull/1807
+
 
 [1.1.0](https://github.com/kube-rs/kube/releases/tag/1.1.0) / 2025-05-26
 ===================
