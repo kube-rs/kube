@@ -16,9 +16,9 @@ Select a version of `kube` along matching versions of [k8s-openapi](https://gith
 
 ```toml
 [dependencies]
-kube = { version = "2", features = ["runtime", "derive"] }
+kube = { version = "2.0.0", features = ["runtime", "derive"] }
+k8s-openapi = { version = "0.26.0", features = ["latest", "schemars"] }
 schemars = { version = "1" }
-k8s-openapi = { version = "0.26", features = ["latest", "schemars"] }
 ```
 
 See [features](https://kube.rs/features/) for a quick overview of default-enabled / opt-in functionality. You can remove `schemars` parts if you do not need the `kube/derive` feature.
