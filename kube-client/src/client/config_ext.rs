@@ -245,7 +245,7 @@ impl ConfigExt for Config {
                     .map_err(Error::RustlsTls)?,
             ));
         }
-        Ok(builder.enable_http1().wrap_connector(connector))
+        Ok(builder.enable_http1().enable_http2().wrap_connector(connector))
     }
 
     #[cfg(feature = "openssl-tls")]
