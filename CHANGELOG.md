@@ -5,7 +5,10 @@
 <!-- next-header -->
 UNRELEASED
 ===================
- * see https://github.com/kube-rs/kube/compare/2.0.0...main
+ * see https://github.com/kube-rs/kube/compare/2.0.1...main
+
+2.0.1 / 2025-09-12
+===================
 
 [2.0.0](https://github.com/kube-rs/kube/releases/tag/2.0.0) / 2025-09-08
 ===================
@@ -22,7 +25,7 @@ Please [upgrade schemars along with kube](https://kube.rs/upgrading/) for this v
 Minimum versions: [MSRV](https://kube.rs/rust-version/) 1.85.0 (for [edition 2024](https://github.com/kube-rs/kube/pull/1785)), [MK8SV](https://kube.rs/kubernetes-version/): 1.30 ([unchanged](https://github.com/kube-rs/kube/pull/1756)).
 
 ## Highlights
-This version is contains fixes, dependency clearups, and dependency updates. Noteworthy additions are `TryFrom` impls for `Kubeconfig` users in #1801, and a namespace accessor in `Api` in #1788
+This version is contains fixes, dependency clearups, and dependency updates. Noteworthy additions are `TryFrom` impls for `Kubeconfig` users in [#1801](https://github.com/kube-rs/kube/issues/1801), and a namespace accessor in `Api` in [#1788](https://github.com/kube-rs/kube/issues/1788)
 
 ## New Major
 A new semver major for unstable, public facing dependency updates. As per the new [release cycle](https://kube.rs/stability/#major-release-cycle), it is aligned with the Kubernetes release.
