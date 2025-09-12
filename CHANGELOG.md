@@ -7,6 +7,17 @@ UNRELEASED
 ===================
  * see https://github.com/kube-rs/kube/compare/2.0.1...main
 
+[2.0.1](https://github.com/kube-rs/kube/releases/tag/2.0.1) / 2025-09-12
+===================
+<!-- Release notes generated using configuration in .github/release.yml at 2.0.1 -->
+
+## What's Changed
+Fixes an accidental inclusion of a constraint added to `Api::log_stream` introduced in the 2.0.0 Rust 2024 upgrade.
+
+### Fixed
+* Remove unused use<'_> from log_stream() by @pgerber in https://github.com/kube-rs/kube/pull/1824
+
+
 2.0.1 / 2025-09-12
 ===================
 
