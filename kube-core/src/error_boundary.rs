@@ -62,19 +62,19 @@ impl<K: Resource> Resource for DeserializeGuard<K> {
     type DynamicType = K::DynamicType;
     type Scope = K::Scope;
 
-    fn kind(dt: &Self::DynamicType) -> Cow<str> {
+    fn kind(dt: &'_ Self::DynamicType) -> Cow<'_, str> {
         K::kind(dt)
     }
 
-    fn group(dt: &Self::DynamicType) -> Cow<str> {
+    fn group(dt: &'_ Self::DynamicType) -> Cow<'_, str> {
         K::group(dt)
     }
 
-    fn version(dt: &Self::DynamicType) -> Cow<str> {
+    fn version(dt: &'_ Self::DynamicType) -> Cow<'_, str> {
         K::version(dt)
     }
 
-    fn plural(dt: &Self::DynamicType) -> Cow<str> {
+    fn plural(dt: &'_ Self::DynamicType) -> Cow<'_, str> {
         K::plural(dt)
     }
 

@@ -222,7 +222,10 @@ where
     ///
     /// NOTE: `can_take_message` should be considered to be fairly performance-sensitive, since
     /// it will generally be executed for each pending message, for each [`poll_next`](Self::poll_next).
-    pub fn hold_unless<C: Fn(&T) -> bool>(self: Pin<&mut Self>, can_take_message: C) -> HoldUnless<T, R, C> {
+    pub fn hold_unless<C: Fn(&T) -> bool>(
+        self: Pin<&'_ mut Self>,
+        can_take_message: C,
+    ) -> HoldUnless<'_, T, R, C> {
         HoldUnless {
             scheduler: self,
             can_take_message,
@@ -233,7 +236,7 @@ where
     /// Its equivalent to doing `self.hold_unless(|_| false)` and is useful when the
     /// consumer is not ready to consume the expired messages that the [`Scheduler`] emits.
     #[must_use]
-    pub fn hold(self: Pin<&mut Self>) -> Hold<T, R> {
+    pub fn hold(self: Pin<&'_ mut Self>) -> Hold<'_, T, R> {
         Hold { scheduler: self }
     }
 
