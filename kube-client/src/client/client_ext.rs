@@ -487,12 +487,7 @@ mod test {
 
         // Fetch using local object reference
         let svc: Service = client
-            .fetch(
-                &LocalObjectReference {
-                    name: svc.name_any().into(),
-                }
-                .within(svc.namespace()),
-            )
+            .fetch(&LocalObjectReference { name: svc.name_any() }.within(svc.namespace()))
             .await?;
         assert_eq!(svc.name_unchecked(), "kubernetes");
 
