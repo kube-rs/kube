@@ -1,3 +1,6 @@
+#![doc(
+    html_logo_url = "https://user-images.githubusercontent.com/639336/155115130-758a8ba9-e209-42de-bf6d-cde7be3ed86f.svg#only-light"
+)]
 //! Kube is an umbrella-crate for interacting with [Kubernetes](http://kubernetes.io) in Rust.
 //!
 //! # Overview
@@ -103,6 +106,9 @@
 //!
 //! # Examples
 //! A large list of complete, runnable examples with explainations are available in the [examples folder](https://github.com/kube-rs/kube/tree/main/examples).
+//!
+//! # Features
+//! Documented at [kube.rs/features](https://kube.rs/features/).
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 macro_rules! cfg_client {
