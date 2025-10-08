@@ -905,6 +905,7 @@ mod tests {
     #[test]
     fn test_derive_crd() {
         let files = [
+            "crd_complex_enum_tests.rs",
             "crd_mixed_enum_test.rs",
             "crd_schema_test.rs",
             "crd_top_level_enum_test.rs",

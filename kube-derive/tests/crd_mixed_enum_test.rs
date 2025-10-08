@@ -43,10 +43,10 @@ enum ValidEnum4Spec {
     B { inner: u32 },
 }
 
-/// Use `cargo test --package kube-derive print_valid_crds -- --nocapture` to get the CRDs as YAML.
-/// Afterwards you can use `kubectl apply -f -` to see if they are valid.
+/// Use `cargo test --package kube-derive print_crds -- --nocapture` to get the CRDs as YAML.
+/// Afterwards you can use `kubectl apply -f -` to see if they are valid CRDs.
 #[test]
-fn print_valid_crds() {
+fn print_crds() {
     println!("{}", serde_yaml::to_string(&ValidEnum3::crd()).unwrap());
     println!("---");
     println!("{}", serde_yaml::to_string(&ValidEnum4::crd()).unwrap());
@@ -225,7 +225,7 @@ fn valid_enum_4() {
 #[should_panic = "Enum variant set [String(\"A\")] has type Single(String) but was already defined as Some(Single(Object)). The instance type must be equal for all subschema variants."]
 fn struct_with_enum_1() {
     #[derive(CustomResource, Serialize, Deserialize, Debug, Clone, JsonSchema)]
-    #[kube(group = "clux.dev", version = "v1", kind = "Foo", shortname = "foo")]
+    #[kube(group = "clux.dev", version = "v1", kind = "Foo")]
     struct FooSpec {
         foo: InvalidEnum1,
     }
