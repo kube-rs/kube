@@ -7,7 +7,7 @@ error: Unions can not #[derive(CustomResource)]
 error: Serde does not support derive for unions
   --> tests/ui/union_fails.rs:8:1
    |
-8  | / union FooSpec {
-9  | |     int: u32,
+ 8 | / union FooSpec {
+ 9 | |     int: u32,
 10 | | }
    | |_^
