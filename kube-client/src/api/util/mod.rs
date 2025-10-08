@@ -79,10 +79,10 @@ mod test {
 
         let node_name = "fakenode";
         let fake_node = serde_json::from_value(json!({
-        "apiVersion": "v1",
-        "kind": "Node",
-        "metadata": {
-            "name": node_name,
+            "apiVersion": "v1",
+            "kind": "Node",
+            "metadata": {
+                "name": node_name,
             },
         }))?;
 
