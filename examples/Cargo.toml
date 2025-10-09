@@ -42,15 +42,16 @@ static_assertions = "1.1.0"
 tar = "0.4.37"
 tracing.workspace = true
 tracing-subscriber.workspace = true
-warp = { version = "0.3", default-features = false, features = ["tls"] }
+tokio-rustls = { version = "0.26.4", default-features = false }
+warp = { version = "0.4", default-features = false }
 bytes.workspace = true
 http.workspace = true
 http-body-util.workspace = true
 json-patch.workspace = true
 tower = { workspace = true, features = ["limit"] }
 tower-http = { workspace = true, features = ["trace", "decompression-gzip"] }
-hyper = { workspace = true, features = ["client", "http1"] }
-hyper-util = { workspace = true, features = ["client-legacy", "http1", "tokio", "tracing"] }
+hyper = { workspace = true, features = ["client", "http1", "server"] }
+hyper-util = { workspace = true, features = ["client-legacy", "http1", "service", "tokio", "tracing"] }
 thiserror.workspace = true
 backon.workspace = true
 clap = { version = "4.0", default-features = false, features = ["std", "cargo", "derive"] }
