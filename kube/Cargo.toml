@@ -13,32 +13,50 @@ categories = ["network-programming", "caching", "api-bindings", "encoding"]
 
 [features]
 default = ["client", "rustls-tls", "ring"]
+#! See [kube.rs/features](https://kube.rs/features/) for more details
 
-# default features
+## default client
 client = ["kube-client/client", "config"]
+## default config
 config = ["kube-client/config"]
+## default tls stack
 rustls-tls = ["kube-client/rustls-tls", "client"]
 
-# alternative features
+## legacy tls stack (must disable rustls-tls to use)
 openssl-tls = ["kube-client/openssl-tls", "client"]
+## aws rustls provider
 aws-lc-rs = ["kube-client?/aws-lc-rs"]
+## ring rustls provider
 ring = ["kube-client?/ring"]
-
-# auxiliary features
-ws = ["kube-client/ws", "kube-core/ws"]
-kubelet-debug = ["kube-client/kubelet-debug", "kube-core/kubelet-debug"]
-oauth = ["kube-client/oauth", "client"]
-oidc = ["kube-client/oidc", "client"]
-gzip = ["kube-client/gzip", "client"]
-jsonpatch = ["kube-core/jsonpatch"]
-admission = ["kube-core/admission"]
-derive = ["kube-derive", "kube-core/schema"]
-runtime = ["kube-runtime"]
-unstable-runtime = ["kube-runtime/unstable-runtime", "runtime"]
-unstable-client = ["kube-client/unstable-client", "client"]
-socks5 = ["kube-client/socks5", "client"]
-http-proxy = ["kube-client/http-proxy", "client"]
+## enable webpki roots in rustls
 webpki-roots = ["kube-client/webpki-roots", "client"]
+
+## enable kube-derive and proc macros
+derive = ["kube-derive", "kube-core/schema"]
+## enable runtime for controllers/watchers/reflectors
+runtime = ["kube-runtime"]
+## enable websocket client support for portforward/exec/attach
+ws = ["kube-client/ws", "kube-core/ws"]
+## enable client oauth support
+oauth = ["kube-client/oauth", "client"]
+## enable client oidc support
+oidc = ["kube-client/oidc", "client"]
+## enable client socks5 support
+socks5 = ["kube-client/socks5", "client"]
+## enable client http proxy support
+http-proxy = ["kube-client/http-proxy", "client"]
+## enable client gzip usage
+gzip = ["kube-client/gzip", "client"]
+## enable support for jsonpatch style patch parameters
+jsonpatch = ["kube-core/jsonpatch"]
+## enable the admission module
+admission = ["kube-core/admission"]
+## enable unstable runtime features
+unstable-runtime = ["kube-runtime/unstable-runtime", "runtime"]
+## enable unstable client features
+unstable-client = ["kube-client/unstable-client", "client"]
+## enable the kubelet debug interface
+kubelet-debug = ["kube-client/kubelet-debug", "kube-core/kubelet-debug"]
 
 [package.metadata.docs.rs]
 features = ["client", "rustls-tls", "openssl-tls", "derive", "ws", "oauth", "jsonpatch", "admission", "runtime", "k8s-openapi/latest", "unstable-runtime", "socks5", "http-proxy"]
