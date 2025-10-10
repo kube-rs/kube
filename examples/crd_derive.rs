@@ -3,7 +3,7 @@ use kube::{
     core::object::{HasSpec, HasStatus},
     CustomResource, CustomResourceExt, Resource,
 };
-use schemars::JsonSchema;
+use schemars::{json_schema, JsonSchema};
 use serde::{Deserialize, Serialize};
 
 /// Our spec for Foo
@@ -63,7 +63,7 @@ fn main() {
 }
 
 fn conditions(_: &mut schemars::generate::SchemaGenerator) -> schemars::Schema {
-    serde_json::from_value(serde_json::json!({
+    json_schema!({
         "type": "array",
         "x-kubernetes-list-type": "map",
         "x-kubernetes-list-map-keys": ["type"],
@@ -85,8 +85,7 @@ fn conditions(_: &mut schemars::generate::SchemaGenerator) -> schemars::Schema {
                 "type"
             ],
         },
-    }))
-    .unwrap()
+    })
 }
 
 // some tests
