@@ -283,12 +283,10 @@ impl schemars::JsonSchema for Duration {
     }
 
     fn json_schema(_: &mut schemars::generate::SchemaGenerator) -> schemars::Schema {
-        use schemars::json_schema;
-
         // the format should *not* be "duration", because "duration" means
         // the duration is formatted in ISO 8601, as described here:
         // https://datatracker.ietf.org/doc/html/draft-handrews-json-schema-validation-02#section-7.3.1
-        json_schema!({
+        schemars::json_schema!({
             "type": "string",
         })
     }

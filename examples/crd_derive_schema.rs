@@ -9,6 +9,7 @@ use kube::{
     runtime::wait::{await_condition, conditions},
     Client, CustomResource, CustomResourceExt, KubeSchema,
 };
+use schemars::json_schema;
 use serde::{Deserialize, Serialize};
 
 // This example shows how the generated schema affects defaulting and validation.
@@ -121,7 +122,7 @@ impl FooSpec {
 
 // https://kubernetes.io/docs/reference/using-api/server-side-apply/#merge-strategy
 fn set_listable_schema(_: &mut schemars::generate::SchemaGenerator) -> schemars::Schema {
-    serde_json::from_value(serde_json::json!({
+    json_schema!({
         "type": "array",
         "items": {
             "format": "u32",
@@ -129,8 +130,7 @@ fn set_listable_schema(_: &mut schemars::generate::SchemaGenerator) -> schemars:
             "type": "integer"
         },
         "x-kubernetes-list-type": "set"
-    }))
-    .unwrap()
+    })
 }
 
 fn default_value() -> String {
