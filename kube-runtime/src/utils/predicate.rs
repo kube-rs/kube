@@ -103,7 +103,7 @@ pub struct PredicateFilter<St, K: Resource, P: Predicate<K>> {
     #[pin]
     stream: St,
     predicate: P,
-    cache: HashMap<ObjectRef<K>, u64>,
+    cache: HashMap<ObjectRef<K>, (Option<String>, u64)>,
 }
 impl<St, K, P> PredicateFilter<St, K, P>
 where
@@ -135,16 +135,13 @@ where
                 Some(Ok(obj)) => {
                     if let Some(val) = me.predicate.hash_property(&obj) {
                         let key = ObjectRef::from_obj(&obj);
-                        let changed = if let Some(old) = me.cache.get(&key) {
-                            *old != val
+                        let uid = obj.meta().uid.clone();
+                        let changed = if let Some((old_uid, old_val)) = me.cache.get(&key) {
+                            old_uid != &uid || *old_val != val
                         } else {
                             true
                         };
-                        if let Some(old) = me.cache.get_mut(&key) {
-                            *old = val;
-                        } else {
-                            me.cache.insert(key, val);
-                        }
+                        me.cache.insert(key, (uid, val));
                         if changed {
                             Some(Ok(obj))
                         } else {
@@ -249,6 +246,53 @@ pub(crate) mod tests {
         // mkobj(2) next
         let second = rx.next().now_or_never().unwrap().unwrap().unwrap();
         assert_eq!(second.meta().generation, Some(2));
+        assert!(matches!(poll!(rx.next()), Poll::Ready(None)));
+    }
+
+    #[tokio::test]
+    async fn predicate_filtering_should_handle_recreated_resources_with_same_generation() {
+        use k8s_openapi::api::core::v1::Pod;
+
+        let mkobj = |g: i32, uid: &str| {
+            let p: Pod = serde_json::from_value(json!({
+                "apiVersion": "v1",
+                "kind": "Pod",
+                "metadata": {
+                    "name": "blog",
+                    "namespace": "default",
+                    "generation": Some(g),
+                    "uid": uid,
+                },
+                "spec": {
+                    "containers": [{
+                      "name": "blog",
+                      "image": "clux/blog:0.1.0"
+                    }],
+                }
+            }))
+            .unwrap();
+            p
+        };
+
+        // Simulate: create (gen=1, uid=1) -> delete -> create (gen=1, uid=2)
+        let data = stream::iter([
+            Ok(mkobj(1, "uid-1")),  // First resource created, generation=1
+            Ok(mkobj(1, "uid-2")),  // Resource recreated with same generation but different UID
+        ]);
+        let mut rx = pin!(PredicateFilter::new(data, predicates::generation));
+
+        // First object should pass through
+        let first = rx.next().now_or_never().unwrap().unwrap().unwrap();
+        assert_eq!(first.meta().generation, Some(1));
+        assert_eq!(first.meta().uid.as_deref(), Some("uid-1"));
+
+        // Second object should also pass through because it's a different resource
+        // (different UID), even though it has the same generation
+        let second = rx.next().now_or_never().unwrap().unwrap().unwrap();
+        assert_eq!(second.meta().generation, Some(1));
+        assert_eq!(second.meta().uid.as_deref(), Some("uid-2"));
+
+        // Stream should be exhausted
         assert!(matches!(poll!(rx.next()), Poll::Ready(None)));
     }
 }
