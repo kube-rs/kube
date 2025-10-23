@@ -1,20 +1,39 @@
-use crate::{reflector::ObjectRef, watcher::Error};
+use crate::watcher::Error;
 use core::{
     pin::Pin,
-    task::{ready, Context, Poll},
+    task::{Context, Poll, ready},
 };
 use futures::Stream;
-use kube_client::Resource;
+use kube_client::{Resource, api::ObjectMeta};
 use pin_project::pin_project;
 use std::{
-    collections::{hash_map::DefaultHasher, HashMap},
+    collections::{HashMap, hash_map::DefaultHasher},
     hash::{Hash, Hasher},
+    marker::PhantomData,
 };
 
 fn hash<T: Hash + ?Sized>(t: &T) -> u64 {
     let mut hasher = DefaultHasher::new();
     t.hash(&mut hasher);
     hasher.finish()
+}
+
+/// Private cache key that includes UID in equality for predicate filtering
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct PredicateCacheKey {
+    name: String,
+    namespace: Option<String>,
+    uid: Option<String>,
+}
+
+impl From<&ObjectMeta> for PredicateCacheKey {
+    fn from(meta: &ObjectMeta) -> Self {
+        Self {
+            name: meta.name.clone().unwrap_or_default(),
+            namespace: meta.namespace.clone(),
+            uid: meta.uid.clone(),
+        }
+    }
 }
 
 /// A predicate is a hasher of Kubernetes objects stream filtering
@@ -103,7 +122,8 @@ pub struct PredicateFilter<St, K: Resource, P: Predicate<K>> {
     #[pin]
     stream: St,
     predicate: P,
-    cache: HashMap<ObjectRef<K>, (Option<String>, u64)>,
+    cache: HashMap<PredicateCacheKey, u64>,
+    _phantom: PhantomData<K>,
 }
 impl<St, K, P> PredicateFilter<St, K, P>
 where
@@ -116,6 +136,7 @@ where
             stream,
             predicate,
             cache: HashMap::new(),
+            _phantom: PhantomData,
         }
     }
 }
@@ -134,14 +155,9 @@ where
             break match ready!(me.stream.as_mut().poll_next(cx)) {
                 Some(Ok(obj)) => {
                     if let Some(val) = me.predicate.hash_property(&obj) {
-                        let key = ObjectRef::from_obj(&obj);
-                        let uid = obj.meta().uid.clone();
-                        let changed = if let Some((old_uid, old_val)) = me.cache.get(&key) {
-                            old_uid != &uid || *old_val != val
-                        } else {
-                            true
-                        };
-                        me.cache.insert(key, (uid, val));
+                        let key = PredicateCacheKey::from(obj.meta());
+                        let changed = me.cache.get(&key) != Some(&val);
+                        me.cache.insert(key, val);
                         if changed {
                             Some(Ok(obj))
                         } else {
@@ -199,8 +215,8 @@ pub mod predicates {
 pub(crate) mod tests {
     use std::{pin::pin, task::Poll};
 
-    use super::{predicates, Error, PredicateFilter};
-    use futures::{poll, stream, FutureExt, StreamExt};
+    use super::{Error, PredicateFilter, predicates};
+    use futures::{FutureExt, StreamExt, poll, stream};
     use kube_client::Resource;
     use serde_json::json;
 
@@ -276,8 +292,8 @@ pub(crate) mod tests {
 
         // Simulate: create (gen=1, uid=1) -> delete -> create (gen=1, uid=2)
         let data = stream::iter([
-            Ok(mkobj(1, "uid-1")),  // First resource created, generation=1
-            Ok(mkobj(1, "uid-2")),  // Resource recreated with same generation but different UID
+            Ok(mkobj(1, "uid-1")), // First resource created, generation=1
+            Ok(mkobj(1, "uid-2")), // Resource recreated with same generation but different UID
         ]);
         let mut rx = pin!(PredicateFilter::new(data, predicates::generation));
 
