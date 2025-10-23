@@ -291,34 +291,32 @@ pub(crate) mod tests {
             p
         };
 
-        // Simulate: create (gen=1, uid=1) -> update (gen=1, uid=1) -> delete -> create (gen=1, uid=2) -> delete -> create (gen=2, uid-3)
+        // Simulate: create (gen=1, uid=1) -> update (gen=1, uid=1) -> delete ->
+        // create (gen=1, uid=2) -> delete -> create (gen=2, uid=3)
         let data = stream::iter([
-            Ok(mkobj(1, "uid-1")), // First resource created, generation=1
-            Ok(mkobj(1, "uid-1")), // Same resource, same generation (should be filtered out)
-            Ok(mkobj(1, "uid-2")), // Resource recreated with same generation but different UID
-            Ok(mkobj(2, "uid-3")), // Resource recreated again with new generation and different UID
+            Ok(mkobj(1, "uid-1")),
+            Ok(mkobj(1, "uid-1")),
+            Ok(mkobj(1, "uid-2")),
+            Ok(mkobj(2, "uid-3")),
         ]);
         let mut rx = pin!(PredicateFilter::new(data, predicates::generation));
 
-        // First object should pass through
+        // mkobj(1, uid-1) passed through
         let first = rx.next().now_or_never().unwrap().unwrap().unwrap();
         assert_eq!(first.meta().generation, Some(1));
         assert_eq!(first.meta().uid.as_deref(), Some("uid-1"));
 
-        // Second object (same UID, same generation) should be filtered out - no event
-        // Third object should pass through because it's a different resource
-        // (different UID), even though it has the same generation
+        // (no repeat mkobj(1, uid-1) - same UID and generation)
+        // mkobj(1, uid-2) next - different UID detected
         let second = rx.next().now_or_never().unwrap().unwrap().unwrap();
         assert_eq!(second.meta().generation, Some(1));
         assert_eq!(second.meta().uid.as_deref(), Some("uid-2"));
 
-        // Fourth object should also pass through because it's a different resource
-        // (different UID and generation)
+        // mkobj(2, uid-3) next
         let third = rx.next().now_or_never().unwrap().unwrap().unwrap();
         assert_eq!(third.meta().generation, Some(2));
         assert_eq!(third.meta().uid.as_deref(), Some("uid-3"));
 
-        // Stream should be exhausted
         assert!(matches!(poll!(rx.next()), Poll::Ready(None)));
     }
 }
