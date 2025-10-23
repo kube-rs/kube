@@ -3,7 +3,9 @@ use kube::core::{
     admission::{AdmissionRequest, AdmissionResponse, AdmissionReview},
     DynamicObject, Resource, ResourceExt,
 };
+use rustls::pki_types::pem::PemObject;
 use std::{convert::Infallible, error::Error};
+use tokio_rustls::rustls;
 use tracing::*;
 use warp::{reply, Filter, Reply};
 
@@ -20,13 +22,51 @@ async fn main() {
     // encode the CA in the MutatingWebhookConfiguration, and terminate TLS here.
     // See admission_setup.sh + admission_controller.yaml.tpl for how to do this.
     let addr = format!("{}:8443", std::env::var("ADMISSION_PRIVATE_IP").unwrap());
-    warp::serve(warp::post().and(routes))
-        .tls()
-        .cert_path("admission-controller-tls.crt")
-        .key_path("admission-controller-tls.key")
-        //.run(([0, 0, 0, 0], 8443)) // in-cluster
-        .run(addr.parse::<std::net::SocketAddr>().unwrap()) // local-dev
-        .await;
+    let addr = addr.parse::<std::net::SocketAddr>().unwrap();
+    let tcp = tokio::net::TcpListener::bind(addr).await.unwrap();
+
+    let tls_config = rustls::ServerConfig::builder()
+        .with_no_client_auth()
+        .with_single_cert(
+            rustls::pki_types::CertificateDer::pem_file_iter("admission-controller-tls.crt")
+                .unwrap()
+                .map(|cert| cert.unwrap())
+                .collect::<Vec<_>>(),
+            rustls::pki_types::PrivateKeyDer::from_pem_file("admission-controller-tls.key").unwrap(),
+        )
+        .unwrap();
+    let tls_acceptor = tokio_rustls::server::TlsAcceptor::from(std::sync::Arc::new(tls_config));
+
+    let service = warp::service(warp::post().and(routes));
+    let service = hyper_util::service::TowerToHyperService::new(service);
+
+    loop {
+        let (tcp_sock, remote_addr) = match tcp.accept().await {
+            Ok(t) => t,
+            Err(e) => {
+                error!("couldn't accept connection: {}", e);
+                break;
+            }
+        };
+        let tls_acceptor = tls_acceptor.clone();
+        let plain_sock = match tls_acceptor.accept(tcp_sock).await {
+            Ok(sock) => sock,
+            Err(e) => {
+                warn!("failed to open tls connection with {}: {}", remote_addr, e);
+                continue;
+            }
+        };
+        let plain_sock = hyper_util::rt::tokio::TokioIo::new(plain_sock);
+        let service = service.clone();
+        tokio::spawn(async move {
+            let conn_res = hyper::server::conn::http1::Builder::new()
+                .serve_connection(plain_sock, service)
+                .await;
+            if let Err(e) = conn_res {
+                warn!("error while handling connection for {}: {}", remote_addr, e);
+            };
+        });
+    }
 }
 
 // A general /mutate handler, handling errors from the underlying business logic
