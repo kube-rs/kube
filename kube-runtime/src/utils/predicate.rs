@@ -123,6 +123,7 @@ pub struct PredicateFilter<St, K: Resource, P: Predicate<K>> {
     stream: St,
     predicate: P,
     cache: HashMap<PredicateCacheKey, u64>,
+    // K: Resource necessary to get .meta() of an object during polling
     _phantom: PhantomData<K>,
 }
 impl<St, K, P> PredicateFilter<St, K, P>
@@ -290,10 +291,11 @@ pub(crate) mod tests {
             p
         };
 
-        // Simulate: create (gen=1, uid=1) -> delete -> create (gen=1, uid=2)
+        // Simulate: create (gen=1, uid=1) -> delete -> create (gen=1, uid=2) -> delete -> create (gen=2, uid=3)
         let data = stream::iter([
             Ok(mkobj(1, "uid-1")), // First resource created, generation=1
             Ok(mkobj(1, "uid-2")), // Resource recreated with same generation but different UID
+            Ok(mkobj(2, "uid-3")), // Resource recreated again with new generation and different UID
         ]);
         let mut rx = pin!(PredicateFilter::new(data, predicates::generation));
 
@@ -307,6 +309,12 @@ pub(crate) mod tests {
         let second = rx.next().now_or_never().unwrap().unwrap().unwrap();
         assert_eq!(second.meta().generation, Some(1));
         assert_eq!(second.meta().uid.as_deref(), Some("uid-2"));
+
+        // Third object should also pass through because it's a different resource
+        // (different UID and generation)
+        let third = rx.next().now_or_never().unwrap().unwrap().unwrap();
+        assert_eq!(third.meta().generation, Some(2));
+        assert_eq!(third.meta().uid.as_deref(), Some("uid-3"));
 
         // Stream should be exhausted
         assert!(matches!(poll!(rx.next()), Poll::Ready(None)));
