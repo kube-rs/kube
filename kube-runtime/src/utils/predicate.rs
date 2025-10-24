@@ -376,6 +376,7 @@ pub(crate) mod tests {
 
     #[tokio::test]
     async fn predicate_cache_ttl_evicts_expired_entries() {
+        use futures::{channel::mpsc, SinkExt};
         use k8s_openapi::api::core::v1::Pod;
         use std::time::Duration;
 
@@ -405,30 +406,29 @@ pub(crate) mod tests {
             ttl: Duration::from_millis(50),
         };
 
-        // Create a stream that we'll manually poll
-        let data = stream::iter([
-            Ok(mkobj(1, "uid-1")),
-            Ok(mkobj(1, "uid-1")), // Same, should be filtered
-            Ok(mkobj(1, "uid-1")), // After TTL, should pass through again
-        ]);
-        let mut rx = pin!(PredicateFilter::new(data, predicates::generation, config));
+        // Use a channel so we can send items with delays
+        let (mut tx, rx) = mpsc::unbounded();
+        let mut filtered = pin!(PredicateFilter::new(
+            rx.map(Ok::<_, Error>),
+            predicates::generation,
+            config
+        ));
 
-        // First object passes through
-        let first = rx.next().now_or_never().unwrap().unwrap().unwrap();
+        // Send first object
+        tx.send(mkobj(1, "uid-1")).await.unwrap();
+        let first = filtered.next().now_or_never().unwrap().unwrap().unwrap();
         assert_eq!(first.meta().generation, Some(1));
-        assert_eq!(first.meta().uid.as_deref(), Some("uid-1"));
 
-        // Second object is filtered (same gen, same uid, within TTL)
-        // Third object should be filtered too if TTL hasn't expired
+        // Send same object immediately - should be filtered
+        tx.send(mkobj(1, "uid-1")).await.unwrap();
+        assert!(matches!(poll!(filtered.next()), Poll::Pending));
 
         // Wait for TTL to expire
         tokio::time::sleep(Duration::from_millis(100)).await;
 
-        // Now the third object should pass through because cache entry expired
-        let third = rx.next().now_or_never().unwrap().unwrap().unwrap();
-        assert_eq!(third.meta().generation, Some(1));
-        assert_eq!(third.meta().uid.as_deref(), Some("uid-1"));
-
-        assert!(matches!(poll!(rx.next()), Poll::Ready(None)));
+        // Send same object after TTL - should pass through due to eviction
+        tx.send(mkobj(1, "uid-1")).await.unwrap();
+        let second = filtered.next().now_or_never().unwrap().unwrap().unwrap();
+        assert_eq!(second.meta().generation, Some(1));
     }
 }
