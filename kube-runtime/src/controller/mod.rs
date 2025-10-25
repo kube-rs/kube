@@ -730,7 +730,7 @@ where
     ///     .default_backoff()
     ///     .reflect(writer)
     ///     .applied_objects()
-    ///     .predicate_filter(predicates::generation);
+    ///     .predicate_filter(predicates::generation, Default::default());
     ///
     /// Controller::for_stream(deploys, reader)
     ///     .run(reconcile, error_policy, Arc::new(()))
@@ -993,7 +993,7 @@ where
     /// # async fn doc(client: kube::Client) {
     /// let sts_stream = metadata_watcher(Api::<StatefulSet>::all(client.clone()), watcher::Config::default())
     ///     .touched_objects()
-    ///     .predicate_filter(predicates::generation);
+    ///     .predicate_filter(predicates::generation, Default::default());
     ///
     /// Controller::new(Api::<CustomResource>::all(client), watcher::Config::default())
     ///     .owns_stream(sts_stream)
@@ -1271,7 +1271,7 @@ where
     /// let cr: Api<CustomResource> = Api::all(client.clone());
     /// let daemons = watcher(api, watcher::Config::default())
     ///     .touched_objects()
-    ///     .predicate_filter(predicates::generation);
+    ///     .predicate_filter(predicates::generation, Default::default());
     ///
     /// Controller::new(cr, watcher::Config::default())
     ///     .watches_stream(daemons, mapper)

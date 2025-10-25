@@ -37,5 +37,5 @@ pub use scheduler::scheduler;
 pub use utils::WatchStreamExt;
 pub use watcher::{metadata_watcher, watcher};
 
-pub use utils::{predicates, Predicate};
+pub use utils::{predicates, Predicate, PredicateConfig};
 pub use wait::conditions;

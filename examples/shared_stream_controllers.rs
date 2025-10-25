@@ -62,7 +62,7 @@ async fn main() -> anyhow::Result<()> {
     let filtered = subscriber
         .clone()
         .map(|r| Ok(r.deref().clone()))
-        .predicate_filter(predicates::resource_version)
+        .predicate_filter(predicates::resource_version, Default::default())
         .filter_map(|r| future::ready(r.ok().map(Arc::new)));
 
     // Reflect a stream of pod watch events into the store and apply a backoff. For subscribers to
