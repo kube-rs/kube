@@ -120,9 +120,20 @@ where
 pub struct Config {
     /// Time-to-live for cache entries
     ///
-    /// Entries older than this duration will be evicted from the cache.
+    /// Entries not seen for at least this long will be evicted from the cache.
     /// Default is 1 hour.
-    pub ttl: Duration,
+    ttl: Duration,
+}
+
+impl Config {
+    /// Set the time-to-live for cache entries
+    ///
+    /// Entries not seen for at least this long will be evicted from the cache.
+    #[must_use]
+    pub fn ttl(mut self, ttl: Duration) -> Self {
+        self.ttl = ttl;
+        self
+    }
 }
 
 impl Default for Config {
@@ -199,7 +210,7 @@ where
                         // Check if the predicate value changed or entry doesn't exist
                         let changed = me.cache.get(&key).map(|entry| entry.hash) != Some(val);
 
-                        // Update cache with new hash and timestamp
+                        // Upsert the cache entry with new hash and timestamp
                         me.cache.insert(key, CacheEntry {
                             hash: val,
                             last_seen: now,
@@ -402,9 +413,7 @@ pub(crate) mod tests {
         };
 
         // Use a very short TTL for testing
-        let config = Config {
-            ttl: Duration::from_millis(50),
-        };
+        let config = Config::default().ttl(Duration::from_millis(50));
 
         // Use a channel so we can send items with delays
         let (mut tx, rx) = mpsc::unbounded();
