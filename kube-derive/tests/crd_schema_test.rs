@@ -49,6 +49,7 @@ struct FooSpec {
     #[serde(skip_serializing_if = "Option::is_none")]
     nullable_skipped: Option<String>,
     nullable: Option<String>,
+    nullnullnullable: Option<Option<Option<String>>>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default = "default_nullable")]
@@ -175,6 +176,7 @@ fn test_serialized_matches_expected() {
             non_nullable_with_default: "asdf".to_string(),
             nullable_skipped: None,
             nullable: None,
+            nullnullnullable: None,
             nullable_skipped_with_default: None,
             nullable_with_default: None,
             timestamp: DateTime::from_timestamp(0, 0).unwrap(),
@@ -207,6 +209,7 @@ fn test_serialized_matches_expected() {
                 "nonNullable": "asdf",
                 "nonNullableWithDefault": "asdf",
                 "nullable": null,
+                "nullnullnullable": null,
                 "nullableWithDefault": null,
                 "timestamp": "1970-01-01T00:00:00Z",
                 "complexEnum": {
@@ -290,12 +293,15 @@ fn test_crd_schema_matches_expected() {
                                                 "default": "default_value",
                                                 "type": "string"
                                             },
-
                                             "nullableSkipped": {
                                                 "nullable": true,
                                                 "type": "string"
                                             },
                                             "nullable": {
+                                                "nullable": true,
+                                                "type": "string"
+                                            },
+                                            "nullnullnullable": {
                                                 "nullable": true,
                                                 "type": "string"
                                             },
