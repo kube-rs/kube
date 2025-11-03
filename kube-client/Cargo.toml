@@ -26,7 +26,7 @@ gzip = ["client", "tower-http/decompression-gzip"]
 client = ["config", "__non_core", "hyper", "hyper-util", "http-body", "http-body-util", "tower", "tower-http", "hyper-timeout", "chrono", "jsonpath-rust", "bytes", "futures", "tokio", "tokio-util", "either"]
 jsonpatch = ["kube-core/jsonpatch"]
 admission = ["kube-core/admission"]
-config = ["__non_core", "pem", "home"]
+config = ["__non_core", "pem"]
 socks5 = ["hyper-util/client-proxy"]
 http-proxy = ["hyper-util/client-proxy"]
 unstable-client = []
@@ -45,7 +45,6 @@ workspace = true
 [dependencies]
 base64 = { workspace = true, optional = true }
 chrono = { workspace = true, optional = true }
-home = { workspace = true, optional = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 serde_yaml = { workspace = true, optional = true }
