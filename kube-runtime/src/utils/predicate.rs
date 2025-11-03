@@ -10,6 +10,7 @@ use std::{
     collections::{hash_map::DefaultHasher, HashMap},
     hash::{Hash, Hasher},
     marker::PhantomData,
+    time::{Duration, Instant},
 };
 
 fn hash<T: Hash + ?Sized>(t: &T) -> u64 {
@@ -114,6 +115,44 @@ where
     }
 }
 
+/// Configuration for predicate filtering with cache TTL
+#[derive(Debug, Clone)]
+pub struct Config {
+    /// Time-to-live for cache entries
+    ///
+    /// Entries not seen for at least this long will be evicted from the cache.
+    /// Default is 1 hour.
+    ttl: Duration,
+}
+
+impl Config {
+    /// Set the time-to-live for cache entries
+    ///
+    /// Entries not seen for at least this long will be evicted from the cache.
+    #[must_use]
+    pub fn ttl(mut self, ttl: Duration) -> Self {
+        self.ttl = ttl;
+        self
+    }
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            // Default to 1 hour TTL - long enough to avoid unnecessary reconciles
+            // but short enough to prevent unbounded memory growth
+            ttl: Duration::from_secs(3600),
+        }
+    }
+}
+
+/// Cache entry storing predicate hash and last access time
+#[derive(Debug, Clone)]
+struct CacheEntry {
+    hash: u64,
+    last_seen: Instant,
+}
+
 #[allow(clippy::pedantic)]
 #[pin_project]
 /// Stream returned by the [`predicate_filter`](super::WatchStreamExt::predicate_filter) method.
@@ -122,7 +161,8 @@ pub struct PredicateFilter<St, K: Resource, P: Predicate<K>> {
     #[pin]
     stream: St,
     predicate: P,
-    cache: HashMap<PredicateCacheKey, u64>,
+    cache: HashMap<PredicateCacheKey, CacheEntry>,
+    config: Config,
     // K: Resource necessary to get .meta() of an object during polling
     _phantom: PhantomData<K>,
 }
@@ -132,11 +172,12 @@ where
     K: Resource,
     P: Predicate<K>,
 {
-    pub(super) fn new(stream: St, predicate: P) -> Self {
+    pub(super) fn new(stream: St, predicate: P, config: Config) -> Self {
         Self {
             stream,
             predicate,
             cache: HashMap::new(),
+            config,
             _phantom: PhantomData,
         }
     }
@@ -152,13 +193,29 @@ where
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut me = self.project();
+
+        // Evict expired entries before processing new events
+        let now = Instant::now();
+        let ttl = me.config.ttl;
+        me.cache
+            .retain(|_, entry| now.duration_since(entry.last_seen) < ttl);
+
         Poll::Ready(loop {
             break match ready!(me.stream.as_mut().poll_next(cx)) {
                 Some(Ok(obj)) => {
                     if let Some(val) = me.predicate.hash_property(&obj) {
                         let key = PredicateCacheKey::from(obj.meta());
-                        let changed = me.cache.get(&key) != Some(&val);
-                        me.cache.insert(key, val);
+                        let now = Instant::now();
+
+                        // Check if the predicate value changed or entry doesn't exist
+                        let changed = me.cache.get(&key).map(|entry| entry.hash) != Some(val);
+
+                        // Upsert the cache entry with new hash and timestamp
+                        me.cache.insert(key, CacheEntry {
+                            hash: val,
+                            last_seen: now,
+                        });
+
                         if changed {
                             Some(Ok(obj))
                         } else {
@@ -216,7 +273,7 @@ pub mod predicates {
 pub(crate) mod tests {
     use std::{pin::pin, task::Poll};
 
-    use super::{predicates, Error, PredicateFilter};
+    use super::{predicates, Config, Error, PredicateFilter};
     use futures::{poll, stream, FutureExt, StreamExt};
     use kube_client::Resource;
     use serde_json::json;
@@ -248,7 +305,11 @@ pub(crate) mod tests {
             Ok(mkobj(1)),
             Ok(mkobj(2)),
         ]);
-        let mut rx = pin!(PredicateFilter::new(data, predicates::generation));
+        let mut rx = pin!(PredicateFilter::new(
+            data,
+            predicates::generation,
+            Config::default()
+        ));
 
         // mkobj(1) passed through
         let first = rx.next().now_or_never().unwrap().unwrap().unwrap();
@@ -299,7 +360,11 @@ pub(crate) mod tests {
             Ok(mkobj(1, "uid-2")),
             Ok(mkobj(2, "uid-3")),
         ]);
-        let mut rx = pin!(PredicateFilter::new(data, predicates::generation));
+        let mut rx = pin!(PredicateFilter::new(
+            data,
+            predicates::generation,
+            Config::default()
+        ));
 
         // mkobj(1, uid-1) passed through
         let first = rx.next().now_or_never().unwrap().unwrap().unwrap();
@@ -318,5 +383,61 @@ pub(crate) mod tests {
         assert_eq!(third.meta().uid.as_deref(), Some("uid-3"));
 
         assert!(matches!(poll!(rx.next()), Poll::Ready(None)));
+    }
+
+    #[tokio::test]
+    async fn predicate_cache_ttl_evicts_expired_entries() {
+        use futures::{channel::mpsc, SinkExt};
+        use k8s_openapi::api::core::v1::Pod;
+        use std::time::Duration;
+
+        let mkobj = |g: i32, uid: &str| {
+            let p: Pod = serde_json::from_value(json!({
+                "apiVersion": "v1",
+                "kind": "Pod",
+                "metadata": {
+                    "name": "blog",
+                    "namespace": "default",
+                    "generation": Some(g),
+                    "uid": uid,
+                },
+                "spec": {
+                    "containers": [{
+                      "name": "blog",
+                      "image": "clux/blog:0.1.0"
+                    }],
+                }
+            }))
+            .unwrap();
+            p
+        };
+
+        // Use a very short TTL for testing
+        let config = Config::default().ttl(Duration::from_millis(50));
+
+        // Use a channel so we can send items with delays
+        let (mut tx, rx) = mpsc::unbounded();
+        let mut filtered = pin!(PredicateFilter::new(
+            rx.map(Ok::<_, Error>),
+            predicates::generation,
+            config
+        ));
+
+        // Send first object
+        tx.send(mkobj(1, "uid-1")).await.unwrap();
+        let first = filtered.next().now_or_never().unwrap().unwrap().unwrap();
+        assert_eq!(first.meta().generation, Some(1));
+
+        // Send same object immediately - should be filtered
+        tx.send(mkobj(1, "uid-1")).await.unwrap();
+        assert!(matches!(poll!(filtered.next()), Poll::Pending));
+
+        // Wait for TTL to expire
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        // Send same object after TTL - should pass through due to eviction
+        tx.send(mkobj(1, "uid-1")).await.unwrap();
+        let second = filtered.next().now_or_never().unwrap().unwrap().unwrap();
+        assert_eq!(second.meta().generation, Some(1));
     }
 }
