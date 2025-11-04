@@ -2,7 +2,7 @@ use crate::{
     utils::{
         event_decode::EventDecode,
         event_modify::EventModify,
-        predicate::{Predicate, PredicateFilter},
+        predicate::{Config as PredicateConfig, Predicate, PredicateFilter},
         stream_backoff::StreamBackoff,
     },
     watcher,
@@ -99,6 +99,9 @@ pub trait WatchStreamExt: Stream {
     /// Common use case for this is to avoid repeat events for status updates
     /// by filtering on [`predicates::generation`](crate::predicates::generation).
     ///
+    /// The cache entries have a configurable time-to-live (TTL) to prevent unbounded
+    /// memory growth. By default, entries expire after 1 hour.
+    ///
     /// ## Usage
     /// ```no_run
     /// # use std::pin::pin;
@@ -111,7 +114,7 @@ pub trait WatchStreamExt: Stream {
     /// let deploys: Api<Deployment> = Api::default_namespaced(client);
     /// let mut changed_deploys = pin!(watcher(deploys, watcher::Config::default())
     ///     .applied_objects()
-    ///     .predicate_filter(predicates::generation));
+    ///     .predicate_filter(predicates::generation, Default::default()));
     ///
     /// while let Some(d) = changed_deploys.try_next().await? {
     ///    println!("saw Deployment '{} with hitherto unseen generation", d.name_any());
@@ -119,13 +122,13 @@ pub trait WatchStreamExt: Stream {
     /// # Ok(())
     /// # }
     /// ```
-    fn predicate_filter<K, P>(self, predicate: P) -> PredicateFilter<Self, K, P>
+    fn predicate_filter<K, P>(self, predicate: P, config: PredicateConfig) -> PredicateFilter<Self, K, P>
     where
         Self: Stream<Item = Result<K, watcher::Error>> + Sized,
         K: Resource + 'static,
         P: Predicate<K> + 'static,
     {
-        PredicateFilter::new(self, predicate)
+        PredicateFilter::new(self, predicate, config)
     }
 
     /// Reflect a [`watcher()`] stream into a [`Store`] through a [`Writer`]
@@ -301,7 +304,7 @@ pub(crate) mod tests {
     fn test_watcher_stream_type_drift() {
         let pred_watch = watcher(compile_type::<Api<Pod>>(), Default::default())
             .touched_objects()
-            .predicate_filter(predicates::generation)
+            .predicate_filter(predicates::generation, Default::default())
             .boxed();
         assert_stream(pred_watch);
     }
