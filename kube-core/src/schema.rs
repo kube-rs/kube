@@ -273,6 +273,15 @@ impl Transform for StructuralSchemaRewriter {
                 // Untagged enums are serialized using `any_of`
                 hoist_subschema_properties(any_of, &mut schema.object, &mut schema.instance_type);
             }
+
+            // FIXME: hack for https://github.com/kube-rs/kube/issues/1821
+            if let Some(any_of) = &mut subschemas.any_of {
+                if let Some(new_schema) = optional_enum_flatten_hack(any_of) {
+                    let metadata = schema.metadata;
+                    schema = new_schema.clone();
+                    schema.metadata = metadata;
+                }
+            }
         }
 
         // check for maps without with properties (i.e. flattened maps)
@@ -423,4 +432,70 @@ fn merge_metadata(
             }
         }
     }
+}
+
+/// In kube 2.x the schema output behavior for `Option<Enum>` types changed.
+///
+/// Previously given an enum like:
+///
+/// ```rust
+/// enum LogLevel {
+///     Debug,
+///     Info,
+///     Error,
+/// }
+/// ```
+///
+/// The following would be generated for Optional<LogLevel>:
+///
+/// ```json
+/// { "enum": ["Debug", "Info", "Error"], "type": "string", "nullable": true }
+/// ```
+///
+/// Now, schemars generates `anyOf` for `Option<LogLevel>` like:
+///
+/// ```json
+/// {
+///   "anyOf": [
+///     { "enum": ["Debug", "Info", "Error"], "type": "string" },
+///     { "enum": [null], "nullable": true }
+///   ]
+/// }
+/// ```
+///
+/// This is breaking, as Kubernetes validation will reject this structure. This
+/// issue was reported in:
+///
+///   https://github.com/kube-rs/kube/issues/1821
+///
+/// This hack does a precise check for this "empty" second enum that would
+/// break validation, and removes it, flattening the schema object.
+///
+/// FIXME: This should be removed once the problem is properly resolved.
+fn optional_enum_flatten_hack(any_of: &mut Vec<Schema>) -> Option<&SchemaObject> {
+    if let [
+        Schema::Object(obj),
+        Schema::Object(SchemaObject {
+            enum_values: Some(null_enum),
+            metadata: None,
+            instance_type: None,
+            format: None,
+            subschemas: None,
+            array: None,
+            object: None,
+            extensions,
+            other: Value::Object(other),
+        }),
+    ] = any_of.as_mut_slice()
+        && null_enum.as_slice() == [Value::Null]
+        && extensions.len() == 1
+        && extensions.get("nullable") == Some(&Value::Bool(true))
+        && other.len() == 1
+        && other.get("nullable") == Some(&Value::Bool(true))
+    {
+        obj.extensions.insert("nullable".into(), Value::Bool(true));
+        return Some(obj);
+    }
+
+    None
 }
