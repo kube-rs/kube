@@ -904,15 +904,17 @@ mod tests {
 
     #[test]
     fn test_derive_crd() {
-        let path = env::current_dir().unwrap().join("tests").join("crd_enum_test.rs");
-        let file = fs::File::open(path).unwrap();
-        runtime_macros::emulate_derive_macro_expansion(file, &[("CustomResource", derive)]).unwrap();
+        let files = [
+            "crd_complex_enum_tests.rs",
+            "crd_mixed_enum_test.rs",
+            "crd_schema_test.rs",
+            "crd_top_level_enum_test.rs",
+        ];
 
-        let path = env::current_dir()
-            .unwrap()
-            .join("tests")
-            .join("crd_schema_test.rs");
-        let file = fs::File::open(path).unwrap();
-        runtime_macros::emulate_derive_macro_expansion(file, &[("CustomResource", derive)]).unwrap();
+        for file in files {
+            let path = env::current_dir().unwrap().join("tests").join(file);
+            let file = fs::File::open(path).unwrap();
+            runtime_macros::emulate_derive_macro_expansion(file, &[("CustomResource", derive)]).unwrap();
+        }
     }
 }

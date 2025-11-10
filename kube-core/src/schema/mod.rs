@@ -2,13 +2,36 @@
 //!
 //! [`CustomResourceDefinition`]: `k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition`
 
+mod transform_any_of;
+mod transform_one_of;
+mod transform_optional_enum_with_null;
+mod transform_properties;
+
 // Used in docs
 #[allow(unused_imports)] use schemars::generate::SchemaSettings;
 
 use schemars::{transform::Transform, JsonSchema};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    sync::LazyLock,
+};
+
+use crate::schema::{
+    transform_any_of::hoist_any_of_subschema_with_a_nullable_variant,
+    transform_one_of::hoist_one_of_enum_with_unit_variants,
+    transform_optional_enum_with_null::remove_optional_enum_null_variant,
+    transform_properties::hoist_properties_for_any_of_subschemas,
+};
+
+/// This is the signature for the `null` variant produced by schemars.
+static NULL_SCHEMA: LazyLock<Value> = LazyLock::new(|| {
+    serde_json::json!({
+        "enum": [null],
+        "nullable": true
+    })
+});
 
 /// schemars [`Visitor`] that rewrites a [`Schema`] to conform to Kubernetes' "structural schema" rules
 ///
@@ -248,32 +271,22 @@ enum SingleOrVec<T> {
 
 impl Transform for StructuralSchemaRewriter {
     fn transform(&mut self, transform_schema: &mut schemars::Schema) {
+        // Apply this (self) transform to all subschemas
         schemars::transform::transform_subschemas(self, transform_schema);
 
         let mut schema: SchemaObject = match serde_json::from_value(transform_schema.clone().to_value()).ok()
         {
+            // TODO (@NickLarsenNZ): At this point, we are seeing duplicate `title` when printing schema as json.
+            // This is because `title` is specified under both `extensions` and `other`.
             Some(schema) => schema,
             None => return,
         };
 
-        if let Some(subschemas) = &mut schema.subschemas {
-            if let Some(one_of) = subschemas.one_of.as_mut() {
-                // Tagged enums are serialized using `one_of`
-                hoist_subschema_properties(one_of, &mut schema.object, &mut schema.instance_type);
-
-                // "Plain" enums are serialized using `one_of` if they have doc tags
-                hoist_subschema_enum_values(one_of, &mut schema.enum_values, &mut schema.instance_type);
-
-                if one_of.is_empty() {
-                    subschemas.one_of = None;
-                }
-            }
-
-            if let Some(any_of) = &mut subschemas.any_of {
-                // Untagged enums are serialized using `any_of`
-                hoist_subschema_properties(any_of, &mut schema.object, &mut schema.instance_type);
-            }
-        }
+        // Hoist parts of the schema to make it valid for k8s
+        hoist_one_of_enum_with_unit_variants(&mut schema);
+        hoist_any_of_subschema_with_a_nullable_variant(&mut schema);
+        hoist_properties_for_any_of_subschemas(&mut schema);
+        remove_optional_enum_null_variant(&mut schema);
 
         // check for maps without with properties (i.e. flattened maps)
         // and allow these to persist dynamically
@@ -297,129 +310,10 @@ impl Transform for StructuralSchemaRewriter {
             array.unique_items = None;
         }
 
+        // Convert back to schemars::Schema
         if let Ok(schema) = serde_json::to_value(schema) {
             if let Ok(transformed) = serde_json::from_value(schema) {
                 *transform_schema = transformed;
-            }
-        }
-    }
-}
-
-/// Bring all plain enum values up to the root schema,
-/// since Kubernetes doesn't allow subschemas to define enum options.
-///
-/// (Enum here means a list of hard-coded values, not a tagged union.)
-fn hoist_subschema_enum_values(
-    subschemas: &mut Vec<Schema>,
-    common_enum_values: &mut Option<Vec<serde_json::Value>>,
-    instance_type: &mut Option<SingleOrVec<InstanceType>>,
-) {
-    subschemas.retain(|variant| {
-        if let Schema::Object(SchemaObject {
-            instance_type: variant_type,
-            enum_values: Some(variant_enum_values),
-            ..
-        }) = variant
-        {
-            if let Some(variant_type) = variant_type {
-                match instance_type {
-                    None => *instance_type = Some(variant_type.clone()),
-                    Some(tpe) => {
-                        if tpe != variant_type {
-                            panic!("Enum variant set {variant_enum_values:?} has type {variant_type:?} but was already defined as {instance_type:?}. The instance type must be equal for all subschema variants.")
-                        }
-                    }
-                }
-            }
-            common_enum_values
-                .get_or_insert_with(Vec::new)
-                .extend(variant_enum_values.iter().cloned());
-            false
-        } else {
-            true
-        }
-    })
-}
-
-/// Bring all property definitions from subschemas up to the root schema,
-/// since Kubernetes doesn't allow subschemas to define properties.
-fn hoist_subschema_properties(
-    subschemas: &mut Vec<Schema>,
-    common_obj: &mut Option<Box<ObjectValidation>>,
-    instance_type: &mut Option<SingleOrVec<InstanceType>>,
-) {
-    for variant in subschemas {
-        if let Schema::Object(SchemaObject {
-            instance_type: variant_type,
-            object: Some(variant_obj),
-            metadata: variant_metadata,
-            ..
-        }) = variant
-        {
-            let common_obj = common_obj.get_or_insert_with(Box::<ObjectValidation>::default);
-
-            if let Some(variant_metadata) = variant_metadata {
-                // Move enum variant description from oneOf clause to its corresponding property
-                if let Some(description) = std::mem::take(&mut variant_metadata.description) {
-                    if let Some(Schema::Object(variant_object)) =
-                        only_item(variant_obj.properties.values_mut())
-                    {
-                        let metadata = variant_object
-                            .metadata
-                            .get_or_insert_with(Box::<Metadata>::default);
-                        metadata.description = Some(description);
-                    }
-                }
-            }
-
-            // Move all properties
-            let variant_properties = std::mem::take(&mut variant_obj.properties);
-            for (property_name, property) in variant_properties {
-                match common_obj.properties.entry(property_name) {
-                    Entry::Vacant(entry) => {
-                        entry.insert(property);
-                    }
-                    Entry::Occupied(entry) => {
-                        if &property != entry.get() {
-                            panic!("Property {:?} has the schema {:?} but was already defined as {:?} in another subschema. The schemas for a property used in multiple subschemas must be identical",
-                            entry.key(),
-                            &property,
-                            entry.get());
-                        }
-                    }
-                }
-            }
-
-            // Kubernetes doesn't allow variants to set additionalProperties
-            variant_obj.additional_properties = None;
-
-            merge_metadata(instance_type, variant_type.take());
-        }
-    }
-}
-
-fn only_item<I: Iterator>(mut i: I) -> Option<I::Item> {
-    let item = i.next()?;
-    if i.next().is_some() {
-        return None;
-    }
-    Some(item)
-}
-
-fn merge_metadata(
-    instance_type: &mut Option<SingleOrVec<InstanceType>>,
-    variant_type: Option<SingleOrVec<InstanceType>>,
-) {
-    match (instance_type, variant_type) {
-        (_, None) => {}
-        (common_type @ None, variant_type) => {
-            *common_type = variant_type;
-        }
-        (Some(common_type), Some(variant_type)) => {
-            if *common_type != variant_type {
-                panic!(
-                    "variant defined type {variant_type:?}, conflicting with existing type {common_type:?}"
-                );
             }
         }
     }
