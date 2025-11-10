@@ -12,7 +12,7 @@ clippy:
 
 fmt:
   #rustup component add rustfmt --toolchain nightly
-  rustfmt +nightly --edition 2021 $(find . -type f -iname *.rs)
+  rustfmt +nightly --edition 2024 $(find . -type f -iname *.rs)
 
 doc:
   RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --all-features --no-deps --open
@@ -61,7 +61,7 @@ hack:
   # Skipped oauth and oidc, as these compile fails without a tls stack.
 
 readme:
-  rustdoc README.md --test --edition=2021
+  rustdoc README.md --test --edition=2024
 
 e2e: (e2e-mink8s) (e2e-incluster "rustls,latest")
 
@@ -89,7 +89,7 @@ e2e-job-musl features:
   docker run \
     -v cargo-cache:/root/.cargo/registry \
     -v "$PWD:/volume" -w /volume \
-    --rm -it clux/muslrust:1.86.0-stable cargo build --release --features={{features}} -p e2e
+    --rm -it clux/muslrust:1.91.0-stable cargo build --release --features={{features}} -p e2e
   cp target/x86_64-unknown-linux-musl/release/job e2e/job
   chmod +x e2e/job
 
