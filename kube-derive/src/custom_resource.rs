@@ -7,7 +7,7 @@ use darling::{
 use proc_macro2::{Ident, Literal, Span, TokenStream};
 use quote::{ToTokens, TokenStreamExt as _};
 use serde::Deserialize;
-use syn::{parse_quote, Data, DeriveInput, Expr, Path, Visibility};
+use syn::{parse_quote, Data, DeriveInput, Expr, Meta, Path, Visibility};
 
 /// Values we can parse from #[kube(attrs)]
 #[derive(Debug, FromDeriveInput)]
@@ -27,6 +27,8 @@ struct KubeAttrs {
     namespaced: bool,
     #[darling(multiple, rename = "derive")]
     derives: Vec<String>,
+    #[darling(multiple, rename = "attr")]
+    attributes: Vec<KubeRootMeta>,
     schema: Option<SchemaMode>,
     status: Option<Path>,
     #[darling(multiple, rename = "category")]
@@ -322,6 +324,43 @@ impl Scale {
     }
 }
 
+/// Attribute meta that should be added to the root of the custom resource.
+/// Wrapper around `Meta` to implement custom validation logic for `darling`.
+/// The validation rejects attributes for `derive`, `serde` and `schemars`.
+/// For `derive` there is `#[kube(derive=...)]` which does specialized handling
+/// and for `serde` and `schemars` allowing to set attributes could result in conflicts
+/// or unexpected behaviour with respect to other parts of the generated code.
+#[derive(Debug)]
+struct KubeRootMeta(Meta);
+
+impl ToTokens for KubeRootMeta {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        self.0.to_tokens(tokens);
+    }
+}
+
+impl FromMeta for KubeRootMeta {
+    fn from_string(value: &str) -> darling::Result<Self> {
+        /// Attributes that are not allowed to be set via `#[kube(attr=...)]`.
+        const NOT_ALLOWED_ATTRIBUTES: [&str; 3] = ["derive", "serde", "schemars"];
+
+        let meta = syn::parse_str::<Meta>(value)?;
+        if let Some(ident) = meta.path().get_ident()
+            && NOT_ALLOWED_ATTRIBUTES.iter().any(|el| ident == el)
+        {
+            if ident == "derive" {
+                return Err(darling::Error::custom(
+                    r#"#[derive(CustomResource)] `kube(attr = "...")` does not support to set derives, you likely want to use `kube(derive = "...")`."#,
+                ));
+            }
+            return Err(darling::Error::custom(format!(
+                r#"#[derive(CustomResource)] `kube(attr = "...")` does not support to set the attributes {NOT_ALLOWED_ATTRIBUTES:?} as they might lead to unexpected behaviour.`"#,
+            )));
+        }
+        Ok(Self(meta))
+    }
+}
+
 pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
     let derive_input: DeriveInput = match syn::parse2(input) {
         Err(err) => return err.to_compile_error(),
@@ -351,6 +390,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         version,
         doc,
         namespaced,
+        attributes,
         derives,
         schema: schema_mode,
         status,
@@ -476,6 +516,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         #[automatically_derived]
         #[allow(missing_docs)]
         #[derive(#(#derive_paths),*)]
+        #(#[#attributes])*
         #[serde(rename_all = "camelCase")]
         #[serde(crate = #quoted_serde)]
         #schemars_attribute
