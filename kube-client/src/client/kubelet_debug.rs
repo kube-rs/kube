@@ -1,9 +1,9 @@
 use crate::{
-    Client, Error, Result,
     api::{AttachParams, AttachedProcess, LogParams, Portforwarder},
     client::AsyncBufRead,
+    Client, Error, Result,
 };
-use kube_core::{Request, kubelet_debug::KubeletDebugParams};
+use kube_core::{kubelet_debug::KubeletDebugParams, Request};
 use std::fmt::Debug;
 
 /// Methods to access debug endpoints directly on `kubelet`
