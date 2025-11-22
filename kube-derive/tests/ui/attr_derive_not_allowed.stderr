@@ -1,0 +1,5 @@
+error: #[derive(CustomResource)] `kube(attr = "...")` does not support to set derives, you likely want to use `kube(derive = "...")`.
+ --> tests/ui/attr_derive_not_allowed.rs:7:15
+  |
+7 | #[kube(attr = "derive(Serialize)")]
+  |               ^^^^^^^^^^^^^^^^^^^

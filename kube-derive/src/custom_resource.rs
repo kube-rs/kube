@@ -7,7 +7,7 @@ use darling::{
 use proc_macro2::{Ident, Literal, Span, TokenStream};
 use quote::{ToTokens, TokenStreamExt as _};
 use serde::Deserialize;
-use syn::{parse_quote, Data, DeriveInput, Expr, Path, Visibility};
+use syn::{parse_quote, Data, DeriveInput, Expr, Meta, Path, Visibility};
 
 /// Values we can parse from #[kube(attrs)]
 #[derive(Debug, FromDeriveInput)]
@@ -27,6 +27,8 @@ struct KubeAttrs {
     namespaced: bool,
     #[darling(multiple, rename = "derive")]
     derives: Vec<String>,
+    #[darling(multiple, rename = "attr")]
+    attributes: Vec<KubeRootMeta>,
     schema: Option<SchemaMode>,
     status: Option<Path>,
     #[darling(multiple, rename = "category")]
@@ -322,6 +324,44 @@ impl Scale {
     }
 }
 
+/// Attribute meta that should be added to the root of the custom resource.
+/// Wrapper around `Meta` to implement custom validation logic for `darling`.
+/// The validation rejects attributes for `derive`, `serde` and `schemars`.
+/// For `derive` there is `#[kube(derive=...)]` which does specialized handling
+/// and for `serde` and `schemars` allowing to set attributes could result in conflicts
+/// or unexpected behaviour with respect to other parts of the generated code.
+#[derive(Debug)]
+struct KubeRootMeta(Meta);
+
+impl ToTokens for KubeRootMeta {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        self.0.to_tokens(tokens);
+    }
+}
+
+impl FromMeta for KubeRootMeta {
+    fn from_string(value: &str) -> darling::Result<Self> {
+        /// Attributes that are not allowed to be set via `#[kube(attr=...)]`.
+        const NOT_ALLOWED_ATTRIBUTES: [&str; 3] = ["derive", "serde", "schemars"];
+
+        let meta = syn::parse_str::<Meta>(value)?;
+        if let Some(ident) = meta.path().get_ident() {
+            if NOT_ALLOWED_ATTRIBUTES.iter().any(|el| ident == el) {
+                if ident == "derive" {
+                    return Err(darling::Error::custom(
+                        r#"#[derive(CustomResource)] `kube(attr = "...")` does not support to set derives, you likely want to use `kube(derive = "...")`."#,
+                    ));
+                }
+                return Err(darling::Error::custom(format!(
+                    r#"#[derive(CustomResource)] `kube(attr = "...")` does not support to set the attributes {NOT_ALLOWED_ATTRIBUTES:?} as they might lead to unexpected behaviour.`"#,
+                )));
+            }
+        }
+
+        Ok(Self(meta))
+    }
+}
+
 pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
     let derive_input: DeriveInput = match syn::parse2(input) {
         Err(err) => return err.to_compile_error(),
@@ -351,6 +391,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         version,
         doc,
         namespaced,
+        attributes,
         derives,
         schema: schema_mode,
         status,
@@ -476,6 +517,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         #[automatically_derived]
         #[allow(missing_docs)]
         #[derive(#(#derive_paths),*)]
+        #(#[#attributes])*
         #[serde(rename_all = "camelCase")]
         #[serde(crate = #quoted_serde)]
         #schemars_attribute
@@ -901,6 +943,36 @@ mod tests {
         assert_eq!(kube_attrs.kind, "Foo".to_string());
         assert!(kube_attrs.namespaced);
     }
+
+    #[test]
+    // The error cases are handled in tests/test_ui together with validating that the error messages are helpful
+    fn test_parse_attribute_ok() {
+        let input = quote! {
+            #[derive(CustomResource, Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+            #[kube(group = "clux.dev", version = "v1", kind = "Foo", namespaced)]
+            #[kube(attr="hello")]
+            #[kube(attr="hello2")]
+            struct FooSpec { foo: String }
+        };
+        let input = syn::parse2(input).unwrap();
+        let kube_attrs = KubeAttrs::from_derive_input(&input).unwrap();
+        assert_eq!(kube_attrs.group, "clux.dev".to_string());
+        assert_eq!(kube_attrs.version, "v1".to_string());
+        assert_eq!(kube_attrs.kind, "Foo".to_string());
+        assert!(kube_attrs.namespaced);
+
+        let expected_attrs = ["hello", "hello2"];
+        assert_eq!(kube_attrs.attributes.len(), expected_attrs.len());
+        for (i, attr) in kube_attrs
+            .attributes
+            .into_iter()
+            .map(|el| el.to_token_stream().to_string())
+            .enumerate()
+        {
+            assert_eq!(attr, expected_attrs[i],);
+        }
+    }
+
 
     #[test]
     fn test_derive_crd() {
