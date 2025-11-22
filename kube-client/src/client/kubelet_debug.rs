@@ -82,7 +82,7 @@ impl Client {
         kubelet_params: &KubeletDebugParams<'_>,
         container: &str,
         lp: &LogParams,
-    ) -> Result<impl AsyncBufRead> {
+    ) -> Result<impl AsyncBufRead + use<>> {
         let mut req =
             Request::kubelet_node_logs(kubelet_params, container, lp).map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("kubelet_node_log");
