@@ -345,18 +345,19 @@ impl FromMeta for KubeRootMeta {
         const NOT_ALLOWED_ATTRIBUTES: [&str; 3] = ["derive", "serde", "schemars"];
 
         let meta = syn::parse_str::<Meta>(value)?;
-        if let Some(ident) = meta.path().get_ident()
-            && NOT_ALLOWED_ATTRIBUTES.iter().any(|el| ident == el)
-        {
-            if ident == "derive" {
-                return Err(darling::Error::custom(
-                    r#"#[derive(CustomResource)] `kube(attr = "...")` does not support to set derives, you likely want to use `kube(derive = "...")`."#,
-                ));
+        if let Some(ident) = meta.path().get_ident() {
+            if NOT_ALLOWED_ATTRIBUTES.iter().any(|el| ident == el) {
+                if ident == "derive" {
+                    return Err(darling::Error::custom(
+                        r#"#[derive(CustomResource)] `kube(attr = "...")` does not support to set derives, you likely want to use `kube(derive = "...")`."#,
+                    ));
+                }
+                return Err(darling::Error::custom(format!(
+                    r#"#[derive(CustomResource)] `kube(attr = "...")` does not support to set the attributes {NOT_ALLOWED_ATTRIBUTES:?} as they might lead to unexpected behaviour.`"#,
+                )));
             }
-            return Err(darling::Error::custom(format!(
-                r#"#[derive(CustomResource)] `kube(attr = "...")` does not support to set the attributes {NOT_ALLOWED_ATTRIBUTES:?} as they might lead to unexpected behaviour.`"#,
-            )));
         }
+
         Ok(Self(meta))
     }
 }
