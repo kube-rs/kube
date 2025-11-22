@@ -945,6 +945,36 @@ mod tests {
     }
 
     #[test]
+    // The error cases are handled in tests/test_ui together with validating that the error messages are helpful
+    fn test_parse_attribute_ok() {
+        let input = quote! {
+            #[derive(CustomResource, Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+            #[kube(group = "clux.dev", version = "v1", kind = "Foo", namespaced)]
+            #[kube(attr="hello")]
+            #[kube(attr="hello2")]
+            struct FooSpec { foo: String }
+        };
+        let input = syn::parse2(input).unwrap();
+        let kube_attrs = KubeAttrs::from_derive_input(&input).unwrap();
+        assert_eq!(kube_attrs.group, "clux.dev".to_string());
+        assert_eq!(kube_attrs.version, "v1".to_string());
+        assert_eq!(kube_attrs.kind, "Foo".to_string());
+        assert!(kube_attrs.namespaced);
+
+        let expected_attrs = ["hello", "hello2"];
+        assert_eq!(kube_attrs.attributes.len(), expected_attrs.len());
+        for (i, attr) in kube_attrs
+            .attributes
+            .into_iter()
+            .map(|el| el.to_token_stream().to_string())
+            .enumerate()
+        {
+            assert_eq!(attr, expected_attrs[i],);
+        }
+    }
+
+
+    #[test]
     fn test_derive_crd() {
         let path = env::current_dir().unwrap().join("tests").join("crd_enum_test.rs");
         let file = fs::File::open(path).unwrap();
