@@ -9,6 +9,8 @@ use std::fmt::Debug;
 #[cfg(feature = "ws")] pub use portforward::Portforwarder;
 
 mod subresource;
+#[cfg_attr(docsrs, doc(cfg(feature = "k8s_if_ge_1_33")))]
+pub use subresource::Resize;
 #[cfg(feature = "ws")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
 pub use subresource::{Attach, AttachParams, Ephemeral, Execute, Portforward};
