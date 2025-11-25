@@ -21,6 +21,8 @@ use serde::{Deserialize, Serialize};
     status = "FooStatus",
     derive = "PartialEq",
     derive = "Default",
+    attr = "allow(deprecated)",
+    attr = "cfg_attr(docsrs,doc(cfg(feature = \"latest\")))",
     shortname = "f",
     scale(
         spec_replicas_path = ".spec.replicas",

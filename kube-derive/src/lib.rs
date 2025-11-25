@@ -113,6 +113,24 @@ mod resource;
 /// Adding `#[kube(derive = "PartialEq")]` is required if you want your generated
 /// top level type to be able to `#[derive(PartialEq)]`
 ///
+/// ## `#[kube(attr = "attribute")]`
+/// Adding `#[kube(attr = "attribute")]` is required if you want your generated
+/// top level type to have the `#[attribute]` type level attribute added.
+/// The attributes will be added after the `#[derive(...)]` attribute of the root type.
+/// The added attributes can either attribute macros or derive macro helper attributes.
+///
+/// Does not allow to set the `derive`, `serde` or `schemars` derive helper attributes.
+/// To add `derive`s the correct way to set it is `#[kube(derive = "Trait")]`.
+/// Setting derive helper attributes for `serde` and `schemars` is not supported as
+/// it might yield unexpected behaviour when interacting with the other generated code.
+///
+/// ```ignore
+/// #[kube(
+///     attr="allow(deprecated)",
+///     attr="cfg_attr(docsrs,doc(cfg(feature = \"latest\")))",
+/// )]
+/// ```
+///
 /// ## `#[kube(schema = "mode")]`
 /// Defines whether the `JsonSchema` of the top level generated type should be used when generating a `CustomResourceDefinition`.
 ///
