@@ -9,6 +9,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
+
 // See `crd_derive_schema` example for how the schema generated from this struct affects defaulting and validation.
 #[derive(CustomResource, Serialize, Deserialize, Debug, PartialEq, Clone, KubeSchema)]
 #[kube(
@@ -77,6 +78,8 @@ struct FooSpec {
 
     #[x_kube(merge_strategy = ListMerge::Set)]
     x_kubernetes_set: Vec<String>,
+
+    optional_enum: Option<Gender>,
 }
 
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize, JsonSchema)]
@@ -187,6 +190,7 @@ fn test_serialized_matches_expected() {
             my_list: vec!["".into()],
             set: HashSet::from(["foo".to_owned()]),
             x_kubernetes_set: vec![],
+            optional_enum: Some(Gender::Other),
         }))
         .unwrap(),
         serde_json::json!({
@@ -222,6 +226,7 @@ fn test_serialized_matches_expected() {
                 "myList": [""],
                 "set": ["foo"],
                 "xKubernetesSet": [],
+                "optionalEnum": "Other",
             }
         })
     )
@@ -410,6 +415,15 @@ fn test_crd_schema_matches_expected() {
                                                 },
                                                 "x-kubernetes-list-type": "set",
                                             },
+                                            "optionalEnum": {
+                                                "nullable": true,
+                                                "type": "string",
+                                                "enum": [
+                                                    "Female",
+                                                    "Male",
+                                                    "Other"
+                                                ],
+                                            }
                                         },
                                         "required": [
                                             "complexEnum",
