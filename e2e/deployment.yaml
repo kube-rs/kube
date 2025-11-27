@@ -66,5 +66,5 @@ spec:
       restartPolicy: Never
       containers:
       - name: e2e
-        image: "clux/kube-e2e:latest"
+        image: "clux/kube-e2e:4ee58317e60d94be83f8651914b13519165e1ee9"
         imagePullPolicy: IfNotPresent
