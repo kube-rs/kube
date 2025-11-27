@@ -234,7 +234,7 @@ jobs:
             target
             ~/.cargo/registry
             ~/.cargo/git
-          key: docker-cargo2-${{ hashFiles('**/Cargo.toml', 'e2e/Dockerfile') }}-${{matrix.tls}}
+          key: docker-cargo-${{matrix.tls}}-${{ hashFiles('**/Cargo.toml', 'e2e/Dockerfile') }}
       - name: Create folders on cache miss
         run: mkdir -p ~/.cargo/{git,registry}
 
