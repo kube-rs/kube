@@ -234,7 +234,7 @@ jobs:
             ~/.cargo/registry/cache
             ~/.cargo/git
             target
-          key: musl-cargo-${{ hashFiles('**/Cargo.toml') }}-${{matrix.tls}}
+          key: docker-cargo-${{ hashFiles('**/Cargo.toml') }}-${{matrix.tls}}
 
       - uses: nolar/setup-k3d-k3s@v1
         with:
@@ -245,19 +245,23 @@ jobs:
           # Anonymous access is limited to 60 requests / hour / worker
           # github-token: ${{ secrets.GITHUB_TOKEN }}
           k3d-args: "--no-lb --no-rollback --k3s-arg --disable=traefik,servicelb,metrics-server@server:*"
-      - name: Compile e2e job against ${{matrix.tls}}
-        run: |
-          mkdir -p ~/.cargo/{git,registry}
-          docker run --rm -t \
-              --mount type=bind,source=${{ github.workspace }},target=/volume \
-              --mount type=bind,source=$HOME/.cargo/registry,target=/root/.cargo/registry \
-              --mount type=bind,source=$HOME/.cargo/git,target=/root/.cargo/git \
-              clux/muslrust:1.86.0-stable \
-              cargo build -p e2e --release --bin=job --features=latest,${{matrix.tls}} -v
-          cp target/x86_64-unknown-linux-musl/release/job e2e/
+      # - name: Compile e2e job against ${{matrix.tls}}
+      #   run: |
+      #     mkdir -p ~/.cargo/{git,registry}
+      #     docker run --rm -t \
+      #         --mount type=bind,source=${{ github.workspace }},target=/volume \
+      #         --mount type=bind,source=$HOME/.cargo/registry,target=/root/.cargo/registry \
+      #         --mount type=bind,source=$HOME/.cargo/git,target=/root/.cargo/git \
+      #         clux/muslrust:1.86.0-stable \
+      #         cargo build -p e2e --release --bin=job --features=latest,${{matrix.tls}} -v
+      #     cp target/x86_64-unknown-linux-musl/release/job e2e/
 
-      - name: Build image
-        run: "docker build -t clux/kube-e2e:${{ github.sha }} e2e/"
+      - name: Build e2e job against ${{matrix.tls}}
+        run: |
+          docker build \
+            --build-arg FEATURES="latest,${{matrix.tls}}" \
+            -t clux/kube-e2e:${{ github.sha}} . \
+            -f e2e/Dockerfile
       - name: Import image
         run: "k3d image import clux/kube-e2e:${{ github.sha }} --cluster kube"
       - run: sed -i 's/latest/${{ github.sha }}/g' e2e/deployment.yaml
