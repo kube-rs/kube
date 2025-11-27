@@ -276,8 +276,10 @@ jobs:
           k3d-args: "--no-lb --no-rollback --k3s-arg --disable=traefik,servicelb,metrics-server@server:*"
       - name: Import image
         run: "k3d image import clux/kube-e2e:${{ github.sha }} --cluster kube"
-      - run: sed -i 's/latest/${{ github.sha }}/g' e2e/deployment.yaml
-      - run: cat e2e/deployment.yaml
+      - name: Template the yaml and verify we are testing what we built
+        run: |
+          sed -i 's/latest/${{ github.sha }}/g' e2e/deployment.yaml
+          grep -q "${{ github.sha }} e2e/deployment.yaml
 
       - name: Create resource
         run: kubectl apply -f e2e/deployment.yaml -n apps

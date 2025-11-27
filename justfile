@@ -84,6 +84,8 @@ e2e-incluster features:
   kubectl wait --for=condition=complete job/e2e -n apps --timeout=50s || kubectl logs -f job/e2e -n apps
   kubectl get all -n apps
   kubectl wait --for=condition=complete job/e2e -n apps --timeout=10s || kubectl get pods -n apps | grep e2e | grep Completed
+  @echo "need to not commit a sha in the deployment.yaml"
+  rg "latest" e2e/deployment.yaml -q
 
 k3d:
   k3d cluster create main --servers 1 --registry-create main --image rancher/k3s:v1.27.3-k3s1 \
