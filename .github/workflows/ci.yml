@@ -276,7 +276,7 @@ jobs:
       - name: Import image
         run: "k3d image import clux/kube-e2e:${{ github.sha }} --cluster kube"
       - run: sed -i 's/latest/${{ github.sha }}/g' e2e/deployment.yaml
-      - run: cat deployment.yaml
+      - run: cat e2e/deployment.yaml
 
       - name: Create resource
         run: kubectl apply -f e2e/deployment.yaml -n apps
