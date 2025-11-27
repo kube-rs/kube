@@ -236,6 +236,8 @@ jobs:
           key: docker-cargo-${{ hashFiles('**/Cargo.toml', 'e2e/Dockerfile') }}-${{matrix.tls}}
       - run: |
           mkdir -p ~/.cargo/{git,registry}
+          touch Cargo.lock
+
 
       # - name: Compile e2e job against ${{matrix.tls}}
       #   run: |
@@ -248,22 +250,19 @@ jobs:
       #         cargo build -p e2e --release --bin=job --features=latest,${{matrix.tls}} -v
       #     cp target/x86_64-unknown-linux-musl/release/job e2e/
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
       - name: Setup Docker buildx
         uses: docker/setup-buildx-action@v3
 
-      # - name: Inject cache into docker
-      #   uses: reproducible-containers/buildkit-cache-dance@v3
-      #   with:
-      #     cache-map: |
-      #       {
-      #         "target": "/home/rust/src/target",
-      #         "~/.cargo/registry": "/root/.cargo/registry",
-      #         "~/.cargo/git": "/root/.cargo/git"
-      #       }
-      #     skip-extraction: ${{ steps.cache.outputs.cache-hit }}
+      - name: Inject cache into docker
+        uses: reproducible-containers/buildkit-cache-dance@v3
+        with:
+          cache-map: |
+            {
+              "target": "/app/target",
+              "~/.cargo/registry": "/root/.cargo/registry",
+              "~/.cargo/git": "/root/.cargo/git"
+            }
+          skip-extraction: ${{ steps.cache.outputs.cache-hit }}
 
       - name: Build and push Docker image
         id: build
