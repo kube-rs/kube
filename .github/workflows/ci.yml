@@ -279,7 +279,7 @@ jobs:
       - name: Template the yaml and verify we are testing what we built
         run: |
           sed -i 's/latest/${{ github.sha }}/g' e2e/deployment.yaml
-          grep -q "${{ github.sha }} e2e/deployment.yaml
+          grep -q "${{ github.sha }}" e2e/deployment.yaml
 
       - name: Create resource
         run: kubectl apply -f e2e/deployment.yaml -n apps
