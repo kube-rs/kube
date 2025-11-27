@@ -261,6 +261,7 @@ jobs:
               "target": "/app/target",
               "~/.cargo/registry": "/root/.cargo/registry",
               "~/.cargo/git": "/root/.cargo/git"
+              "Cargo.lock": "/app/Cargo.lock"
             }
           skip-extraction: ${{ steps.cache.outputs.cache-hit }}
 
