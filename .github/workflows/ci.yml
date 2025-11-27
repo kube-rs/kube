@@ -250,16 +250,16 @@ jobs:
       - name: Setup Docker buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Inject cache into docker
-        uses: reproducible-containers/buildkit-cache-dance@v3
-        with:
-          cache-map: |
-            {
-              "target": "/home/rust/src/target",
-              "registry": "/root/.cargo/registry",
-              "git": "/root/.cargo/git"
-            }
-          skip-extraction: ${{ steps.cache.outputs.cache-hit }}
+      # - name: Inject cache into docker
+      #   uses: reproducible-containers/buildkit-cache-dance@v3
+      #   with:
+      #     cache-map: |
+      #       {
+      #         "target": "/home/rust/src/target",
+      #         "registry": "/root/.cargo/registry",
+      #         "git": "/root/.cargo/git"
+      #       }
+      #     skip-extraction: ${{ steps.cache.outputs.cache-hit }}
 
       - name: Build and push Docker image
         id: build
