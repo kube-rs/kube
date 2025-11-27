@@ -237,6 +237,7 @@ jobs:
       - run: |
           mkdir -p ~/.cargo/{git,registry}
           touch Cargo.lock
+          echo $PWD
 
 
       # - name: Compile e2e job against ${{matrix.tls}}
@@ -258,6 +259,7 @@ jobs:
         with:
           cache-map: |
             {
+              "${{ github.workspace}}": ".",
               "target": "/app/target",
               "~/.cargo/registry": "/root/.cargo/registry",
               "~/.cargo/git": "/root/.cargo/git"
