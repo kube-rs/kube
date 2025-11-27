@@ -1,3 +1,5 @@
+use schemars::transform::Transform;
+
 use crate::schema::{InstanceType, Metadata, Schema, SchemaObject, SingleOrVec, NULL_SCHEMA};
 
 /// Take oneOf or anyOf subschema properties and move them them into the schema
@@ -11,7 +13,34 @@ use crate::schema::{InstanceType, Metadata, Schema, SchemaObject, SingleOrVec, N
 /// - Each subschema has the type "object"
 ///
 /// NOTE: This should work regardless of whether other hoisting has been performed or not.
-pub(crate) fn hoist_properties_for_any_of_subschemas(kube_schema: &mut SchemaObject) {
+#[derive(Debug, Clone)]
+pub struct PropertiesSchemaRewriter;
+
+impl Transform for PropertiesSchemaRewriter {
+    fn transform(&mut self, transform_schema: &mut schemars::Schema) {
+        // Apply this (self) transform to all subschemas
+        schemars::transform::transform_subschemas(self, transform_schema);
+
+        let mut schema: SchemaObject = match serde_json::from_value(transform_schema.clone().to_value()).ok()
+        {
+            // TODO (@NickLarsenNZ): At this point, we are seeing duplicate `title` when printing schema as json.
+            // This is because `title` is specified under both `extensions` and `other`.
+            Some(schema) => schema,
+            None => return,
+        };
+
+        hoist_properties_for_any_of_subschemas(&mut schema);
+
+        // Convert back to schemars::Schema
+        if let Ok(schema) = serde_json::to_value(schema) {
+            if let Ok(transformed) = serde_json::from_value(schema) {
+                *transform_schema = transformed;
+            }
+        }
+    }
+}
+
+fn hoist_properties_for_any_of_subschemas(kube_schema: &mut SchemaObject) {
     // Run some initial checks in case there is nothing to do
     let SchemaObject {
         subschemas: Some(subschemas),

@@ -634,6 +634,10 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
                     s.meta_schema = None;
                 })
                 .with_transform(#schemars::transform::AddNullable::default())
+                .with_transform(#kube_core::schema::OneOfSchemaRewriter)
+                .with_transform(#kube_core::schema::AnyOfSchemaRewriter)
+                .with_transform(#kube_core::schema::PropertiesSchemaRewriter)
+                .with_transform(#kube_core::schema::OptionalEnumSchemaRewriter)
                 .with_transform(#kube_core::schema::StructuralSchemaRewriter)
                 .into_generator();
             let schema = generate.into_root_schema_for::<Self>();

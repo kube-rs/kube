@@ -1,5 +1,7 @@
 use std::ops::DerefMut;
 
+use schemars::transform::Transform;
+
 use crate::schema::{Schema, SchemaObject, SubschemaValidation, NULL_SCHEMA};
 
 /// Replace the schema with the anyOf subschema and set to nullable when the
@@ -14,7 +16,34 @@ use crate::schema::{Schema, SchemaObject, SubschemaValidation, NULL_SCHEMA};
 ///   `null` entry, and `nullable` set to true).
 ///
 /// NOTE: This should work regardless of whether other hoisting has been performed or not.
-pub(crate) fn hoist_any_of_subschema_with_a_nullable_variant(kube_schema: &mut SchemaObject) {
+#[derive(Debug, Clone)]
+pub struct AnyOfSchemaRewriter;
+
+impl Transform for AnyOfSchemaRewriter {
+    fn transform(&mut self, transform_schema: &mut schemars::Schema) {
+        // Apply this (self) transform to all subschemas
+        schemars::transform::transform_subschemas(self, transform_schema);
+
+        let mut schema: SchemaObject = match serde_json::from_value(transform_schema.clone().to_value()).ok()
+        {
+            // TODO (@NickLarsenNZ): At this point, we are seeing duplicate `title` when printing schema as json.
+            // This is because `title` is specified under both `extensions` and `other`.
+            Some(schema) => schema,
+            None => return,
+        };
+
+        hoist_any_of_subschema_with_a_nullable_variant(&mut schema);
+
+        // Convert back to schemars::Schema
+        if let Ok(schema) = serde_json::to_value(schema) {
+            if let Ok(transformed) = serde_json::from_value(schema) {
+                *transform_schema = transformed;
+            }
+        }
+    }
+}
+
+fn hoist_any_of_subschema_with_a_nullable_variant(kube_schema: &mut SchemaObject) {
     // Run some initial checks in case there is nothing to do
     let SchemaObject {
         subschemas: Some(subschemas),

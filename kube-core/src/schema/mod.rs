@@ -18,11 +18,10 @@ use std::{
     sync::LazyLock,
 };
 
-use crate::schema::{
-    transform_any_of::hoist_any_of_subschema_with_a_nullable_variant,
-    transform_one_of::hoist_one_of_enum_with_unit_variants,
-    transform_optional_enum_with_null::remove_optional_enum_null_variant,
-    transform_properties::hoist_properties_for_any_of_subschemas,
+pub use crate::schema::{
+    transform_any_of::AnyOfSchemaRewriter, transform_one_of::OneOfSchemaRewriter,
+    transform_optional_enum_with_null::OptionalEnumSchemaRewriter,
+    transform_properties::PropertiesSchemaRewriter,
 };
 
 /// This is the signature for the `null` variant produced by schemars.
@@ -47,6 +46,7 @@ static NULL_SCHEMA: LazyLock<Value> = LazyLock::new(|| {
 ///
 /// The [`Visitor`] functions may panic if the transform could not be applied. For example,
 /// there must not be any overlapping properties between `oneOf` branches.
+// TODO (@NickLarsenNZ): Rename this transformer and update the docs above
 #[derive(Debug, Clone)]
 pub struct StructuralSchemaRewriter;
 
@@ -281,12 +281,6 @@ impl Transform for StructuralSchemaRewriter {
             Some(schema) => schema,
             None => return,
         };
-
-        // Hoist parts of the schema to make it valid for k8s
-        hoist_one_of_enum_with_unit_variants(&mut schema);
-        hoist_any_of_subschema_with_a_nullable_variant(&mut schema);
-        hoist_properties_for_any_of_subschemas(&mut schema);
-        remove_optional_enum_null_variant(&mut schema);
 
         // check for maps without with properties (i.e. flattened maps)
         // and allow these to persist dynamically

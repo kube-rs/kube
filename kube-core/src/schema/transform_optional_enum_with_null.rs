@@ -1,3 +1,4 @@
+use schemars::transform::Transform;
 use serde_json::Value;
 
 use super::SchemaObject;
@@ -8,7 +9,34 @@ use super::SchemaObject;
 ///
 /// NOTE: The trailing null is removed because it's not needed by Kubernetes
 /// and makes the CRD more compact by removing redundant information.
-pub(crate) fn remove_optional_enum_null_variant(kube_schema: &mut SchemaObject) {
+#[derive(Debug, Clone)]
+pub struct OptionalEnumSchemaRewriter;
+
+impl Transform for OptionalEnumSchemaRewriter {
+    fn transform(&mut self, transform_schema: &mut schemars::Schema) {
+        // Apply this (self) transform to all subschemas
+        schemars::transform::transform_subschemas(self, transform_schema);
+
+        let mut schema: SchemaObject = match serde_json::from_value(transform_schema.clone().to_value()).ok()
+        {
+            // TODO (@NickLarsenNZ): At this point, we are seeing duplicate `title` when printing schema as json.
+            // This is because `title` is specified under both `extensions` and `other`.
+            Some(schema) => schema,
+            None => return,
+        };
+
+        remove_optional_enum_null_variant(&mut schema);
+
+        // Convert back to schemars::Schema
+        if let Ok(schema) = serde_json::to_value(schema) {
+            if let Ok(transformed) = serde_json::from_value(schema) {
+                *transform_schema = transformed;
+            }
+        }
+    }
+}
+
+fn remove_optional_enum_null_variant(kube_schema: &mut SchemaObject) {
     let SchemaObject {
         enum_values: Some(enum_values),
         extensions,
