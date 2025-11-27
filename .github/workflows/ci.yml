@@ -230,12 +230,10 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: |
-            home-cargo-bin
-            home-cargo-registry-index
-            home-cargo-registry-cache
-            home-cargo-git-db
             target
-          key: docker-cargo-${{ hashFiles('**/Cargo.toml') }}-${{matrix.tls}}
+            registry
+            git
+          key: docker-cargo-${{ hashFiles('**/Cargo.toml', e2e/Dockerfile) }}-${{matrix.tls}}
 
       # - name: Compile e2e job against ${{matrix.tls}}
       #   run: |
@@ -257,11 +255,9 @@ jobs:
         with:
           cache-map: |
             {
-              "home-cargo-bin": "/usr/local/cargo/bin",
-              "home-cargo-registry-index": "/usr/local/cargo/registry/index",
-              "home-cargo-registry-cache": "/usr/local/cargo/registry/cache",
-              "home-cargo-git-db": "/usr/local/cargo/git/db",
-              "target": "/build/target"
+              "target": "/home/rust/src/target",
+              "registry": "/root/.cargo/registry",
+              "git": "/root/.cargo/git"
             }
           skip-extraction: ${{ steps.cache.outputs.cache-hit }}
 
