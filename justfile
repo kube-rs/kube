@@ -73,9 +73,9 @@ e2e-mink8s:
   #cargo run -p e2e --bin boot --features=rustls,mk8sv
 
 e2e-incluster features:
-  just e2e-job-musl {{features}}
-  docker build -t clux/kube-e2e:{{VERSION}} e2e/
-  k3d image import clux/kube-e2e:{{VERSION}} --cluster main
+  docker build --build-arg FEATURES="{{features}}" \
+    -t clux/kube-e2e:{{VERSION}} . -f e2e/Dockerfile
+  k3d image import clux/kube-e2e:{{VERSION}} -c=$(k3d cluster list -ojson |jq '.[0].name' -r)
   sed -i 's/latest/{{VERSION}}/g' e2e/deployment.yaml
   kubectl apply -f e2e/deployment.yaml
   sed -i 's/{{VERSION}}/latest/g' e2e/deployment.yaml
@@ -84,14 +84,6 @@ e2e-incluster features:
   kubectl wait --for=condition=complete job/e2e -n apps --timeout=50s || kubectl logs -f job/e2e -n apps
   kubectl get all -n apps
   kubectl wait --for=condition=complete job/e2e -n apps --timeout=10s || kubectl get pods -n apps | grep e2e | grep Completed
-e2e-job-musl features:
-  #!/usr/bin/env bash
-  docker run \
-    -v cargo-cache:/root/.cargo/registry \
-    -v "$PWD:/volume" -w /volume \
-    --rm -it clux/muslrust:1.86.0-stable cargo build --release --features={{features}} -p e2e
-  cp target/x86_64-unknown-linux-musl/release/job e2e/job
-  chmod +x e2e/job
 
 k3d:
   k3d cluster create main --servers 1 --registry-create main --image rancher/k3s:v1.27.3-k3s1 \

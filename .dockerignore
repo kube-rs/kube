@@ -1,0 +1,5 @@
+.git/
+target/
+e2e/Dockerfile
+e2e/target
+justfile
