@@ -230,21 +230,13 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: |
-            ~/.cargo/registry/index
-            ~/.cargo/registry/cache
-            ~/.cargo/git
+            home-cargo-bin
+            home-cargo-registry-index
+            home-cargo-registry-cache
+            home-cargo-git-db
             target
           key: docker-cargo-${{ hashFiles('**/Cargo.toml') }}-${{matrix.tls}}
 
-      - uses: nolar/setup-k3d-k3s@v1
-        with:
-          version: latest
-          # k3d-kube
-          k3d-name: kube
-          # Used to avoid rate limits when fetching the releases from k3s repo.
-          # Anonymous access is limited to 60 requests / hour / worker
-          # github-token: ${{ secrets.GITHUB_TOKEN }}
-          k3d-args: "--no-lb --no-rollback --k3s-arg --disable=traefik,servicelb,metrics-server@server:*"
       # - name: Compile e2e job against ${{matrix.tls}}
       #   run: |
       #     mkdir -p ~/.cargo/{git,registry}
@@ -259,13 +251,31 @@ jobs:
 
       - name: Setup Docker buildx
         uses: docker/setup-buildx-action@v3
+
+      - name: Inject cache into docker
+        uses: reproducible-containers/buildkit-cache-dance@v3
+        with:
+          cache-map: |
+            {
+              "home-cargo-bin": "/usr/local/cargo/bin",
+              "home-cargo-registry-index": "/usr/local/cargo/registry/index",
+              "home-cargo-registry-cache": "/usr/local/cargo/registry/cache",
+              "home-cargo-git-db": "/usr/local/cargo/git/db",
+              "target": "/build/target"
+            }
+          skip-extraction: ${{ steps.cache.outputs.cache-hit }}
+
       - name: Build and push Docker image
         id: build
         uses: docker/build-push-action@v6
         with:
           context: .
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           platforms: linux/amd64
           push: false
+          load: true
+          file: e2e/Dockerfile
           tags: clux/kube-e2e:${{ github.sha }}
           build-args: "latest,${{matrix.tls}}"
 
@@ -275,6 +285,16 @@ jobs:
       #       --build-arg FEATURES="latest,${{matrix.tls}}" \
       #       -t clux/kube-e2e:${{ github.sha}} . \
       #       -f e2e/Dockerfile
+
+      - uses: nolar/setup-k3d-k3s@v1
+        with:
+          version: latest
+          # k3d-kube
+          k3d-name: kube
+          # Used to avoid rate limits when fetching the releases from k3s repo.
+          # Anonymous access is limited to 60 requests / hour / worker
+          # github-token: ${{ secrets.GITHUB_TOKEN }}
+          k3d-args: "--no-lb --no-rollback --k3s-arg --disable=traefik,servicelb,metrics-server@server:*"
       - name: Import image
         run: "k3d image import clux/kube-e2e:${{ github.sha }} --cluster kube"
       - run: sed -i 's/latest/${{ github.sha }}/g' e2e/deployment.yaml
