@@ -228,12 +228,13 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: actions/cache@v4
+        id: cache
         with:
           path: |
             target
             ~/.cargo/registry
             ~/.cargo/git
-          key: docker-cargo-${{ hashFiles('**/Cargo.toml', 'e2e/Dockerfile') }}-${{matrix.tls}}
+          key: docker-cargo2-${{ hashFiles('**/Cargo.toml', 'e2e/Dockerfile') }}-${{matrix.tls}}
       - name: Create folders on cache miss
         run: mkdir -p ~/.cargo/{git,registry}
 
