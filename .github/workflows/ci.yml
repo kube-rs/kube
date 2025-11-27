@@ -233,7 +233,7 @@ jobs:
             target
             registry
             git
-          key: docker-cargo-${{ hashFiles('**/Cargo.toml', e2e/Dockerfile) }}-${{matrix.tls}}
+          key: docker-cargo-${{ hashFiles('**/Cargo.toml', 'e2e/Dockerfile') }}-${{matrix.tls}}
 
       # - name: Compile e2e job against ${{matrix.tls}}
       #   run: |
