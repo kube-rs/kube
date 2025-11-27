@@ -277,7 +277,8 @@ jobs:
           load: true
           file: e2e/Dockerfile
           tags: clux/kube-e2e:${{ github.sha }}
-          build-args: "latest,${{matrix.tls}}"
+          build-args: |
+            FEATURES=latest,${{matrix.tls}}
 
       # - name: Build e2e job against ${{matrix.tls}}
       #   run: |
