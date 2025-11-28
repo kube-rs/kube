@@ -1,4 +1,4 @@
-use k8s_openapi::api::core::v1::Pod;
+use k8s_openapi::{api::core::v1::Pod, apimachinery::pkg::api::resource::Quantity};
 use kube::{
     api::{Api, DeleteParams, Patch, PatchParams, PostParams, ResourceExt},
     runtime::wait::{await_condition, conditions::is_pod_running},
@@ -87,25 +87,20 @@ async fn main() -> anyhow::Result<()> {
                 info!("Updated resources via patch: {:?}", container.resources);
             }
         }
-        Err(e) => {
-            error!("Failed to patch resize pod: {}", e);
-        }
+        Err(e) => error!("Failed to patch resize pod: {}", e),
     }
 
     // Example 3: Using replace_resize
     info!("Example 3: Using replace_resize method");
     let mut current_pod = pods.get_resize("resize-demo").await?;
 
+    // Update memory request
     if let Some(spec) = &mut current_pod.spec
         && let Some(container) = spec.containers.get_mut(0)
         && let Some(resources) = &mut container.resources
         && let Some(requests) = &mut resources.requests
     {
-        // Update memory request
-        requests.insert(
-            "memory".to_string(),
-            k8s_openapi::apimachinery::pkg::api::resource::Quantity("384Mi".to_string()),
-        );
+        requests.insert("memory".into(), Quantity("384Mi".into()));
     }
 
     match pods.replace_resize("resize-demo", &pp, &current_pod).await {
