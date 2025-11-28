@@ -232,34 +232,36 @@ jobs:
         id: setup-buildx
         uses: docker/setup-buildx-action@v3
 
-      - uses: actions/cache@v4
-        id: cache
-        with:
-          path: |
-            target
-            .cargo/registry
-            .cargo/git
-          key: docker-cargo4-${{matrix.tls}}-${{ hashFiles('**/Cargo.toml', 'e2e/Dockerfile') }}
-          restore-keys: |
-            docker-cargo4-${{matrix.tls}}-
-      - name: Create folders on cache miss
+      # clux: i can never get the buildkit cache dance seems to work reliably so commenting it out
+      # would like to get this to work long term, but at least the build is pretty fast
+      # - uses: actions/cache@v4
+      #   id: cache
+      #   with:
+      #     path: |
+      #       target
+      #       .cargo/registry
+      #       .cargo/git
+      #     key: docker-cargo4-${{matrix.tls}}-${{ hashFiles('**/Cargo.toml', 'e2e/Dockerfile') }}
+      #     restore-keys: |
+      #       docker-cargo4-${{matrix.tls}}-
+      - name: Create folders on cache miss (blank cache always atm)
         run: mkdir -p ~/.cargo/{git,registry} && mkdir -p target
 
-      - name: Inject cache into docker
-        uses: reproducible-containers/buildkit-cache-dance@v3
-        with:
-          dockerfile: e2e/Dockerfile
-          builder: ${{ steps.setup-buildx.outputs.name }}
-          cache-map: |
-            {
-              "target": {
-                "target": "/app/target",
-                "id": "target"
-              },
-              ".cargo/registry": "/root/.cargo/registry",
-              ".cargo/git": "/root/.cargo/git"
-            }
-          skip-extraction: ${{ steps.cache.outputs.cache-hit }}
+      # - name: Inject cache into docker
+      #   uses: reproducible-containers/buildkit-cache-dance@v3
+      #   with:
+      #     dockerfile: e2e/Dockerfile
+      #     builder: ${{ steps.setup-buildx.outputs.name }}
+      #     cache-map: |
+      #       {
+      #         "target": {
+      #           "target": "/app/target",
+      #           "id": "target"
+      #         },
+      #         ".cargo/registry": "/root/.cargo/registry",
+      #         ".cargo/git": "/root/.cargo/git"
+      #       }
+      #     skip-extraction: ${{ steps.cache.outputs.cache-hit }}
 
       - name: Build and push Docker image
         id: build
