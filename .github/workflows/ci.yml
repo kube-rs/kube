@@ -259,7 +259,7 @@ jobs:
               ".cargo/registry": "/root/.cargo/registry",
               ".cargo/git": "/root/.cargo/git"
             }
-          # skip-extraction: ${{ steps.cache.outputs.cache-hit }}
+          skip-extraction: ${{ steps.cache.outputs.cache-hit }}
 
       - name: Build and push Docker image
         id: build
