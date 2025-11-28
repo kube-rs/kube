@@ -7,7 +7,8 @@ COPY . /app
 RUN --mount=type=bind,rw,target=. \
     --mount=type=cache,target=/root/.cargo \
     cargo fetch
-RUN --mount=type=bind,rw,target=. --mount=type=cache,target=/root/.cargo \
+RUN --mount=type=bind,rw,target=. \
+    --mount=type=cache,target=/root/.cargo \
     --mount=type=cache,target=target,id=target \
     cargo install --path=e2e --features=${FEATURES} --bin=job
 

@@ -237,11 +237,11 @@ jobs:
         with:
           path: |
             target
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: docker-cargo3-${{matrix.tls}}-${{ hashFiles('**/Cargo.toml', 'e2e/Dockerfile') }}
+            .cargo/registry
+            .cargo/git
+          key: docker-cargo4-${{matrix.tls}}-${{ hashFiles('**/Cargo.toml', 'e2e/Dockerfile') }}
           restore-keys: |
-            docker-cargo3-${{matrix.tls}}-
+            docker-cargo4-${{matrix.tls}}-
       - name: Create folders on cache miss
         run: mkdir -p ~/.cargo/{git,registry} && mkdir -p target
 
@@ -252,9 +252,12 @@ jobs:
           builder: ${{ steps.setup-buildx.outputs.name }}
           cache-map: |
             {
-              "target": "/app/target",
-              "~/.cargo/registry": "/root/.cargo/registry",
-              "~/.cargo/git": "/root/.cargo/git"
+              "target": {
+                "target": "/app/target",
+                "id": "target"
+              },
+              ".cargo/registry": "/root/.cargo/registry",
+              ".cargo/git": "/root/.cargo/git"
             }
           # skip-extraction: ${{ steps.cache.outputs.cache-hit }}
 
