@@ -61,7 +61,7 @@ hack:
   # Skipped oauth and oidc, as these compile fails without a tls stack.
 
 readme:
-  rustdoc README.md --test --edition=2021
+  rustdoc README.md --test --edition=2024
 
 e2e: (e2e-mink8s) (e2e-incluster "rustls,latest")
 
