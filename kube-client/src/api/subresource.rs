@@ -1,10 +1,10 @@
 use futures::AsyncBufRead;
-use serde::{Serialize, de::DeserializeOwned};
+use serde::{de::DeserializeOwned, Serialize};
 use std::fmt::Debug;
 
 use crate::{
-    Error, Result,
     api::{Api, Patch, PatchParams, PostParams},
+    Error, Result,
 };
 
 use kube_core::response::Status;
@@ -16,10 +16,8 @@ pub use kube_core::subresource::AttachParams;
 
 pub use k8s_openapi::api::autoscaling::v1::{Scale, ScaleSpec, ScaleStatus};
 
-#[cfg(feature = "ws")]
-use crate::api::portforward::Portforwarder;
-#[cfg(feature = "ws")]
-use crate::api::remote_command::AttachedProcess;
+#[cfg(feature = "ws")] use crate::api::portforward::Portforwarder;
+#[cfg(feature = "ws")] use crate::api::remote_command::AttachedProcess;
 
 /// Methods for [scale subresource](https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/#scale-subresource).
 impl<K> Api<K>

@@ -1,8 +1,8 @@
 use k8s_openapi::api::core::v1::Pod;
 use kube::{
-    Client,
     api::{Api, DeleteParams, Patch, PatchParams, PostParams, ResourceExt},
     runtime::wait::{await_condition, conditions::is_pod_running},
+    Client,
 };
 use tracing::*;
 
