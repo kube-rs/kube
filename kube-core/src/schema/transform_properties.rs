@@ -21,12 +21,8 @@ impl Transform for PropertiesSchemaRewriter {
         // Apply this (self) transform to all subschemas
         schemars::transform::transform_subschemas(self, transform_schema);
 
-        let mut schema: SchemaObject = match serde_json::from_value(transform_schema.clone().to_value()).ok()
-        {
-            // TODO (@NickLarsenNZ): At this point, we are seeing duplicate `title` when printing schema as json.
-            // This is because `title` is specified under both `extensions` and `other`.
-            Some(schema) => schema,
-            None => return,
+        let Some(mut schema) = serde_json::from_value(transform_schema.clone().to_value()).ok() else {
+            return;
         };
 
         hoist_properties_for_any_of_subschemas(&mut schema);
