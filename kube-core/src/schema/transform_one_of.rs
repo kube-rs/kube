@@ -80,9 +80,11 @@ fn hoist_one_of_enum_with_unit_variants(kube_schema: &mut SchemaObject) {
         Schema::Bool(_) => panic!("oneOf variants can not be of type boolean"),
     });
 
-    // Get the first type
+    // Get the first type...
     let variant_type = types.next().expect("at this point, there must be a type");
-    // Ensure all variant types match it
+    // ... and ensure all variant types match it.
+    // This is needed because the individual subschema enums (each with their own type field)
+    // will be combined into one enum with one type field.
     if types.any(|r#type| r#type != variant_type) {
         panic!("oneOf variants must all have the same type");
     }
