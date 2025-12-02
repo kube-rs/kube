@@ -152,7 +152,7 @@ mod tests {
 
     #[test]
     fn tagged_enum_with_stuct_and_tuple_variants_before_one_of_hoisting() {
-        let original_schema_object_value = serde_json::json!({
+        let original_value = serde_json::json!({
             "description": "A complex tagged enum with unit and struct variants",
             "oneOf": [
                 {
@@ -242,7 +242,7 @@ mod tests {
             ]
         });
 
-        let expected_converted_schema_object_value = serde_json::json!(
+        let expected_converted_value = serde_json::json!(
             {
                 "description": "A complex tagged enum with unit and struct variants",
                 "oneOf": [
@@ -328,20 +328,19 @@ mod tests {
               }
         );
 
-        let original_schema_object: SchemaObject =
-            serde_json::from_value(original_schema_object_value).expect("valid JSON");
-        let expected_converted_schema_object: SchemaObject =
-            serde_json::from_value(expected_converted_schema_object_value).expect("valid JSON");
+        let original: SchemaObject = serde_json::from_value(original_value).expect("valid JSON");
+        let expected_converted: SchemaObject =
+            serde_json::from_value(expected_converted_value).expect("valid JSON");
 
-        let mut actual_converted_schema_object = original_schema_object.clone();
-        hoist_properties_for_any_of_subschemas(&mut actual_converted_schema_object);
+        let mut actual_converted = original.clone();
+        hoist_properties_for_any_of_subschemas(&mut actual_converted);
 
-        assert_json_eq!(actual_converted_schema_object, expected_converted_schema_object);
+        assert_json_eq!(actual_converted, expected_converted);
     }
 
     #[test]
     fn tagged_enum_with_stuct_and_tuple_variants_after_one_of_hoisting() {
-        let original_schema_object_value = serde_json::json!({
+        let original_value = serde_json::json!({
             "description": "A complex tagged enum with unit and struct variants",
             "oneOf": [
                 {
@@ -399,7 +398,7 @@ mod tests {
             ]
         });
 
-        let expected_converted_schema_object_value = serde_json::json!(
+        let expected_converted_value = serde_json::json!(
             {
                 "description": "A complex tagged enum with unit and struct variants",
                 "oneOf": [
@@ -453,20 +452,19 @@ mod tests {
               }
         );
 
-        let original_schema_object: SchemaObject =
-            serde_json::from_value(original_schema_object_value).expect("valid JSON");
-        let expected_converted_schema_object: SchemaObject =
-            serde_json::from_value(expected_converted_schema_object_value).expect("valid JSON");
+        let original: SchemaObject = serde_json::from_value(original_value).expect("valid JSON");
+        let expected_converted: SchemaObject =
+            serde_json::from_value(expected_converted_value).expect("valid JSON");
 
-        let mut actual_converted_schema_object = original_schema_object.clone();
-        hoist_properties_for_any_of_subschemas(&mut actual_converted_schema_object);
+        let mut actual_converted = original.clone();
+        hoist_properties_for_any_of_subschemas(&mut actual_converted);
 
-        assert_json_eq!(actual_converted_schema_object, expected_converted_schema_object);
+        assert_json_eq!(actual_converted, expected_converted);
     }
 
     #[test]
     fn untagged_enum_with_empty_variant_before_one_of_hoisting() {
-        let original_schema_object_value = serde_json::json!({
+        let original_value = serde_json::json!({
             "description": "An untagged enum with a nested enum inside",
             "anyOf": [
                 {
@@ -523,7 +521,7 @@ mod tests {
             ]
         });
 
-        let expected_converted_schema_object_value = serde_json::json!({
+        let expected_converted_value = serde_json::json!({
             "description": "An untagged enum with a nested enum inside",
             "type": "object",
             "anyOf": [
@@ -572,20 +570,19 @@ mod tests {
             }
         });
 
-        let original_schema_object: SchemaObject =
-            serde_json::from_value(original_schema_object_value).expect("valid JSON");
-        let expected_converted_schema_object: SchemaObject =
-            serde_json::from_value(expected_converted_schema_object_value).expect("valid JSON");
+        let original: SchemaObject = serde_json::from_value(original_value).expect("valid JSON");
+        let expected_converted: SchemaObject =
+            serde_json::from_value(expected_converted_value).expect("valid JSON");
 
-        let mut actual_converted_schema_object = original_schema_object.clone();
-        hoist_properties_for_any_of_subschemas(&mut actual_converted_schema_object);
+        let mut actual_converted = original.clone();
+        hoist_properties_for_any_of_subschemas(&mut actual_converted);
 
-        assert_json_eq!(actual_converted_schema_object, expected_converted_schema_object);
+        assert_json_eq!(actual_converted, expected_converted);
     }
 
     #[test]
     fn untagged_enum_with_duplicate_field_of_same_shape() {
-        let original_schema_object_value = serde_json::json!({
+        let original_value = serde_json::json!({
             "description": "Comment for untagged enum ProductImageSelection",
             "anyOf": [
                 {
@@ -627,7 +624,7 @@ mod tests {
             ]
         });
 
-        let expected_converted_schema_object_value = serde_json::json!({
+        let expected_converted_value = serde_json::json!({
             "description": "Comment for untagged enum ProductImageSelection",
             "type": "object",
             "anyOf": [
@@ -661,21 +658,20 @@ mod tests {
 
         });
 
-        let original_schema_object: SchemaObject =
-            serde_json::from_value(original_schema_object_value).expect("valid JSON");
-        let expected_converted_schema_object: SchemaObject =
-            serde_json::from_value(expected_converted_schema_object_value).expect("valid JSON");
+        let original: SchemaObject = serde_json::from_value(original_value).expect("valid JSON");
+        let expected_converted: SchemaObject =
+            serde_json::from_value(expected_converted_value).expect("valid JSON");
 
-        let mut actual_converted_schema_object = original_schema_object.clone();
-        hoist_properties_for_any_of_subschemas(&mut actual_converted_schema_object);
+        let mut actual_converted = original.clone();
+        hoist_properties_for_any_of_subschemas(&mut actual_converted);
 
-        assert_json_eq!(actual_converted_schema_object, expected_converted_schema_object);
+        assert_json_eq!(actual_converted, expected_converted);
     }
 
     #[test]
     #[should_panic(expected = "Properties for \"two\" are defined multiple times with different shapes")]
     fn invalid_untagged_enum_with_conflicting_variant_fields_before_one_of_hosting() {
-        let original_schema_object_value = serde_json::json!({
+        let original_value = serde_json::json!({
             "description": "An untagged enum with a nested enum inside",
             "anyOf": [
                 {
@@ -737,18 +733,17 @@ mod tests {
         });
 
 
-        let original_schema_object: SchemaObject =
-            serde_json::from_value(original_schema_object_value).expect("valid JSON");
+        let original: SchemaObject = serde_json::from_value(original_value).expect("valid JSON");
 
-        let mut actual_converted_schema_object = original_schema_object.clone();
-        hoist_properties_for_any_of_subschemas(&mut actual_converted_schema_object);
+        let mut actual_converted = original.clone();
+        hoist_properties_for_any_of_subschemas(&mut actual_converted);
     }
 
     #[test]
     #[should_panic(expected = "Properties for \"two\" are defined multiple times with different shapes")]
     fn invalid_untagged_enum_with_conflicting_variant_fields_after_one_of_hosting() {
         // NOTE: the oneOf for the second variant has already been hoisted
-        let original_schema_object_value = serde_json::json!({
+        let original_value = serde_json::json!({
             "description": "An untagged enum with a nested enum inside",
             "anyOf": [
                 {
@@ -793,10 +788,9 @@ mod tests {
             ]
         });
 
-        let original_schema_object: SchemaObject =
-            serde_json::from_value(original_schema_object_value).expect("valid JSON");
+        let original: SchemaObject = serde_json::from_value(original_value).expect("valid JSON");
 
-        let mut actual_converted_schema_object = original_schema_object.clone();
-        hoist_properties_for_any_of_subschemas(&mut actual_converted_schema_object);
+        let mut actual_converted = original.clone();
+        hoist_properties_for_any_of_subschemas(&mut actual_converted);
     }
 }

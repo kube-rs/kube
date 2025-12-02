@@ -105,7 +105,7 @@ mod tests {
 
     #[test]
     fn optional_tagged_enum_with_unit_variants() {
-        let original_schema_object_value = serde_json::json!({
+        let original_value = serde_json::json!({
             "anyOf": [
                 {
                     "description": "A very simple enum with empty variants",
@@ -142,7 +142,7 @@ mod tests {
             ]
         });
 
-        let expected_converted_schema_object_value = serde_json::json!({
+        let expected_converted_value = serde_json::json!({
             "description": "A very simple enum with empty variants",
             "nullable": true,
             "oneOf": [
@@ -171,20 +171,19 @@ mod tests {
         });
 
 
-        let original_schema_object: SchemaObject =
-            serde_json::from_value(original_schema_object_value).expect("valid JSON");
-        let expected_converted_schema_object: SchemaObject =
-            serde_json::from_value(expected_converted_schema_object_value).expect("valid JSON");
+        let original: SchemaObject = serde_json::from_value(original_value).expect("valid JSON");
+        let expected_converted: SchemaObject =
+            serde_json::from_value(expected_converted_value).expect("valid JSON");
 
-        let mut actual_converted_schema_object = original_schema_object.clone();
-        hoist_any_of_subschema_with_a_nullable_variant(&mut actual_converted_schema_object);
+        let mut actual_converted = original.clone();
+        hoist_any_of_subschema_with_a_nullable_variant(&mut actual_converted);
 
-        assert_json_eq!(actual_converted_schema_object, expected_converted_schema_object);
+        assert_json_eq!(actual_converted, expected_converted);
     }
 
     #[test]
     fn optional_tagged_enum_with_unit_variants_but_also_an_existing_description() {
-        let original_schema_object_value = serde_json::json!({
+        let original_value = serde_json::json!({
             "description": "This comment will be lost",
             "anyOf": [
                 {
@@ -206,7 +205,7 @@ mod tests {
             ]
         });
 
-        let expected_converted_schema_object_value = serde_json::json!({
+        let expected_converted_value = serde_json::json!({
             "description": "A very simple enum with empty variants",
             "nullable": true,
             "type": "string",
@@ -219,14 +218,13 @@ mod tests {
         });
 
 
-        let original_schema_object: SchemaObject =
-            serde_json::from_value(original_schema_object_value).expect("valid JSON");
-        let expected_converted_schema_object: SchemaObject =
-            serde_json::from_value(expected_converted_schema_object_value).expect("valid JSON");
+        let original: SchemaObject = serde_json::from_value(original_value).expect("valid JSON");
+        let expected_converted: SchemaObject =
+            serde_json::from_value(expected_converted_value).expect("valid JSON");
 
-        let mut actual_converted_schema_object = original_schema_object.clone();
-        hoist_any_of_subschema_with_a_nullable_variant(&mut actual_converted_schema_object);
+        let mut actual_converted = original.clone();
+        hoist_any_of_subschema_with_a_nullable_variant(&mut actual_converted);
 
-        assert_json_eq!(actual_converted_schema_object, expected_converted_schema_object);
+        assert_json_eq!(actual_converted, expected_converted);
     }
 }
