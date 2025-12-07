@@ -1,9 +1,9 @@
-use axum::{response::IntoResponse, routing::post, Json, Router};
+use axum::{Json, Router, response::IntoResponse, routing::post};
 use axum_server::tls_rustls::RustlsConfig;
 use json_patch::jsonptr::PointerBuf;
 use kube::core::{
-    admission::{AdmissionRequest, AdmissionResponse, AdmissionReview},
     DynamicObject, Resource, ResourceExt,
+    admission::{AdmissionRequest, AdmissionResponse, AdmissionReview},
 };
 use std::{error::Error, net::SocketAddr};
 use tower_http::trace::TraceLayer;
