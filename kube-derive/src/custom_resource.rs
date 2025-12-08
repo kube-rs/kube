@@ -676,6 +676,10 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
                     s.meta_schema = None;
                 })
                 .with_transform(#schemars::transform::AddNullable::default())
+                .with_transform(#kube_core::schema::OneOfSchemaRewriter)
+                .with_transform(#kube_core::schema::AnyOfSchemaRewriter)
+                .with_transform(#kube_core::schema::PropertiesSchemaRewriter)
+                .with_transform(#kube_core::schema::OptionalEnumSchemaRewriter)
                 .with_transform(#kube_core::schema::StructuralSchemaRewriter)
                 .into_generator();
             let schema = generate.into_root_schema_for::<Self>();
@@ -976,15 +980,17 @@ mod tests {
 
     #[test]
     fn test_derive_crd() {
-        let path = env::current_dir().unwrap().join("tests").join("crd_enum_test.rs");
-        let file = fs::File::open(path).unwrap();
-        runtime_macros::emulate_derive_macro_expansion(file, &[("CustomResource", derive)]).unwrap();
+        let files = [
+            "crd_complex_enum_tests.rs",
+            "crd_mixed_enum_test.rs",
+            "crd_schema_test.rs",
+            "crd_top_level_enum_test.rs",
+        ];
 
-        let path = env::current_dir()
-            .unwrap()
-            .join("tests")
-            .join("crd_schema_test.rs");
-        let file = fs::File::open(path).unwrap();
-        runtime_macros::emulate_derive_macro_expansion(file, &[("CustomResource", derive)]).unwrap();
+        for file in files {
+            let path = env::current_dir().unwrap().join("tests").join(file);
+            let file = fs::File::open(path).unwrap();
+            runtime_macros::emulate_derive_macro_expansion(file, &[("CustomResource", derive)]).unwrap();
+        }
     }
 }

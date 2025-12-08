@@ -36,3 +36,4 @@ trybuild.workspace = true
 assert-json-diff.workspace = true
 runtime-macros.workspace = true
 prettyplease.workspace = true
+tokio = { workspace = true, features = ["rt", "macros"] }
