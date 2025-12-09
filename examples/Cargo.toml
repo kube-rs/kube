@@ -57,7 +57,8 @@ static_assertions = "1.1.0"
 tar = "0.4.37"
 tracing.workspace = true
 tracing-subscriber.workspace = true
-warp = { version = "0.3", default-features = false, features = ["tls"] }
+axum = "0.8.7"
+axum-server = { version = "0.8.0", features = ["tls-rustls-no-provider"] }
 bytes.workspace = true
 http.workspace = true
 http-body-util.workspace = true

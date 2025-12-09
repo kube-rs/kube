@@ -1,44 +1,49 @@
+use axum::{response::IntoResponse, routing::post, Json, Router};
+use axum_server::tls_rustls::RustlsConfig;
 use json_patch::jsonptr::PointerBuf;
 use kube::core::{
     admission::{AdmissionRequest, AdmissionResponse, AdmissionReview},
     DynamicObject, Resource, ResourceExt,
 };
-use std::{convert::Infallible, error::Error};
+use std::{error::Error, net::SocketAddr};
+use tower_http::trace::TraceLayer;
 use tracing::*;
-use warp::{reply, Filter, Reply};
 
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt::init();
 
-    let routes = warp::path("mutate")
-        .and(warp::body::json())
-        .and_then(mutate_handler)
-        .with(warp::trace::request());
+    let app = Router::new().route("/mutate", post(mutate_handler)).layer(
+        TraceLayer::new_for_http()
+            .make_span_with(tower_http::trace::DefaultMakeSpan::new().level(Level::INFO)),
+    );
 
     // You must generate a certificate for the service / url,
     // encode the CA in the MutatingWebhookConfiguration, and terminate TLS here.
     // See admission_setup.sh + admission_controller.yaml.tpl for how to do this.
     let addr = format!("{}:8443", std::env::var("ADMISSION_PRIVATE_IP").unwrap());
-    warp::serve(warp::post().and(routes))
-        .tls()
-        .cert_path("admission-controller-tls.crt")
-        .key_path("admission-controller-tls.key")
-        //.run(([0, 0, 0, 0], 8443)) // in-cluster
-        .run(addr.parse::<std::net::SocketAddr>().unwrap()) // local-dev
-        .await;
+    axum_server::bind_rustls(
+        // SocketAddr::from(([0, 0, 0, 0], 8443)), // in-cluster
+        addr.parse::<SocketAddr>().unwrap(), // local-dev
+        RustlsConfig::from_pem_file("admission-controller-tls.crt", "admission-controller-tls.key")
+            .await
+            .unwrap(),
+    )
+    .serve(app.into_make_service())
+    .await
+    .unwrap();
 }
 
 // A general /mutate handler, handling errors from the underlying business logic
-async fn mutate_handler(body: AdmissionReview<DynamicObject>) -> Result<impl Reply, Infallible> {
+async fn mutate_handler(
+    Json(body): Json<AdmissionReview<DynamicObject>>,
+) -> Json<AdmissionReview<DynamicObject>> {
     // Parse incoming webhook AdmissionRequest first
     let req: AdmissionRequest<_> = match body.try_into() {
         Ok(req) => req,
         Err(err) => {
             error!("invalid request: {}", err.to_string());
-            return Ok(reply::json(
-                &AdmissionResponse::invalid(err.to_string()).into_review(),
-            ));
+            return Json(AdmissionResponse::invalid(err.to_string()).into_review());
         }
     };
 
@@ -60,7 +65,7 @@ async fn mutate_handler(body: AdmissionReview<DynamicObject>) -> Result<impl Rep
         };
     };
     // Wrap the AdmissionResponse wrapped in an AdmissionReview
-    Ok(reply::json(&res.into_review()))
+    Json(res.into_review())
 }
 
 // The main handler and core business logic, failures here implies rejected applies
