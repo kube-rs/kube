@@ -77,14 +77,12 @@ struct KVTuple(String, String);
 
 impl FromMeta for KVTuple {
     fn from_list(items: &[darling::ast::NestedMeta]) -> darling::Result<Self> {
-        if items.len() == 2 {
-            if let (
-                darling::ast::NestedMeta::Lit(syn::Lit::Str(key)),
-                darling::ast::NestedMeta::Lit(syn::Lit::Str(value)),
-            ) = (&items[0], &items[1])
-            {
-                return Ok(KVTuple(key.value(), value.value()));
-            }
+        if let [
+            darling::ast::NestedMeta::Lit(syn::Lit::Str(key)),
+            darling::ast::NestedMeta::Lit(syn::Lit::Str(value)),
+        ] = items
+        {
+            return Ok(KVTuple(key.value(), value.value()));
         }
 
         Err(darling::Error::unsupported_format(
@@ -345,17 +343,17 @@ impl FromMeta for KubeRootMeta {
         const NOT_ALLOWED_ATTRIBUTES: [&str; 3] = ["derive", "serde", "schemars"];
 
         let meta = syn::parse_str::<Meta>(value)?;
-        if let Some(ident) = meta.path().get_ident() {
-            if NOT_ALLOWED_ATTRIBUTES.iter().any(|el| ident == el) {
-                if ident == "derive" {
-                    return Err(darling::Error::custom(
-                        r#"#[derive(CustomResource)] `kube(attr = "...")` does not support to set derives, you likely want to use `kube(derive = "...")`."#,
-                    ));
-                }
-                return Err(darling::Error::custom(format!(
-                    r#"#[derive(CustomResource)] `kube(attr = "...")` does not support to set the attributes {NOT_ALLOWED_ATTRIBUTES:?} as they might lead to unexpected behaviour.`"#,
-                )));
+        if let Some(ident) = meta.path().get_ident()
+            && NOT_ALLOWED_ATTRIBUTES.iter().any(|el| ident == el)
+        {
+            if ident == "derive" {
+                return Err(darling::Error::custom(
+                    r#"#[derive(CustomResource)] `kube(attr = "...")` does not support to set derives, you likely want to use `kube(derive = "...")`."#,
+                ));
             }
+            return Err(darling::Error::custom(format!(
+                r#"#[derive(CustomResource)] `kube(attr = "...")` does not support to set the attributes {NOT_ALLOWED_ATTRIBUTES:?} as they might lead to unexpected behaviour.`"#,
+            )));
         }
 
         Ok(Self(meta))
@@ -909,15 +907,14 @@ fn to_plural(word: &str) -> String {
 
     // Words ending in y that are preceded by a consonant will be pluralized by
     // replacing y with -ies (eg. puppies).
-    if word.ends_with('y') {
-        if let Some(c) = word.chars().nth(word.len() - 2) {
-            if !matches!(c, 'a' | 'e' | 'i' | 'o' | 'u') {
-                // Remove 'y' and add `ies`
-                let mut chars = word.chars();
-                chars.next_back();
-                return format!("{}ies", chars.as_str());
-            }
-        }
+    if word.ends_with('y')
+        && let Some(c) = word.chars().nth(word.len() - 2)
+        && !matches!(c, 'a' | 'e' | 'i' | 'o' | 'u')
+    {
+        // Remove 'y' and add `ies`
+        let mut chars = word.chars();
+        chars.next_back();
+        return format!("{}ies", chars.as_str());
     }
 
     // All other words will have "s" added to the end (eg. days).
@@ -973,7 +970,6 @@ mod tests {
             assert_eq!(attr, expected_attrs[i],);
         }
     }
-
 
     #[test]
     fn test_derive_crd() {
