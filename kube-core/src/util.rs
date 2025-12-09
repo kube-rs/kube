@@ -1,8 +1,9 @@
 //! Utils and helpers
 
 use crate::{
+    Request,
     params::{Patch, PatchParams},
-    request, Request,
+    request,
 };
 use chrono::Utc;
 use k8s_openapi::api::apps::v1::{DaemonSet, Deployment, ReplicaSet, StatefulSet};

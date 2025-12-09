@@ -25,16 +25,16 @@ pub mod entry;
 #[cfg_attr(docsrs, doc(cfg(feature = "admission")))]
 pub use kube_core::admission;
 pub(crate) use kube_core::params;
+use kube_core::{DynamicResourceScope, NamespaceResourceScope};
 pub use kube_core::{
+    Resource, ResourceExt,
     dynamic::{ApiResource, DynamicObject},
     gvk::{GroupVersionKind, GroupVersionResource},
     metadata::{ListMeta, ObjectMeta, PartialObjectMeta, PartialObjectMetaExt, TypeMeta},
     object::{NotUsed, Object, ObjectList},
     request::Request,
     watch::WatchEvent,
-    Resource, ResourceExt,
 };
-use kube_core::{DynamicResourceScope, NamespaceResourceScope};
 pub use params::{
     DeleteParams, GetParams, ListParams, Patch, PatchParams, PostParams, Preconditions, PropagationPolicy,
     ValidationDirective, VersionMatch, WatchParams,
@@ -254,7 +254,7 @@ impl<K> Debug for Api<K> {
 /// Sanity test on scope restrictions
 #[cfg(test)]
 mod test {
-    use crate::{client::Body, Api, Client};
+    use crate::{Api, Client, client::Body};
     use k8s_openapi::api::core::v1 as corev1;
 
     use http::{Request, Response};

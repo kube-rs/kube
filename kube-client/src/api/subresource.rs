@@ -1,10 +1,10 @@
 use futures::AsyncBufRead;
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 use std::fmt::Debug;
 
 use crate::{
-    api::{Api, Patch, PatchParams, PostParams},
     Error, Result,
+    api::{Api, Patch, PatchParams, PostParams},
 };
 
 use kube_core::response::Status;

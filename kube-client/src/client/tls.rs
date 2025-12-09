@@ -2,10 +2,9 @@
 pub mod rustls_tls {
     use hyper_rustls::ConfigBuilderExt;
     use rustls::{
-        self,
+        self, ClientConfig, DigitallySignedStruct,
         client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier},
         pki_types::{CertificateDer, InvalidDnsNameError, PrivateKeyDer, ServerName},
-        ClientConfig, DigitallySignedStruct,
     };
     use thiserror::Error;
 

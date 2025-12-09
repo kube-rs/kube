@@ -1,5 +1,5 @@
 //! Set base URI of requests.
-use http::{uri, Request};
+use http::{Request, uri};
 use tower::{Layer, Service};
 
 /// Layer that applies [`BaseUri`] which makes all requests relative to the URI.

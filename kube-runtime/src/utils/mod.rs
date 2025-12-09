@@ -9,28 +9,28 @@ mod reflect;
 mod stream_backoff;
 mod watch_ext;
 
-pub use backoff_reset_timer::{Backoff, ResetTimerBackoff};
-pub use event_decode::EventDecode;
-pub use event_modify::EventModify;
-pub use predicate::{predicates, Config as PredicateConfig, Predicate, PredicateFilter};
-pub use reflect::Reflect;
-pub use stream_backoff::StreamBackoff;
-pub use watch_ext::WatchStreamExt;
 /// Deprecated type alias for `EventDecode`
 #[deprecated(
     since = "0.96.0",
     note = "renamed to by `EventDecode`. This alias will be removed in 0.100.0."
 )]
 pub use EventDecode as EventFlatten;
+pub use backoff_reset_timer::{Backoff, ResetTimerBackoff};
+pub use event_decode::EventDecode;
+pub use event_modify::EventModify;
+pub use predicate::{Config as PredicateConfig, Predicate, PredicateFilter, predicates};
+pub use reflect::Reflect;
+pub use stream_backoff::StreamBackoff;
+pub use watch_ext::WatchStreamExt;
 
 use futures::{
-    stream::{self, Peekable},
     FutureExt, Stream, StreamExt, TryStream, TryStreamExt,
+    stream::{self, Peekable},
 };
 use pin_project::pin_project;
 use std::{
     fmt::Debug,
-    pin::{pin, Pin},
+    pin::{Pin, pin},
     sync::{Arc, Mutex},
     task::Poll,
 };

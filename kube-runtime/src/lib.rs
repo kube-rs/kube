@@ -30,12 +30,12 @@ pub mod utils;
 pub mod wait;
 pub mod watcher;
 
-pub use controller::{applier, Config, Controller};
+pub use controller::{Config, Controller, applier};
 pub use finalizer::finalizer;
 pub use reflector::reflector;
 pub use scheduler::scheduler;
 pub use utils::WatchStreamExt;
 pub use watcher::{metadata_watcher, watcher};
 
-pub use utils::{predicates, Predicate, PredicateConfig};
+pub use utils::{Predicate, PredicateConfig, predicates};
 pub use wait::conditions;

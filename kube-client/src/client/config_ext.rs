@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use http::{header::HeaderName, HeaderValue};
+use http::{HeaderValue, header::HeaderName};
 #[cfg(feature = "openssl-tls")] use hyper::rt::{Read, Write};
 use hyper_util::client::legacy::connect::HttpConnector;
 use secrecy::ExposeSecret;
@@ -105,7 +105,7 @@ pub trait ConfigExt: private::Sealed {
     #[cfg_attr(docsrs, doc(cfg(feature = "openssl-tls")))]
     #[cfg(feature = "openssl-tls")]
     fn openssl_https_connector(&self)
-        -> Result<hyper_openssl::client::legacy::HttpsConnector<HttpConnector>>;
+    -> Result<hyper_openssl::client::legacy::HttpsConnector<HttpConnector>>;
 
     /// Create [`hyper_openssl::HttpsConnector`] based on config and `connector`.
     /// # Example

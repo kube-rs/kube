@@ -2,12 +2,13 @@ use std::collections::HashMap;
 
 use bytes::{Buf, Bytes};
 use futures::{
+    FutureExt, SinkExt, StreamExt,
     channel::{mpsc, oneshot},
-    future, FutureExt, SinkExt, StreamExt,
+    future,
 };
 use thiserror::Error;
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt, DuplexStream};
-use tokio_tungstenite::{tungstenite as ws, WebSocketStream};
+use tokio_tungstenite::{WebSocketStream, tungstenite as ws};
 use tokio_util::io::ReaderStream;
 
 /// Errors from Portforwarder.

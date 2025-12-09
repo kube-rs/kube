@@ -7,7 +7,7 @@
 //! kubelet. The kubelet itself supports statistics access through CRI, or
 //! through cAdvisor.
 use k8s_openapi::{api::core::v1::Node, apimachinery::pkg::api::resource::Quantity};
-use kube::{api::ListParams, Api, ResourceExt};
+use kube::{Api, ResourceExt, api::ListParams};
 use serde::Deserialize;
 
 #[tokio::main]
@@ -111,8 +111,8 @@ fn print_table(summaries: Vec<NodeSummary>) {
     };
 
     println!(
-            "{NAME:w_name$} {USED_MEM:w_used_mem$} {PERCENT_MEM:w_percent_mem$} {USED_CPU:w_used_cpu$} {PERCENT_CPU:w_percent_cpu$}"
-        );
+        "{NAME:w_name$} {USED_MEM:w_used_mem$} {PERCENT_MEM:w_percent_mem$} {USED_CPU:w_used_cpu$} {PERCENT_CPU:w_percent_cpu$}"
+    );
     for summary in summaries {
         // Get Node memory allocatable and trim measurement suffix.
         let mem_total = summary
@@ -136,7 +136,9 @@ fn print_table(summaries: Vec<NodeSummary>) {
         let (percent_mem, used_mem) = summary.metrics.memory.convert_to_stat(mem_total);
         let (percent_cpu, used_cpu) = summary.metrics.cpu.convert_to_stat(cpu_total);
 
-        println!("{name:w_name$} {used_mem:<w_used_mem$} {percent_mem:<w_percent_mem$} {used_cpu:<w_used_cpu$} {percent_cpu:<w_percent_cpu$}");
+        println!(
+            "{name:w_name$} {used_mem:<w_used_mem$} {percent_mem:<w_percent_mem$} {used_cpu:<w_used_cpu$} {percent_cpu:<w_percent_cpu$}"
+        );
     }
 }
 

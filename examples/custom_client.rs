@@ -4,7 +4,7 @@ use k8s_openapi::api::core::v1::Pod;
 use tower::BoxError;
 use tracing::*;
 
-use kube::{client::ConfigExt, Api, Client, Config, ResourceExt};
+use kube::{Api, Client, Config, ResourceExt, client::ConfigExt};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

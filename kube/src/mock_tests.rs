@@ -1,12 +1,12 @@
 use crate::{
-    runtime::{
-        watcher::{watcher, Config},
-        WatchStreamExt,
-    },
     Api, Client,
+    runtime::{
+        WatchStreamExt,
+        watcher::{Config, watcher},
+    },
 };
 use anyhow::Result;
-use futures::{poll, StreamExt, TryStreamExt};
+use futures::{StreamExt, TryStreamExt, poll};
 use http::{Request, Response};
 use kube_client::client::Body;
 use kube_derive::CustomResource;

@@ -7,8 +7,8 @@
 use std::fmt::Debug;
 
 use crate::{Api, Error, Result};
-use kube_core::{params::PostParams, Resource};
-use serde::{de::DeserializeOwned, Serialize};
+use kube_core::{Resource, params::PostParams};
+use serde::{Serialize, de::DeserializeOwned};
 
 impl<K: Resource + Clone + DeserializeOwned + Debug> Api<K> {
     /// Gets a given object's "slot" on the Kubernetes API, designed for "get-or-create" and "get-and-modify" patterns
@@ -260,7 +260,9 @@ pub enum CommitError {
 /// Pre-commit validation errors
 pub enum CommitValidationError {
     /// `ObjectMeta::name` does not match the name passed to [`Api::entry`]
-    #[error(".metadata.name does not match the name passed to Api::entry (got: {object_name:?}, expected: {expected:?})")]
+    #[error(
+        ".metadata.name does not match the name passed to Api::entry (got: {object_name:?}, expected: {expected:?})"
+    )]
     NameMismatch {
         /// The name of the object (`ObjectMeta::name`)
         object_name: String,
@@ -268,7 +270,9 @@ pub enum CommitValidationError {
         expected: String,
     },
     /// `ObjectMeta::namespace` does not match the namespace of the [`Api`]
-    #[error(".metadata.namespace does not match the namespace of the Api (got: {object_namespace:?}, expected: {expected:?})")]
+    #[error(
+        ".metadata.namespace does not match the namespace of the Api (got: {object_namespace:?}, expected: {expected:?})"
+    )]
     NamespaceMismatch {
         /// The name of the object (`ObjectMeta::namespace`)
         object_namespace: Option<String>,
@@ -316,13 +320,13 @@ mod tests {
 
     use k8s_openapi::api::core::v1::ConfigMap;
     use kube_core::{
-        params::{DeleteParams, PostParams},
         ErrorResponse, ObjectMeta,
+        params::{DeleteParams, PostParams},
     };
 
     use crate::{
-        api::entry::{CommitError, Entry},
         Api, Client, Error,
+        api::entry::{CommitError, Entry},
     };
 
     #[tokio::test]

@@ -3,8 +3,8 @@ use k8s_openapi::api::core::v1::Pod;
 use tracing::*;
 
 use kube::{
-    api::{Api, AttachParams, DeleteParams, PostParams, ResourceExt, WatchEvent, WatchParams},
     Client,
+    api::{Api, AttachParams, DeleteParams, PostParams, ResourceExt, WatchEvent, WatchParams},
 };
 use tokio::io::AsyncWriteExt;
 

@@ -2,7 +2,7 @@ use http::{self, HeaderValue, Response, StatusCode};
 use thiserror::Error;
 use tokio_tungstenite::tungstenite as ws;
 
-use crate::{client::Body, Error, Result};
+use crate::{Error, Result, client::Body};
 
 #[derive(Debug)]
 pub enum StreamProtocol {

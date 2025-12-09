@@ -343,7 +343,7 @@ pub mod conditions {
         #[test]
         /// pass when CRD is established
         fn crd_established_ok() {
-            use super::{is_crd_established, Condition};
+            use super::{Condition, is_crd_established};
 
             let crd = r#"
                 apiVersion: apiextensions.k8s.io/v1
@@ -396,7 +396,7 @@ pub mod conditions {
         #[test]
         /// fail when CRD is not yet ready
         fn crd_established_fail() {
-            use super::{is_crd_established, Condition};
+            use super::{Condition, is_crd_established};
 
             let crd = r#"
                 apiVersion: apiextensions.k8s.io/v1
@@ -449,7 +449,7 @@ pub mod conditions {
         #[test]
         /// fail when CRD does not exist
         fn crd_established_missing() {
-            use super::{is_crd_established, Condition};
+            use super::{Condition, is_crd_established};
 
             assert!(!is_crd_established().matches_object(None))
         }
@@ -457,7 +457,7 @@ pub mod conditions {
         #[test]
         /// pass when pod is running
         fn pod_running_ok() {
-            use super::{is_pod_running, Condition};
+            use super::{Condition, is_pod_running};
 
             let pod = r#"
                 apiVersion: v1
@@ -516,7 +516,7 @@ pub mod conditions {
         #[test]
         /// fail if pod is unschedulable
         fn pod_running_unschedulable() {
-            use super::{is_pod_running, Condition};
+            use super::{Condition, is_pod_running};
 
             let pod = r#"
                 apiVersion: v1
@@ -550,7 +550,7 @@ pub mod conditions {
         #[test]
         /// fail if pod does not exist
         fn pod_running_missing() {
-            use super::{is_pod_running, Condition};
+            use super::{Condition, is_pod_running};
 
             assert!(!is_pod_running().matches_object(None))
         }
@@ -558,7 +558,7 @@ pub mod conditions {
         #[test]
         /// pass if job completed
         fn job_completed_ok() {
-            use super::{is_job_completed, Condition};
+            use super::{Condition, is_job_completed};
 
             let job = r#"
                 apiVersion: batch/v1
@@ -607,7 +607,7 @@ pub mod conditions {
         #[test]
         /// fail if job is still in progress
         fn job_completed_running() {
-            use super::{is_job_completed, Condition};
+            use super::{Condition, is_job_completed};
 
             let job = r#"
                 apiVersion: batch/v1
@@ -647,7 +647,7 @@ pub mod conditions {
         #[test]
         /// fail if job does not exist
         fn job_completed_missing() {
-            use super::{is_job_completed, Condition};
+            use super::{Condition, is_job_completed};
 
             assert!(!is_job_completed().matches_object(None))
         }
@@ -655,7 +655,7 @@ pub mod conditions {
         #[test]
         /// pass when deployment has been fully rolled out
         fn deployment_completed_ok() {
-            use super::{is_deployment_completed, Condition};
+            use super::{Condition, is_deployment_completed};
 
             let depl = r#"
                 apiVersion: apps/v1
@@ -719,7 +719,7 @@ pub mod conditions {
         #[test]
         /// fail if deployment update is still rolling out
         fn deployment_completed_pending() {
-            use super::{is_deployment_completed, Condition};
+            use super::{Condition, is_deployment_completed};
 
             let depl = r#"
                 apiVersion: apps/v1
@@ -782,7 +782,7 @@ pub mod conditions {
         #[test]
         /// fail if deployment does not exist
         fn deployment_completed_missing() {
-            use super::{is_deployment_completed, Condition};
+            use super::{Condition, is_deployment_completed};
 
             assert!(!is_deployment_completed().matches_object(None))
         }
@@ -790,7 +790,7 @@ pub mod conditions {
         #[test]
         /// pass if loadbalancer service has recieved a loadbalancer IP
         fn service_lb_provisioned_ok_ip() {
-            use super::{is_service_loadbalancer_provisioned, Condition};
+            use super::{Condition, is_service_loadbalancer_provisioned};
 
             let service = r"
                 apiVersion: v1
@@ -819,7 +819,7 @@ pub mod conditions {
         #[test]
         /// pass if loadbalancer service has recieved a loadbalancer hostname
         fn service_lb_provisioned_ok_hostname() {
-            use super::{is_service_loadbalancer_provisioned, Condition};
+            use super::{Condition, is_service_loadbalancer_provisioned};
 
             let service = r"
                 apiVersion: v1
@@ -848,7 +848,7 @@ pub mod conditions {
         #[test]
         /// fail if loadbalancer service is still waiting for a LB
         fn service_lb_provisioned_pending() {
-            use super::{is_service_loadbalancer_provisioned, Condition};
+            use super::{Condition, is_service_loadbalancer_provisioned};
 
             let service = r"
                 apiVersion: v1
@@ -875,7 +875,7 @@ pub mod conditions {
         #[test]
         /// pass if service is not a loadbalancer
         fn service_lb_provisioned_not_loadbalancer() {
-            use super::{is_service_loadbalancer_provisioned, Condition};
+            use super::{Condition, is_service_loadbalancer_provisioned};
 
             let service = r"
                 apiVersion: v1
@@ -901,7 +901,7 @@ pub mod conditions {
         #[test]
         /// fail if service does not exist
         fn service_lb_provisioned_missing() {
-            use super::{is_service_loadbalancer_provisioned, Condition};
+            use super::{Condition, is_service_loadbalancer_provisioned};
 
             assert!(!is_service_loadbalancer_provisioned().matches_object(None))
         }
@@ -909,7 +909,7 @@ pub mod conditions {
         #[test]
         /// pass when ingress has recieved a loadbalancer IP
         fn ingress_provisioned_ok_ip() {
-            use super::{is_ingress_provisioned, Condition};
+            use super::{Condition, is_ingress_provisioned};
 
             let ingress = r#"
                 apiVersion: networking.k8s.io/v1
@@ -944,7 +944,7 @@ pub mod conditions {
         #[test]
         /// pass when ingress has recieved a loadbalancer hostname
         fn ingress_provisioned_ok_hostname() {
-            use super::{is_ingress_provisioned, Condition};
+            use super::{Condition, is_ingress_provisioned};
 
             let ingress = r#"
                 apiVersion: networking.k8s.io/v1
@@ -979,7 +979,7 @@ pub mod conditions {
         #[test]
         /// fail if ingress is still waiting for a LB
         fn ingress_provisioned_pending() {
-            use super::{is_ingress_provisioned, Condition};
+            use super::{Condition, is_ingress_provisioned};
 
             let ingress = r#"
                 apiVersion: networking.k8s.io/v1
@@ -1012,7 +1012,7 @@ pub mod conditions {
         #[test]
         /// fail if ingress does not exist
         fn ingress_provisioned_missing() {
-            use super::{is_ingress_provisioned, Condition};
+            use super::{Condition, is_ingress_provisioned};
 
             assert!(!is_ingress_provisioned().matches_object(None))
         }
@@ -1022,7 +1022,7 @@ pub mod conditions {
 /// Utilities for deleting objects
 pub mod delete {
     use super::{await_condition, conditions};
-    use kube_client::{api::DeleteParams, Api, Resource};
+    use kube_client::{Api, Resource, api::DeleteParams};
     use serde::de::DeserializeOwned;
     use std::fmt::Debug;
     use thiserror::Error;

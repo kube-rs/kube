@@ -1,6 +1,6 @@
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
-use http::{header::HeaderMap, Request, Response};
+use http::{Request, Response, header::HeaderMap};
 use hyper::{
     body::Incoming,
     rt::{Read, Write},
@@ -13,14 +13,14 @@ use hyper_util::{
 };
 
 use std::time::Duration;
-use tower::{util::BoxService, BoxError, Layer, Service, ServiceBuilder};
+use tower::{BoxError, Layer, Service, ServiceBuilder, util::BoxService};
 use tower_http::{
     classify::ServerErrorsFailureClass, map_response_body::MapResponseBodyLayer, trace::TraceLayer,
 };
 use tracing::Span;
 
 use super::body::Body;
-use crate::{client::ConfigExt, Client, Config, Error, Result};
+use crate::{Client, Config, Error, Result, client::ConfigExt};
 
 /// HTTP body of a dynamic backing type.
 ///
@@ -275,8 +275,8 @@ mod tests {
 
     #[cfg(feature = "gzip")]
     #[tokio::test]
-    async fn test_no_accept_encoding_header_sent_when_compression_disabled(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    async fn test_no_accept_encoding_header_sent_when_compression_disabled()
+    -> Result<(), Box<dyn std::error::Error>> {
         use http::Uri;
         use std::net::SocketAddr;
         use tokio::net::{TcpListener, TcpStream};

@@ -7,15 +7,15 @@ use std::{
 use chrono::{DateTime, Duration, Utc};
 use futures::future::BoxFuture;
 use http::{
-    header::{InvalidHeaderValue, AUTHORIZATION},
     HeaderValue, Request,
+    header::{AUTHORIZATION, InvalidHeaderValue},
 };
 use jsonpath_rust::JsonPath;
 use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::sync::{Mutex, RwLock};
-use tower::{filter::AsyncPredicate, BoxError};
+use tower::{BoxError, filter::AsyncPredicate};
 
 use crate::config::{AuthInfo, AuthProviderConfig, ExecAuthCluster, ExecConfig, ExecInteractiveMode};
 

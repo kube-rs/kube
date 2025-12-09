@@ -3,7 +3,7 @@ use std::fmt::Debug;
 
 use crate::{
     params::{DeleteParams, PostParams},
-    request::{Error, Request, JSON_MIME},
+    request::{Error, JSON_MIME, Request},
 };
 
 pub use k8s_openapi::api::autoscaling::v1::{Scale, ScaleSpec, ScaleStatus};
@@ -434,7 +434,10 @@ mod test {
             timestamps: true,
         };
         let req = Request::new(url).logs("mypod", &lp).unwrap();
-        assert_eq!(req.uri(), "/api/v1/namespaces/ns/pods/mypod/log?&container=nginx&follow=true&limitBytes=10485760&pretty=true&previous=true&sinceSeconds=3600&tailLines=4096&timestamps=true");
+        assert_eq!(
+            req.uri(),
+            "/api/v1/namespaces/ns/pods/mypod/log?&container=nginx&follow=true&limitBytes=10485760&pretty=true&previous=true&sinceSeconds=3600&tailLines=4096&timestamps=true"
+        );
     }
 
     #[test]

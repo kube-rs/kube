@@ -1,10 +1,10 @@
 use futures::prelude::*;
 use k8s_openapi::api::core::v1::ConfigMap;
 use kube::{
+    Client, Resource,
     api::{Api, ObjectMeta},
     core::DeserializeGuard,
-    runtime::{reflector::ObjectRef, watcher, WatchStreamExt},
-    Client, Resource,
+    runtime::{WatchStreamExt, reflector::ObjectRef, watcher},
 };
 use serde::Deserialize;
 use tracing::*;
