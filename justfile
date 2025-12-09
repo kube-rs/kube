@@ -12,7 +12,7 @@ clippy:
 
 fmt:
   #rustup component add rustfmt --toolchain nightly
-  rustfmt +nightly --edition 2021 $(find . -type f -iname *.rs)
+  rustfmt +nightly --edition 2024 $(find . -type f -iname *.rs)
 
 doc:
   RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --all-features --no-deps --open
@@ -61,7 +61,7 @@ hack:
   # Skipped oauth and oidc, as these compile fails without a tls stack.
 
 readme:
-  rustdoc README.md --test --edition=2021
+  rustdoc README.md --test --edition=2024
 
 e2e: (e2e-mink8s) (e2e-incluster "rustls,latest")
 

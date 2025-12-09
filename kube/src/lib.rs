@@ -212,7 +212,7 @@ pub mod prelude {
 
     #[allow(unreachable_pub)] pub use crate::core::PartialObjectMetaExt as _;
     #[allow(unreachable_pub)] pub use crate::core::SelectorExt as _;
-    pub use crate::{core::crd::CustomResourceExt as _, Resource as _, ResourceExt as _};
+    pub use crate::{Resource as _, ResourceExt as _, core::crd::CustomResourceExt as _};
 
     #[cfg(feature = "runtime")] pub use crate::runtime::utils::WatchStreamExt as _;
 }
@@ -223,8 +223,8 @@ pub mod prelude {
 #[cfg(all(feature = "derive", feature = "client"))]
 mod test {
     use crate::{
-        api::{DeleteParams, Patch, PatchParams},
         Api, Client, CustomResourceExt, Resource, ResourceExt,
+        api::{DeleteParams, Patch, PatchParams},
     };
     use kube_derive::CustomResource;
     use schemars::JsonSchema;
@@ -350,8 +350,8 @@ mod test {
     async fn custom_serialized_objects_are_queryable_and_iterable() -> Result<(), Box<dyn std::error::Error>>
     {
         use crate::core::{
-            object::{HasSpec, HasStatus, NotUsed, Object},
             ApiResource,
+            object::{HasSpec, HasStatus, NotUsed, Object},
         };
         use k8s_openapi::api::core::v1::Pod;
         #[derive(Clone, Deserialize, Debug)]
@@ -403,8 +403,8 @@ mod test {
     async fn derived_resources_discoverable() -> Result<(), Box<dyn std::error::Error>> {
         use crate::{
             core::{DynamicObject, GroupVersion, GroupVersionKind},
-            discovery::{self, verbs, ApiGroup, Discovery, Scope},
-            runtime::wait::{await_condition, conditions, Condition},
+            discovery::{self, ApiGroup, Discovery, Scope, verbs},
+            runtime::wait::{Condition, await_condition, conditions},
         };
 
         #[derive(CustomResource, Deserialize, Serialize, Clone, Debug, JsonSchema)]
@@ -478,9 +478,9 @@ mod test {
     #[cfg(feature = "runtime")]
     async fn pod_can_await_conditions() -> Result<(), Box<dyn std::error::Error>> {
         use crate::{
-            api::{DeleteParams, PostParams},
-            runtime::wait::{await_condition, conditions, delete::delete_and_finalize, Condition},
             Api, Client,
+            api::{DeleteParams, PostParams},
+            runtime::wait::{Condition, await_condition, conditions, delete::delete_and_finalize},
         };
         use k8s_openapi::api::core::v1::Pod;
         use std::time::Duration;

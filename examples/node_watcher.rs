@@ -4,8 +4,8 @@ use futures::TryStreamExt;
 use k8s_openapi::api::core::v1::{Event, Node};
 use kube::{
     api::{Api, ListParams, ResourceExt},
-    client::{scope, Client},
-    runtime::{watcher, WatchStreamExt},
+    client::{Client, scope},
+    runtime::{WatchStreamExt, watcher},
 };
 use tracing::*;
 

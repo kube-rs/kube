@@ -1,10 +1,10 @@
 use futures::AsyncBufRead;
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 use std::fmt::Debug;
 
 use crate::{
-    api::{Api, Patch, PatchParams, PostParams},
     Error, Result,
+    api::{Api, Patch, PatchParams, PostParams},
 };
 
 use kube_core::response::Status;
@@ -399,13 +399,11 @@ k8s_openapi::k8s_if_ge_1_33! {
         /// let mut pod = pods.get("mypod").await?;
         ///
         /// // Modify resource requirements
-        /// if let Some(spec) = &mut pod.spec {
-        ///     if let Some(container) = spec.containers.get_mut(0) {
-        ///         if let Some(resources) = &mut container.resources {
-        ///             // Update CPU/memory limits or requests
-        ///             // ...
-        ///         }
-        ///     }
+        /// if let Some(spec) = &mut pod.spec &&
+        ///    let Some(container) = spec.containers.get_mut(0) &&
+        ///    let Some(resources) = &mut container.resources {
+        ///         // Update CPU/memory limits or requests
+        ///         // ...
         /// }
         ///
         /// pods.replace_resize("mypod", &pp, &pod).await?;

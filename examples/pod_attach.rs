@@ -1,14 +1,14 @@
 use std::io::Write;
 use tracing::*;
 
-use futures::{join, stream, StreamExt, TryStreamExt};
+use futures::{StreamExt, TryStreamExt, join, stream};
 use k8s_openapi::api::core::v1::Pod;
 
 use kube::{
+    Client,
     api::{
         Api, AttachParams, AttachedProcess, DeleteParams, PostParams, ResourceExt, WatchEvent, WatchParams,
     },
-    Client,
 };
 
 #[tokio::main]

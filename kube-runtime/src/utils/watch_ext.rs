@@ -282,7 +282,7 @@ impl<St: ?Sized> WatchStreamExt for St where St: Stream {}
 #[cfg(test)]
 pub(crate) mod tests {
     use super::watcher;
-    use crate::{predicates, WatchStreamExt as _};
+    use crate::{WatchStreamExt as _, predicates};
     use futures::prelude::*;
     use k8s_openapi::api::core::v1::Pod;
     use kube_client::{Api, Resource};

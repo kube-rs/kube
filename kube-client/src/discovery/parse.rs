@@ -1,5 +1,5 @@
 //! Abstractions on top of k8s_openapi::apimachinery::pkg::apis::meta::v1
-use crate::{error::DiscoveryError, Error, Result};
+use crate::{Error, Result, error::DiscoveryError};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{APIResource, APIResourceList};
 use kube_core::{
     discovery::{ApiCapabilities, ApiResource, Scope},

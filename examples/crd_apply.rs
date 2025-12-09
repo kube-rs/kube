@@ -8,9 +8,9 @@ use apiexts::CustomResourceDefinition;
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1 as apiexts;
 
 use kube::{
+    Client, CustomResource, CustomResourceExt,
     api::{Api, Patch, PatchParams, ResourceExt},
     runtime::wait::{await_condition, conditions},
-    Client, CustomResource, CustomResourceExt,
 };
 
 /// Spec object for Foo

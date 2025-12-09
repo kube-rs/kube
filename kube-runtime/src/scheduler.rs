@@ -1,7 +1,7 @@
 //! Delays and deduplicates [`Stream`](futures::stream::Stream) items
 
-use futures::{stream::Fuse, Stream, StreamExt};
-use hashbrown::{hash_map::RawEntryMut, HashMap};
+use futures::{Stream, StreamExt, stream::Fuse};
+use hashbrown::{HashMap, hash_map::RawEntryMut};
 use pin_project::pin_project;
 use std::{
     collections::HashSet,
@@ -299,11 +299,11 @@ pub(crate) fn max_schedule_time() -> Instant {
 mod tests {
     use crate::utils::KubeRuntimeStreamExt;
 
-    use super::{debounced_scheduler, scheduler, ScheduleRequest};
+    use super::{ScheduleRequest, debounced_scheduler, scheduler};
     use educe::Educe;
-    use futures::{channel::mpsc, future, poll, stream, FutureExt, SinkExt, StreamExt};
+    use futures::{FutureExt, SinkExt, StreamExt, channel::mpsc, future, poll, stream};
     use std::{pin::pin, task::Poll};
-    use tokio::time::{advance, pause, sleep, Duration, Instant};
+    use tokio::time::{Duration, Instant, advance, pause, sleep};
 
     fn unwrap_poll<T>(poll: Poll<T>) -> T {
         if let Poll::Ready(x) = poll {

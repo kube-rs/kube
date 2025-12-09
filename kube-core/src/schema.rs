@@ -6,12 +6,12 @@
 #[allow(unused_imports)] use schemars::generate::SchemaSettings;
 
 use schemars::{
-    transform::{transform_subschemas, Transform},
     JsonSchema,
+    transform::{Transform, transform_subschemas},
 };
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
-use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
+use serde_json::{Value, json};
+use std::collections::{BTreeMap, BTreeSet, btree_map::Entry};
 
 /// schemars [`Visitor`] that rewrites a [`Schema`] to conform to Kubernetes' "structural schema" rules
 ///
@@ -455,10 +455,12 @@ fn hoist_subschema_properties(
                     }
                     Entry::Occupied(entry) => {
                         if &property != entry.get() {
-                            panic!("Property {:?} has the schema {:?} but was already defined as {:?} in another subschema. The schemas for a property used in multiple subschemas must be identical",
-                            entry.key(),
-                            &property,
-                            entry.get());
+                            panic!(
+                                "Property {:?} has the schema {:?} but was already defined as {:?} in another subschema. The schemas for a property used in multiple subschemas must be identical",
+                                entry.key(),
+                                &property,
+                                entry.get()
+                            );
                         }
                     }
                 }

@@ -3,21 +3,20 @@
 use self::runner::Runner;
 use crate::{
     reflector::{
-        self, reflector,
+        self, ObjectRef, reflector,
         store::{Store, Writer},
-        ObjectRef,
     },
-    scheduler::{debounced_scheduler, ScheduleRequest},
+    scheduler::{ScheduleRequest, debounced_scheduler},
     utils::{
-        trystream_try_via, Backoff, CancelableJoinHandle, KubeRuntimeStreamExt, StreamBackoff, WatchStreamExt,
+        Backoff, CancelableJoinHandle, KubeRuntimeStreamExt, StreamBackoff, WatchStreamExt, trystream_try_via,
     },
-    watcher::{self, metadata_watcher, watcher, DefaultBackoff},
+    watcher::{self, DefaultBackoff, metadata_watcher, watcher},
 };
 use educe::Educe;
 use futures::{
-    channel,
+    FutureExt, Stream, StreamExt, TryFuture, TryFutureExt, TryStream, TryStreamExt, channel,
     future::{self, BoxFuture},
-    stream, FutureExt, Stream, StreamExt, TryFuture, TryFutureExt, TryStream, TryStreamExt,
+    stream,
 };
 use kube_client::api::{Api, DynamicObject, Resource};
 use pin_project::pin_project;
@@ -26,13 +25,13 @@ use std::{
     fmt::{Debug, Display},
     hash::Hash,
     sync::Arc,
-    task::{ready, Poll},
+    task::{Poll, ready},
     time::Duration,
 };
 use stream::BoxStream;
 use thiserror::Error;
 use tokio::{runtime::Handle, time::Instant};
-use tracing::{info_span, Instrument};
+use tracing::{Instrument, info_span};
 
 mod future_hash_map;
 mod runner;
@@ -1679,16 +1678,15 @@ where
 mod tests {
     use std::{convert::Infallible, pin::pin, sync::Arc, time::Duration};
 
-    use super::{Action, APPLIER_REQUEUE_BUF_SIZE};
+    use super::{APPLIER_REQUEUE_BUF_SIZE, Action};
     use crate::{
-        applier,
+        Config, Controller, applier,
         reflector::{self, ObjectRef},
-        watcher::{self, metadata_watcher, watcher, Event},
-        Config, Controller,
+        watcher::{self, Event, metadata_watcher, watcher},
     };
     use futures::{Stream, StreamExt, TryStreamExt};
     use k8s_openapi::api::core::v1::ConfigMap;
-    use kube_client::{core::ObjectMeta, Api, Resource};
+    use kube_client::{Api, Resource, core::ObjectMeta};
     use serde::de::DeserializeOwned;
     use tokio::time::timeout;
 

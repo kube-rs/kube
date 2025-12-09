@@ -5,9 +5,9 @@ use tracing::*;
 use futures::AsyncBufReadExt;
 use hyper::Uri;
 use kube::{
+    Client, Config,
     api::{Api, DeleteParams, ResourceExt},
     core::{kubelet_debug::KubeletDebugParams, subresource::LogParams},
-    Client, Config,
 };
 use serde_json::json;
 

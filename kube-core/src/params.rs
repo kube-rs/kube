@@ -1,5 +1,5 @@
 //! A port of request parameter *Optionals from apimachinery/types.go
-use crate::{request::Error, Selector};
+use crate::{Selector, request::Error};
 use serde::Serialize;
 
 /// Controls how the resource version parameter is applied for list calls
@@ -876,7 +876,7 @@ where
 }
 #[cfg(test)]
 mod test {
-    use crate::{params::WatchParams, Expression, Selector};
+    use crate::{Expression, Selector, params::WatchParams};
 
     use super::{DeleteParams, ListParams, PatchParams};
     #[test]

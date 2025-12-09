@@ -1,19 +1,20 @@
 //! This is a simple imitation of the basic functionality of kubectl:
 //! kubectl {get, delete, apply, watch, edit} <resource> [name]
 //! with labels and namespace selectors supported.
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::{apimachinery::pkg::apis::meta::v1::Time, chrono::Utc};
 use kube::{
+    Client,
     api::{Api, DynamicObject, ListParams, Patch, PatchParams, ResourceExt},
     config::KubeConfigOptions,
     core::GroupVersionKind,
     discovery::{ApiCapabilities, ApiResource, Discovery, Scope},
     runtime::{
+        WatchStreamExt,
         wait::{await_condition, conditions::is_deleted},
-        watcher, WatchStreamExt,
+        watcher,
     },
-    Client,
 };
 use tracing::*;
 

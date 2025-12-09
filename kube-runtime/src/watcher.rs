@@ -6,12 +6,12 @@ use crate::utils::{Backoff, ResetTimerBackoff};
 
 use backon::BackoffBuilder;
 use educe::Educe;
-use futures::{stream::BoxStream, Stream, StreamExt};
+use futures::{Stream, StreamExt, stream::BoxStream};
 use kube_client::{
-    api::{ListParams, Resource, ResourceExt, VersionMatch, WatchEvent, WatchParams},
-    core::{metadata::PartialObjectMeta, ObjectList, Selector},
-    error::ErrorResponse,
     Api, Error as ClientErr,
+    api::{ListParams, Resource, ResourceExt, VersionMatch, WatchEvent, WatchParams},
+    core::{ObjectList, Selector, metadata::PartialObjectMeta},
+    error::ErrorResponse,
 };
 use serde::de::DeserializeOwned;
 use std::{clone::Clone, collections::VecDeque, fmt::Debug, future, time::Duration};

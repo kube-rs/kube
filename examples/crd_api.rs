@@ -1,4 +1,4 @@
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use either::Either::{Left, Right};
 use garde::Validate;
 use schemars::JsonSchema;
@@ -10,9 +10,9 @@ use tracing::*;
 
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
 use kube::{
+    Client, CustomResource,
     api::{Api, DeleteParams, ListParams, Patch, PatchParams, PostParams, ResourceExt},
     core::crd::CustomResourceExt,
-    Client, CustomResource,
 };
 
 // Own custom resource
@@ -212,9 +212,10 @@ async fn main() -> Result<()> {
     match foos.create(&pp, &fx).await {
         Err(kube::Error::Api(ae)) => {
             assert_eq!(ae.code, 422);
-            assert!(ae
-                .message
-                .contains("spec.name in body should be at least 3 chars long"));
+            assert!(
+                ae.message
+                    .contains("spec.name in body should be at least 3 chars long")
+            );
         }
         Err(e) => bail!("somehow got unexpected error from validation: {:?}", e),
         Ok(o) => bail!("somehow created {:?} despite validation", o),

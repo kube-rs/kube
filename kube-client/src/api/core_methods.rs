@@ -1,11 +1,11 @@
 use either::Either;
 use futures::Stream;
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 use std::fmt::Debug;
 
-use crate::{api::Api, Error, Result};
+use crate::{Error, Result, api::Api};
 use kube_core::{
-    metadata::PartialObjectMeta, object::ObjectList, params::*, response::Status, ErrorResponse, WatchEvent,
+    ErrorResponse, WatchEvent, metadata::PartialObjectMeta, object::ObjectList, params::*, response::Status,
 };
 
 /// PUSH/PUT/POST/GET abstractions

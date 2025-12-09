@@ -2,7 +2,7 @@ use std::{pin::Pin, task::Poll};
 
 use futures::{Stream, TryStream};
 use pin_project::pin_project;
-use tokio::time::{sleep, Instant, Sleep};
+use tokio::time::{Instant, Sleep, sleep};
 
 use crate::utils::Backoff;
 
@@ -103,7 +103,7 @@ pub(crate) mod tests {
 
     use super::StreamBackoff;
     use backon::BackoffBuilder;
-    use futures::{channel::mpsc, poll, stream, StreamExt};
+    use futures::{StreamExt, channel::mpsc, poll, stream};
 
     pub struct ConstantBackoff {
         inner: backon::ConstantBackoff,

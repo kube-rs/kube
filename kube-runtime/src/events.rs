@@ -14,8 +14,8 @@ use k8s_openapi::{
     chrono::{Duration, Utc},
 };
 use kube_client::{
-    api::{Api, Patch, PatchParams, PostParams},
     Client, ResourceExt,
+    api::{Api, Patch, PatchParams, PostParams},
 };
 use tokio::sync::RwLock;
 

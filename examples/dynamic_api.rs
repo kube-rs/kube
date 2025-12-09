@@ -1,9 +1,9 @@
 //! In this example we will implement something similar to `kubectl get all`.
 
 use kube::{
-    api::{Api, DynamicObject, ResourceExt},
-    discovery::{verbs, Discovery, Scope},
     Client,
+    api::{Api, DynamicObject, ResourceExt},
+    discovery::{Discovery, Scope, verbs},
 };
 use tracing::*;
 

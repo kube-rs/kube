@@ -1,9 +1,9 @@
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::Condition;
 use kube::{
-    core::object::{HasSpec, HasStatus},
     CustomResource, CustomResourceExt, Resource,
+    core::object::{HasSpec, HasStatus},
 };
-use schemars::{json_schema, JsonSchema};
+use schemars::{JsonSchema, json_schema};
 use serde::{Deserialize, Serialize};
 
 /// Our spec for Foo

@@ -1,8 +1,8 @@
 //! Node proxy methods
 use crate::{
+    Request,
     request::Error,
     subresource::{AttachParams, LogParams},
-    Request,
 };
 use std::fmt::Debug;
 
@@ -163,9 +163,9 @@ impl Request {
 #[cfg(test)]
 mod test {
     use crate::{
+        Request,
         kubelet_debug::KubeletDebugParams,
         subresource::{AttachParams, LogParams},
-        Request,
     };
     #[test]
     fn node_attach_test() {

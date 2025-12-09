@@ -1,8 +1,8 @@
 #![allow(missing_docs)]
 
 use k8s_openapi::{
-    api::core::v1::{ConfigMap, Secret},
     ByteString,
+    api::core::v1::{ConfigMap, Secret},
 };
 use kube::api::ObjectMeta;
 use kube_derive::Resource;

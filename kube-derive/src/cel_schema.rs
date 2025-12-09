@@ -1,9 +1,9 @@
 use darling::{
-    util::{parse_expr, IdentString},
     FromDeriveInput, FromField, FromMeta,
+    util::{IdentString, parse_expr},
 };
 use proc_macro2::TokenStream;
-use syn::{parse_quote, Attribute, DeriveInput, Expr, Ident, Path};
+use syn::{Attribute, DeriveInput, Expr, Ident, Path, parse_quote};
 
 #[derive(FromField)]
 #[darling(attributes(x_kube))]
