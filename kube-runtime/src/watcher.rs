@@ -491,11 +491,11 @@ where
                 });
             }
             // check if we need to perform more pages
-            if continue_token.is_none() {
-                if let Some(resource_version) = last_bookmark {
-                    // we have drained the last page - move on to next stage
-                    return (Some(Ok(Event::InitDone)), State::InitListed { resource_version });
-                }
+            if continue_token.is_none()
+                && let Some(resource_version) = last_bookmark
+            {
+                // we have drained the last page - move on to next stage
+                return (Some(Ok(Event::InitDone)), State::InitListed { resource_version });
             }
             let mut lp = wc.to_list_params();
             lp.continue_token = continue_token;

@@ -359,30 +359,29 @@ impl Kubeconfig {
         for mut config in kubeconfig_from_yaml(&data)? {
             if let Some(dir) = path.as_ref().parent() {
                 for named in config.clusters.iter_mut() {
-                    if let Some(cluster) = &mut named.cluster {
-                        if let Some(path) = &cluster.certificate_authority {
-                            if let Some(abs_path) = to_absolute(dir, path) {
-                                cluster.certificate_authority = Some(abs_path);
-                            }
-                        }
+                    if let Some(cluster) = &mut named.cluster
+                        && let Some(path) = &cluster.certificate_authority
+                        && let Some(abs_path) = to_absolute(dir, path)
+                    {
+                        cluster.certificate_authority = Some(abs_path);
                     }
                 }
                 for named in config.auth_infos.iter_mut() {
                     if let Some(auth_info) = &mut named.auth_info {
-                        if let Some(path) = &auth_info.client_certificate {
-                            if let Some(abs_path) = to_absolute(dir, path) {
-                                auth_info.client_certificate = Some(abs_path);
-                            }
+                        if let Some(path) = &auth_info.client_certificate
+                            && let Some(abs_path) = to_absolute(dir, path)
+                        {
+                            auth_info.client_certificate = Some(abs_path);
                         }
-                        if let Some(path) = &auth_info.client_key {
-                            if let Some(abs_path) = to_absolute(dir, path) {
-                                auth_info.client_key = Some(abs_path);
-                            }
+                        if let Some(path) = &auth_info.client_key
+                            && let Some(abs_path) = to_absolute(dir, path)
+                        {
+                            auth_info.client_key = Some(abs_path);
                         }
-                        if let Some(path) = &auth_info.token_file {
-                            if let Some(abs_path) = to_absolute(dir, path) {
-                                auth_info.token_file = Some(abs_path);
-                            }
+                        if let Some(path) = &auth_info.token_file
+                            && let Some(abs_path) = to_absolute(dir, path)
+                        {
+                            auth_info.token_file = Some(abs_path);
                         }
                     }
                 }

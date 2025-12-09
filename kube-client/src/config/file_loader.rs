@@ -97,10 +97,10 @@ impl ConfigLoader {
             AuthInfo::default()
         };
 
-        if let Some(exec_config) = &mut auth_info.exec {
-            if exec_config.provide_cluster_info {
-                exec_config.cluster = Some((&cluster).try_into()?);
-            }
+        if let Some(exec_config) = &mut auth_info.exec
+            && exec_config.provide_cluster_info
+        {
+            exec_config.cluster = Some((&cluster).try_into()?);
         }
 
         Ok(ConfigLoader {
