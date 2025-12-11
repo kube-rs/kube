@@ -316,15 +316,14 @@ impl Transform for StructuralSchemaRewriter {
 
         // check for maps without with properties (i.e. flattened maps)
         // and allow these to persist dynamically
-        if let Some(object) = &mut schema.object {
-            if !object.properties.is_empty()
-                && object.additional_properties.as_deref() == Some(&Schema::Bool(true))
-            {
-                object.additional_properties = None;
-                schema
-                    .extensions
-                    .insert("x-kubernetes-preserve-unknown-fields".into(), true.into());
-            }
+        if let Some(object) = &mut schema.object
+            && !object.properties.is_empty()
+            && object.additional_properties.as_deref() == Some(&Schema::Bool(true))
+        {
+            object.additional_properties = None;
+            schema
+                .extensions
+                .insert("x-kubernetes-preserve-unknown-fields".into(), true.into());
         }
 
         // As of version 1.30 Kubernetes does not support setting `uniqueItems` to `true`,
@@ -336,10 +335,10 @@ impl Transform for StructuralSchemaRewriter {
             array.unique_items = None;
         }
 
-        if let Ok(schema) = serde_json::to_value(schema) {
-            if let Ok(transformed) = serde_json::from_value(schema) {
-                *transform_schema = transformed;
-            }
+        if let Ok(schema) = serde_json::to_value(schema)
+            && let Ok(transformed) = serde_json::from_value(schema)
+        {
+            *transform_schema = transformed;
         }
     }
 }
@@ -432,18 +431,15 @@ fn hoist_subschema_properties(
         {
             let common_obj = common_obj.get_or_insert_with(Box::<ObjectValidation>::default);
 
-            if let Some(variant_metadata) = variant_metadata {
-                // Move enum variant description from oneOf clause to its corresponding property
-                if let Some(description) = std::mem::take(&mut variant_metadata.description) {
-                    if let Some(Schema::Object(variant_object)) =
-                        only_item(variant_obj.properties.values_mut())
-                    {
-                        let metadata = variant_object
-                            .metadata
-                            .get_or_insert_with(Box::<Metadata>::default);
-                        metadata.description = Some(description);
-                    }
-                }
+            // Move enum variant description from oneOf clause to its corresponding property
+            if let Some(variant_metadata) = variant_metadata
+                && let Some(description) = std::mem::take(&mut variant_metadata.description)
+                && let Some(Schema::Object(variant_object)) = only_item(variant_obj.properties.values_mut())
+            {
+                let metadata = variant_object
+                    .metadata
+                    .get_or_insert_with(Box::<Metadata>::default);
+                metadata.description = Some(description);
             }
 
             // Move all properties

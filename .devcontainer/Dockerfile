@@ -1,4 +1,4 @@
-FROM docker.io/rust:1.85.0-bullseye
+FROM docker.io/rust:1.88.0-bullseye
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt update && apt upgrade -y
@@ -41,7 +41,7 @@ RUN export K8S_VERSION="$(scurl https://dl.k8s.io/release/stable.txt)" \
 RUN scurl https://raw.githubusercontent.com/rancher/k3d/main/install.sh \
     | USE_SUDO=false K3D_INSTALL_DIR=$HOME/bin bash
 
-RUN rustup component add clippy rls rust-src rustfmt
+RUN rustup component add clippy rust-analysis rust-src rustfmt
 
 # Install cargo-deny
 ARG CARGO_DENY_VERSION=0.16.1

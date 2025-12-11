@@ -103,21 +103,19 @@ impl ListParams {
         }
         if let Some(continue_token) = &self.continue_token {
             qp.append_pair("continue", continue_token);
-        } else {
-            // When there's a continue token, we don't want to set resourceVersion
-            if let Some(rv) = &self.resource_version {
-                if rv != "0" || self.limit.is_none() {
-                    qp.append_pair("resourceVersion", rv.as_str());
+        } else if let Some(rv) = &self.resource_version
+            && (rv != "0" || self.limit.is_none())
+        {
+            // NB: When there's a continue token, we don't want to set resourceVersion
+            qp.append_pair("resourceVersion", rv.as_str());
 
-                    match &self.version_match {
-                        None => {}
-                        Some(VersionMatch::NotOlderThan) => {
-                            qp.append_pair("resourceVersionMatch", "NotOlderThan");
-                        }
-                        Some(VersionMatch::Exact) => {
-                            qp.append_pair("resourceVersionMatch", "Exact");
-                        }
-                    }
+            match &self.version_match {
+                None => {}
+                Some(VersionMatch::NotOlderThan) => {
+                    qp.append_pair("resourceVersionMatch", "NotOlderThan");
+                }
+                Some(VersionMatch::Exact) => {
+                    qp.append_pair("resourceVersionMatch", "Exact");
                 }
             }
         }

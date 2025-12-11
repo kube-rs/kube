@@ -130,15 +130,14 @@ fn to_plural(word: &str) -> String {
 
     // Words ending in y that are preceded by a consonant will be pluralized by
     // replacing y with -ies (eg. puppies).
-    if word.ends_with('y') {
-        if let Some(c) = word.chars().nth(word.len() - 2) {
-            if !matches!(c, 'a' | 'e' | 'i' | 'o' | 'u') {
-                // Remove 'y' and add `ies`
-                let mut chars = word.chars();
-                chars.next_back();
-                return format!("{}ies", chars.as_str());
-            }
-        }
+    if word.ends_with('y')
+        && let Some(c) = word.chars().nth(word.len() - 2)
+        && !matches!(c, 'a' | 'e' | 'i' | 'o' | 'u')
+    {
+        // Remove 'y' and add `ies`
+        let mut chars = word.chars();
+        chars.next_back();
+        return format!("{}ies", chars.as_str());
     }
 
     // All other words will have "s" added to the end (eg. days).

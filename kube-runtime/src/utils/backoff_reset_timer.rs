@@ -33,15 +33,15 @@ impl<B: Backoff> Iterator for ResetTimerBackoff<B> {
     type Item = Duration;
 
     fn next(&mut self) -> Option<Duration> {
-        if let Some(last_backoff) = self.last_backoff {
-            if tokio::time::Instant::now().into_std() > last_backoff + self.reset_duration {
-                tracing::debug!(
-                    ?last_backoff,
-                    reset_duration = ?self.reset_duration,
-                    "Resetting backoff, since reset duration has expired"
-                );
-                self.backoff.reset();
-            }
+        if let Some(last_backoff) = self.last_backoff
+            && tokio::time::Instant::now().into_std() > last_backoff + self.reset_duration
+        {
+            tracing::debug!(
+                ?last_backoff,
+                reset_duration = ?self.reset_duration,
+                "Resetting backoff, since reset duration has expired"
+            );
+            self.backoff.reset();
         }
         self.last_backoff = Some(tokio::time::Instant::now().into_std());
         self.backoff.next()

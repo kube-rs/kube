@@ -79,14 +79,12 @@ where
 /// use k8s_openapi::api::core::v1::Pod;
 /// fn my_custom_condition(my_cond: &str) -> impl Condition<Pod> + '_ {
 ///     move |obj: Option<&Pod>| {
-///         if let Some(pod) = &obj {
-///             if let Some(status) = &pod.status {
-///                 if let Some(conds) = &status.conditions {
-///                     if let Some(pcond) = conds.iter().find(|c| c.type_ == my_cond) {
-///                         return pcond.status == "True";
-///                     }
-///                 }
-///             }
+///         if let Some(pod) = &obj
+///             && let Some(status) = &pod.status
+///             && let Some(conds) = &status.conditions
+///             && let Some(pcond) = conds.iter().find(|c| c.type_ == my_cond)
+///         {
+///             return pcond.status == "True";
 ///         }
 ///         false
 ///     }
@@ -196,14 +194,12 @@ pub mod conditions {
     #[must_use]
     pub fn is_crd_established() -> impl Condition<CustomResourceDefinition> {
         |obj: Option<&CustomResourceDefinition>| {
-            if let Some(o) = obj {
-                if let Some(s) = &o.status {
-                    if let Some(conds) = &s.conditions {
-                        if let Some(pcond) = conds.iter().find(|c| c.type_ == "Established") {
-                            return pcond.status == "True";
-                        }
-                    }
-                }
+            if let Some(o) = obj
+                && let Some(s) = &o.status
+                && let Some(conds) = &s.conditions
+                && let Some(pcond) = conds.iter().find(|c| c.type_ == "Established")
+            {
+                return pcond.status == "True";
             }
             false
         }
@@ -213,12 +209,11 @@ pub mod conditions {
     #[must_use]
     pub fn is_pod_running() -> impl Condition<Pod> {
         |obj: Option<&Pod>| {
-            if let Some(pod) = &obj {
-                if let Some(status) = &pod.status {
-                    if let Some(phase) = &status.phase {
-                        return phase == "Running";
-                    }
-                }
+            if let Some(pod) = &obj
+                && let Some(status) = &pod.status
+                && let Some(phase) = &status.phase
+            {
+                return phase == "Running";
             }
             false
         }
@@ -228,14 +223,12 @@ pub mod conditions {
     #[must_use]
     pub fn is_job_completed() -> impl Condition<Job> {
         |obj: Option<&Job>| {
-            if let Some(job) = &obj {
-                if let Some(s) = &job.status {
-                    if let Some(conds) = &s.conditions {
-                        if let Some(pcond) = conds.iter().find(|c| c.type_ == "Complete") {
-                            return pcond.status == "True";
-                        }
-                    }
-                }
+            if let Some(job) = &obj
+                && let Some(s) = &job.status
+                && let Some(conds) = &s.conditions
+                && let Some(pcond) = conds.iter().find(|c| c.type_ == "Complete")
+            {
+                return pcond.status == "True";
             }
             false
         }
@@ -248,16 +241,14 @@ pub mod conditions {
     #[must_use]
     pub fn is_deployment_completed() -> impl Condition<Deployment> {
         |obj: Option<&Deployment>| {
-            if let Some(depl) = &obj {
-                if let Some(s) = &depl.status {
-                    if let Some(conds) = &s.conditions {
-                        if let Some(dcond) = conds.iter().find(|c| {
-                            c.type_ == "Progressing" && c.reason == Some("NewReplicaSetAvailable".to_string())
-                        }) {
-                            return dcond.status == "True";
-                        }
-                    }
-                }
+            if let Some(depl) = &obj
+                && let Some(s) = &depl.status
+                && let Some(conds) = &s.conditions
+                && let Some(dcond) = conds.iter().find(|c| {
+                    c.type_ == "Progressing" && c.reason == Some("NewReplicaSetAvailable".to_string())
+                })
+            {
+                return dcond.status == "True";
             }
             false
         }
@@ -267,20 +258,19 @@ pub mod conditions {
     #[must_use]
     pub fn is_service_loadbalancer_provisioned() -> impl Condition<Service> {
         |obj: Option<&Service>| {
-            if let Some(svc) = &obj {
+            if let Some(svc) = &obj
+                && let Some(spec) = &svc.spec
+            {
                 // ignore services that are not type LoadBalancer (return true immediately)
-                if let Some(spec) = &svc.spec {
-                    if spec.type_ != Some("LoadBalancer".to_string()) {
-                        return true;
-                    }
-                    // carry on if this is a LoadBalancer service
-                    if let Some(s) = &svc.status {
-                        if let Some(lbs) = &s.load_balancer {
-                            if let Some(ings) = &lbs.ingress {
-                                return ings.iter().all(|ip| ip.ip.is_some() || ip.hostname.is_some());
-                            }
-                        }
-                    }
+                if spec.type_ != Some("LoadBalancer".to_string()) {
+                    return true;
+                }
+                // carry on if this is a LoadBalancer service
+                if let Some(s) = &svc.status
+                    && let Some(lbs) = &s.load_balancer
+                    && let Some(ings) = &lbs.ingress
+                {
+                    return ings.iter().all(|ip| ip.ip.is_some() || ip.hostname.is_some());
                 }
             }
             false
@@ -291,14 +281,12 @@ pub mod conditions {
     #[must_use]
     pub fn is_ingress_provisioned() -> impl Condition<Ingress> {
         |obj: Option<&Ingress>| {
-            if let Some(ing) = &obj {
-                if let Some(s) = &ing.status {
-                    if let Some(lbs) = &s.load_balancer {
-                        if let Some(ings) = &lbs.ingress {
-                            return ings.iter().all(|ip| ip.ip.is_some() || ip.hostname.is_some());
-                        }
-                    }
-                }
+            if let Some(ing) = &obj
+                && let Some(s) = &ing.status
+                && let Some(lbs) = &s.load_balancer
+                && let Some(ings) = &lbs.ingress
+            {
+                return ings.iter().all(|ip| ip.ip.is_some() || ip.hostname.is_some());
             }
             false
         }
