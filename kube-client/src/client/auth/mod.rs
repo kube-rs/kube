@@ -504,25 +504,30 @@ fn token_from_gcp_provider(provider: &AuthProviderConfig) -> Result<ProviderToke
 }
 
 fn extract_value(json: &serde_json::Value, context: &str, path: &str) -> Result<String, Error> {
-    let parsed_path = path
-        .trim_matches(|c| c == '"' || c == '{' || c == '}')
-        .parse::<JsonPath>()
-        .map_err(|err| {
-            Error::AuthExec(format!(
-                "Failed to parse {context:?} as a JsonPath: {path}\n
-                 Error: {err}"
-            ))
-        })?;
+    let path = {
+        let p = path.trim_matches(|c| c == '"' || c == '{' || c == '}');
+        if p.starts_with('$') {
+            p
+        } else if p.starts_with('.') {
+            &format!("${p}")
+        } else {
+            &format!("$.{p}")
+        }
+    };
 
-    let res = parsed_path.find_slice(json);
+    let res = json.query(path).map_err(|err| {
+        Error::AuthExec(format!(
+            "Failed to query {context:?} as a JsonPath: {path}\n
+             Error: {err}"
+        ))
+    })?;
 
-    let Some(res) = res.into_iter().next() else {
+    let Some(jval) = res.into_iter().next() else {
         return Err(Error::AuthExec(format!(
             "Target {context:?} value {path:?} not found"
         )));
     };
 
-    let jval = res.to_data();
     let val = jval.as_str().ok_or(Error::AuthExec(format!(
         "Target {context:?} value {path:?} is not a string"
     )))?;

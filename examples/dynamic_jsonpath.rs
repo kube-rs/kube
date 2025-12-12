@@ -1,4 +1,3 @@
-use anyhow::{Context, Error};
 use jsonpath_rust::JsonPath;
 use k8s_openapi::api::core::v1::Pod;
 use kube::{
@@ -18,14 +17,6 @@ async fn main() -> anyhow::Result<()> {
     let jsonpath = {
         let path = std::env::var("JSONPATH").unwrap_or_else(|_| ".items[*].spec.containers[*].image".into());
         format!("${path}")
-            .parse::<JsonPath>()
-            .map_err(Error::msg)
-            .with_context(|| {
-                format!(
-                    "Failed to parse 'JSONPATH' value as a JsonPath expression.\n
-                     Got: {path}"
-                )
-            })?
     };
 
     let pods: Api<Pod> = Api::<Pod>::all(client);
@@ -34,8 +25,8 @@ async fn main() -> anyhow::Result<()> {
 
     // Use the given JSONPATH to filter the ObjectList
     let list_json = serde_json::to_value(&list)?;
-    for res in jsonpath.find_slice(&list_json) {
-        info!("\t\t {}", res.to_data());
+    for res in list_json.query(&jsonpath)? {
+        info!("\t\t {}", res.as_str().unwrap());
     }
     Ok(())
 }
