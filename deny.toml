@@ -68,3 +68,11 @@ name = "getrandom"
 name = "wasi"
 [[bans.skip]]
 name = "zerocopy"
+
+# serde-saphyr 0.0.8 pulls in different versions of these three crates
+[[bans.skip]]
+name = "foldhash"
+[[bans.skip]]
+name = "hashbrown"
+[[bans.skip]]
+name = "smallvec"
