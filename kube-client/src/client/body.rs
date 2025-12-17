@@ -53,6 +53,18 @@ impl Body {
     pub async fn collect_bytes(self) -> Result<Bytes, crate::Error> {
         Ok(self.collect().await?.to_bytes())
     }
+
+    /// Tries to clone a [`Body`].
+    ///
+    /// Returns the cloned `Body` when it's [`Kind::Once`].
+    pub fn try_clone(&self) -> Option<Self> {
+        match &self.kind {
+            Kind::Once(bytes) => Some(Self {
+                kind: Kind::Once(bytes.clone()),
+            }),
+            Kind::Wrap(..) => None,
+        }
+    }
 }
 
 impl From<Bytes> for Body {
