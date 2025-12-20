@@ -3,11 +3,7 @@
 //! with labels and namespace selectors supported.
 use anyhow::{Context, Result, bail};
 use futures::{StreamExt, TryStreamExt};
-use k8s_openapi::{
-    apimachinery::pkg::apis::meta::v1::Time,
-    jiff,
-    jiff::{SpanRound, Timestamp, Unit},
-};
+use k8s_openapi::{apimachinery::pkg::apis::meta::v1::Time, chrono::Utc};
 use kube::{
     Client,
     api::{Api, DynamicObject, ListParams, Patch, PatchParams, ResourceExt},
@@ -105,11 +101,7 @@ impl App {
                 let max_name = result.iter().map(|x| x.name_any().len() + 2).max().unwrap_or(63);
                 println!("{0:<width$} {1:<20}", "NAME", "AGE", width = max_name);
                 for inst in result {
-                    let age = inst
-                        .creation_timestamp()
-                        .map(format_creation)
-                        .transpose()?
-                        .unwrap_or_default();
+                    let age = inst.creation_timestamp().map(format_creation).unwrap_or_default();
                     println!("{0:<width$} {1:<20}", inst.name_any(), age, width = max_name);
                 }
             }
@@ -137,11 +129,7 @@ impl App {
         let mut stream = watcher(api, wc).applied_objects().boxed();
         println!("{0:<width$} {1:<20}", "NAME", "AGE", width = 63);
         while let Some(inst) = stream.try_next().await? {
-            let age = inst
-                .creation_timestamp()
-                .map(format_creation)
-                .transpose()?
-                .unwrap_or_default();
+            let age = inst.creation_timestamp().map(format_creation).unwrap_or_default();
             println!("{0:<width$} {1:<20}", inst.name_any(), age, width = 63);
         }
         Ok(())
@@ -252,15 +240,13 @@ fn dynamic_api(
     }
 }
 
-fn format_creation(time: Time) -> std::result::Result<String, jiff::Error> {
-    let dur = Timestamp::now()
-        .since(time.0)?
-        .round(SpanRound::new().largest(Unit::Day).smallest(Unit::Minute))?;
-    Ok(match (dur.get_days(), dur.get_hours(), dur.get_minutes()) {
+fn format_creation(time: Time) -> String {
+    let dur = Utc::now().signed_duration_since(time.0);
+    match (dur.num_days(), dur.num_hours(), dur.num_minutes()) {
         (days, _, _) if days > 0 => format!("{days}d"),
         (_, hours, _) if hours > 0 => format!("{hours}h"),
         (_, _, mins) => format!("{mins}m"),
-    })
+    }
 }
 
 pub fn multidoc_deserialize(data: &str) -> Result<Vec<serde_yaml::Value>> {

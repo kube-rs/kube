@@ -4,8 +4,7 @@ use futures::StreamExt;
 use k8s_openapi::{
     api::{core::v1::ObjectReference, events::v1::Event},
     apimachinery::pkg::apis::meta::v1::Time,
-    jiff,
-    jiff::{SpanRound, Timestamp, Unit},
+    chrono::Utc,
 };
 use kube::{
     Api, Client, ResourceExt,
@@ -51,11 +50,7 @@ async fn main() -> anyhow::Result<()> {
     while let Some(ev) = event_stream.next().await {
         match ev {
             Ok(ev) => {
-                let age = ev
-                    .creation_timestamp()
-                    .map(format_creation)
-                    .transpose()?
-                    .unwrap_or_default();
+                let age = ev.creation_timestamp().map(format_creation).unwrap_or_default();
                 let reason = ev.reason.unwrap_or_default();
                 let obj = ev.regarding.and_then(format_objref).unwrap_or_default();
                 let note = ev.note.unwrap_or_default();
@@ -71,13 +66,11 @@ fn format_objref(oref: ObjectReference) -> Option<String> {
     Some(format!("{}/{}", oref.kind?, oref.name?))
 }
 
-fn format_creation(time: Time) -> Result<String, jiff::Error> {
-    let dur = Timestamp::now()
-        .since(time.0)?
-        .round(SpanRound::new().largest(Unit::Day).smallest(Unit::Minute))?;
-    Ok(match (dur.get_days(), dur.get_hours(), dur.get_minutes()) {
+fn format_creation(time: Time) -> String {
+    let dur = Utc::now().signed_duration_since(time.0);
+    match (dur.num_days(), dur.num_hours(), dur.num_minutes()) {
         (days, _, _) if days > 0 => format!("{days}d"),
         (_, hours, _) if hours > 0 => format!("{hours}h"),
         (_, _, mins) => format!("{mins}m"),
-    })
+    }
 }

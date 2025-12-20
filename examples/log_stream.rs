@@ -1,5 +1,6 @@
 use futures::{AsyncBufReadExt, TryStreamExt};
-use k8s_openapi::{api::core::v1::Pod, jiff::Timestamp};
+use jiff::Timestamp;
+use k8s_openapi::api::core::v1::Pod;
 use kube::{
     Client,
     api::{Api, LogParams},
