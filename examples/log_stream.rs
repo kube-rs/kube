@@ -1,8 +1,5 @@
 use futures::{AsyncBufReadExt, TryStreamExt};
-use k8s_openapi::{
-    api::core::v1::Pod,
-    chrono::{DateTime, Utc},
-};
+use k8s_openapi::{api::core::v1::Pod, jiff::Timestamp};
 use kube::{
     Client,
     api::{Api, LogParams},
@@ -26,7 +23,7 @@ struct App {
     since: Option<i64>,
     /// Since time
     #[arg(long, conflicts_with = "since")]
-    since_time: Option<DateTime<Utc>>,
+    since_time: Option<Timestamp>,
 
     /// Include timestamps in the log output
     #[arg(long, default_value = "false")]

@@ -1,10 +1,10 @@
 //! Request builder types and parameters for subresources
-use std::fmt::Debug;
-
 use crate::{
     params::{DeleteParams, PostParams},
     request::{Error, JSON_MIME, Request},
 };
+use jiff::{Timestamp, Unit};
+use std::fmt::Debug;
 
 pub use k8s_openapi::api::autoscaling::v1::{Scale, ScaleSpec, ScaleStatus};
 
@@ -34,7 +34,7 @@ pub struct LogParams {
     /// precedes the time a pod was started, only logs since the pod start will be returned.
     /// If this value is in the future, no logs will be returned.
     /// Only one of sinceSeconds or sinceTime may be specified.
-    pub since_time: Option<chrono::DateTime<chrono::Utc>>,
+    pub since_time: Option<Timestamp>,
     /// If set, the number of lines from the end of the logs to show.
     /// If not specified, logs are shown from the creation of the container or sinceSeconds or sinceTime
     pub tail_lines: Option<i64>,
@@ -71,8 +71,11 @@ impl Request {
         if let Some(ss) = &lp.since_seconds {
             qp.append_pair("sinceSeconds", &ss.to_string());
         } else if let Some(st) = &lp.since_time {
-            let ser_since = st.to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
-            qp.append_pair("sinceTime", &ser_since);
+            // Should never error for a rounding increment of one second.
+            // Only errors if rounding increment is larger than one hour or 86400(1day) / <rounding increment>
+            // does not yield an integer.
+            let ser_since = st.round(Unit::Second).map_err(Error::TimestampRoundingError)?;
+            qp.append_pair("sinceTime", &ser_since.to_string());
         }
 
         if let Some(tl) = &lp.tail_lines {
@@ -413,7 +416,7 @@ impl Request {
 #[cfg(test)]
 mod test {
     use crate::{request::Request, resource::Resource};
-    use chrono::{DateTime, TimeZone, Utc};
+    use jiff::Timestamp;
     use k8s::core::v1 as corev1;
     use k8s_openapi::api as k8s;
 
@@ -443,7 +446,7 @@ mod test {
     #[test]
     fn logs_since_time() {
         let url = corev1::Pod::url_path(&(), Some("ns"));
-        let date: DateTime<Utc> = Utc.with_ymd_and_hms(2023, 10, 19, 13, 14, 26).unwrap();
+        let date: Timestamp = "2023-10-19T13:14:26Z".parse().unwrap();
         let lp = LogParams {
             since_seconds: None,
             since_time: Some(date),

@@ -2,7 +2,7 @@
 #![recursion_limit = "256"]
 
 use assert_json_diff::assert_json_eq;
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use kube::KubeSchema;
 use kube_derive::CustomResource;
 use schemars::JsonSchema;
@@ -58,8 +58,8 @@ struct FooSpec {
     #[serde(default = "default_nullable")]
     nullable_with_default: Option<String>,
 
-    // Using feature `chrono`
-    timestamp: DateTime<Utc>,
+    // Using feature `jiff`
+    timestamp: Timestamp,
 
     /// This is a complex enum with a description
     #[x_kube(validation = "!has(self.variantOne) || self.variantOne.int > 22")]
@@ -180,7 +180,7 @@ fn test_serialized_matches_expected() {
             nullable: None,
             nullable_skipped_with_default: None,
             nullable_with_default: None,
-            timestamp: DateTime::from_timestamp(0, 0).unwrap(),
+            timestamp: Timestamp::new(0, 0).unwrap(),
             complex_enum: ComplexEnum::VariantOne { int: 23 },
             untagged_enum_person: UntaggedEnumPerson::GenderAndAge(GenderAndAge {
                 age: 42,

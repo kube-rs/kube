@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
-use chrono::{DateTime, Utc};
 use http::{HeaderValue, header::HeaderName};
 #[cfg(feature = "openssl-tls")] use hyper::rt::{Read, Write};
 use hyper_util::client::legacy::connect::HttpConnector;
+use jiff::Timestamp;
 use secrecy::ExposeSecret;
 use tower::{filter::AsyncFilterLayer, util::Either};
 
@@ -296,16 +296,16 @@ impl Config {
     // returns a client certificate and key instead of a token.
     // This has be to be checked on TLS configuration vs tokens
     // which can be added in as an AuthLayer.
-    pub(crate) fn exec_identity_pem(&self) -> (Option<Vec<u8>>, Option<DateTime<Utc>>) {
+    pub(crate) fn exec_identity_pem(&self) -> (Option<Vec<u8>>, Option<Timestamp>) {
         match Auth::try_from(&self.auth_info) {
-            Ok(Auth::Certificate(client_certificate_data, client_key_data, expiratiom)) => {
+            Ok(Auth::Certificate(client_certificate_data, client_key_data, expiration)) => {
                 const NEW_LINE: u8 = b'\n';
 
                 let mut buffer = client_key_data.expose_secret().as_bytes().to_vec();
                 buffer.push(NEW_LINE);
                 buffer.extend_from_slice(client_certificate_data.as_bytes());
                 buffer.push(NEW_LINE);
-                (Some(buffer), expiratiom)
+                (Some(buffer), expiration)
             }
             _ => (None, None),
         }

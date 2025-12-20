@@ -30,6 +30,11 @@ pub enum Error {
     /// Failed to validate request.
     #[error("failed to validate request: {0}")]
     Validation(String),
+    /// Failed to round a timestamp.
+    // This should never be thrown as we just round to a single second.
+    // Still it's better to fail a single request if it happens over panicking.
+    #[error("failed to round a timestamp: {0}")]
+    TimestampRoundingError(#[source] jiff::Error),
 }
 
 /// A Kubernetes request builder

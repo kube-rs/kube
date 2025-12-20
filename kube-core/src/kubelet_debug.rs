@@ -4,6 +4,7 @@ use crate::{
     request::Error,
     subresource::{AttachParams, LogParams},
 };
+use jiff::Unit;
 use std::fmt::Debug;
 
 /// Struct that hold all required parameters to call specific pod methods from node
@@ -142,8 +143,11 @@ impl Request {
         if let Some(ss) = &lp.since_seconds {
             qp.append_pair("sinceSeconds", &ss.to_string());
         } else if let Some(st) = &lp.since_time {
-            let ser_since = st.to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
-            qp.append_pair("sinceTime", &ser_since);
+            // Should never error for a rounding increment of one second.
+            // Only errors if rounding increment is larger than one hour or 86400(1day) / <rounding increment>
+            // does not yield an integer.
+            let ser_since = st.round(Unit::Second).map_err(Error::TimestampRoundingError)?;
+            qp.append_pair("sinceTime", &ser_since.to_string());
         }
 
         if let Some(tl) = &lp.tail_lines {
