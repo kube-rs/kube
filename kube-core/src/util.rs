@@ -19,7 +19,7 @@ impl Restart for ReplicaSet {}
 impl Request {
     /// Restart a resource
     pub fn restart(&self, name: &str) -> Result<http::Request<Vec<u8>>, request::Error> {
-        // `jiff::Timestamp` provides RFC 3339 via `Display`, docs: https://docs.rs/jiff/latest/jiff/struct.Timestamp.html#impl-Display-for-Timestamp
+        // `jiff::Timestamp` provides RFC3339 via `Display`, docs: https://docs.rs/jiff/latest/jiff/struct.Timestamp.html#impl-Display-for-Timestamp
         let patch = serde_json::json!({
           "spec": {
             "template": {

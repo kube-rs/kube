@@ -143,11 +143,11 @@ impl Request {
         if let Some(ss) = &lp.since_seconds {
             qp.append_pair("sinceSeconds", &ss.to_string());
         } else if let Some(st) = &lp.since_time {
-            // Should never error for a rounding increment of one second.
-            // Only errors if rounding increment is larger than one hour or 86400(1day) / <rounding increment>
-            // does not yield an integer.
-            let ser_since = st.round(Unit::Second).map_err(Error::TimestampRoundingError)?;
-            qp.append_pair("sinceTime", &ser_since.to_string());
+            // Unwrapping here is ok as `round` only errors if a.) the smallest unit is larger than hour (we set second as smallest unit)
+            // or b.) a rounding increment is configured (which we don't set) that does not fit into 86400 seconds (a day)
+            // without any remainder.
+            // `jiff::Timestamp` provides RFC3339 via `Display`, docs: https://docs.rs/jiff/latest/jiff/struct.Timestamp.html#impl-Display-for-Timestamp
+            qp.append_pair("sinceTime", &st.round(Unit::Second).unwrap().to_string());
         }
 
         if let Some(tl) = &lp.tail_lines {

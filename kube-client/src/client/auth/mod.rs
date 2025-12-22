@@ -300,7 +300,7 @@ impl TryFrom<&AuthInfo> for Auth {
                     let mut info = auth_info.clone();
                     let mut provider = provider.clone();
                     provider.config.insert("access-token".into(), token.clone());
-                    // `jiff::Timestamp` provides RFC 3339 via `Display`, docs: https://docs.rs/jiff/latest/jiff/struct.Timestamp.html#impl-Display-for-Timestamp
+                    // `jiff::Timestamp` provides RFC3339 via `Display`, docs: https://docs.rs/jiff/latest/jiff/struct.Timestamp.html#impl-Display-for-Timestamp
                     provider.config.insert("expiry".into(), expiry.to_string());
                     info.auth_provider = Some(provider);
                     return Ok(Self::RefreshableToken(RefreshableToken::Exec(Arc::new(
