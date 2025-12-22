@@ -62,6 +62,7 @@ axum-server = { version = "0.8.0", features = ["tls-rustls-no-provider"] }
 bytes.workspace = true
 http.workspace = true
 http-body-util.workspace = true
+jiff.workspace = true
 json-patch.workspace = true
 tower = { workspace = true, features = ["limit"] }
 tower-http = { workspace = true, features = ["trace", "decompression-gzip"] }

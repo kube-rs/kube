@@ -7,12 +7,12 @@
 //!
 //! The [`Client`] can also be used with [`Discovery`](crate::Discovery) to dynamically
 //! retrieve the resources served by the kubernetes API.
-use chrono::{DateTime, Utc};
 use either::{Either, Left, Right};
 use futures::{AsyncBufRead, StreamExt, TryStream, TryStreamExt, future::BoxFuture};
 use http::{self, Request, Response};
 use http_body_util::BodyExt;
 #[cfg(feature = "ws")] use hyper_util::rt::TokioIo;
+use jiff::Timestamp;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1 as k8s_meta_v1;
 pub use kube_core::response::Status;
 use serde::de::DeserializeOwned;
@@ -79,7 +79,7 @@ pub struct Client {
     // - `BoxFuture` for dynamic response future type
     inner: Buffer<Request<Body>, BoxFuture<'static, Result<Response<Body>, BoxError>>>,
     default_ns: String,
-    valid_until: Option<DateTime<Utc>>,
+    valid_until: Option<Timestamp>,
 }
 
 /// Represents a WebSocket connection.
@@ -161,12 +161,12 @@ impl Client {
     }
 
     /// Sets an expiration timestamp to the client, which has to be checked by the user using [`Client::valid_until`] function.
-    pub fn with_valid_until(self, valid_until: Option<DateTime<Utc>>) -> Self {
+    pub fn with_valid_until(self, valid_until: Option<Timestamp>) -> Self {
         Client { valid_until, ..self }
     }
 
     /// Get the expiration timestamp of the client, if it has been set.
-    pub fn valid_until(&self) -> &Option<DateTime<Utc>> {
+    pub fn valid_until(&self) -> &Option<Timestamp> {
         &self.valid_until
     }
 

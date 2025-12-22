@@ -1,5 +1,4 @@
 use bytes::Bytes;
-use chrono::{DateTime, Utc};
 use http::{Request, Response, header::HeaderMap};
 use hyper::{
     body::Incoming,
@@ -12,6 +11,7 @@ use hyper_util::{
     rt::TokioExecutor,
 };
 
+use jiff::Timestamp;
 use std::time::Duration;
 use tower::{BoxError, Layer, Service, ServiceBuilder, util::BoxService};
 use tower_http::{
@@ -31,7 +31,7 @@ pub type DynBody = dyn http_body::Body<Data = Bytes, Error = BoxError> + Send + 
 pub struct ClientBuilder<Svc> {
     service: Svc,
     default_ns: String,
-    valid_until: Option<DateTime<Utc>>,
+    valid_until: Option<Timestamp>,
 }
 
 impl<Svc> ClientBuilder<Svc> {
@@ -65,7 +65,7 @@ impl<Svc> ClientBuilder<Svc> {
     }
 
     /// Sets an expiration timestamp for the client.
-    pub fn with_valid_until(self, valid_until: Option<DateTime<Utc>>) -> Self {
+    pub fn with_valid_until(self, valid_until: Option<Timestamp>) -> Self {
         ClientBuilder {
             service: self.service,
             default_ns: self.default_ns,

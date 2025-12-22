@@ -1,18 +1,17 @@
-use std::{
-    path::{Path, PathBuf},
-    process::Command,
-    sync::Arc,
-};
-
-use chrono::{DateTime, Duration, Utc};
 use futures::future::BoxFuture;
 use http::{
     HeaderValue, Request,
     header::{AUTHORIZATION, InvalidHeaderValue},
 };
+use jiff::{SignedDuration, Timestamp};
 use jsonpath_rust::JsonPath;
 use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
+use std::{
+    path::{Path, PathBuf},
+    process::Command,
+    sync::Arc,
+};
 use thiserror::Error;
 use tokio::sync::{Mutex, RwLock};
 use tower::{BoxError, filter::AsyncPredicate};
@@ -46,7 +45,7 @@ pub enum Error {
 
     /// Malformed token expiration date
     #[error("malformed token expiration date: {0}")]
-    MalformedTokenExpirationDate(#[source] chrono::ParseError),
+    MalformedTokenExpirationDate(#[source] jiff::Error),
 
     /// Failed to start auth exec
     #[error("unable to run auth exec: {0}")]
@@ -115,7 +114,7 @@ pub(crate) enum Auth {
     Basic(String, SecretString),
     Bearer(SecretString),
     RefreshableToken(RefreshableToken),
-    Certificate(String, SecretString, Option<DateTime<Utc>>),
+    Certificate(String, SecretString, Option<Timestamp>),
 }
 
 // Token file reference. Reloads at least once per minute.
@@ -123,7 +122,7 @@ pub(crate) enum Auth {
 pub struct TokenFile {
     path: PathBuf,
     token: SecretString,
-    expires_at: DateTime<Utc>,
+    expires_at: Timestamp,
 }
 
 impl TokenFile {
@@ -134,12 +133,12 @@ impl TokenFile {
             path: path.as_ref().to_owned(),
             token: SecretString::from(token),
             // Try to reload at least once a minute
-            expires_at: Utc::now() + SIXTY_SEC,
+            expires_at: Timestamp::now() + SIXTY_SEC,
         })
     }
 
     fn is_expiring(&self) -> bool {
-        Utc::now() + TEN_SEC > self.expires_at
+        Timestamp::now() + TEN_SEC > self.expires_at
     }
 
     /// Get the cached token. Returns `None` if it's expiring.
@@ -157,26 +156,16 @@ impl TokenFile {
             if let Ok(token) = std::fs::read_to_string(&self.path) {
                 self.token = SecretString::from(token);
             }
-            self.expires_at = Utc::now() + SIXTY_SEC;
+            self.expires_at = Timestamp::now() + SIXTY_SEC;
         }
         self.token.expose_secret()
     }
 }
 
-// Questionable decisions by chrono: https://github.com/chronotope/chrono/issues/1491
-macro_rules! const_unwrap {
-    ($e:expr) => {
-        match $e {
-            Some(v) => v,
-            None => panic!(),
-        }
-    };
-}
-
 /// Common constant for checking if an auth token is close to expiring
-pub const TEN_SEC: chrono::TimeDelta = const_unwrap!(Duration::try_seconds(10));
+pub const TEN_SEC: SignedDuration = SignedDuration::from_secs(10);
 /// Common duration for time between reloads
-const SIXTY_SEC: chrono::TimeDelta = const_unwrap!(Duration::try_seconds(60));
+const SIXTY_SEC: SignedDuration = SignedDuration::from_secs(60);
 
 // See https://github.com/kubernetes/kubernetes/tree/master/staging/src/k8s.io/client-go/plugin/pkg/client/auth
 // for the list of auth-plugins supported by client-go.
@@ -190,7 +179,7 @@ const SIXTY_SEC: chrono::TimeDelta = const_unwrap!(Duration::try_seconds(60));
 // It's not accessible from outside and not shown on docs.
 #[derive(Debug, Clone)]
 pub enum RefreshableToken {
-    Exec(Arc<Mutex<(SecretString, DateTime<Utc>, AuthInfo)>>),
+    Exec(Arc<Mutex<(SecretString, Timestamp, AuthInfo)>>),
     File(Arc<RwLock<TokenFile>>),
     #[cfg(feature = "oauth")]
     GcpOauth(Arc<Mutex<oauth::Gcp>>),
@@ -224,7 +213,7 @@ impl RefreshableToken {
                 let mut locked_data = data.lock().await;
                 // Add some wiggle room onto the current timestamp so we don't get any race
                 // conditions where the token expires while we are refreshing
-                if Utc::now() + SIXTY_SEC >= locked_data.1 {
+                if Timestamp::now() + SIXTY_SEC >= locked_data.1 {
                     // TODO Improve refreshing exec to avoid `Auth::try_from`
                     match Auth::try_from(&locked_data.2)? {
                         Auth::None | Auth::Basic(_, _) | Auth::Bearer(_) | Auth::Certificate(_, _, _) => {
@@ -311,7 +300,8 @@ impl TryFrom<&AuthInfo> for Auth {
                     let mut info = auth_info.clone();
                     let mut provider = provider.clone();
                     provider.config.insert("access-token".into(), token.clone());
-                    provider.config.insert("expiry".into(), expiry.to_rfc3339());
+                    // `jiff::Timestamp` provides RFC3339 via `Display`, docs: https://docs.rs/jiff/latest/jiff/struct.Timestamp.html#impl-Display-for-Timestamp
+                    provider.config.insert("expiry".into(), expiry.to_string());
                     info.auth_provider = Some(provider);
                     return Ok(Self::RefreshableToken(RefreshableToken::Exec(Arc::new(
                         Mutex::new((SecretString::from(token), expiry, info)),
@@ -386,7 +376,7 @@ enum ProviderToken {
     #[cfg(not(feature = "oidc"))]
     Oidc(String),
     // "access-token", "expiry" (RFC3339)
-    GcpCommand(String, Option<DateTime<Utc>>),
+    GcpCommand(String, Option<Timestamp>),
     #[cfg(feature = "oauth")]
     GcpOauth(oauth::Gcp),
     // "access-token", "expires-on" (timestamp)
@@ -434,9 +424,9 @@ fn token_from_gcp_provider(provider: &AuthProviderConfig) -> Result<ProviderToke
         && let Some(expiry) = provider.config.get("expiry")
     {
         let expiry_date = expiry
-            .parse::<DateTime<Utc>>()
+            .parse::<Timestamp>()
             .map_err(Error::MalformedTokenExpirationDate)?;
-        if Utc::now() + SIXTY_SEC < expiry_date {
+        if Timestamp::now() + SIXTY_SEC < expiry_date {
             return Ok(ProviderToken::GcpCommand(access_token.clone(), Some(expiry_date)));
         }
     }
@@ -473,7 +463,7 @@ fn token_from_gcp_provider(provider: &AuthProviderConfig) -> Result<ProviderToke
             if let Some(field) = provider.config.get("expiry-key") {
                 let expiry = extract_value(&json_output, "expiry-key", field)?;
                 let expiry = expiry
-                    .parse::<DateTime<Utc>>()
+                    .parse::<Timestamp>()
                     .map_err(Error::MalformedTokenExpirationDate)?;
                 return Ok(ProviderToken::GcpCommand(token, Some(expiry)));
             } else {
@@ -649,7 +639,7 @@ mod test {
     #[tokio::test]
     #[ignore = "fails on windows mysteriously"]
     async fn exec_auth_command() -> Result<(), Error> {
-        let expiry = (Utc::now() + SIXTY_SEC).to_rfc3339();
+        let expiry = (Timestamp::now() + SIXTY_SEC).to_string();
         let test_file = format!(
             r#"
         apiVersion: v1
@@ -705,7 +695,7 @@ mod test {
         std::fs::write(file.path(), "token2").unwrap();
         assert_eq!(token_file.token(), "token1");
 
-        token_file.expires_at = Utc::now();
+        token_file.expires_at = Timestamp::now();
         assert!(token_file.is_expiring());
         assert_eq!(token_file.cached_token(), None);
         assert_eq!(token_file.token(), "token2");

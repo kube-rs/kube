@@ -29,8 +29,8 @@ mod tests {
 
     use std::{matches, pin::pin, sync::Arc};
 
-    use chrono::{Duration, Utc};
     use http::{HeaderValue, Request, Response, header::AUTHORIZATION};
+    use jiff::{SignedDuration, Timestamp};
     use secrecy::SecretString;
     use tokio::sync::Mutex;
     use tokio_test::assert_ready_ok;
@@ -87,7 +87,7 @@ mod tests {
     }
 
     fn test_token(token: String) -> RefreshableToken {
-        let expiry = Utc::now() + Duration::try_seconds(60 * 60).unwrap();
+        let expiry = Timestamp::now() + SignedDuration::from_secs(60 * 60);
         let secret_token = SecretString::from(token);
         let info = AuthInfo {
             token: Some(secret_token.clone()),
