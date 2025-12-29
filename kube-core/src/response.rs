@@ -161,7 +161,8 @@ fn is_u32_zero(&v: &u32) -> bool {
 
 #[cfg(test)]
 mod test {
-    use super::Status;
+
+    use super::*;
 
     // ensure our status schema is sensible
     #[test]
@@ -173,5 +174,55 @@ mod test {
         let statusnoname = r#"{"kind":"Status","apiVersion":"v1","metadata":{},"status":"Success","details":{"group":"clux.dev","kind":"foos","uid":"1234-some-uid"}}"#;
         let s2: Status = serde_json::from_str::<Status>(statusnoname).unwrap();
         assert_eq!(s2.details.unwrap().name, ""); // optional probably better..
+    }
+
+    #[test]
+    fn failiure_with_details2() {
+        let status = r#"
+            {
+              "kind": "Status",
+              "apiVersion": "v1",
+              "metadata": {},
+              "status": "Failure",
+              "message": "Lease.coordination.k8s.io \"test_\" is invalid: metadata.name: Invalid value: \"test_\": a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')",
+              "reason": "Invalid",
+              "details": {
+                "name": "test_",
+                "group": "coordination.k8s.io",
+                "kind": "Lease",
+                "causes": [
+                  {
+                    "reason": "FieldValueInvalid",
+                    "message": "Invalid value: \"test_\": a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')",
+                    "field": "metadata.name"
+                  }
+                ]
+              },
+              "code": 422
+            }"#;
+        let s = serde_json::from_str::<Status>(status).unwrap();
+        assert_eq!(s.status.unwrap(), StatusSummary::Failure);
+        assert_eq!(s.details.unwrap().name, "test_");
+    }
+
+    #[test]
+    fn failure_with_details3() {
+        let status1 = r#"
+            {
+                "kind": "Status",
+                "apiVersion": "v1",
+                "metadata": {},
+                "status": "Failure",
+                "message": "pods \"foobar-1\" not found",
+                "reason": "NotFound",
+                "details": {
+                    "name": "foobar-1",
+                    "kind": "pods"
+                },
+                "code": 404
+            }"#;
+        let s = serde_json::from_str::<Status>(status1).unwrap();
+        assert_eq!(s.status.unwrap(), StatusSummary::Failure);
+        assert_eq!(s.details.unwrap().name, "foobar-1");
     }
 }
