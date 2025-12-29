@@ -11,7 +11,8 @@ use either::{Either, Left, Right};
 use futures::{AsyncBufRead, StreamExt, TryStream, TryStreamExt, future::BoxFuture};
 use http::{self, Request, Response};
 use http_body_util::BodyExt;
-#[cfg(feature = "ws")] use hyper_util::rt::TokioIo;
+#[cfg(feature = "ws")]
+use hyper_util::rt::TokioIo;
 use jiff::Timestamp;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1 as k8s_meta_v1;
 pub use kube_core::response::Status;
@@ -32,6 +33,11 @@ use crate::{Config, Error, Result, api::WatchEvent, config::Kubeconfig, error::E
 mod auth;
 mod body;
 mod builder;
+mod discovery_types;
+pub use discovery_types::{
+    APIGroupDiscovery, APIGroupDiscoveryList, APIResourceDiscovery, APISubresourceDiscovery,
+    APIVersionDiscovery, GroupVersionKind as DiscoveryGroupVersionKind,
+};
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable-client")))]
 #[cfg(feature = "unstable-client")]
 mod client_ext;
@@ -43,12 +49,15 @@ pub use auth::Error as AuthError;
 pub use config_ext::ConfigExt;
 pub mod middleware;
 
-#[cfg(any(feature = "rustls-tls", feature = "openssl-tls"))] mod tls;
+#[cfg(any(feature = "rustls-tls", feature = "openssl-tls"))]
+mod tls;
 
 #[cfg(feature = "openssl-tls")]
 pub use tls::openssl_tls::Error as OpensslTlsError;
-#[cfg(feature = "rustls-tls")] pub use tls::rustls_tls::Error as RustlsTlsError;
-#[cfg(feature = "ws")] mod upgrade;
+#[cfg(feature = "rustls-tls")]
+pub use tls::rustls_tls::Error as RustlsTlsError;
+#[cfg(feature = "ws")]
+mod upgrade;
 
 #[cfg(feature = "oauth")]
 #[cfg_attr(docsrs, doc(cfg(feature = "oauth")))]
@@ -58,7 +67,8 @@ pub use auth::OAuthError;
 #[cfg_attr(docsrs, doc(cfg(feature = "oidc")))]
 pub use auth::oidc_errors;
 
-#[cfg(feature = "ws")] pub use upgrade::UpgradeConnectionError;
+#[cfg(feature = "ws")]
+pub use upgrade::UpgradeConnectionError;
 
 #[cfg(feature = "kubelet-debug")]
 #[cfg_attr(docsrs, doc(cfg(feature = "kubelet-debug")))]
@@ -467,6 +477,85 @@ impl Client {
         self.request(
             Request::builder()
                 .uri(url)
+                .body(vec![])
+                .map_err(Error::HttpError)?,
+        )
+        .await
+    }
+}
+
+/// Content negotiation Accept header for Aggregated Discovery API v2
+const ACCEPT_AGGREGATED_DISCOVERY_V2: &str =
+    "application/json;g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList";
+
+/// Aggregated Discovery API methods
+///
+/// These methods use the Aggregated Discovery API (available since Kubernetes 1.26, stable in 1.30)
+/// to fetch all API resources in a single request, reducing the number of API calls compared to
+/// the traditional discovery methods.
+impl Client {
+    /// Returns aggregated discovery for all API groups served at /apis.
+    ///
+    /// This uses the Aggregated Discovery API to fetch all non-core API groups
+    /// and their resources in a single request.
+    ///
+    /// Requires Kubernetes 1.26+ (beta) or 1.30+ (stable).
+    ///
+    /// ### Example usage:
+    /// ```rust,no_run
+    /// # async fn scope(client: kube::Client) -> Result<(), Box<dyn std::error::Error>> {
+    /// let discovery = client.list_api_groups_aggregated().await?;
+    /// for group in discovery.items {
+    ///     let name = group.metadata.as_ref().and_then(|m| m.name.as_ref());
+    ///     println!("Group: {:?}", name);
+    ///     for version in group.versions {
+    ///         println!("  Version: {:?}", version.version);
+    ///         for resource in version.resources {
+    ///             println!("    Resource: {:?}", resource.resource);
+    ///         }
+    ///     }
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn list_api_groups_aggregated(&self) -> Result<APIGroupDiscoveryList> {
+        self.request(
+            Request::builder()
+                .uri("/apis")
+                .header(http::header::ACCEPT, ACCEPT_AGGREGATED_DISCOVERY_V2)
+                .body(vec![])
+                .map_err(Error::HttpError)?,
+        )
+        .await
+    }
+
+    /// Returns aggregated discovery for core API group served at /api.
+    ///
+    /// This uses the Aggregated Discovery API to fetch the core API group
+    /// and all its resources in a single request.
+    ///
+    /// Requires Kubernetes 1.26+ (beta) or 1.30+ (stable).
+    ///
+    /// ### Example usage:
+    /// ```rust,no_run
+    /// # async fn scope(client: kube::Client) -> Result<(), Box<dyn std::error::Error>> {
+    /// let discovery = client.list_core_api_versions_aggregated().await?;
+    /// for group in discovery.items {
+    ///     for version in group.versions {
+    ///         println!("Core version: {:?}", version.version);
+    ///         for resource in version.resources {
+    ///             println!("  Resource: {:?} (scope: {:?})", resource.resource, resource.scope);
+    ///         }
+    ///     }
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn list_core_api_versions_aggregated(&self) -> Result<APIGroupDiscoveryList> {
+        self.request(
+            Request::builder()
+                .uri("/api")
+                .header(http::header::ACCEPT, ACCEPT_AGGREGATED_DISCOVERY_V2)
                 .body(vec![])
                 .map_err(Error::HttpError)?,
         )
