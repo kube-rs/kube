@@ -11,8 +11,7 @@ use either::{Either, Left, Right};
 use futures::{AsyncBufRead, StreamExt, TryStream, TryStreamExt, future::BoxFuture};
 use http::{self, Request, Response};
 use http_body_util::BodyExt;
-#[cfg(feature = "ws")]
-use hyper_util::rt::TokioIo;
+#[cfg(feature = "ws")] use hyper_util::rt::TokioIo;
 use jiff::Timestamp;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1 as k8s_meta_v1;
 pub use kube_core::response::Status;
@@ -49,15 +48,12 @@ pub use auth::Error as AuthError;
 pub use config_ext::ConfigExt;
 pub mod middleware;
 
-#[cfg(any(feature = "rustls-tls", feature = "openssl-tls"))]
-mod tls;
+#[cfg(any(feature = "rustls-tls", feature = "openssl-tls"))] mod tls;
 
 #[cfg(feature = "openssl-tls")]
 pub use tls::openssl_tls::Error as OpensslTlsError;
-#[cfg(feature = "rustls-tls")]
-pub use tls::rustls_tls::Error as RustlsTlsError;
-#[cfg(feature = "ws")]
-mod upgrade;
+#[cfg(feature = "rustls-tls")] pub use tls::rustls_tls::Error as RustlsTlsError;
+#[cfg(feature = "ws")] mod upgrade;
 
 #[cfg(feature = "oauth")]
 #[cfg_attr(docsrs, doc(cfg(feature = "oauth")))]
@@ -67,8 +63,7 @@ pub use auth::OAuthError;
 #[cfg_attr(docsrs, doc(cfg(feature = "oidc")))]
 pub use auth::oidc_errors;
 
-#[cfg(feature = "ws")]
-pub use upgrade::UpgradeConnectionError;
+#[cfg(feature = "ws")] pub use upgrade::UpgradeConnectionError;
 
 #[cfg(feature = "kubelet-debug")]
 #[cfg_attr(docsrs, doc(cfg(feature = "kubelet-debug")))]
