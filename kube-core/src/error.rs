@@ -76,3 +76,81 @@ pub struct StatusCause {
     /// If this value is empty there is no information available.
     pub reason: Option<String>,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const STATUS1: &str = r#"
+    {
+      "kind": "Status",
+      "apiVersion": "v1",
+      "metadata": {},
+      "status": "Failure",
+      "message": "leases.coordination.k8s.io \"test\" is invalid: metadata.resourceVersion: Invalid value: 0: must be specified for an update",
+      "reason": "Invalid",
+      "details": {
+        "name": "test",
+        "group": "coordination.k8s.io",
+        "kind": "leases",
+        "causes": [
+          {
+            "reason": "FieldValueInvalid",
+            "message": "Invalid value: 0: must be specified for an update",
+            "field": "metadata.resourceVersion"
+          }
+        ]
+      },
+      "code": 422
+    }
+    "#;
+
+    const STATUS2: &str = r#"
+    {
+      "kind": "Status",
+      "apiVersion": "v1",
+      "metadata": {},
+      "status": "Failure",
+      "message": "Lease.coordination.k8s.io \"test_\" is invalid: metadata.name: Invalid value: \"test_\": a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')",
+      "reason": "Invalid",
+      "details": {
+        "name": "test_",
+        "group": "coordination.k8s.io",
+        "kind": "Lease",
+        "causes": [
+          {
+            "reason": "FieldValueInvalid",
+            "message": "Invalid value: \"test_\": a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')",
+            "field": "metadata.name"
+          }
+        ]
+      },
+      "code": 422
+    }
+    "#;
+
+    fn error_response(text: &str) -> serde_json::Result<ErrorResponse> {
+        serde_json::from_str(text)
+    }
+
+    #[test]
+    fn status1() {
+        let status1 = error_response(STATUS1).unwrap();
+        assert_eq!(status1.code, 422);
+        assert_eq!(status1.details.unwrap().name.unwrap(), "test");
+    }
+
+    #[test]
+    fn status2() {
+        let status2 = error_response(STATUS2).unwrap();
+        assert_eq!(status2.code, 422);
+        assert_eq!(status2.details.unwrap().name.unwrap(), "test_");
+    }
+
+    #[test]
+    fn different() {
+        let status1 = error_response(STATUS1).unwrap();
+        let status2 = error_response(STATUS2).unwrap();
+        assert_ne!(status1, status2);
+    }
+}
