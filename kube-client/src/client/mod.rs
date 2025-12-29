@@ -27,7 +27,7 @@ use tower::{BoxError, Layer, Service, ServiceExt, buffer::Buffer, util::BoxServi
 use tower_http::map_response_body::MapResponseBodyLayer;
 
 pub use self::body::Body;
-use crate::{Config, Error, Result, api::WatchEvent, config::Kubeconfig, error::ErrorResponse};
+use crate::{Config, Error, Result, api::WatchEvent, config::Kubeconfig};
 
 mod auth;
 mod body;
@@ -364,8 +364,8 @@ impl Client {
                         }
 
                         // Got general error response
-                        if let Ok(e_resp) = serde_json::from_str::<ErrorResponse>(&line) {
-                            return Some(Err(Error::Api(e_resp)));
+                        if let Ok(status) = serde_json::from_str::<Status>(&line) {
+                            return Some(Err(Error::Api(status)));
                         }
                         // Parsing error
                         Some(Err(Error::SerdeError(e)))
@@ -572,19 +572,14 @@ async fn handle_api_errors(res: Response<Body>) -> Result<Response<Body>> {
         let text = String::from_utf8(body_bytes.to_vec()).map_err(Error::FromUtf8)?;
         // Print better debug when things do fail
         // trace!("Parsing error: {}", text);
-        if let Ok(errdata) = serde_json::from_str::<ErrorResponse>(&text) {
-            tracing::debug!("Unsuccessful: {errdata:?}");
-            Err(Error::Api(errdata))
+        if let Ok(status) = serde_json::from_str::<Status>(&text) {
+            tracing::debug!("Unsuccessful: {status:?}");
+            Err(Error::Api(status))
         } else {
-            tracing::warn!("Unsuccessful data error parse: {}", text);
-            let error_response = ErrorResponse {
-                status: status.to_string(),
-                code: status.as_u16(),
-                message: format!("{text:?}"),
-                reason: "Failed to parse error data".into(),
-            };
-            tracing::debug!("Unsuccessful: {error_response:?} (reconstruct)");
-            Err(Error::Api(error_response))
+            tracing::warn!("Unsuccessful data error parse: {text}");
+            let status = Status::failure(&text, "Failed to parse error data").with_code(status.as_u16());
+            tracing::debug!("Unsuccessful: {status:?} (reconstruct)");
+            Err(Error::Api(status))
         }
     } else {
         Ok(res)

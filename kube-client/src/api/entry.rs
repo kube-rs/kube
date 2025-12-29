@@ -402,7 +402,7 @@ mod tests {
             ..ConfigMap::default()
         });
         assert!(
-            matches!(dbg!(entry2.commit(&PostParams::default()).await), Err(CommitError::Save(Error::Api(ErrorResponse { reason, .. }))) if reason == "AlreadyExists")
+            matches!(dbg!(entry2.commit(&PostParams::default()).await), Err(CommitError::Save(Error::Api(status))) if status.is_already_exists())
         );
 
         // Cleanup
@@ -473,7 +473,7 @@ mod tests {
             .get_or_insert_with(BTreeMap::default)
             .insert("key".to_string(), "value3".to_string());
         assert!(
-            matches!(entry2.commit(&PostParams::default()).await, Err(CommitError::Save(Error::Api(ErrorResponse { reason, .. }))) if reason == "Conflict")
+            matches!(entry2.commit(&PostParams::default()).await, Err(CommitError::Save(Error::Api(status))) if status.is_conflict())
         );
 
         // Cleanup

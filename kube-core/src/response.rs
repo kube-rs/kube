@@ -1,8 +1,12 @@
 //! Generic api response types
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
+
+pub mod reason;
 
 /// A Kubernetes status object
-#[derive(Serialize, Deserialize, Debug, Default, Clone, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone, PartialEq, Eq, Error)]
+#[error("{message}: {reason}")]
 pub struct Status {
     /// Status of the operation
     ///
@@ -82,6 +86,39 @@ impl Status {
     /// when both `is_success` and `is_failure` return false.
     pub fn is_failure(&self) -> bool {
         self.status == Some(StatusSummary::Failure)
+    }
+
+    /// Checks if this `Status` represents not found error
+    ///
+    /// Note that it is possible for `Status` to be in indeterminate state
+    /// when both `is_success` and `is_failure` return false.
+    pub fn is_not_found(&self) -> bool {
+        self.reason_or_code(reason::NOT_FOUND, 404)
+    }
+
+    /// Checks if this `Status` indicates that a specified resource already exists.
+    pub fn is_already_exists(&self) -> bool {
+        self.reason == reason::ALREADY_EXISTS
+    }
+
+    /// Checks if this `Status` indicates update conflict
+    pub fn is_conflict(&self) -> bool {
+        self.reason_or_code(reason::CONFLICT, 409)
+    }
+
+    /// Checks if this `Status` indicates that the request is forbidden and cannot
+    /// be completed as requested.
+    pub fn is_forbidden(&self) -> bool {
+        self.reason_or_code(reason::FORBIDDEN, 403)
+    }
+
+    /// Checks if this `Status` indicates that provided resource is not valid.
+    pub fn is_invalid(&self) -> bool {
+        self.reason_or_code(reason::INVALID, 422)
+    }
+
+    fn reason_or_code(&self, reason: &str, code: u16) -> bool {
+        self.reason == reason || (!reason::is_known(reason) && self.code == code)
     }
 }
 

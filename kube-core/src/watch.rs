@@ -2,7 +2,7 @@
 //!
 //! See <https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes>
 
-use crate::{error::ErrorResponse, metadata::TypeMeta};
+use crate::{metadata::TypeMeta, response::Status};
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 /// A raw event returned from a watch query
@@ -24,7 +24,7 @@ pub enum WatchEvent<K> {
     /// NB: This became Beta first in Kubernetes 1.16.
     Bookmark(Bookmark),
     /// There was some kind of error
-    Error(ErrorResponse),
+    Error(Status),
 }
 
 impl<K> Debug for WatchEvent<K> {

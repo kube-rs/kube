@@ -230,7 +230,7 @@ async fn main() -> Result<()> {
         Some(kube::Error::Api(err)) => {
             assert_eq!(err.code, 422);
             assert_eq!(err.reason, "Invalid");
-            assert_eq!(err.status, "Failure");
+            assert!(err.is_failure());
             assert!(err.message.contains("clux.dev \"qux\" is invalid"));
             assert!(err.message.contains("spec.nonNullable: Required value"));
         }
@@ -271,7 +271,7 @@ async fn main() -> Result<()> {
         Some(kube::Error::Api(err)) => {
             assert_eq!(err.code, 422);
             assert_eq!(err.reason, "Invalid");
-            assert_eq!(err.status, "Failure");
+            assert!(err.is_failure());
             assert!(err.message.contains("Foo.clux.dev \"baz\" is invalid"));
             assert!(err.message.contains("spec.celValidated: Forbidden"));
             assert!(err.message.contains("string cannot be illegal"));
@@ -293,7 +293,7 @@ async fn main() -> Result<()> {
         Some(kube::Error::Api(err)) => {
             assert_eq!(err.code, 422);
             assert_eq!(err.reason, "Invalid");
-            assert_eq!(err.status, "Failure");
+            assert!(err.is_failure());
             assert!(err.message.contains("Foo.clux.dev \"baz\" is invalid"));
             assert!(err.message.contains("spec.celValidated: Invalid value"));
             assert!(err.message.contains("failed rule: self != 'not legal'"));
@@ -316,7 +316,7 @@ async fn main() -> Result<()> {
         Some(kube::Error::Api(err)) => {
             assert_eq!(err.code, 422);
             assert_eq!(err.reason, "Invalid");
-            assert_eq!(err.status, "Failure");
+            assert!(err.is_failure());
             assert!(err.message.contains("Foo.clux.dev \"baz\" is invalid"));
             assert!(err.message.contains("spec.fooSubSpec.field: Invalid value"));
             assert!(err.message.contains("failed rule: self != 'not legal'"));
@@ -339,7 +339,7 @@ async fn main() -> Result<()> {
         Some(kube::Error::Api(err)) => {
             assert_eq!(err.code, 422);
             assert_eq!(err.reason, "Invalid");
-            assert_eq!(err.status, "Failure");
+            assert!(err.is_failure());
             assert!(err.message.contains("Foo.clux.dev \"baz\" is invalid"));
             assert!(err.message.contains("spec.fooSubSpec.field: Invalid value"));
             assert!(err.message.contains("some pretty good reason"));
@@ -375,7 +375,7 @@ async fn main() -> Result<()> {
         Some(kube::Error::Api(err)) => {
             assert_eq!(err.code, 422);
             assert_eq!(err.reason, "Invalid");
-            assert_eq!(err.status, "Failure");
+            assert!(err.is_failure());
             assert!(err.message.contains("Foo.clux.dev \"baz\" is invalid"));
             assert!(err.message.contains("spec.fooSubSpec: Invalid value"));
             assert!(err.message.contains("Invalid value: \"object\": is immutable"));
