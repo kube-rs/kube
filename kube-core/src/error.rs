@@ -15,4 +15,64 @@ pub struct ErrorResponse {
     pub reason: String,
     /// The error code
     pub code: u16,
+    /// Extended data associated with the reason.
+    /// Each reason may define its own extended details.
+    pub details: Option<StatusDetails>,
+}
+
+/// StatusDetails is a set of additional properties that MAY be set by the server
+/// to provide additional information about a response.
+/// The Reason field of a Status object defines what attributes will be set.
+/// Clients must ignore fields that do not match the defined type of each attribute,
+/// and should assume that any attribute may be empty, invalid, or under defined.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StatusDetails {
+    /// The Causes array includes more details associated with the StatusReason failure.
+    /// Not all StatusReasons may provide detailed causes.
+    pub causes: Option<Vec<StatusCause>>,
+
+    /// The group attribute of the resource associated with the status StatusReason.
+    pub group: Option<String>,
+
+    /// The kind attribute of the resource associated with the status StatusReason.
+    /// On some operations may differ from the requested resource Kind.
+    /// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+    pub kind: Option<String>,
+
+    /// The name attribute of the resource associated with the status StatusReason
+    /// (when there is a single name which can be described).
+    pub name: Option<String>,
+
+    /// If specified, the time in seconds before the operation should be retried.
+    /// Some errors may indicate the client must take an alternate action - for
+    /// those errors this field may indicate how long to wait before taking the
+    /// alternate action.
+    pub retry_after_seconds: Option<i32>,
+
+    /// UID of the resource. (when there is a single resource which can be described).
+    /// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names#uids
+    pub uid: Option<String>,
+}
+
+/// StatusCause provides more information about an api.Status failure,
+/// including cases when multiple errors are encountered.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StatusCause {
+    /// The field of the resource that has caused this error, as named by its JSON serialization.
+    /// May include dot and postfix notation for nested attributes. Arrays are zero-indexed.
+    /// Fields may appear more than once in an array of causes due to fields having multiple errors.
+    /// Optional.
+    ///
+    /// Examples:
+    ///   "name" - the field "name" on the current resource
+    ///   "items\[0\].name" - the field "name" on the first array entry in "items"
+    pub field: Option<String>,
+
+    /// A human-readable description of the cause of the error.
+    /// This field may be presented as-is to a reader.
+    pub message: Option<String>,
+
+    /// A machine-readable description of the cause of the error.
+    /// If this value is empty there is no information available.
+    pub reason: Option<String>,
 }

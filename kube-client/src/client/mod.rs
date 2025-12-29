@@ -499,6 +499,7 @@ async fn handle_api_errors(res: Response<Body>) -> Result<Response<Body>> {
                 code: status.as_u16(),
                 message: format!("{text:?}"),
                 reason: "Failed to parse error data".into(),
+                details: None,
             };
             tracing::debug!("Unsuccessful: {error_response:?} (reconstruct)");
             Err(Error::Api(error_response))
