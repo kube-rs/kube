@@ -320,7 +320,7 @@ mod tests {
 
     use k8s_openapi::api::core::v1::ConfigMap;
     use kube_core::{
-        ErrorResponse, ObjectMeta,
+        ObjectMeta,
         params::{DeleteParams, PostParams},
     };
 

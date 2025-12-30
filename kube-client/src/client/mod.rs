@@ -365,7 +365,7 @@ impl Client {
 
                         // Got general error response
                         if let Ok(status) = serde_json::from_str::<Status>(&line) {
-                            return Some(Err(Error::Api(status)));
+                            return Some(Err(Error::Api(status.boxed())));
                         }
                         // Parsing error
                         Some(Err(Error::SerdeError(e)))
@@ -574,12 +574,12 @@ async fn handle_api_errors(res: Response<Body>) -> Result<Response<Body>> {
         // trace!("Parsing error: {}", text);
         if let Ok(status) = serde_json::from_str::<Status>(&text) {
             tracing::debug!("Unsuccessful: {status:?}");
-            Err(Error::Api(status))
+            Err(Error::Api(status.boxed()))
         } else {
             tracing::warn!("Unsuccessful data error parse: {text}");
             let status = Status::failure(&text, "Failed to parse error data").with_code(status.as_u16());
             tracing::debug!("Unsuccessful: {status:?} (reconstruct)");
-            Err(Error::Api(status))
+            Err(Error::Api(status.boxed()))
         }
     } else {
         Ok(res)

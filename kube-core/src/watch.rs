@@ -24,7 +24,7 @@ pub enum WatchEvent<K> {
     /// NB: This became Beta first in Kubernetes 1.16.
     Bookmark(Bookmark),
     /// There was some kind of error
-    Error(Status),
+    Error(Box<Status>),
 }
 
 impl<K> Debug for WatchEvent<K> {

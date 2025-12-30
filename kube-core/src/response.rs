@@ -38,6 +38,11 @@ pub struct Status {
 }
 
 impl Status {
+    /// Returns a boxed `Status`
+    pub fn boxed(self) -> Box<Self> {
+        Box::new(self)
+    }
+
     /// Returns a successful `Status`
     pub fn success() -> Self {
         Status {
