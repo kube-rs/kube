@@ -195,6 +195,69 @@ mod test {
     }
 
     #[tokio::test]
+    #[ignore = "needs cluster (uses aggregated discovery, requires k8s 1.26+)"]
+    #[cfg(feature = "client")]
+    async fn aggregated_discovery_apis() -> Result<(), Box<dyn std::error::Error>> {
+        let client = Client::try_default().await?;
+
+        // Test /apis aggregated discovery
+        let apis_discovery = client.list_api_groups_aggregated().await?;
+        assert!(!apis_discovery.items.is_empty(), "should have API groups");
+
+        // Find the apps group
+        let apps_group = apis_discovery
+            .items
+            .iter()
+            .find(|g| g.metadata.as_ref().and_then(|m| m.name.as_ref()) == Some(&"apps".to_string()));
+        assert!(apps_group.is_some(), "should have apps group");
+
+        let apps = apps_group.unwrap();
+        assert!(!apps.versions.is_empty(), "apps should have versions");
+
+        // Check that deployments resource exists in apps/v1
+        let v1 = apps.versions.iter().find(|v| v.version == Some("v1".to_string()));
+        assert!(v1.is_some(), "apps should have v1");
+
+        let deployments = v1
+            .unwrap()
+            .resources
+            .iter()
+            .find(|r| r.resource == Some("deployments".to_string()));
+        assert!(deployments.is_some(), "apps/v1 should have deployments");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[ignore = "needs cluster (uses aggregated discovery, requires k8s 1.26+)"]
+    #[cfg(feature = "client")]
+    async fn aggregated_discovery_core() -> Result<(), Box<dyn std::error::Error>> {
+        let client = Client::try_default().await?;
+
+        // Test /api aggregated discovery (core group)
+        let core_discovery = client.list_core_api_versions_aggregated().await?;
+        assert!(!core_discovery.items.is_empty(), "should have core group");
+
+        let core = &core_discovery.items[0];
+        let v1 = core.versions.iter().find(|v| v.version == Some("v1".to_string()));
+        assert!(v1.is_some(), "core should have v1");
+
+        // Check that pods resource exists
+        let pods = v1
+            .unwrap()
+            .resources
+            .iter()
+            .find(|r| r.resource == Some("pods".to_string()));
+        assert!(pods.is_some(), "core/v1 should have pods");
+
+        let pods_resource = pods.unwrap();
+        assert_eq!(pods_resource.scope, Some("Namespaced".to_string()));
+        assert!(pods_resource.verbs.contains(&"list".to_string()));
+
+        Ok(())
+    }
+
+    #[tokio::test]
     #[ignore = "needs cluster (will create and edit a pod)"]
     async fn pod_can_use_core_apis() -> Result<(), Box<dyn std::error::Error>> {
         use kube::api::{DeleteParams, ListParams, Patch, PatchParams, PostParams, WatchEvent};
