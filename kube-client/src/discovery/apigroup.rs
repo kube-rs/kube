@@ -391,7 +391,9 @@ mod tests {
             versions: vec![APIVersionDiscovery {
                 version: Some("v1".to_string()),
                 resources: vec![
-                    make_v2_resource("deployments", "Deployment", "Namespaced", vec!["get", "list", "create"]),
+                    make_v2_resource("deployments", "Deployment", "Namespaced", vec![
+                        "get", "list", "create",
+                    ]),
                     make_v2_resource("replicasets", "ReplicaSet", "Namespaced", vec!["get", "list"]),
                 ],
                 freshness: Some("Current".to_string()),

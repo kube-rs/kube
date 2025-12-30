@@ -186,12 +186,7 @@ mod tests {
     use super::*;
     use kube_core::discovery::v2::GroupVersionKind;
 
-    fn make_resource(
-        resource: &str,
-        kind: &str,
-        scope: &str,
-        verbs: Vec<&str>,
-    ) -> APIResourceDiscovery {
+    fn make_resource(resource: &str, kind: &str, scope: &str, verbs: Vec<&str>) -> APIResourceDiscovery {
         APIResourceDiscovery {
             resource: Some(resource.to_string()),
             response_kind: Some(GroupVersionKind {
@@ -221,7 +216,9 @@ mod tests {
 
     #[test]
     fn test_parse_v2_resource_namespaced() {
-        let res = make_resource("pods", "Pod", "Namespaced", vec!["get", "list", "watch", "create"]);
+        let res = make_resource("pods", "Pod", "Namespaced", vec![
+            "get", "list", "watch", "create",
+        ]);
 
         let (ar, caps) = parse_v2_resource(&res, "", "v1", "v1");
 
@@ -308,12 +305,9 @@ mod tests {
     fn test_group_version_data_from_v2_apps() {
         let ver = APIVersionDiscovery {
             version: Some("v1".to_string()),
-            resources: vec![make_resource(
-                "deployments",
-                "Deployment",
-                "Namespaced",
-                vec!["get", "list", "create"],
-            )],
+            resources: vec![make_resource("deployments", "Deployment", "Namespaced", vec![
+                "get", "list", "create",
+            ])],
             freshness: Some("Current".to_string()),
         };
 
