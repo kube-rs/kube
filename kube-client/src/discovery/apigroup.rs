@@ -4,6 +4,7 @@ use k8s_openapi::apimachinery::pkg::apis::meta::v1::{APIGroup, APIVersions};
 pub use kube_core::discovery::{ApiCapabilities, ApiResource};
 use kube_core::{
     Version,
+    discovery::v2::APIGroupDiscovery,
     gvk::{GroupVersion, GroupVersionKind, ParseGroupVersionError},
 };
 use std::{cmp::Reverse, collections::HashMap, iter::Iterator};
@@ -119,6 +120,39 @@ impl ApiGroup {
             name: ApiGroup::CORE_GROUP.to_string(),
             data,
             preferred: Some("v1".to_string()),
+        };
+        group.sort_versions();
+        Ok(group)
+    }
+
+    /// Create an ApiGroup from aggregated discovery v2 types
+    ///
+    /// This is used by `Discovery::run_aggregated()` to convert the aggregated
+    /// discovery response into the same format used by regular discovery.
+    pub(crate) fn from_v2(ag: &APIGroupDiscovery) -> Result<Self> {
+        let name = ag
+            .metadata
+            .as_ref()
+            .and_then(|m| m.name.clone())
+            .unwrap_or_default();
+
+        if ag.versions.is_empty() {
+            return Err(Error::Discovery(DiscoveryError::EmptyApiGroup(name)));
+        }
+
+        let data: Vec<GroupVersionData> = ag
+            .versions
+            .iter()
+            .map(|ver| GroupVersionData::from_v2(&name, ver))
+            .collect();
+
+        // Preferred version is the first one in the list (they're sorted by preference)
+        let preferred = ag.versions.first().and_then(|v| v.version.clone());
+
+        let mut group = ApiGroup {
+            name,
+            data,
+            preferred,
         };
         group.sort_versions();
         Ok(group)
@@ -327,7 +361,143 @@ impl ApiGroup {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use kube_core::discovery::Scope;
+    use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
+    use kube_core::discovery::{
+        Scope,
+        v2::{APIGroupDiscovery, APIResourceDiscovery, APIVersionDiscovery, GroupVersionKind},
+    };
+
+    fn make_v2_resource(resource: &str, kind: &str, scope: &str, verbs: Vec<&str>) -> APIResourceDiscovery {
+        APIResourceDiscovery {
+            resource: Some(resource.to_string()),
+            response_kind: Some(GroupVersionKind {
+                group: None,
+                version: None,
+                kind: Some(kind.to_string()),
+            }),
+            scope: Some(scope.to_string()),
+            verbs: verbs.into_iter().map(String::from).collect(),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn test_api_group_from_v2_apps() {
+        let ag = APIGroupDiscovery {
+            metadata: Some(ObjectMeta {
+                name: Some("apps".to_string()),
+                ..Default::default()
+            }),
+            versions: vec![APIVersionDiscovery {
+                version: Some("v1".to_string()),
+                resources: vec![
+                    make_v2_resource("deployments", "Deployment", "Namespaced", vec!["get", "list", "create"]),
+                    make_v2_resource("replicasets", "ReplicaSet", "Namespaced", vec!["get", "list"]),
+                ],
+                freshness: Some("Current".to_string()),
+            }],
+        };
+
+        let group = ApiGroup::from_v2(&ag).unwrap();
+
+        assert_eq!(group.name(), "apps");
+        assert_eq!(group.preferred_version(), Some("v1"));
+        assert_eq!(group.versions().collect::<Vec<_>>(), vec!["v1"]);
+
+        let resources = group.recommended_resources();
+        assert_eq!(resources.len(), 2);
+
+        let (deploy_ar, deploy_caps) = group.recommended_kind("Deployment").unwrap();
+        assert_eq!(deploy_ar.group, "apps");
+        assert_eq!(deploy_ar.version, "v1");
+        assert_eq!(deploy_ar.api_version, "apps/v1");
+        assert_eq!(deploy_ar.kind, "Deployment");
+        assert_eq!(deploy_caps.scope, Scope::Namespaced);
+    }
+
+    #[test]
+    fn test_api_group_from_v2_core() {
+        let ag = APIGroupDiscovery {
+            metadata: Some(ObjectMeta {
+                name: Some("".to_string()), // core group has empty name
+                ..Default::default()
+            }),
+            versions: vec![APIVersionDiscovery {
+                version: Some("v1".to_string()),
+                resources: vec![
+                    make_v2_resource("pods", "Pod", "Namespaced", vec!["get", "list", "watch"]),
+                    make_v2_resource("nodes", "Node", "Cluster", vec!["get", "list"]),
+                ],
+                freshness: Some("Current".to_string()),
+            }],
+        };
+
+        let group = ApiGroup::from_v2(&ag).unwrap();
+
+        assert_eq!(group.name(), "");
+        assert_eq!(group.preferred_version(), Some("v1"));
+
+        let (pod_ar, pod_caps) = group.recommended_kind("Pod").unwrap();
+        assert_eq!(pod_ar.group, "");
+        assert_eq!(pod_ar.api_version, "v1"); // core group: no prefix
+        assert_eq!(pod_caps.scope, Scope::Namespaced);
+
+        let (node_ar, node_caps) = group.recommended_kind("Node").unwrap();
+        assert_eq!(node_ar.kind, "Node");
+        assert_eq!(node_caps.scope, Scope::Cluster);
+    }
+
+    #[test]
+    fn test_api_group_from_v2_multiple_versions() {
+        let ag = APIGroupDiscovery {
+            metadata: Some(ObjectMeta {
+                name: Some("batch".to_string()),
+                ..Default::default()
+            }),
+            versions: vec![
+                // First version is preferred
+                APIVersionDiscovery {
+                    version: Some("v1".to_string()),
+                    resources: vec![make_v2_resource("jobs", "Job", "Namespaced", vec!["get", "list"])],
+                    freshness: Some("Current".to_string()),
+                },
+                APIVersionDiscovery {
+                    version: Some("v1beta1".to_string()),
+                    resources: vec![make_v2_resource("jobs", "Job", "Namespaced", vec!["get"])],
+                    freshness: Some("Current".to_string()),
+                },
+            ],
+        };
+
+        let group = ApiGroup::from_v2(&ag).unwrap();
+
+        assert_eq!(group.name(), "batch");
+        assert_eq!(group.preferred_version(), Some("v1"));
+        assert_eq!(group.versions().collect::<Vec<_>>(), vec!["v1", "v1beta1"]);
+
+        // Recommended should be v1
+        let (ar, _) = group.recommended_kind("Job").unwrap();
+        assert_eq!(ar.version, "v1");
+
+        // Can also get v1beta1 explicitly
+        let v1beta1_resources = group.versioned_resources("v1beta1");
+        assert_eq!(v1beta1_resources.len(), 1);
+        assert_eq!(v1beta1_resources[0].0.version, "v1beta1");
+    }
+
+    #[test]
+    fn test_api_group_from_v2_empty_versions_error() {
+        let ag = APIGroupDiscovery {
+            metadata: Some(ObjectMeta {
+                name: Some("empty".to_string()),
+                ..Default::default()
+            }),
+            versions: vec![], // empty!
+        };
+
+        let result = ApiGroup::from_v2(&ag);
+        assert!(result.is_err());
+    }
 
     #[test]
     fn test_resources_by_stability() {

@@ -2,7 +2,10 @@
 use crate::{Error, Result, error::DiscoveryError};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{APIResource, APIResourceList};
 use kube_core::{
-    discovery::{ApiCapabilities, ApiResource, Scope},
+    discovery::{
+        ApiCapabilities, ApiResource, Scope,
+        v2::{APIResourceDiscovery, APISubresourceDiscovery, APIVersionDiscovery},
+    },
     gvk::{GroupVersion, ParseGroupVersionError},
 };
 
@@ -84,5 +87,246 @@ impl GroupVersionData {
             resources.push((ar, caps));
         }
         Ok(GroupVersionData { version, resources })
+    }
+
+    /// Create GroupVersionData from aggregated discovery v2 types
+    pub(crate) fn from_v2(group: &str, ver: &APIVersionDiscovery) -> Self {
+        let version = ver.version.clone().unwrap_or_default();
+        let gv = if group.is_empty() {
+            version.clone()
+        } else {
+            format!("{group}/{version}")
+        };
+
+        let resources = ver
+            .resources
+            .iter()
+            .map(|res| parse_v2_resource(res, group, &version, &gv))
+            .collect();
+
+        GroupVersionData { version, resources }
+    }
+}
+
+/// Convert an APIResourceDiscovery (v2) to ApiResource + ApiCapabilities
+fn parse_v2_resource(
+    res: &APIResourceDiscovery,
+    group: &str,
+    version: &str,
+    api_version: &str,
+) -> (ApiResource, ApiCapabilities) {
+    let kind = res
+        .response_kind
+        .as_ref()
+        .and_then(|gvk| gvk.kind.clone())
+        .unwrap_or_default();
+
+    let ar = ApiResource {
+        group: group.to_string(),
+        version: version.to_string(),
+        api_version: api_version.to_string(),
+        kind,
+        plural: res.resource.clone().unwrap_or_default(),
+    };
+
+    let scope = match res.scope.as_deref() {
+        Some("Namespaced") => Scope::Namespaced,
+        _ => Scope::Cluster,
+    };
+
+    let subresources = res
+        .subresources
+        .iter()
+        .map(|sub| parse_v2_subresource(sub, group, version, api_version, scope.clone()))
+        .collect();
+
+    let caps = ApiCapabilities {
+        scope,
+        subresources,
+        operations: res.verbs.clone(),
+    };
+
+    (ar, caps)
+}
+
+/// Convert an APISubresourceDiscovery (v2) to ApiResource + ApiCapabilities
+fn parse_v2_subresource(
+    sub: &APISubresourceDiscovery,
+    group: &str,
+    version: &str,
+    api_version: &str,
+    parent_scope: Scope,
+) -> (ApiResource, ApiCapabilities) {
+    let kind = sub
+        .response_kind
+        .as_ref()
+        .and_then(|gvk| gvk.kind.clone())
+        .unwrap_or_default();
+
+    let ar = ApiResource {
+        group: group.to_string(),
+        version: version.to_string(),
+        api_version: api_version.to_string(),
+        kind,
+        plural: sub.subresource.clone().unwrap_or_default(),
+    };
+
+    // Subresources inherit scope from parent resource
+    let caps = ApiCapabilities {
+        scope: parent_scope,
+        subresources: vec![],
+        operations: sub.verbs.clone(),
+    };
+
+    (ar, caps)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use kube_core::discovery::v2::GroupVersionKind;
+
+    fn make_resource(
+        resource: &str,
+        kind: &str,
+        scope: &str,
+        verbs: Vec<&str>,
+    ) -> APIResourceDiscovery {
+        APIResourceDiscovery {
+            resource: Some(resource.to_string()),
+            response_kind: Some(GroupVersionKind {
+                group: None,
+                version: None,
+                kind: Some(kind.to_string()),
+            }),
+            scope: Some(scope.to_string()),
+            verbs: verbs.into_iter().map(String::from).collect(),
+            subresources: vec![],
+            ..Default::default()
+        }
+    }
+
+    fn make_subresource(subresource: &str, kind: &str, verbs: Vec<&str>) -> APISubresourceDiscovery {
+        APISubresourceDiscovery {
+            subresource: Some(subresource.to_string()),
+            response_kind: Some(GroupVersionKind {
+                group: None,
+                version: None,
+                kind: Some(kind.to_string()),
+            }),
+            verbs: verbs.into_iter().map(String::from).collect(),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn test_parse_v2_resource_namespaced() {
+        let res = make_resource("pods", "Pod", "Namespaced", vec!["get", "list", "watch", "create"]);
+
+        let (ar, caps) = parse_v2_resource(&res, "", "v1", "v1");
+
+        assert_eq!(ar.group, "");
+        assert_eq!(ar.version, "v1");
+        assert_eq!(ar.api_version, "v1");
+        assert_eq!(ar.kind, "Pod");
+        assert_eq!(ar.plural, "pods");
+        assert_eq!(caps.scope, Scope::Namespaced);
+        assert_eq!(caps.operations, vec!["get", "list", "watch", "create"]);
+        assert!(caps.subresources.is_empty());
+    }
+
+    #[test]
+    fn test_parse_v2_resource_cluster_scoped() {
+        let res = make_resource("nodes", "Node", "Cluster", vec!["get", "list"]);
+
+        let (ar, caps) = parse_v2_resource(&res, "", "v1", "v1");
+
+        assert_eq!(ar.kind, "Node");
+        assert_eq!(caps.scope, Scope::Cluster);
+    }
+
+    #[test]
+    fn test_parse_v2_resource_with_group() {
+        let res = make_resource("deployments", "Deployment", "Namespaced", vec!["get", "list"]);
+
+        let (ar, caps) = parse_v2_resource(&res, "apps", "v1", "apps/v1");
+
+        assert_eq!(ar.group, "apps");
+        assert_eq!(ar.version, "v1");
+        assert_eq!(ar.api_version, "apps/v1");
+        assert_eq!(ar.kind, "Deployment");
+        assert_eq!(ar.plural, "deployments");
+        assert_eq!(caps.scope, Scope::Namespaced);
+    }
+
+    #[test]
+    fn test_parse_v2_resource_with_subresources() {
+        let mut res = make_resource("pods", "Pod", "Namespaced", vec!["get", "list"]);
+        res.subresources = vec![
+            make_subresource("status", "Pod", vec!["get", "patch"]),
+            make_subresource("log", "Pod", vec!["get"]),
+        ];
+
+        let (ar, caps) = parse_v2_resource(&res, "", "v1", "v1");
+
+        assert_eq!(ar.kind, "Pod");
+        assert_eq!(caps.subresources.len(), 2);
+
+        let (status_ar, status_caps) = &caps.subresources[0];
+        assert_eq!(status_ar.plural, "status");
+        assert_eq!(status_caps.scope, Scope::Namespaced); // inherited
+        assert_eq!(status_caps.operations, vec!["get", "patch"]);
+
+        let (log_ar, log_caps) = &caps.subresources[1];
+        assert_eq!(log_ar.plural, "log");
+        assert_eq!(log_caps.operations, vec!["get"]);
+    }
+
+    #[test]
+    fn test_group_version_data_from_v2_core() {
+        let ver = APIVersionDiscovery {
+            version: Some("v1".to_string()),
+            resources: vec![
+                make_resource("pods", "Pod", "Namespaced", vec!["get", "list"]),
+                make_resource("nodes", "Node", "Cluster", vec!["get", "list"]),
+            ],
+            freshness: Some("Current".to_string()),
+        };
+
+        let gvd = GroupVersionData::from_v2("", &ver);
+
+        assert_eq!(gvd.version, "v1");
+        assert_eq!(gvd.resources.len(), 2);
+
+        // Core group: api_version should be just "v1" (no group prefix)
+        let (pod_ar, _) = &gvd.resources[0];
+        assert_eq!(pod_ar.api_version, "v1");
+        assert_eq!(pod_ar.group, "");
+    }
+
+    #[test]
+    fn test_group_version_data_from_v2_apps() {
+        let ver = APIVersionDiscovery {
+            version: Some("v1".to_string()),
+            resources: vec![make_resource(
+                "deployments",
+                "Deployment",
+                "Namespaced",
+                vec!["get", "list", "create"],
+            )],
+            freshness: Some("Current".to_string()),
+        };
+
+        let gvd = GroupVersionData::from_v2("apps", &ver);
+
+        assert_eq!(gvd.version, "v1");
+        assert_eq!(gvd.resources.len(), 1);
+
+        let (ar, caps) = &gvd.resources[0];
+        assert_eq!(ar.group, "apps");
+        assert_eq!(ar.version, "v1");
+        assert_eq!(ar.api_version, "apps/v1");
+        assert_eq!(ar.kind, "Deployment");
+        assert_eq!(caps.scope, Scope::Namespaced);
     }
 }
