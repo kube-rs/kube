@@ -92,16 +92,15 @@ impl GroupVersionData {
     /// Create GroupVersionData from aggregated discovery v2 types
     pub(crate) fn from_v2(group: &str, ver: &APIVersionDiscovery) -> Self {
         let version = ver.version.clone().unwrap_or_default();
-        let gv = if group.is_empty() {
-            version.clone()
-        } else {
-            format!("{group}/{version}")
+        let gv = GroupVersion {
+            group: group.to_string(),
+            version: version.clone(),
         };
 
         let resources = ver
             .resources
             .iter()
-            .map(|res| parse_v2_resource(res, group, &version, &gv))
+            .map(|res| parse_v2_resource(res, &gv))
             .collect();
 
         GroupVersionData { version, resources }
@@ -109,12 +108,7 @@ impl GroupVersionData {
 }
 
 /// Convert an APIResourceDiscovery (v2) to ApiResource + ApiCapabilities
-fn parse_v2_resource(
-    res: &APIResourceDiscovery,
-    group: &str,
-    version: &str,
-    api_version: &str,
-) -> (ApiResource, ApiCapabilities) {
+fn parse_v2_resource(res: &APIResourceDiscovery, gv: &GroupVersion) -> (ApiResource, ApiCapabilities) {
     let kind = res
         .response_kind
         .as_ref()
@@ -122,9 +116,9 @@ fn parse_v2_resource(
         .unwrap_or_default();
 
     let ar = ApiResource {
-        group: group.to_string(),
-        version: version.to_string(),
-        api_version: api_version.to_string(),
+        group: gv.group.clone(),
+        version: gv.version.clone(),
+        api_version: gv.api_version(),
         kind,
         plural: res.resource.clone().unwrap_or_default(),
     };
@@ -137,7 +131,7 @@ fn parse_v2_resource(
     let subresources = res
         .subresources
         .iter()
-        .map(|sub| parse_v2_subresource(sub, group, version, api_version, scope.clone()))
+        .map(|sub| parse_v2_subresource(sub, gv, scope.clone()))
         .collect();
 
     let caps = ApiCapabilities {
@@ -152,9 +146,7 @@ fn parse_v2_resource(
 /// Convert an APISubresourceDiscovery (v2) to ApiResource + ApiCapabilities
 fn parse_v2_subresource(
     sub: &APISubresourceDiscovery,
-    group: &str,
-    version: &str,
-    api_version: &str,
+    gv: &GroupVersion,
     parent_scope: Scope,
 ) -> (ApiResource, ApiCapabilities) {
     let kind = sub
@@ -164,9 +156,9 @@ fn parse_v2_subresource(
         .unwrap_or_default();
 
     let ar = ApiResource {
-        group: group.to_string(),
-        version: version.to_string(),
-        api_version: api_version.to_string(),
+        group: gv.group.clone(),
+        version: gv.version.clone(),
+        api_version: gv.api_version(),
         kind,
         plural: sub.subresource.clone().unwrap_or_default(),
     };
@@ -219,8 +211,9 @@ mod tests {
         let res = make_resource("pods", "Pod", "Namespaced", vec![
             "get", "list", "watch", "create",
         ]);
+        let gv = GroupVersion::gv("", "v1");
 
-        let (ar, caps) = parse_v2_resource(&res, "", "v1", "v1");
+        let (ar, caps) = parse_v2_resource(&res, &gv);
 
         assert_eq!(ar.group, "");
         assert_eq!(ar.version, "v1");
@@ -235,8 +228,9 @@ mod tests {
     #[test]
     fn test_parse_v2_resource_cluster_scoped() {
         let res = make_resource("nodes", "Node", "Cluster", vec!["get", "list"]);
+        let gv = GroupVersion::gv("", "v1");
 
-        let (ar, caps) = parse_v2_resource(&res, "", "v1", "v1");
+        let (ar, caps) = parse_v2_resource(&res, &gv);
 
         assert_eq!(ar.kind, "Node");
         assert_eq!(caps.scope, Scope::Cluster);
@@ -245,8 +239,9 @@ mod tests {
     #[test]
     fn test_parse_v2_resource_with_group() {
         let res = make_resource("deployments", "Deployment", "Namespaced", vec!["get", "list"]);
+        let gv = GroupVersion::gv("apps", "v1");
 
-        let (ar, caps) = parse_v2_resource(&res, "apps", "v1", "apps/v1");
+        let (ar, caps) = parse_v2_resource(&res, &gv);
 
         assert_eq!(ar.group, "apps");
         assert_eq!(ar.version, "v1");
@@ -263,8 +258,9 @@ mod tests {
             make_subresource("status", "Pod", vec!["get", "patch"]),
             make_subresource("log", "Pod", vec!["get"]),
         ];
+        let gv = GroupVersion::gv("", "v1");
 
-        let (ar, caps) = parse_v2_resource(&res, "", "v1", "v1");
+        let (ar, caps) = parse_v2_resource(&res, &gv);
 
         assert_eq!(ar.kind, "Pod");
         assert_eq!(caps.subresources.len(), 2);
