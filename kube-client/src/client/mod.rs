@@ -8,7 +8,7 @@
 //! The [`Client`] can also be used with [`Discovery`](crate::Discovery) to dynamically
 //! retrieve the resources served by the kubernetes API.
 use either::{Either, Left, Right};
-use futures::{future::BoxFuture, AsyncBufRead, StreamExt, TryStream, TryStreamExt};
+use futures::{AsyncBufRead, StreamExt, TryStream, TryStreamExt, future::BoxFuture};
 use http::{self, Request, Response};
 use http_body_util::BodyExt;
 #[cfg(feature = "ws")] use hyper_util::rt::TokioIo;
@@ -18,16 +18,16 @@ pub use kube_core::response::Status;
 use serde::de::DeserializeOwned;
 use serde_json::{self, Value};
 #[cfg(feature = "ws")]
-use tokio_tungstenite::{tungstenite as ws, WebSocketStream};
+use tokio_tungstenite::{WebSocketStream, tungstenite as ws};
 use tokio_util::{
     codec::{FramedRead, LinesCodec, LinesCodecError},
     io::StreamReader,
 };
-use tower::{buffer::Buffer, util::BoxService, BoxError, Layer, Service, ServiceExt};
+use tower::{BoxError, Layer, Service, ServiceExt, buffer::Buffer, util::BoxService};
 use tower_http::map_response_body::MapResponseBodyLayer;
 
 pub use self::body::Body;
-use crate::{api::WatchEvent, config::Kubeconfig, error::ErrorResponse, Config, Error, Result};
+use crate::{Config, Error, Result, api::WatchEvent, config::Kubeconfig, error::ErrorResponse};
 
 mod auth;
 mod body;
@@ -616,9 +616,9 @@ mod tests {
     use std::pin::pin;
 
     use crate::{
-        client::Body, config::{AuthInfo, Cluster, Context, Kubeconfig, NamedAuthInfo, NamedCluster, NamedContext},
-        Api,
-        Client,
+        Api, Client,
+        client::Body,
+        config::{AuthInfo, Cluster, Context, Kubeconfig, NamedAuthInfo, NamedCluster, NamedContext},
     };
 
     use http::{Request, Response};
