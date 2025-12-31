@@ -129,25 +129,22 @@ impl ApiGroup {
     ///
     /// This is used by `Discovery::run_aggregated()` to convert the aggregated
     /// discovery response into the same format used by regular discovery.
-    pub(crate) fn from_v2(ag: &APIGroupDiscovery) -> Result<Self> {
-        let name = ag
-            .metadata
-            .as_ref()
-            .and_then(|m| m.name.clone())
-            .unwrap_or_default();
+    /// Takes ownership to avoid cloning internal data.
+    pub(crate) fn from_v2(ag: APIGroupDiscovery) -> Result<Self> {
+        let name = ag.metadata.and_then(|m| m.name).unwrap_or_default();
 
         if ag.versions.is_empty() {
             return Err(Error::Discovery(DiscoveryError::EmptyApiGroup(name)));
         }
 
-        let data: Vec<GroupVersionData> = ag
-            .versions
-            .iter()
-            .map(|ver| GroupVersionData::from_v2(&name, ver))
-            .collect();
-
         // Preferred version is the first one in the list (they're sorted by preference)
         let preferred = ag.versions.first().and_then(|v| v.version.clone());
+
+        let data: Vec<GroupVersionData> = ag
+            .versions
+            .into_iter()
+            .map(|ver| GroupVersionData::from_v2(&name, ver))
+            .collect();
 
         let mut group = ApiGroup {
             name,
@@ -400,7 +397,7 @@ mod tests {
             }],
         };
 
-        let group = ApiGroup::from_v2(&ag).unwrap();
+        let group = ApiGroup::from_v2(ag).unwrap();
 
         assert_eq!(group.name(), "apps");
         assert_eq!(group.preferred_version(), Some("v1"));
@@ -434,7 +431,7 @@ mod tests {
             }],
         };
 
-        let group = ApiGroup::from_v2(&ag).unwrap();
+        let group = ApiGroup::from_v2(ag).unwrap();
 
         assert_eq!(group.name(), "");
         assert_eq!(group.preferred_version(), Some("v1"));
@@ -451,40 +448,52 @@ mod tests {
 
     #[test]
     fn test_api_group_from_v2_multiple_versions() {
+        // Use autoscaling group which has multiple major versions (v1, v2)
+        // Major versions are never removed per deprecation policy Rule #4a
         let ag = APIGroupDiscovery {
             metadata: Some(ObjectMeta {
-                name: Some("batch".to_string()),
+                name: Some("autoscaling".to_string()),
                 ..Default::default()
             }),
             versions: vec![
                 // First version is preferred
                 APIVersionDiscovery {
-                    version: Some("v1".to_string()),
-                    resources: vec![make_v2_resource("jobs", "Job", "Namespaced", vec!["get", "list"])],
+                    version: Some("v2".to_string()),
+                    resources: vec![make_v2_resource(
+                        "horizontalpodautoscalers",
+                        "HorizontalPodAutoscaler",
+                        "Namespaced",
+                        vec!["get", "list"],
+                    )],
                     freshness: Some("Current".to_string()),
                 },
                 APIVersionDiscovery {
-                    version: Some("v1beta1".to_string()),
-                    resources: vec![make_v2_resource("jobs", "Job", "Namespaced", vec!["get"])],
+                    version: Some("v1".to_string()),
+                    resources: vec![make_v2_resource(
+                        "horizontalpodautoscalers",
+                        "HorizontalPodAutoscaler",
+                        "Namespaced",
+                        vec!["get"],
+                    )],
                     freshness: Some("Current".to_string()),
                 },
             ],
         };
 
-        let group = ApiGroup::from_v2(&ag).unwrap();
+        let group = ApiGroup::from_v2(ag).unwrap();
 
-        assert_eq!(group.name(), "batch");
-        assert_eq!(group.preferred_version(), Some("v1"));
-        assert_eq!(group.versions().collect::<Vec<_>>(), vec!["v1", "v1beta1"]);
+        assert_eq!(group.name(), "autoscaling");
+        assert_eq!(group.preferred_version(), Some("v2"));
+        assert_eq!(group.versions().collect::<Vec<_>>(), vec!["v2", "v1"]);
 
-        // Recommended should be v1
-        let (ar, _) = group.recommended_kind("Job").unwrap();
-        assert_eq!(ar.version, "v1");
+        // Recommended should be v2
+        let (ar, _) = group.recommended_kind("HorizontalPodAutoscaler").unwrap();
+        assert_eq!(ar.version, "v2");
 
-        // Can also get v1beta1 explicitly
-        let v1beta1_resources = group.versioned_resources("v1beta1");
-        assert_eq!(v1beta1_resources.len(), 1);
-        assert_eq!(v1beta1_resources[0].0.version, "v1beta1");
+        // Can also get v1 explicitly
+        let v1_resources = group.versioned_resources("v1");
+        assert_eq!(v1_resources.len(), 1);
+        assert_eq!(v1_resources[0].0.version, "v1");
     }
 
     #[test]
@@ -497,7 +506,7 @@ mod tests {
             versions: vec![], // empty!
         };
 
-        let result = ApiGroup::from_v2(&ag);
+        let result = ApiGroup::from_v2(ag);
         assert!(result.is_err());
     }
 

@@ -86,6 +86,9 @@ impl Discovery {
     /// The cache is empty cleared when this is started. By default, every api group found is checked,
     /// causing `N+2` queries to the api server (where `N` is number of api groups).
     ///
+    /// **Note**: Consider using [`Discovery::run_aggregated`] instead, which only requires
+    /// 2 API calls regardless of the number of groups (requires Kubernetes 1.26+).
+    ///
     /// ```no_run
     /// use kube::{Client, api::{Api, DynamicObject}, discovery::{Discovery, verbs, Scope}, ResourceExt};
     /// #[tokio::main]
@@ -170,7 +173,7 @@ impl Discovery {
 
         // Query /apis for all non-core groups (single request)
         let apis_discovery = self.client.list_api_groups_aggregated().await?;
-        for ag in &apis_discovery.items {
+        for ag in apis_discovery.items {
             let key = ag
                 .metadata
                 .as_ref()
@@ -187,7 +190,7 @@ impl Discovery {
         if self.mode.is_queryable(&corekey) {
             let core_discovery = self.client.list_core_api_versions_aggregated().await?;
             // Core group is the first (and usually only) item
-            if let Some(core_ag) = core_discovery.items.first() {
+            if let Some(core_ag) = core_discovery.items.into_iter().next() {
                 let apigroup = ApiGroup::from_v2(core_ag)?;
                 self.groups.insert(corekey, apigroup);
             }
