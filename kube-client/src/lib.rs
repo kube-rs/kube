@@ -258,6 +258,41 @@ mod test {
     }
 
     #[tokio::test]
+    #[ignore = "needs cluster (uses aggregated discovery, requires k8s 1.26+)"]
+    #[cfg(feature = "client")]
+    async fn discovery_run_aggregated() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::discovery::{Discovery, verbs};
+
+        let client = Client::try_default().await?;
+
+        // Test Discovery::run_aggregated()
+        let discovery = Discovery::new(client.clone()).run_aggregated().await?;
+
+        // Should have discovered groups
+        assert!(discovery.groups().count() > 0, "should have discovered groups");
+
+        // Should have core group
+        assert!(discovery.has_group(""), "should have core group");
+
+        // Should have apps group
+        assert!(discovery.has_group("apps"), "should have apps group");
+
+        // Check that we can find deployments in apps group
+        let apps = discovery.get("apps").expect("apps group");
+        let (ar, caps) = apps.recommended_kind("Deployment").expect("Deployment kind");
+        assert_eq!(ar.kind, "Deployment");
+        assert!(caps.supports_operation(verbs::LIST));
+
+        // Check that we can find pods in core group
+        let core = discovery.get("").expect("core group");
+        let (ar, caps) = core.recommended_kind("Pod").expect("Pod kind");
+        assert_eq!(ar.kind, "Pod");
+        assert!(caps.supports_operation(verbs::GET));
+
+        Ok(())
+    }
+
+    #[tokio::test]
     #[ignore = "needs cluster (will create and edit a pod)"]
     async fn pod_can_use_core_apis() -> Result<(), Box<dyn std::error::Error>> {
         use kube::api::{DeleteParams, ListParams, Patch, PatchParams, PostParams, WatchEvent};
