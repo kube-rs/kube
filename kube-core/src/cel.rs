@@ -187,7 +187,7 @@ impl FromStr for Reason {
 ///```
 #[cfg(feature = "schema")]
 #[cfg_attr(docsrs, doc(cfg(feature = "schema")))]
-pub fn validate(s: &mut Schema, rule: impl Into<Rule>) -> Result<(), serde_json::Error> {
+pub fn validate(s: &mut Schema, rule: impl Into<Rule>) -> serde_json::Result<()> {
     let rule: Rule = rule.into();
     let rule = serde_json::to_value(rule)?;
     s.ensure_object()
@@ -229,13 +229,8 @@ pub fn validate_property(
     s: &mut Schema,
     property_index: usize,
     rule: impl Into<Rule> + Clone,
-) -> Result<(), serde_json::Error> {
-    let obj = s.ensure_object();
-    if let Some(properties) = obj
-        .entry("properties")
-        .or_insert(serde_json::Value::Object(Default::default()))
-        .as_object_mut()
-    {
+) -> serde_json::Result<()> {
+    if let Some(properties) = s.properties_mut() {
         for (n, (_, schema)) in properties.iter_mut().enumerate() {
             if n == property_index {
                 let mut prop = Schema::try_from(schema.clone())?;
@@ -276,21 +271,11 @@ pub fn validate_property(
 #[cfg(feature = "schema")]
 #[cfg_attr(docsrs, doc(cfg(feature = "schema")))]
 pub fn merge_properties(s: &mut Schema, merge: &mut Schema) {
-    if let Some(properties) = s
-        .ensure_object()
-        .entry("properties")
-        .or_insert(serde_json::Value::Object(Default::default()))
-        .as_object_mut()
+    if let Some(properties) = s.properties_mut()
+        && let Some(merge_properties) = merge.properties_mut()
     {
-        if let Some(merge_properties) = merge
-            .ensure_object()
-            .entry("properties")
-            .or_insert(serde_json::Value::Object(Default::default()))
-            .as_object_mut()
-        {
-            for (k, v) in merge_properties {
-                properties.insert(k.clone(), v.clone());
-            }
+        for (k, v) in merge_properties {
+            properties.insert(k.clone(), v.clone());
         }
     }
 }
@@ -344,7 +329,7 @@ pub enum MergeStrategy {
 }
 
 impl MergeStrategy {
-    fn keys(self) -> Result<BTreeMap<String, Value>, serde_json::Error> {
+    fn keys(self) -> serde_json::Result<BTreeMap<String, Value>> {
         if let Self::ListType(ListMerge::Map(keys)) = self {
             let mut data = BTreeMap::new();
             data.insert("x-kubernetes-list-type".into(), "map".into());
@@ -386,13 +371,8 @@ pub fn merge_strategy_property(
     s: &mut Schema,
     property_index: usize,
     strategy: impl Into<MergeStrategy>,
-) -> Result<(), serde_json::Error> {
-    if let Some(properties) = s
-        .ensure_object()
-        .entry("properties")
-        .or_insert(serde_json::Value::Object(Default::default()))
-        .as_object_mut()
-    {
+) -> serde_json::Result<()> {
+    if let Some(properties) = s.properties_mut() {
         for (n, (_, schema)) in properties.iter_mut().enumerate() {
             if n == property_index {
                 return merge_strategy(schema, strategy.into());
@@ -420,11 +400,26 @@ pub fn merge_strategy_property(
 ///```
 #[cfg(feature = "schema")]
 #[cfg_attr(docsrs, doc(cfg(feature = "schema")))]
-pub fn merge_strategy(s: &mut Value, strategy: MergeStrategy) -> Result<(), serde_json::Error> {
+pub fn merge_strategy(s: &mut Value, strategy: MergeStrategy) -> serde_json::Result<()> {
     for (key, value) in strategy.keys()? {
         if let Some(s) = s.as_object_mut() {
             s.insert(key, value);
         }
     }
     Ok(())
+}
+
+#[cfg(feature = "schema")]
+trait SchemaExt {
+    fn properties_mut(&mut self) -> Option<&mut serde_json::Map<String, Value>>;
+}
+
+#[cfg(feature = "schema")]
+impl SchemaExt for Schema {
+    fn properties_mut(&mut self) -> Option<&mut serde_json::Map<String, Value>> {
+        self.ensure_object()
+            .entry("properties")
+            .or_insert_with(|| Value::Object(Default::default()))
+            .as_object_mut()
+    }
 }
