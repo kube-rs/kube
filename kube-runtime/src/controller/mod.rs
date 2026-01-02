@@ -41,9 +41,9 @@ pub type RunnerError = runner::Error<reflector::store::WriterDropped>;
 #[derive(Debug, Error)]
 pub enum Error<ReconcilerErr: 'static, QueueErr: 'static> {
     #[error("tried to reconcile object {0} that was not found in local store")]
-    ObjectNotFound(ObjectRef<DynamicObject>),
+    ObjectNotFound(Box<ObjectRef<DynamicObject>>),
     #[error("reconciler for object {1} failed")]
-    ReconcilerFailed(#[source] ReconcilerErr, ObjectRef<DynamicObject>),
+    ReconcilerFailed(#[source] ReconcilerErr, Box<ObjectRef<DynamicObject>>),
     #[error("event queue error")]
     QueueError(#[source] QueueErr),
     #[error("runner error")]
@@ -411,8 +411,10 @@ where
                             .instrument(reconciler_span)
                             .left_future()
                         }
-                        None => std::future::ready(Err(Error::ObjectNotFound(request.obj_ref.erase())))
-                            .right_future(),
+                        None => {
+                            std::future::ready(Err(Error::ObjectNotFound(Box::new(request.obj_ref.erase()))))
+                                .right_future()
+                        }
                     }
                 },
             )
@@ -431,7 +433,7 @@ where
     .and_then(move |(obj_ref, reconciler_result)| async move {
         match reconciler_result {
             Ok(action) => Ok((obj_ref, action)),
-            Err(err) => Err(Error::ReconcilerFailed(err, obj_ref.erase())),
+            Err(err) => Err(Error::ReconcilerFailed(err, Box::new(obj_ref.erase()))),
         }
     })
     .on_complete(async { tracing::debug!("applier terminated") })
