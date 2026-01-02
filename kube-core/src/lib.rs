@@ -71,11 +71,35 @@ pub mod util;
 pub mod watch;
 pub use watch::WatchEvent;
 
-mod error;
-pub use error::ErrorResponse;
-
 mod version;
 pub use version::Version;
 
 pub mod error_boundary;
 pub use error_boundary::DeserializeGuard;
+
+/// This type used to be a payload for `kube::Error::Api`. It has been replaced by `Status`.
+/// In the interest of backward compatibility, we keep this type definition here as a deprecated alias.
+/// `Status` better reflects the Kubernetes API conventions and is more versatile.
+/// If you need to migrate your code, simply replace `ErrorResponse` with `Status` and also check
+/// helper methods implemented on `Status` for easily identifying common error cases.
+///
+/// As a reference below is the original definition of this type:
+///
+/// An error response from the API.
+/// #[derive(Error, Deserialize, Serialize, Debug, Clone, Eq, PartialEq)]
+/// #[error("{message}: {reason}")]
+/// pub struct ErrorResponse {
+///     /// The status
+///     pub status: String,
+///     /// A message about the error
+///     #[serde(default)]
+///     pub message: String,
+///     /// The reason for the error
+///     #[serde(default)]
+///     pub reason: String,
+///     /// The error code
+///     pub code: u16,
+/// }
+///
+#[deprecated(since = "3.0.0", note = "use Status instead")]
+pub type ErrorResponse = Status;

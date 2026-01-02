@@ -2,7 +2,7 @@
 use http::Uri;
 use thiserror::Error;
 
-pub use kube_core::ErrorResponse;
+pub use kube_core::Status;
 
 /// Possible errors from the [`Client`](crate::Client)
 #[cfg_attr(docsrs, doc(cfg(any(feature = "config", feature = "client"))))]
@@ -15,7 +15,7 @@ pub enum Error {
     ///
     /// It's quite common to get a `410 Gone` when the `resourceVersion` is too old.
     #[error("ApiError: {0} ({0:?})")]
-    Api(#[source] ErrorResponse),
+    Api(#[source] Box<Status>),
 
     /// Hyper error
     #[cfg(feature = "client")]

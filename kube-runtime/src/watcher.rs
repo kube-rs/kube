@@ -11,7 +11,7 @@ use kube_client::{
     Api, Error as ClientErr,
     api::{ListParams, Resource, ResourceExt, VersionMatch, WatchEvent, WatchParams},
     core::{ObjectList, Selector, metadata::PartialObjectMeta},
-    error::ErrorResponse,
+    error::Status,
 };
 use serde::de::DeserializeOwned;
 use std::{clone::Clone, collections::VecDeque, fmt::Debug, future, time::Duration};
@@ -25,7 +25,7 @@ pub enum Error {
     #[error("failed to start watching object: {0}")]
     WatchStartFailed(#[source] kube_client::Error),
     #[error("error returned by apiserver during watch: {0}")]
-    WatchError(#[source] ErrorResponse),
+    WatchError(#[source] Box<Status>),
     #[error("watch stream failed: {0}")]
     WatchFailed(#[source] kube_client::Error),
     #[error("no metadata.resourceVersion in watch result (does resource support watch?)")]
@@ -469,7 +469,7 @@ where
             InitialListStrategy::StreamingList => match api.watch(&wc.to_watch_params(), "0").await {
                 Ok(stream) => (None, State::InitialWatch { stream }),
                 Err(err) => {
-                    if std::matches!(err, ClientErr::Api(ErrorResponse { code: 403, .. })) {
+                    if std::matches!(err, ClientErr::Api(ref status) if status.is_forbidden()) {
                         warn!("watch initlist error with 403: {err:?}");
                     } else {
                         debug!("watch initlist error: {err:?}");
@@ -515,7 +515,7 @@ where
                     })
                 }
                 Err(err) => {
-                    if std::matches!(err, ClientErr::Api(ErrorResponse { code: 403, .. })) {
+                    if std::matches!(err, ClientErr::Api(ref status) if status.is_forbidden()) {
                         warn!("watch list error with 403: {err:?}");
                     } else {
                         debug!("watch list error: {err:?}");
@@ -558,10 +558,10 @@ where
                     } else {
                         debug!("error watchevent error: {err:?}");
                     }
-                    (Some(Err(Error::WatchError(err))), new_state)
+                    (Some(Err(Error::WatchError(err.boxed()))), new_state)
                 }
                 Some(Err(err)) => {
-                    if std::matches!(err, ClientErr::Api(ErrorResponse { code: 403, .. })) {
+                    if std::matches!(err, ClientErr::Api(ref status) if status.is_forbidden()) {
                         warn!("watcher error 403: {err:?}");
                     } else {
                         debug!("watcher error: {err:?}");
@@ -578,7 +578,7 @@ where
                     stream,
                 }),
                 Err(err) => {
-                    if std::matches!(err, ClientErr::Api(ErrorResponse { code: 403, .. })) {
+                    if std::matches!(err, ClientErr::Api(ref status) if status.is_forbidden()) {
                         warn!("watch initlist error with 403: {err:?}");
                     } else {
                         debug!("watch initlist error: {err:?}");
@@ -634,10 +634,10 @@ where
                 } else {
                     debug!("error watchevent error: {err:?}");
                 }
-                (Some(Err(Error::WatchError(err))), new_state)
+                (Some(Err(Error::WatchError(err.boxed()))), new_state)
             }
             Some(Err(err)) => {
-                if std::matches!(err, ClientErr::Api(ErrorResponse { code: 403, .. })) {
+                if std::matches!(err, ClientErr::Api(ref status) if status.is_forbidden()) {
                     warn!("watcher error 403: {err:?}");
                 } else {
                     debug!("watcher error: {err:?}");
