@@ -101,5 +101,8 @@ pub use error_boundary::DeserializeGuard;
 ///     pub code: u16,
 /// }
 ///
-#[deprecated(since = "3.0.0", note = "use Status instead")]
+#[deprecated(
+    since = "3.0.0",
+    note = "use kube::core::Status instead. \n\nNote that the Error::Api constructor based pattern matches have been helper functions due to boxing.\n  See Status docs for the new pattern:\n  https://docs.rs/kube/latest/kube/core/struct.Status.html"
+)]
 pub type ErrorResponse = Status;
