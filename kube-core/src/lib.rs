@@ -103,6 +103,6 @@ pub use error_boundary::DeserializeGuard;
 ///
 #[deprecated(
     since = "3.0.0",
-    note = "use kube::core::Status instead. Note that constructor based pattern matches have been updated with helper functions. See Status docs for the new pattern."
+    note = "use kube::core::Status instead. \n\nNote that constructor based pattern matches have been updated with helper functions.\nSee Status docs for the new pattern."
 )]
 pub type ErrorResponse = Status;
