@@ -947,3 +947,31 @@ impl Backoff for DefaultBackoff {
         self.0.reset();
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn to_watch_params_initial_phase_with_streaming_list_sets_send_initial_events() {
+        let config = Config::default().streaming_lists();
+        let params = config.to_watch_params(WatchPhase::Initial);
+        assert!(params.send_initial_events);
+    }
+
+    #[test]
+    fn to_watch_params_resumed_phase_with_streaming_list_does_not_set_send_initial_events() {
+        let config = Config::default().streaming_lists();
+        let params = config.to_watch_params(WatchPhase::Resumed);
+        assert!(!params.send_initial_events);
+    }
+
+    #[test]
+    fn to_watch_params_listwatch_mode_does_not_set_send_initial_events() {
+        let config = Config::default(); // ListWatch mode
+        let params_initial = config.to_watch_params(WatchPhase::Initial);
+        let params_resumed = config.to_watch_params(WatchPhase::Resumed);
+        assert!(!params_initial.send_initial_events);
+        assert!(!params_resumed.send_initial_events);
+    }
+}
