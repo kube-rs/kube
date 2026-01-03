@@ -3,6 +3,24 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 /// A Kubernetes status object
+///
+/// This struct is returned by the Kubernetes API on failures,
+/// and bubbles up to users inside a [`kube::Error::Api`] variant
+/// when client requests fail in [`kube::Client`].
+///
+/// To match on specific error cases, you can;
+///
+/// ```no_compile
+/// match err {
+///     kube::Error::Api(s) if s.is_not_found() => {...},
+/// }
+/// ```
+///
+/// or in a standalone `if` statement with [std::matches];
+///
+/// ```no_compile
+/// if std::matches!(err, kube::Error::Api(s) if s.is_forbidden()) {...}
+/// ```
 #[derive(Serialize, Deserialize, Debug, Default, Clone, PartialEq, Eq, Error)]
 #[error("{message}: {reason}")]
 pub struct Status {
