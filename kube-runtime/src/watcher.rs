@@ -390,15 +390,28 @@ impl Config {
     }
 
     /// Converts generic `watcher::Config` structure to the instance of `WatchParams` used for watch requests.
-    fn to_watch_params(&self) -> WatchParams {
+    fn to_watch_params(&self, phase: WatchPhase) -> WatchParams {
         WatchParams {
             label_selector: self.label_selector.clone(),
             field_selector: self.field_selector.clone(),
             timeout: self.timeout,
             bookmarks: self.bookmarks,
-            send_initial_events: self.initial_list_strategy == InitialListStrategy::StreamingList,
+            send_initial_events: phase == WatchPhase::Initial
+                && self.initial_list_strategy == InitialListStrategy::StreamingList,
         }
     }
+}
+
+/// Distinguishes between initial watch and resumed watch for streaming lists.
+///
+/// This is used to determine whether to set `sendInitialEvents=true` in watch requests.
+/// Only initial watches should request initial events; reconnections should not.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum WatchPhase {
+    /// Initial watch from `State::Empty` - requests initial events for streaming lists
+    Initial,
+    /// Resumed watch from `State::InitListed` - does not request initial events
+    Resumed,
 }
 
 impl<K> ApiMode for FullObject<'_, K>
@@ -466,17 +479,19 @@ where
                 objects: VecDeque::default(),
                 last_bookmark: None,
             }),
-            InitialListStrategy::StreamingList => match api.watch(&wc.to_watch_params(), "0").await {
-                Ok(stream) => (None, State::InitialWatch { stream }),
-                Err(err) => {
-                    if std::matches!(err, ClientErr::Api(ref status) if status.is_forbidden()) {
-                        warn!("watch initlist error with 403: {err:?}");
-                    } else {
-                        debug!("watch initlist error: {err:?}");
+            InitialListStrategy::StreamingList => {
+                match api.watch(&wc.to_watch_params(WatchPhase::Initial), "0").await {
+                    Ok(stream) => (None, State::InitialWatch { stream }),
+                    Err(err) => {
+                        if std::matches!(err, ClientErr::Api(ref status) if status.is_forbidden()) {
+                            warn!("watch initlist error with 403: {err:?}");
+                        } else {
+                            debug!("watch initlist error: {err:?}");
+                        }
+                        (Some(Err(Error::WatchStartFailed(err))), State::default())
                     }
-                    (Some(Err(Error::WatchStartFailed(err))), State::default())
                 }
-            },
+            }
         },
         State::InitPage {
             continue_token,
@@ -572,7 +587,10 @@ where
             }
         }
         State::InitListed { resource_version } => {
-            match api.watch(&wc.to_watch_params(), &resource_version).await {
+            match api
+                .watch(&wc.to_watch_params(WatchPhase::Resumed), &resource_version)
+                .await
+            {
                 Ok(stream) => (None, State::Watching {
                     resource_version,
                     stream,
