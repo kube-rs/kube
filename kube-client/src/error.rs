@@ -3,7 +3,7 @@ use http::Uri;
 use thiserror::Error;
 
 #[allow(deprecated)] pub use kube_core::ErrorResponse;
-use kube_core::Status;
+pub use kube_core::Status;
 
 /// Possible errors from the [`Client`](crate::Client)
 #[cfg_attr(docsrs, doc(cfg(any(feature = "config", feature = "client"))))]
