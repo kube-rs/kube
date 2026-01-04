@@ -81,19 +81,25 @@ where
     }
 
     /// Create an instance of the subresource
-    pub async fn create_subresource<T>(
+    pub async fn create_subresource<I, T>(
         &self,
         subresource_name: &str,
         name: &str,
         pp: &PostParams,
-        data: Vec<u8>,
+        data: &I,
     ) -> Result<T>
     where
+        I: Serialize,
         T: DeserializeOwned,
     {
         let mut req = self
             .request
-            .create_subresource(subresource_name, name, pp, data)
+            .create_subresource(
+                subresource_name,
+                name,
+                pp,
+                serde_json::to_vec(data).map_err(Error::SerdeError)?,
+            )
             .map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("create_subresource");
         self.client.request::<T>(req).await
