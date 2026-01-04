@@ -500,14 +500,22 @@ where
     /// let mut o = jobs.get_status("baz").await?; // retrieve partial object
     /// o.status = Some(JobStatus::default()); // update the job part
     /// let pp = PostParams::default();
-    /// let o = jobs.replace_status("baz", &pp, serde_json::to_vec(&o)?).await?;
+    /// let o = jobs.replace_status("baz", &pp, &o).await?;
     /// #    Ok(())
     /// # }
     /// ```
-    pub async fn replace_status(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<K> {
+    pub async fn replace_status(&self, name: &str, pp: &PostParams, data: &K) -> Result<K>
+    where
+        K: Serialize,
+    {
         let mut req = self
             .request
-            .replace_subresource("status", name, pp, data)
+            .replace_subresource(
+                "status",
+                name,
+                pp,
+                serde_json::to_vec(data).map_err(Error::SerdeError)?,
+            )
             .map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("replace_status");
         self.client.request::<K>(req).await
