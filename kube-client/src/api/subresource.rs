@@ -50,10 +50,15 @@ where
     }
 
     /// Replace the scale subresource
-    pub async fn replace_scale(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<Scale> {
+    pub async fn replace_scale(&self, name: &str, pp: &PostParams, data: &Scale) -> Result<Scale> {
         let mut req = self
             .request
-            .replace_subresource("scale", name, pp, data)
+            .replace_subresource(
+                "scale",
+                name,
+                pp,
+                serde_json::to_vec(data).map_err(Error::SerdeError)?,
+            )
             .map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("replace_scale");
         self.client.request::<Scale>(req).await
