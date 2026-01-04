@@ -122,16 +122,24 @@ where
     }
 
     /// Replace an instance of the subresource
-    pub async fn replace_subresource(
+    pub async fn replace_subresource<I>(
         &self,
         subresource_name: &str,
         name: &str,
         pp: &PostParams,
-        data: Vec<u8>,
-    ) -> Result<K> {
+        data: &I,
+    ) -> Result<K>
+    where
+        I: Serialize,
+    {
         let mut req = self
             .request
-            .replace_subresource(subresource_name, name, pp, data)
+            .replace_subresource(
+                subresource_name,
+                name,
+                pp,
+                serde_json::to_vec(data).map_err(Error::SerdeError)?,
+            )
             .map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("replace_subresource");
         self.client.request::<K>(req).await
