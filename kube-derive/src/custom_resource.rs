@@ -836,6 +836,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
                 .with_transform(#schemars::transform::AddNullable::default())
                 .with_transform(#kube_core::schema::StructuralSchemaRewriter)
                 .with_transform(#kube_core::schema::OptionalEnum)
+                .with_transform(#kube_core::schema::OptionalIntOrString)
                 .into_generator();
             let schema = generate.into_root_schema_for::<Self>();
         }

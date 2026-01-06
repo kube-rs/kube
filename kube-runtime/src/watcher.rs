@@ -11,7 +11,7 @@ use kube_client::{
     Api, Error as ClientErr,
     api::{ListParams, Resource, ResourceExt, VersionMatch, WatchEvent, WatchParams},
     core::{ObjectList, Selector, metadata::PartialObjectMeta},
-    error::ErrorResponse,
+    error::Status,
 };
 use serde::de::DeserializeOwned;
 use std::{clone::Clone, collections::VecDeque, fmt::Debug, future, time::Duration};
@@ -25,7 +25,7 @@ pub enum Error {
     #[error("failed to start watching object: {0}")]
     WatchStartFailed(#[source] kube_client::Error),
     #[error("error returned by apiserver during watch: {0}")]
-    WatchError(#[source] ErrorResponse),
+    WatchError(#[source] Box<Status>),
     #[error("watch stream failed: {0}")]
     WatchFailed(#[source] kube_client::Error),
     #[error("no metadata.resourceVersion in watch result (does resource support watch?)")]
@@ -390,15 +390,28 @@ impl Config {
     }
 
     /// Converts generic `watcher::Config` structure to the instance of `WatchParams` used for watch requests.
-    fn to_watch_params(&self) -> WatchParams {
+    fn to_watch_params(&self, phase: WatchPhase) -> WatchParams {
         WatchParams {
             label_selector: self.label_selector.clone(),
             field_selector: self.field_selector.clone(),
             timeout: self.timeout,
             bookmarks: self.bookmarks,
-            send_initial_events: self.initial_list_strategy == InitialListStrategy::StreamingList,
+            send_initial_events: phase == WatchPhase::Initial
+                && self.initial_list_strategy == InitialListStrategy::StreamingList,
         }
     }
+}
+
+/// Distinguishes between initial watch and resumed watch for streaming lists.
+///
+/// This is used to determine whether to set `sendInitialEvents=true` in watch requests.
+/// Only initial watches should request initial events; reconnections should not.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum WatchPhase {
+    /// Initial watch from `State::Empty` - requests initial events for streaming lists
+    Initial,
+    /// Resumed watch from `State::InitListed` - does not request initial events
+    Resumed,
 }
 
 impl<K> ApiMode for FullObject<'_, K>
@@ -466,17 +479,19 @@ where
                 objects: VecDeque::default(),
                 last_bookmark: None,
             }),
-            InitialListStrategy::StreamingList => match api.watch(&wc.to_watch_params(), "0").await {
-                Ok(stream) => (None, State::InitialWatch { stream }),
-                Err(err) => {
-                    if std::matches!(err, ClientErr::Api(ErrorResponse { code: 403, .. })) {
-                        warn!("watch initlist error with 403: {err:?}");
-                    } else {
-                        debug!("watch initlist error: {err:?}");
+            InitialListStrategy::StreamingList => {
+                match api.watch(&wc.to_watch_params(WatchPhase::Initial), "0").await {
+                    Ok(stream) => (None, State::InitialWatch { stream }),
+                    Err(err) => {
+                        if std::matches!(err, ClientErr::Api(ref status) if status.is_forbidden()) {
+                            warn!("watch initlist error with 403: {err:?}");
+                        } else {
+                            debug!("watch initlist error: {err:?}");
+                        }
+                        (Some(Err(Error::WatchStartFailed(err))), State::default())
                     }
-                    (Some(Err(Error::WatchStartFailed(err))), State::default())
                 }
-            },
+            }
         },
         State::InitPage {
             continue_token,
@@ -515,7 +530,7 @@ where
                     })
                 }
                 Err(err) => {
-                    if std::matches!(err, ClientErr::Api(ErrorResponse { code: 403, .. })) {
+                    if std::matches!(err, ClientErr::Api(ref status) if status.is_forbidden()) {
                         warn!("watch list error with 403: {err:?}");
                     } else {
                         debug!("watch list error: {err:?}");
@@ -558,10 +573,10 @@ where
                     } else {
                         debug!("error watchevent error: {err:?}");
                     }
-                    (Some(Err(Error::WatchError(err))), new_state)
+                    (Some(Err(Error::WatchError(err.boxed()))), new_state)
                 }
                 Some(Err(err)) => {
-                    if std::matches!(err, ClientErr::Api(ErrorResponse { code: 403, .. })) {
+                    if std::matches!(err, ClientErr::Api(ref status) if status.is_forbidden()) {
                         warn!("watcher error 403: {err:?}");
                     } else {
                         debug!("watcher error: {err:?}");
@@ -572,13 +587,16 @@ where
             }
         }
         State::InitListed { resource_version } => {
-            match api.watch(&wc.to_watch_params(), &resource_version).await {
+            match api
+                .watch(&wc.to_watch_params(WatchPhase::Resumed), &resource_version)
+                .await
+            {
                 Ok(stream) => (None, State::Watching {
                     resource_version,
                     stream,
                 }),
                 Err(err) => {
-                    if std::matches!(err, ClientErr::Api(ErrorResponse { code: 403, .. })) {
+                    if std::matches!(err, ClientErr::Api(ref status) if status.is_forbidden()) {
                         warn!("watch initlist error with 403: {err:?}");
                     } else {
                         debug!("watch initlist error: {err:?}");
@@ -634,10 +652,10 @@ where
                 } else {
                     debug!("error watchevent error: {err:?}");
                 }
-                (Some(Err(Error::WatchError(err))), new_state)
+                (Some(Err(Error::WatchError(err.boxed()))), new_state)
             }
             Some(Err(err)) => {
-                if std::matches!(err, ClientErr::Api(ErrorResponse { code: 403, .. })) {
+                if std::matches!(err, ClientErr::Api(ref status) if status.is_forbidden()) {
                     warn!("watcher error 403: {err:?}");
                 } else {
                     debug!("watcher error: {err:?}");
@@ -927,5 +945,33 @@ impl Iterator for DefaultBackoff {
 impl Backoff for DefaultBackoff {
     fn reset(&mut self) {
         self.0.reset();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn to_watch_params_initial_phase_with_streaming_list_sets_send_initial_events() {
+        let config = Config::default().streaming_lists();
+        let params = config.to_watch_params(WatchPhase::Initial);
+        assert!(params.send_initial_events);
+    }
+
+    #[test]
+    fn to_watch_params_resumed_phase_with_streaming_list_does_not_set_send_initial_events() {
+        let config = Config::default().streaming_lists();
+        let params = config.to_watch_params(WatchPhase::Resumed);
+        assert!(!params.send_initial_events);
+    }
+
+    #[test]
+    fn to_watch_params_listwatch_mode_does_not_set_send_initial_events() {
+        let config = Config::default(); // ListWatch mode
+        let params_initial = config.to_watch_params(WatchPhase::Initial);
+        let params_resumed = config.to_watch_params(WatchPhase::Resumed);
+        assert!(!params_initial.send_initial_events);
+        assert!(!params_resumed.send_initial_events);
     }
 }

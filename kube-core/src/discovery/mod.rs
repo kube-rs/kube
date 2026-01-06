@@ -1,5 +1,7 @@
 //! Type information structs for API discovery
 use crate::{gvk::GroupVersionKind, resource::Resource};
+
+pub mod v2;
 use serde::{Deserialize, Serialize};
 
 /// Information about a Kubernetes API resource

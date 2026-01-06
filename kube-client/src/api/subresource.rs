@@ -50,10 +50,15 @@ where
     }
 
     /// Replace the scale subresource
-    pub async fn replace_scale(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<Scale> {
+    pub async fn replace_scale(&self, name: &str, pp: &PostParams, data: &Scale) -> Result<Scale> {
         let mut req = self
             .request
-            .replace_subresource("scale", name, pp, data)
+            .replace_subresource(
+                "scale",
+                name,
+                pp,
+                serde_json::to_vec(data).map_err(Error::SerdeError)?,
+            )
             .map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("replace_scale");
         self.client.request::<Scale>(req).await
@@ -76,19 +81,25 @@ where
     }
 
     /// Create an instance of the subresource
-    pub async fn create_subresource<T>(
+    pub async fn create_subresource<I, T>(
         &self,
         subresource_name: &str,
         name: &str,
         pp: &PostParams,
-        data: Vec<u8>,
+        data: &I,
     ) -> Result<T>
     where
+        I: Serialize,
         T: DeserializeOwned,
     {
         let mut req = self
             .request
-            .create_subresource(subresource_name, name, pp, data)
+            .create_subresource(
+                subresource_name,
+                name,
+                pp,
+                serde_json::to_vec(data).map_err(Error::SerdeError)?,
+            )
             .map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("create_subresource");
         self.client.request::<T>(req).await
@@ -111,16 +122,24 @@ where
     }
 
     /// Replace an instance of the subresource
-    pub async fn replace_subresource(
+    pub async fn replace_subresource<I>(
         &self,
         subresource_name: &str,
         name: &str,
         pp: &PostParams,
-        data: Vec<u8>,
-    ) -> Result<K> {
+        data: &I,
+    ) -> Result<K>
+    where
+        I: Serialize,
+    {
         let mut req = self
             .request
-            .replace_subresource(subresource_name, name, pp, data)
+            .replace_subresource(
+                subresource_name,
+                name,
+                pp,
+                serde_json::to_vec(data).map_err(Error::SerdeError)?,
+            )
             .map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("replace_subresource");
         self.client.request::<K>(req).await
@@ -500,14 +519,22 @@ where
     /// let mut o = jobs.get_status("baz").await?; // retrieve partial object
     /// o.status = Some(JobStatus::default()); // update the job part
     /// let pp = PostParams::default();
-    /// let o = jobs.replace_status("baz", &pp, serde_json::to_vec(&o)?).await?;
+    /// let o = jobs.replace_status("baz", &pp, &o).await?;
     /// #    Ok(())
     /// # }
     /// ```
-    pub async fn replace_status(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<K> {
+    pub async fn replace_status(&self, name: &str, pp: &PostParams, data: &K) -> Result<K>
+    where
+        K: Serialize,
+    {
         let mut req = self
             .request
-            .replace_subresource("status", name, pp, data)
+            .replace_subresource(
+                "status",
+                name,
+                pp,
+                serde_json::to_vec(data).map_err(Error::SerdeError)?,
+            )
             .map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("replace_status");
         self.client.request::<K>(req).await
