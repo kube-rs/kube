@@ -14,7 +14,7 @@ use http_body_util::BodyExt;
 #[cfg(feature = "ws")] use hyper_util::rt::TokioIo;
 use jiff::Timestamp;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1 as k8s_meta_v1;
-use kube_core::response::Status;
+use kube_core::{discovery::v2::ACCEPT_AGGREGATED_DISCOVERY_V2, response::Status};
 use serde::de::DeserializeOwned;
 use serde_json::{self, Value};
 #[cfg(feature = "ws")]
@@ -477,10 +477,6 @@ impl Client {
         .await
     }
 }
-
-/// Content negotiation Accept header for Aggregated Discovery API v2
-const ACCEPT_AGGREGATED_DISCOVERY_V2: &str =
-    "application/json;g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList";
 
 /// Aggregated Discovery API methods
 ///
