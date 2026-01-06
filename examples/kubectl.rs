@@ -203,7 +203,7 @@ async fn main() -> Result<()> {
     let client = Client::try_from(kubeconfig)?;
 
     // discovery (to be able to infer apis from kind/plural only)
-    let discovery = Discovery::new(client.clone()).run().await?;
+    let discovery = Discovery::new(client.clone()).run_aggregated().await?;
 
     // Defer to methods for verbs
     if let Some(resource) = &app.resource {

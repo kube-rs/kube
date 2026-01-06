@@ -1,4 +1,4 @@
-use axum::{Json, Router, response::IntoResponse, routing::post};
+use axum::{Json, Router, routing::post};
 use axum_server::tls_rustls::RustlsConfig;
 use json_patch::jsonptr::PointerBuf;
 use kube::core::{
