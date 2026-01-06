@@ -9,7 +9,6 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
-
 // See `crd_derive_schema` example for how the schema generated from this struct affects defaulting and validation.
 #[derive(CustomResource, Serialize, Deserialize, Debug, PartialEq, Clone, KubeSchema)]
 #[kube(
@@ -488,4 +487,40 @@ fn flattening() {
         .unwrap()["spec"];
     assert_eq!(spec.x_kubernetes_preserve_unknown_fields, Some(true));
     assert_eq!(spec.additional_properties, None);
+}
+
+// Test for Option<IntOrString> nullable handling (issue #1869)
+#[derive(CustomResource, Deserialize, Serialize, Clone, Debug, JsonSchema)]
+#[kube(group = "clux.dev", version = "v1", kind = "IntOrStringTest")]
+pub struct IntOrStringTestSpec {
+    pub required_int_or_string: k8s_openapi::apimachinery::pkg::util::intstr::IntOrString,
+    pub optional_int_or_string: Option<k8s_openapi::apimachinery::pkg::util::intstr::IntOrString>,
+}
+
+#[test]
+fn test_optional_int_or_string_nullable() {
+    use kube::core::CustomResourceExt;
+    let crd = IntOrStringTest::crd();
+    let spec_schema = &crd.spec.versions[0]
+        .schema
+        .as_ref()
+        .unwrap()
+        .open_api_v3_schema
+        .as_ref()
+        .unwrap()
+        .properties
+        .as_ref()
+        .unwrap()["spec"];
+
+    let properties = spec_schema.properties.as_ref().unwrap();
+
+    // Required field should have x-kubernetes-int-or-string but not nullable
+    let required = &properties["required_int_or_string"];
+    assert_eq!(required.x_kubernetes_int_or_string, Some(true));
+    assert_eq!(required.nullable, None);
+
+    // Optional field should have both x-kubernetes-int-or-string and nullable
+    let optional = &properties["optional_int_or_string"];
+    assert_eq!(optional.x_kubernetes_int_or_string, Some(true));
+    assert_eq!(optional.nullable, Some(true));
 }
