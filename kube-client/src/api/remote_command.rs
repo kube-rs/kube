@@ -1,3 +1,6 @@
+use std::time::Duration;
+
+use bytes::Bytes;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::Status;
 
 use futures::{
@@ -8,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::{
     io::{AsyncRead, AsyncWrite, AsyncWriteExt, DuplexStream},
-    select,
+    select, time,
 };
 use tokio_tungstenite::tungstenite as ws;
 
@@ -63,6 +66,10 @@ pub enum Error {
     /// Failed to send close message.
     #[error("failed to send a WebSocket close message: {0}")]
     SendClose(#[source] ws::Error),
+
+    /// Failed to send ping message.
+    #[error("failed to send a WebSocket ping message: {0}")]
+    SendPing(#[source] ws::Error),
 
     /// Failed to deserialize status object
     #[error("failed to deserialize status object: {0}")]
@@ -283,6 +290,10 @@ async fn start_message_loop(
     // True until we reach EOF for stdin.
     let mut stdin_is_open = true;
 
+    let mut ping_interval = time::interval(Duration::from_secs(60));
+    ping_interval.set_missed_tick_behavior(time::MissedTickBehavior::Delay);
+    ping_interval.reset();
+
     loop {
         let terminal_size_next = async {
             match terminal_size_rx.as_mut() {
@@ -290,7 +301,16 @@ async fn start_message_loop(
                 None => None,
             }
         };
+
         select! {
+            _ = ping_interval.tick() => {
+                // send a ping to keep an idle connection alive
+                server_send
+                    .send(ws::Message::Ping(Bytes::new()))
+                    .await
+                    .map_err(Error::SendPing)?;
+            },
+
             server_message = server_recv.next() => {
                 match server_message {
                     Some(Ok(Message::Stdout(bin))) => {
