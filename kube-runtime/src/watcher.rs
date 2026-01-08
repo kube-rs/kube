@@ -684,12 +684,12 @@ where
 /// Direct users may want to use [`WatchStreamExt`] for higher-level constructs.
 ///
 /// ```
-/// # use kube::{
-/// #   api::{Api, ResourceExt}, Client,
-/// # runtime::{watcher, WatchStreamExt}
-/// # };
-/// # use k8s_openapi::api::core::v1::Pod;
-/// # use futures::TryStreamExt;
+/// use kube::{
+///   api::{Api, ResourceExt}, Client,
+///   runtime::{watcher, WatchStreamExt}
+/// };
+/// use k8s_openapi::api::core::v1::Pod;
+/// use futures::TryStreamExt;
 /// 
 /// # async fn wrapper() -> Result<(), watcher::Error> {
 /// #   let client: Client = todo!();
@@ -748,12 +748,12 @@ pub fn watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
 /// Direct users may want to use [`WatchStreamExt`] for higher-level constructs.
 ///
 /// ```
-/// # use kube::{
-/// # api::{Api, ResourceExt}, Client,
-/// # runtime::{watcher, metadata_watcher, WatchStreamExt}
-/// # };
-/// # use k8s_openapi::api::core::v1::Pod;
-/// # use futures::TryStreamExt;
+/// use kube::{
+///   api::{Api, ResourceExt}, Client,
+///   runtime::{watcher, metadata_watcher, WatchStreamExt}
+/// };
+/// use k8s_openapi::api::core::v1::Pod;
+/// use futures::TryStreamExt;
 /// 
 /// # async fn wrapper() -> Result<(), watcher::Error> {
 /// #   let client: Client = todo!(); 
