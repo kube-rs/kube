@@ -690,7 +690,7 @@ where
 /// };
 /// use k8s_openapi::api::core::v1::Pod;
 /// use futures::TryStreamExt;
-/// 
+///
 /// # async fn wrapper() -> Result<(), watcher::Error> {
 /// #   let client: Client = todo!();
 /// let pods: Api<Pod> = Api::namespaced(client, "apps");
@@ -754,9 +754,9 @@ pub fn watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
 /// };
 /// use k8s_openapi::api::core::v1::Pod;
 /// use futures::TryStreamExt;
-/// 
+///
 /// # async fn wrapper() -> Result<(), watcher::Error> {
-/// #   let client: Client = todo!(); 
+/// #   let client: Client = todo!();
 /// let pods: Api<Pod> = Api::namespaced(client, "apps");
 ///
 /// metadata_watcher(pods, watcher::Config::default()).applied_objects()
