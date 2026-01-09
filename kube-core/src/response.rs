@@ -21,7 +21,7 @@ use thiserror::Error;
 /// ```no_compile
 /// if std::matches!(err, kube::Error::Api(s) if s.is_forbidden()) {...}
 /// ```
-#[derive(Serialize, Deserialize, Debug, Default, Clone, PartialEq, Eq, Error)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone, PartialEq, Error)]
 #[error("{message}: {reason}")]
 pub struct Status {
     /// Status of the operation
@@ -37,6 +37,10 @@ pub struct Status {
     /// A human-readable  description of the status of this operation
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub message: String,
+
+    /// Standard list metadata - [more info](https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<k8s_openapi::apimachinery::pkg::apis::meta::v1::ListMeta>,
 
     /// A machine-readable description of why this operation is in the “Failure” status.
     ///
@@ -65,6 +69,7 @@ impl Status {
             status: Some(StatusSummary::Success),
             code: 0,
             message: String::new(),
+            metadata: None,
             reason: String::new(),
             details: None,
         }
@@ -76,6 +81,7 @@ impl Status {
             status: Some(StatusSummary::Failure),
             code: 0,
             message: message.to_string(),
+            metadata: None,
             reason: reason.to_string(),
             details: None,
         }
@@ -514,5 +520,28 @@ mod test {
         assert!(s.is_not_found());
         assert_eq!(s.status.unwrap(), StatusSummary::Failure);
         assert_eq!(s.details.unwrap().name, "foobar-1");
+    }
+
+    #[test]
+    fn expired_with_continue_token() {
+        let status = r#"
+            {
+              "kind": "Status",
+              "apiVersion": "v1",
+              "metadata": {
+                "continue": "<NEW_CONTINUE_TOKEN>"
+              },
+              "status": "Failure",
+              "message": "The provided continue parameter is too old to display a consistent list result.",
+              "reason": "Expired",
+              "code": 410
+            }"#;
+        let s = serde_json::from_str::<Status>(status).unwrap();
+        assert_eq!(s.reason, "Expired");
+        assert_eq!(s.code, 410);
+        assert_eq!(
+            s.metadata.unwrap().continue_.as_deref(),
+            Some("<NEW_CONTINUE_TOKEN>")
+        );
     }
 }

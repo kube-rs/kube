@@ -171,6 +171,7 @@ impl From<ConversionRequest> for ConversionResponse {
                 status: None,
                 code: 0,
                 message: String::new(),
+                metadata: None,
                 reason: String::new(),
                 details: None,
             },
