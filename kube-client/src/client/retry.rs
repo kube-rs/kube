@@ -30,12 +30,24 @@
 //! # }
 //! ```
 
-use std::time::Duration;
+use std::{fmt, time::Duration};
 
 use http::{Request, Response, StatusCode};
 use tower::{BoxError, retry::Policy};
 
 use super::Body;
+
+/// Backoff configuration validation error.
+#[derive(Debug)]
+pub struct InvalidBackoff(&'static str);
+
+impl fmt::Display for InvalidBackoff {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "invalid backoff: {}", self.0)
+    }
+}
+
+impl std::error::Error for InvalidBackoff {}
 
 /// A retry policy for Kubernetes API requests.
 ///
@@ -63,14 +75,27 @@ impl RetryPolicy {
     /// * `min_delay` - Initial delay between retries
     /// * `max_delay` - Maximum delay between retries (cap for exponential growth)
     /// * `max_retries` - Maximum number of retry attempts
-    pub fn new(min_delay: Duration, max_delay: Duration, max_retries: u32) -> Self {
-        Self {
+    ///
+    /// # Errors
+    ///
+    /// Returns [`InvalidBackoff`] if:
+    /// - `min_delay` > `max_delay`
+    /// - `max_delay` is zero
+    pub fn new(min_delay: Duration, max_delay: Duration, max_retries: u32) -> Result<Self, InvalidBackoff> {
+        if min_delay > max_delay {
+            return Err(InvalidBackoff("min_delay must not exceed max_delay"));
+        }
+        if max_delay.is_zero() {
+            return Err(InvalidBackoff("max_delay must be non-zero"));
+        }
+
+        Ok(Self {
             min_delay,
             max_delay,
             max_retries,
             current_attempt: 0,
             current_delay: min_delay,
-        }
+        })
     }
 
     /// Reset the policy state for a new request sequence.
@@ -106,6 +131,7 @@ impl Default for RetryPolicy {
     /// - `max_retries`: 3
     fn default() -> Self {
         Self::new(Duration::from_millis(500), Duration::from_secs(5), 3)
+            .expect("default RetryPolicy parameters are valid")
     }
 }
 
@@ -188,7 +214,7 @@ mod tests {
 
     #[test]
     fn test_exponential_backoff() {
-        let mut policy = RetryPolicy::new(Duration::from_millis(100), Duration::from_secs(1), 5);
+        let mut policy = RetryPolicy::new(Duration::from_millis(100), Duration::from_secs(1), 5).unwrap();
 
         assert_eq!(policy.next_backoff(), Duration::from_millis(100));
         assert_eq!(policy.next_backoff(), Duration::from_millis(200));
@@ -223,5 +249,17 @@ mod tests {
             StatusCode::INTERNAL_SERVER_ERROR
         ));
         assert!(!RetryPolicy::is_retryable_status(StatusCode::NOT_FOUND));
+    }
+
+    #[test]
+    fn test_invalid_min_exceeds_max() {
+        let result = RetryPolicy::new(Duration::from_secs(10), Duration::from_secs(1), 3);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_invalid_zero_max_delay() {
+        let result = RetryPolicy::new(Duration::ZERO, Duration::ZERO, 3);
+        assert!(result.is_err());
     }
 }
