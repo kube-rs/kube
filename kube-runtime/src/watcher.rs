@@ -701,26 +701,26 @@ where
 /// The events are intended to provide a safe input interface for a state store like a [`reflector`].
 /// Direct users may want to use [`WatchStreamExt`] for higher-level constructs.
 ///
-/// ```no_run
+/// ```
 /// use kube::{
 ///   api::{Api, ResourceExt}, Client,
 ///   runtime::{watcher, WatchStreamExt}
 /// };
 /// use k8s_openapi::api::core::v1::Pod;
 /// use futures::TryStreamExt;
-/// #[tokio::main]
-/// async fn main() -> Result<(), watcher::Error> {
-///     let client = Client::try_default().await.unwrap();
-///     let pods: Api<Pod> = Api::namespaced(client, "apps");
 ///
-///     watcher(pods, watcher::Config::default()).applied_objects()
-///         .try_for_each(|p| async move {
-///          println!("Applied: {}", p.name_any());
-///             Ok(())
-///         })
-///         .await?;
-///     Ok(())
-/// }
+/// # async fn wrapper() -> Result<(), watcher::Error> {
+/// #   let client: Client = todo!();
+/// let pods: Api<Pod> = Api::namespaced(client, "apps");
+///
+/// watcher(pods, watcher::Config::default()).applied_objects()
+///     .try_for_each(|p| async move {
+///         println!("Applied: {}", p.name_any());
+///        Ok(())
+///     })
+///     .await?;
+/// # Ok(())
+/// # }
 /// ```
 /// [`WatchStreamExt`]: super::WatchStreamExt
 /// [`reflector`]: super::reflector::reflector
@@ -765,26 +765,26 @@ pub fn watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
 /// The events are intended to provide a safe input interface for a state store like a [`reflector`].
 /// Direct users may want to use [`WatchStreamExt`] for higher-level constructs.
 ///
-/// ```no_run
+/// ```
 /// use kube::{
 ///   api::{Api, ResourceExt}, Client,
 ///   runtime::{watcher, metadata_watcher, WatchStreamExt}
 /// };
 /// use k8s_openapi::api::core::v1::Pod;
 /// use futures::TryStreamExt;
-/// #[tokio::main]
-/// async fn main() -> Result<(), watcher::Error> {
-///     let client = Client::try_default().await.unwrap();
-///     let pods: Api<Pod> = Api::namespaced(client, "apps");
 ///
-///     metadata_watcher(pods, watcher::Config::default()).applied_objects()
+/// # async fn wrapper() -> Result<(), watcher::Error> {
+/// #   let client: Client = todo!();
+/// let pods: Api<Pod> = Api::namespaced(client, "apps");
+///
+/// metadata_watcher(pods, watcher::Config::default()).applied_objects()
 ///         .try_for_each(|p| async move {
 ///          println!("Applied: {}", p.name_any());
 ///             Ok(())
 ///         })
 ///         .await?;
-///     Ok(())
-/// }
+/// #   Ok(())
+/// # }
 /// ```
 /// [`WatchStreamExt`]: super::WatchStreamExt
 /// [`reflector`]: super::reflector::reflector
