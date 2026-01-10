@@ -33,15 +33,19 @@
 use std::time::Duration;
 
 use http::{Request, Response, StatusCode};
-use thiserror::Error;
-use tower::{BoxError, retry::Policy};
+use tower::{
+    BoxError,
+    retry::{
+        Policy,
+        backoff::{Backoff, ExponentialBackoff, ExponentialBackoffMaker, MakeBackoff},
+    },
+    util::rng::HasherRng,
+};
 
 use super::Body;
 
 /// Backoff configuration validation error.
-#[derive(Debug, Error)]
-#[error("invalid backoff: {0}")]
-pub struct InvalidBackoff(&'static str);
+pub use tower::retry::backoff::InvalidBackoff;
 
 /// A retry policy for Kubernetes API requests.
 ///
@@ -54,11 +58,9 @@ pub struct InvalidBackoff(&'static str);
 /// with a configurable maximum number of retries.
 #[derive(Clone)]
 pub struct RetryPolicy {
-    min_delay: Duration,
-    max_delay: Duration,
-    max_retries: u32,
+    backoff: ExponentialBackoff,
     current_attempt: u32,
-    current_delay: Duration,
+    max_retries: u32,
 }
 
 impl RetryPolicy {
@@ -72,39 +74,16 @@ impl RetryPolicy {
     ///
     /// # Errors
     ///
-    /// Returns [`InvalidBackoff`] if:
-    /// - `min_delay` > `max_delay`
-    /// - `max_delay` is zero
+    /// Returns [`InvalidBackoff`] if the backoff parameters are invalid.
     pub fn new(min_delay: Duration, max_delay: Duration, max_retries: u32) -> Result<Self, InvalidBackoff> {
-        if min_delay > max_delay {
-            return Err(InvalidBackoff("min_delay must not exceed max_delay"));
-        }
-        if max_delay.is_zero() {
-            return Err(InvalidBackoff("max_delay must be non-zero"));
-        }
+        let backoff =
+            ExponentialBackoffMaker::new(min_delay, max_delay, 2.0, HasherRng::new())?.make_backoff();
 
         Ok(Self {
-            min_delay,
-            max_delay,
-            max_retries,
+            backoff,
             current_attempt: 0,
-            current_delay: min_delay,
+            max_retries,
         })
-    }
-
-    /// Reset the policy state for a new request sequence.
-    fn reset(&mut self) {
-        self.current_attempt = 0;
-        self.current_delay = self.min_delay;
-    }
-
-    /// Advance to the next retry attempt, returning the delay to wait.
-    fn next_backoff(&mut self) -> Duration {
-        let delay = self.current_delay;
-        // Exponential backoff: double the delay, capped at max_delay
-        self.current_delay = std::cmp::min(self.current_delay * 2, self.max_delay);
-        self.current_attempt += 1;
-        delay
     }
 
     /// Check if the status code is retryable.
@@ -138,37 +117,14 @@ impl<Res> Policy<Request<Body>, Response<Res>, BoxError> for RetryPolicy {
         result: &mut Result<Response<Res>, BoxError>,
     ) -> Option<Self::Future> {
         match result {
-            Ok(response) if Self::is_retryable_status(response.status()) => {
-                if self.current_attempt < self.max_retries {
-                    let delay = self.next_backoff();
-                    tracing::debug!(
-                        status = %response.status(),
-                        attempt = self.current_attempt,
-                        delay_ms = delay.as_millis(),
-                        "Retrying request"
-                    );
-                    Some(tokio::time::sleep(delay))
-                } else {
-                    tracing::debug!(
-                        status = %response.status(),
-                        attempts = self.current_attempt,
-                        "Max retries exceeded"
-                    );
-                    self.reset();
-                    None
-                }
+            Ok(response)
+                if Self::is_retryable_status(response.status())
+                    && self.current_attempt < self.max_retries =>
+            {
+                self.current_attempt += 1;
+                Some(self.backoff.next_backoff())
             }
-            Ok(_) => {
-                // Successful response, reset for next request
-                self.reset();
-                None
-            }
-            Err(err) => {
-                // Don't retry on errors - they might not be idempotent
-                tracing::debug!(error = %err, "Request failed with error, not retrying");
-                self.reset();
-                None
-            }
+            _ => None,
         }
     }
 
@@ -201,34 +157,7 @@ mod tests {
     #[test]
     fn test_default_policy() {
         let policy = RetryPolicy::default();
-        assert_eq!(policy.min_delay, Duration::from_millis(500));
-        assert_eq!(policy.max_delay, Duration::from_secs(5));
         assert_eq!(policy.max_retries, 3);
-    }
-
-    #[test]
-    fn test_exponential_backoff() {
-        let mut policy = RetryPolicy::new(Duration::from_millis(100), Duration::from_secs(1), 5).unwrap();
-
-        assert_eq!(policy.next_backoff(), Duration::from_millis(100));
-        assert_eq!(policy.next_backoff(), Duration::from_millis(200));
-        assert_eq!(policy.next_backoff(), Duration::from_millis(400));
-        assert_eq!(policy.next_backoff(), Duration::from_millis(800));
-        // Capped at max_delay
-        assert_eq!(policy.next_backoff(), Duration::from_secs(1));
-        assert_eq!(policy.next_backoff(), Duration::from_secs(1));
-    }
-
-    #[test]
-    fn test_reset() {
-        let mut policy = RetryPolicy::default();
-        policy.next_backoff();
-        policy.next_backoff();
-        assert_eq!(policy.current_attempt, 2);
-
-        policy.reset();
-        assert_eq!(policy.current_attempt, 0);
-        assert_eq!(policy.current_delay, policy.min_delay);
     }
 
     #[test]
@@ -246,14 +175,8 @@ mod tests {
     }
 
     #[test]
-    fn test_invalid_min_exceeds_max() {
+    fn test_invalid_backoff() {
         let result = RetryPolicy::new(Duration::from_secs(10), Duration::from_secs(1), 3);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_invalid_zero_max_delay() {
-        let result = RetryPolicy::new(Duration::ZERO, Duration::ZERO, 3);
         assert!(result.is_err());
     }
 }
