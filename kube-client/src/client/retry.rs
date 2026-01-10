@@ -30,24 +30,18 @@
 //! # }
 //! ```
 
-use std::{fmt, time::Duration};
+use std::time::Duration;
 
 use http::{Request, Response, StatusCode};
+use thiserror::Error;
 use tower::{BoxError, retry::Policy};
 
 use super::Body;
 
 /// Backoff configuration validation error.
-#[derive(Debug)]
+#[derive(Debug, Error)]
+#[error("invalid backoff: {0}")]
 pub struct InvalidBackoff(&'static str);
-
-impl fmt::Display for InvalidBackoff {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "invalid backoff: {}", self.0)
-    }
-}
-
-impl std::error::Error for InvalidBackoff {}
 
 /// A retry policy for Kubernetes API requests.
 ///
