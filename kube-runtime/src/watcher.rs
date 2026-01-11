@@ -701,26 +701,26 @@ where
 /// The events are intended to provide a safe input interface for a state store like a [`reflector`].
 /// Direct users may want to use [`WatchStreamExt`] for higher-level constructs.
 ///
-/// ```no_run
+/// ```
 /// use kube::{
 ///   api::{Api, ResourceExt}, Client,
 ///   runtime::{watcher, WatchStreamExt}
 /// };
 /// use k8s_openapi::api::core::v1::Pod;
 /// use futures::TryStreamExt;
-/// #[tokio::main]
-/// async fn main() -> Result<(), watcher::Error> {
-///     let client = Client::try_default().await.unwrap();
-///     let pods: Api<Pod> = Api::namespaced(client, "apps");
 ///
-///     watcher(pods, watcher::Config::default()).applied_objects()
-///         .try_for_each(|p| async move {
-///          println!("Applied: {}", p.name_any());
-///             Ok(())
-///         })
-///         .await?;
-///     Ok(())
-/// }
+/// # async fn wrapper() -> Result<(), watcher::Error> {
+/// #   let client: Client = todo!();
+/// let pods: Api<Pod> = Api::namespaced(client, "apps");
+///
+/// watcher(pods, watcher::Config::default()).applied_objects()
+///     .try_for_each(|p| async move {
+///         println!("Applied: {}", p.name_any());
+///        Ok(())
+///     })
+///     .await?;
+/// # Ok(())
+/// # }
 /// ```
 /// [`WatchStreamExt`]: super::WatchStreamExt
 /// [`reflector`]: super::reflector::reflector
@@ -765,26 +765,26 @@ pub fn watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
 /// The events are intended to provide a safe input interface for a state store like a [`reflector`].
 /// Direct users may want to use [`WatchStreamExt`] for higher-level constructs.
 ///
-/// ```no_run
+/// ```
 /// use kube::{
 ///   api::{Api, ResourceExt}, Client,
 ///   runtime::{watcher, metadata_watcher, WatchStreamExt}
 /// };
 /// use k8s_openapi::api::core::v1::Pod;
 /// use futures::TryStreamExt;
-/// #[tokio::main]
-/// async fn main() -> Result<(), watcher::Error> {
-///     let client = Client::try_default().await.unwrap();
-///     let pods: Api<Pod> = Api::namespaced(client, "apps");
 ///
-///     metadata_watcher(pods, watcher::Config::default()).applied_objects()
+/// # async fn wrapper() -> Result<(), watcher::Error> {
+/// #   let client: Client = todo!();
+/// let pods: Api<Pod> = Api::namespaced(client, "apps");
+///
+/// metadata_watcher(pods, watcher::Config::default()).applied_objects()
 ///         .try_for_each(|p| async move {
 ///          println!("Applied: {}", p.name_any());
 ///             Ok(())
 ///         })
 ///         .await?;
-///     Ok(())
-/// }
+/// #   Ok(())
+/// # }
 /// ```
 /// [`WatchStreamExt`]: super::WatchStreamExt
 /// [`reflector`]: super::reflector::reflector
@@ -878,9 +878,11 @@ impl ExponentialBackoff {
             .with_factor(factor)
             .without_max_times();
 
-        if enable_jitter {
-            builder.with_jitter();
-        }
+        let builder = if enable_jitter {
+            builder.with_jitter()
+        } else {
+            builder
+        };
 
         Self {
             inner: builder.build(),
@@ -973,5 +975,52 @@ mod tests {
         let params_resumed = config.to_watch_params(WatchPhase::Resumed);
         assert!(!params_initial.send_initial_events);
         assert!(!params_resumed.send_initial_events);
+    }
+
+    fn approx_eq(a: Duration, b: Duration) -> bool {
+        let diff = if a > b { a - b } else { b - a };
+        diff < Duration::from_micros(100)
+    }
+
+    #[test]
+    fn exponential_backoff_without_jitter() {
+        let mut backoff =
+            ExponentialBackoff::new(Duration::from_millis(100), Duration::from_secs(1), 2.0, false);
+
+        assert!(approx_eq(backoff.next().unwrap(), Duration::from_millis(100)));
+        assert!(approx_eq(backoff.next().unwrap(), Duration::from_millis(200)));
+        assert!(approx_eq(backoff.next().unwrap(), Duration::from_millis(400)));
+    }
+
+    #[test]
+    fn exponential_backoff_with_jitter_applies_randomness() {
+        let mut backoff =
+            ExponentialBackoff::new(Duration::from_millis(100), Duration::from_secs(1), 2.0, true);
+
+        let delays: Vec<_> = (0..5).filter_map(|_| backoff.next()).collect();
+
+        // All delays should be positive
+        for d in &delays {
+            assert!(*d > Duration::ZERO);
+        }
+
+        // With jitter, at least one delay should differ from exact values
+        let exact_values = [
+            Duration::from_millis(100),
+            Duration::from_millis(200),
+            Duration::from_millis(400),
+            Duration::from_millis(800),
+            Duration::from_secs(1),
+        ];
+
+        let all_exact = delays
+            .iter()
+            .zip(exact_values.iter())
+            .all(|(d, e)| approx_eq(*d, *e));
+
+        assert!(
+            !all_exact,
+            "With jitter enabled, delays should not all match exact exponential values"
+        );
     }
 }
