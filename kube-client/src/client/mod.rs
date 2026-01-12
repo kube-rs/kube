@@ -46,6 +46,7 @@ mod config_ext;
 pub use auth::Error as AuthError;
 pub use config_ext::ConfigExt;
 pub mod middleware;
+pub mod retry;
 
 #[cfg(any(feature = "rustls-tls", feature = "openssl-tls"))] mod tls;
 
