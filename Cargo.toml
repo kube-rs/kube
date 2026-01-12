@@ -58,7 +58,7 @@ hyper-util = "0.1.16"
 jiff = { version = "0.2.16", default-features = false }
 json-patch = "4"
 jsonpath-rust = "1"
-k8s-openapi = { rev="f21871c458ce6bfd7a78d2e07693cadaee0e617e", default-features = false,git="https://github.com/Arnavion/k8s-openapi" }
+k8s-openapi = { version = "0.27.0", default-features = false }
 openssl = "0.10.36"
 parking_lot = "0.12.0"
 pem = "3.0.1"
