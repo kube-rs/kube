@@ -603,9 +603,9 @@ impl Config {
 /// }
 ///
 /// /// something to drive the controller
-/// #[tokio::main]
-/// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-///     let client = Client::try_default().await?;
+/// 
+/// async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
+/// #   let client: Client = todo!(); 
 ///     let context = Arc::new(()); // bad empty context - put client in here
 ///     let cmgs = Api::<ConfigMapGenerator>::all(client.clone());
 ///     let cms = Api::<ConfigMap>::all(client.clone());
@@ -619,8 +619,8 @@ impl Config {
 ///             }
 ///         })
 ///         .await; // controller does nothing unless polled
-///     Ok(())
-/// }
+/// #    Ok(())
+/// # }
 /// ```
 pub struct Controller<K>
 where
