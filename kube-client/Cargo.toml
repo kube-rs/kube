@@ -78,7 +78,7 @@ k8s-openapi= { workspace = true, features = [] }
 
 [dev-dependencies]
 hyper = { workspace = true, features = ["server"] }
-kube = { path = "../kube", features = ["derive", "client", "ws"], version = ">=1" }
+kube = { path = "../kube", features = ["derive", "client", "ws"], version = ">=2" }
 tempfile.workspace = true
 futures = { workspace = true, features = ["async-await"] }
 tokio = { workspace = true, features = ["full"] }
