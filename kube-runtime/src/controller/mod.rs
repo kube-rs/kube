@@ -603,9 +603,9 @@ impl Config {
 /// }
 ///
 /// /// something to drive the controller
-/// 
+///
 /// async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
-/// #   let client: Client = todo!(); 
+/// #   let client: Client = todo!();
 ///     let context = Arc::new(()); // bad empty context - put client in here
 ///     let cmgs = Api::<ConfigMapGenerator>::all(client.clone());
 ///     let cms = Api::<ConfigMap>::all(client.clone());
