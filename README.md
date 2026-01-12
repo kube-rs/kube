@@ -17,7 +17,7 @@ Select a version of `kube` along matching versions of [k8s-openapi](https://gith
 ```toml
 [dependencies]
 kube = { version = "2.0.1", features = ["runtime", "derive"] }
-k8s-openapi = { version = "0.26.0", features = ["latest", "schemars"] }
+k8s-openapi = { version = "0.27.0", features = ["latest", "schemars"] }
 schemars = { version = "1" }
 ```
 
