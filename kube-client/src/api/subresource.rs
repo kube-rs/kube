@@ -578,7 +578,7 @@ where
 
     /// Stream the logs via [`AsyncBufRead`].
     ///
-    /// Log stream can be processsed using [`AsyncReadExt`](futures::AsyncReadExt)
+    /// Log stream can be processed using [`AsyncReadExt`](futures::AsyncReadExt)
     /// and [`AsyncBufReadExt`](futures::AsyncBufReadExt).
     ///
     /// # Example
