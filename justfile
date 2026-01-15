@@ -12,7 +12,7 @@ clippy:
 
 fmt:
   #rustup component add rustfmt --toolchain nightly
-  cargo +nightly fmt
+  cargo +nightly fmt --all
 
 doc:
   RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --all-features --no-deps --open
