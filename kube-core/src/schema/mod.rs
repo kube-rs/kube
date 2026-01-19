@@ -13,9 +13,19 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::{
     collections::{BTreeMap, BTreeSet, btree_map::Entry},
-    ops::DerefMut as _,
     sync::LazyLock,
 };
+
+mod transform_optional_enum;
+pub use transform_optional_enum::OptionalEnum;
+
+/// This is the signature for the `null` variant produced by schemars.
+static NULL_SCHEMA: LazyLock<Value> = LazyLock::new(|| {
+    serde_json::json!({
+        "enum": [null],
+        "nullable": true
+    })
+});
 
 /// schemars [`Visitor`] that rewrites a [`Schema`] to conform to Kubernetes' "structural schema" rules
 ///
@@ -33,42 +43,6 @@ use std::{
 /// there must not be any overlapping properties between `oneOf` branches.
 #[derive(Debug, Clone)]
 pub struct StructuralSchemaRewriter;
-
-/// Recursively restructures JSON Schema objects so that the Option<Enum> object
-/// is returned per k8s CRD schema expectations.
-///
-/// In kube 2.x the schema output behavior for `Option<Enum>` types changed.
-///
-/// Previously given an enum like:
-///
-/// ```rust
-/// enum LogLevel {
-///     Debug,
-///     Info,
-///     Error,
-/// }
-/// ```
-///
-/// The following would be generated for Optional<LogLevel>:
-///
-/// ```json
-/// { "enum": ["Debug", "Info", "Error"], "type": "string", "nullable": true }
-/// ```
-///
-/// Now, schemars generates `anyOf` for `Option<LogLevel>` like:
-///
-/// ```json
-/// {
-///   "anyOf": [
-///     { "enum": ["Debug", "Info", "Error"], "type": "string" },
-///     { "enum": [null], "nullable": true }
-///   ]
-/// }
-/// ```
-///
-/// This transform implementation prevents this specific case from happening.
-#[derive(Debug, Clone, Default)]
-pub struct OptionalEnum;
 
 /// Recursively restructures JSON Schema objects so that the `Option<T>` object
 /// where `T` uses `x-kubernetes-int-or-string` is returned per k8s CRD schema expectations.
@@ -375,221 +349,6 @@ impl Transform for StructuralSchemaRewriter {
         {
             *transform_schema = transformed;
         }
-    }
-}
-
-impl Transform for OptionalEnum {
-    fn transform(&mut self, transform_schema: &mut schemars::Schema) {
-        transform_subschemas(self, transform_schema);
-
-        let Some(mut schema) = serde_json::from_value(transform_schema.clone().to_value()).ok() else {
-            return;
-        };
-
-        hoist_any_of_subschema_with_a_nullable_variant(&mut schema);
-
-        // Convert back to schemars::Schema
-        if let Ok(schema) = serde_json::to_value(schema) {
-            if let Ok(transformed) = serde_json::from_value(schema) {
-                *transform_schema = transformed;
-            }
-        }
-    }
-}
-
-/// This is the signature for the `null` variant produced by schemars.
-static NULL_SCHEMA: LazyLock<Value> = LazyLock::new(|| {
-    serde_json::json!({
-        "enum": [null],
-        "nullable": true
-    })
-});
-
-fn hoist_any_of_subschema_with_a_nullable_variant(kube_schema: &mut SchemaObject) {
-    // Run some initial checks in case there is nothing to do
-    let SchemaObject {
-        subschemas: Some(subschemas),
-        ..
-    } = kube_schema
-    else {
-        return;
-    };
-
-    let SubschemaValidation {
-        any_of: Some(any_of),
-        one_of: None,
-    } = subschemas.deref_mut()
-    else {
-        return;
-    };
-
-    if any_of.len() != 2 {
-        return;
-    }
-
-    let entry_is_null: [bool; 2] = any_of
-        .iter()
-        .map(|schema| serde_json::to_value(schema).expect("schema should be able to convert to JSON"))
-        .map(|value| value == *NULL_SCHEMA)
-        .collect::<Vec<_>>()
-        .try_into()
-        .expect("there should be exactly 2 elements. We checked earlier");
-
-    // Get the `any_of` subschema that isn't the null entry
-    let subschema_to_hoist = match entry_is_null {
-        [true, false] => &any_of[1],
-        [false, true] => &any_of[0],
-        _ => return,
-    };
-
-    // At this point, we can be reasonably sure we need to hoist the non-null
-    // anyOf subschema up to the schema level, and unset the anyOf field.
-    // From here, anything that looks wrong will panic instead of return.
-    // TODO (@NickLarsenNZ): Return errors instead of panicking, leave panicking up to the
-    // infallible schemars::Transform
-    let Schema::Object(to_hoist) = subschema_to_hoist else {
-        panic!("the non-null anyOf subschema is a bool. That is not expected here");
-    };
-
-    let mut to_hoist = to_hoist.clone();
-
-    // Move the metadata into the subschema before hoisting (unless it already has metadata set)
-    to_hoist.metadata = to_hoist.metadata.or_else(|| kube_schema.metadata.take());
-
-    // Replace the schema with the non-null subschema
-    *kube_schema = to_hoist;
-
-    // Set the schema to nullable (as we know we matched the null variant earlier)
-    kube_schema.extensions.insert("nullable".to_owned(), true.into());
-}
-
-#[cfg(test)]
-mod tests {
-    use assert_json_diff::assert_json_eq;
-
-    use super::*;
-
-    #[test]
-    fn optional_tagged_enum_with_unit_variants() {
-        let original_value = serde_json::json!({
-            "anyOf": [
-                {
-                    "description": "A very simple enum with empty variants",
-                    "oneOf": [
-                        {
-                            "type": "string",
-                            "enum": [
-                                "C",
-                                "D"
-                            ]
-                        },
-                        {
-                            "description": "First variant doc-comment",
-                            "type": "string",
-                            "enum": [
-                                "A"
-                            ]
-                        },
-                        {
-                            "description": "Second variant doc-comment",
-                            "type": "string",
-                            "enum": [
-                                "B"
-                            ]
-                        }
-                    ]
-                },
-                {
-                    "enum": [
-                        null
-                    ],
-                    "nullable": true
-                }
-            ]
-        });
-
-        let expected_converted_value = serde_json::json!({
-            "description": "A very simple enum with empty variants",
-            "nullable": true,
-            "oneOf": [
-                {
-                    "type": "string",
-                    "enum": [
-                        "C",
-                        "D"
-                    ]
-                },
-                {
-                    "description": "First variant doc-comment",
-                    "type": "string",
-                    "enum": [
-                    "A"
-                ]
-                },
-                {
-                    "description": "Second variant doc-comment",
-                    "type": "string",
-                    "enum": [
-                        "B"
-                    ]
-                }
-            ]
-        });
-
-        let original: SchemaObject = serde_json::from_value(original_value).expect("valid JSON");
-        let expected_converted: SchemaObject =
-            serde_json::from_value(expected_converted_value).expect("valid JSON");
-
-        let mut actual_converted = original.clone();
-        hoist_any_of_subschema_with_a_nullable_variant(&mut actual_converted);
-
-        assert_json_eq!(actual_converted, expected_converted);
-    }
-
-    #[test]
-    fn optional_tagged_enum_with_unit_variants_but_also_an_existing_description() {
-        let original_value = serde_json::json!({
-            "description": "This comment will be lost",
-            "anyOf": [
-                {
-                    "description": "A very simple enum with empty variants",
-                    "type": "string",
-                    "enum": [
-                        "C",
-                        "D",
-                        "A",
-                        "B"
-                    ]
-                },
-                {
-                    "enum": [
-                        null
-                    ],
-                    "nullable": true
-                }
-            ]
-        });
-
-        let expected_converted_value = serde_json::json!({
-            "description": "A very simple enum with empty variants",
-            "nullable": true,
-            "type": "string",
-            "enum": [
-                "C",
-                "D",
-                "A",
-                "B"
-            ]
-        });
-
-        let original: SchemaObject = serde_json::from_value(original_value).expect("valid JSON");
-        let expected_converted: SchemaObject =
-            serde_json::from_value(expected_converted_value).expect("valid JSON");
-
-        let mut actual_converted = original.clone();
-        hoist_any_of_subschema_with_a_nullable_variant(&mut actual_converted);
-
-        assert_json_eq!(actual_converted, expected_converted);
     }
 }
 
