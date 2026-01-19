@@ -78,6 +78,7 @@ struct FooSpec {
     #[x_kube(merge_strategy = ListMerge::Set)]
     x_kubernetes_set: Vec<String>,
 
+    /// This comment will be present unless the Gender enum has doc-comments
     optional_enum: Option<Gender>,
 }
 
