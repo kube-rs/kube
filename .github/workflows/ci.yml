@@ -167,7 +167,7 @@ jobs:
         run: cargo run -p kube-examples --example crd_derive
 
   mk8sv:
-    # comile check e2e tests against mk8sv
+    # compile check e2e tests against mk8sv
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
