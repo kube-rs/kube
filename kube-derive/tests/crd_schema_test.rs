@@ -416,6 +416,7 @@ fn test_crd_schema_matches_expected() {
                                                 "x-kubernetes-list-type": "set",
                                             },
                                             "optionalEnum": {
+                                                "description": "This comment will be present unless the Gender enum has doc-comments",
                                                 "nullable": true,
                                                 "type": "string",
                                                 "enum": [
