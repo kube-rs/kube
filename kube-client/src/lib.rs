@@ -135,7 +135,6 @@ mod test {
         client::ConfigExt,
     };
     use futures::{AsyncBufRead, AsyncBufReadExt, StreamExt, TryStreamExt};
-    use hyper::Uri;
     use k8s_openapi::api::core::v1::{EphemeralContainer, Pod, PodSpec};
     use kube_core::{
         params::{DeleteParams, Patch, PatchParams, PostParams, WatchParams},
@@ -954,7 +953,7 @@ mod test {
 
         let mut config = Config::infer().await?;
         config.accept_invalid_certs = true;
-        config.cluster_url = "https://localhost:10250".to_string().parse::<Uri>().unwrap();
+        config.cluster_url = "https://localhost:10250".parse().unwrap();
         let kubelet_client: Client = config.try_into()?;
 
         // Verify exec works and we can get the output
