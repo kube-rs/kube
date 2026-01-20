@@ -3,7 +3,6 @@ use k8s_openapi::api::core::v1::Pod;
 use tracing::*;
 
 use futures::AsyncBufReadExt;
-use hyper::Uri;
 use kube::{
     Client, Config,
     api::{Api, DeleteParams, ResourceExt},
@@ -62,7 +61,7 @@ async fn kubelet_log() -> anyhow::Result<()> {
     // and assumes 10250 is a reachable kubelet port (k3d default)
     let mut config = Config::infer().await?;
     config.accept_invalid_certs = true;
-    config.cluster_url = "https://localhost:10250".to_string().parse::<Uri>().unwrap();
+    config.cluster_url = "https://localhost:10250".parse().unwrap();
     let client: Client = config.try_into()?;
 
     // Get logs directly from the node, bypassing the kube-apiserver
