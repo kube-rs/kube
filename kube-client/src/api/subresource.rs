@@ -197,7 +197,7 @@ where
     /// mypod.spec.as_mut().unwrap().ephemeral_containers = Some(serde_json::from_value(serde_json::json!([
     ///    {
     ///        "name": "myephemeralcontainer",
-    ///        "image": "busybox:1.34.1",
+    ///        "image": "busybox:stable",
     ///        "command": ["sh", "-c", "sleep 20"],
     ///    },
     /// ]))?);
@@ -262,7 +262,7 @@ where
     ///    "ephemeralContainers": [
     ///    {
     ///        "name": "myephemeralcontainer",
-    ///        "image": "busybox:1.34.1",
+    ///        "image": "busybox:stable",
     ///        "command": ["sh", "-c", "sleep 20"],
     ///    },
     ///    ]

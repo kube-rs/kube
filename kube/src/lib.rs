@@ -502,7 +502,7 @@ mod test {
                 "restartPolicy": "Never",
                 "containers": [{
                   "name": "busybox",
-                  "image": "busybox:1.34.1",
+                  "image": "busybox:stable",
                   "command": ["sh", "-c", "sleep 20"],
                 }],
             }

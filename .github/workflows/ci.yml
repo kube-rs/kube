@@ -154,6 +154,11 @@ jobs:
           # github-token: ${{ secrets.GITHUB_TOKEN }}
           k3d-args: "-p 10250:10250 --no-rollback --k3s-arg --disable=traefik,servicelb,metrics-server@server:*"
 
+      - name: Import test images into k3d
+        run: |
+          docker pull busybox:stable
+          k3d image import busybox:stable -c kube
+
       # Real CI work starts here
       - name: Build workspace
         run: cargo build
@@ -167,7 +172,7 @@ jobs:
         run: cargo run -p kube-examples --example crd_derive
 
   mk8sv:
-    # comile check e2e tests against mk8sv
+    # compile check e2e tests against mk8sv
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6

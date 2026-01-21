@@ -31,6 +31,20 @@ Conduct](https://github.com/cncf/foundation/blob/master/code-of-conduct.md).
 
 For a list of tooling that we glue together everything see [TOOLS.md](https://kube.rs/tools/).
 
+## Pull Request Guidelines
+
+1. **Please try to keep each PR small, and minimal for the relevant change.**
+
+Each line has be reviewed, so unnecessary changes increase the difficulty threshold for maintainers (and decreases the likelyhood that your PR will be expedited).
+
+I.e. try to not not move files, or reformat files while also changing the logic in those same files. Github does not highlight moved lines very well.
+
+2. **Please do not force-push**
+
+Github does not show history between force pushes very well, and if you rewrite commits that previously have been reviewed, those reviews will have to be re-verified.
+
+There's no need to force-push / squash / rebase internally within a branch because each PR is set to squash merge.
+
 ## Testing
 
 We have 3 classes of tests.
