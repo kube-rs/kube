@@ -146,6 +146,10 @@ where
 /// By the time this function returns, the store contains a complete snapshot
 /// of all watched resources.
 ///
+/// # Panics
+///
+/// Panics if the store writer is dropped before the store becomes ready.
+///
 /// # Example
 ///
 /// ```no_run
