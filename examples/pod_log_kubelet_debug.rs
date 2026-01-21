@@ -30,7 +30,7 @@ async fn main() -> anyhow::Result<()> {
             "restartPolicy": "Never",
             "containers": [{
               "name": "busybox",
-              "image": "busybox:1.34.1",
+              "image": "busybox:stable",
               "command": ["sh", "-c", "for i in $(seq 1 5); do echo kube $i; sleep 0.1; done"],
             }],
         }
