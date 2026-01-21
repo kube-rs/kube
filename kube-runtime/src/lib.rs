@@ -32,7 +32,7 @@ pub mod watcher;
 
 pub use controller::{Config, Controller, applier};
 pub use finalizer::finalizer;
-pub use reflector::reflector;
+pub use reflector::{prewarmed_reflector, reflector};
 pub use scheduler::scheduler;
 pub use utils::WatchStreamExt;
 pub use watcher::{metadata_watcher, watcher};

@@ -11,7 +11,8 @@ pub use self::{
 use crate::watcher;
 use async_stream::stream;
 use futures::{Stream, StreamExt};
-use std::hash::Hash;
+use kube_client::Resource;
+use std::{fmt::Debug, hash::Hash};
 #[cfg(feature = "unstable-runtime-subscribe")] pub use store::store_shared;
 pub use store::{Store, store};
 
@@ -132,6 +133,85 @@ where
             }
         }
     }
+}
+
+/// Creates a pre-warmed reflector that waits for the store to be fully synchronized
+/// before returning.
+///
+/// This function:
+/// 1. Creates a reflector from the given writer and watcher stream
+/// 2. Processes events until `InitDone` is received (store is ready)
+/// 3. Returns a stream of touched objects for continued processing
+///
+/// By the time this function returns, the store contains a complete snapshot
+/// of all watched resources.
+///
+/// # Example
+///
+/// ```no_run
+/// use std::future::ready;
+/// use k8s_openapi::api::core::v1::ConfigMap;
+/// use kube::runtime::{reflector, watcher, prewarmed_reflector};
+/// use futures::StreamExt;
+/// # use kube::api::Api;
+/// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
+/// # let client: kube::Client = todo!();
+///
+/// let cms: Api<ConfigMap> = Api::default_namespaced(client);
+/// let (reader, writer) = reflector::store();
+///
+/// // This awaits until the store has received InitDone
+/// let stream = prewarmed_reflector(reader.clone(), writer, watcher(cms, Default::default())).await;
+///
+/// // reader.state() now contains all ConfigMaps
+/// println!("Loaded {} ConfigMaps", reader.state().len());
+///
+/// // Continue processing changes
+/// stream.for_each(|obj| async {
+///     match obj {
+///         Ok(cm) => println!("ConfigMap changed: {:?}", cm.metadata.name),
+///         Err(e) => eprintln!("Error: {}", e),
+///     }
+/// }).await;
+/// # Ok(())
+/// # }
+/// ```
+pub async fn prewarmed_reflector<K, W>(
+    store: Store<K>,
+    writer: store::Writer<K>,
+    stream: W,
+) -> impl Stream<Item = Result<K, watcher::Error>> + Send
+where
+    K: Resource + Clone + Debug + Send + Sync + 'static,
+    K::DynamicType: Eq + Hash + Clone + Default,
+    W: Stream<Item = watcher::Result<watcher::Event<K>>> + Send + 'static,
+{
+    use crate::WatchStreamExt;
+
+    let dt = K::DynamicType::default();
+    let kind = K::kind(&dt);
+    tracing::debug!(%kind, "Waiting for store to sync...");
+
+    let mut stream = reflector(writer, stream)
+        .touched_objects()
+        .default_backoff()
+        .boxed();
+
+    let mut store_ready = std::pin::pin!(store.wait_until_ready());
+
+    loop {
+        tokio::select! {
+            biased;
+            ready = &mut store_ready => {
+                ready.expect("store writer was dropped unexpectedly");
+                break;
+            }
+            _ = stream.next() => {}
+        }
+    }
+
+    tracing::debug!(%kind, "Store ready");
+    stream
 }
 
 #[cfg(test)]
@@ -291,5 +371,75 @@ mod tests {
             assert_eq!(seen_objects.get(obj.metadata.name.as_ref().unwrap()), None);
             seen_objects.insert(obj.metadata.name.clone().unwrap(), obj);
         }
+    }
+
+    #[tokio::test]
+    async fn prewarmed_reflector_waits_for_init_done() {
+        use futures::{SinkExt, channel::mpsc};
+
+        let store_w = store::Writer::default();
+        let store = store_w.as_reader();
+
+        let cm1 = ConfigMap {
+            metadata: ObjectMeta {
+                name: Some("a".to_string()),
+                ..ObjectMeta::default()
+            },
+            ..ConfigMap::default()
+        };
+        let cm2 = ConfigMap {
+            metadata: ObjectMeta {
+                name: Some("b".to_string()),
+                ..ObjectMeta::default()
+            },
+            ..ConfigMap::default()
+        };
+
+        // Use a channel to simulate a realistic watcher stream that pends after InitDone
+        let (mut tx, rx) = mpsc::channel(10);
+
+        // Send initial events
+        tx.send(Ok(watcher::Event::Init)).await.unwrap();
+        tx.send(Ok(watcher::Event::InitApply(cm1.clone()))).await.unwrap();
+        tx.send(Ok(watcher::Event::InitApply(cm2.clone()))).await.unwrap();
+        tx.send(Ok(watcher::Event::InitDone)).await.unwrap();
+
+        let stream = super::prewarmed_reflector(store.clone(), store_w, rx).await;
+
+        // After prewarmed_reflector returns, store should be populated
+        assert_eq!(store.state().len(), 2);
+
+        // Send another event after warmup
+        tx.send(Ok(watcher::Event::Apply(cm1.clone()))).await.unwrap();
+        drop(tx); // Close the channel to end the stream
+
+        // The stream should yield the subsequent event
+        let items: Vec<_> = stream.collect().await;
+        assert!(!items.is_empty());
+    }
+
+    #[tokio::test]
+    async fn prewarmed_reflector_store_accessible_immediately() {
+        let store_w = store::Writer::default();
+        let store = store_w.as_reader();
+
+        let cm = ConfigMap {
+            metadata: ObjectMeta {
+                name: Some("test".to_string()),
+                ..ObjectMeta::default()
+            },
+            ..ConfigMap::default()
+        };
+
+        let input_stream = stream::iter(vec![
+            Ok(watcher::Event::Init),
+            Ok(watcher::Event::InitApply(cm.clone())),
+            Ok(watcher::Event::InitDone),
+        ]);
+
+        let _stream = super::prewarmed_reflector(store.clone(), store_w, input_stream).await;
+
+        // Store should be immediately accessible with correct data
+        assert_eq!(store.get(&ObjectRef::from_obj(&cm)).as_deref(), Some(&cm));
     }
 }
