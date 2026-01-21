@@ -11,7 +11,21 @@ use schemars::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use std::collections::{BTreeMap, BTreeSet, btree_map::Entry};
+use std::{
+    collections::{BTreeMap, BTreeSet, btree_map::Entry},
+    sync::LazyLock,
+};
+
+mod transform_optional_enum;
+pub use transform_optional_enum::OptionalEnum;
+
+/// This is the signature for the `null` variant produced by schemars.
+static NULL_SCHEMA: LazyLock<Value> = LazyLock::new(|| {
+    serde_json::json!({
+        "enum": [null],
+        "nullable": true
+    })
+});
 
 /// schemars [`Visitor`] that rewrites a [`Schema`] to conform to Kubernetes' "structural schema" rules
 ///
@@ -29,42 +43,6 @@ use std::collections::{BTreeMap, BTreeSet, btree_map::Entry};
 /// there must not be any overlapping properties between `oneOf` branches.
 #[derive(Debug, Clone)]
 pub struct StructuralSchemaRewriter;
-
-/// Recursively restructures JSON Schema objects so that the Option<Enum> object
-/// is returned per k8s CRD schema expectations.
-///
-/// In kube 2.x the schema output behavior for `Option<Enum>` types changed.
-///
-/// Previously given an enum like:
-///
-/// ```rust
-/// enum LogLevel {
-///     Debug,
-///     Info,
-///     Error,
-/// }
-/// ```
-///
-/// The following would be generated for Optional<LogLevel>:
-///
-/// ```json
-/// { "enum": ["Debug", "Info", "Error"], "type": "string", "nullable": true }
-/// ```
-///
-/// Now, schemars generates `anyOf` for `Option<LogLevel>` like:
-///
-/// ```json
-/// {
-///   "anyOf": [
-///     { "enum": ["Debug", "Info", "Error"], "type": "string" },
-///     { "enum": [null], "nullable": true }
-///   ]
-/// }
-/// ```
-///
-/// This transform implementation prevents this specific case from happening.
-#[derive(Debug, Clone, Default)]
-pub struct OptionalEnum;
 
 /// Recursively restructures JSON Schema objects so that the `Option<T>` object
 /// where `T` uses `x-kubernetes-int-or-string` is returned per k8s CRD schema expectations.
@@ -370,41 +348,6 @@ impl Transform for StructuralSchemaRewriter {
             && let Ok(transformed) = serde_json::from_value(schema)
         {
             *transform_schema = transformed;
-        }
-    }
-}
-
-impl Transform for OptionalEnum {
-    fn transform(&mut self, schema: &mut schemars::Schema) {
-        transform_subschemas(self, schema);
-
-        let Some(obj) = schema.as_object_mut().filter(|o| o.len() == 1) else {
-            return;
-        };
-
-        let arr = obj
-            .get("anyOf")
-            .iter()
-            .flat_map(|any_of| any_of.as_array())
-            .last()
-            .cloned()
-            .unwrap_or_default();
-
-        let [first, second] = arr.as_slice() else {
-            return;
-        };
-        let (Some(first), Some(second)) = (first.as_object(), second.as_object()) else {
-            return;
-        };
-
-        if first.contains_key("enum")
-            && !first.contains_key("nullable")
-            && second.get("enum") == Some(&json!([null]))
-            && second.get("nullable") == Some(&json!(true))
-        {
-            obj.remove("anyOf");
-            obj.append(&mut first.clone());
-            obj.insert("nullable".to_string(), Value::Bool(true));
         }
     }
 }
