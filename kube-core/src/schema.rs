@@ -378,7 +378,7 @@ impl Transform for OptionalEnum {
     fn transform(&mut self, schema: &mut schemars::Schema) {
         transform_subschemas(self, schema);
 
-        let Some(obj) = schema.as_object_mut().filter(|o| o.len() == 1) else {
+        let Some(obj) = schema.as_object_mut() else {
             return;
         };
 
