@@ -312,7 +312,7 @@ mod test {
                 "restartPolicy": "Never",
                 "containers": [{
                   "name": "busybox",
-                  "image": "busybox:1.34.1",
+                  "image": "busybox:stable",
                   "command": ["sh", "-c", "sleep 30"],
                 }],
             }
@@ -394,7 +394,7 @@ mod test {
                 "restartPolicy": "Never",
                 "containers": [{
                   "name": "busybox",
-                  "image": "busybox:1.34.1",
+                  "image": "busybox:stable",
                   "command": ["sh", "-c", "sleep 30"],
                 }],
             }
@@ -541,7 +541,7 @@ mod test {
                 "restartPolicy": "Never",
                 "containers": [{
                   "name": "busybox",
-                  "image": "busybox:1.34.1",
+                  "image": "busybox:stable",
                   "command": ["sh", "-c", "for i in $(seq 1 5); do echo kube $i; sleep 0.1; done"],
                 }],
             }
@@ -627,7 +627,7 @@ mod test {
                 "restartPolicy": "Never",
                 "containers": [{
                   "name": "busybox",
-                  "image": "busybox:1.34.1",
+                  "image": "busybox:stable",
                   "command": ["sh", "-c", "sleep 30s"],
                 }],
             }
@@ -768,7 +768,7 @@ mod test {
                 "restartPolicy": "Never",
                 "containers": [{
                   "name": "busybox",
-                  "image": "busybox:1.34.1",
+                  "image": "busybox:stable",
                   "command": ["sh", "-c", "sleep 2"],
                 }],
             }
@@ -807,7 +807,7 @@ mod test {
         let mut busybox_eph: EphemeralContainer = serde_json::from_value(json!(
             {
                 "name": "myephemeralcontainer1",
-                "image": "busybox:1.34.1",
+                "image": "busybox:stable",
                 "command": ["sh", "-c", "sleep 2"],
             }
         ))?;
@@ -841,7 +841,7 @@ mod test {
         busybox_eph = serde_json::from_value(json!(
             {
                 "name": "myephemeralcontainer2",
-                "image": "busybox:1.35.0",
+                "image": "busybox:stable",
                 "command": ["sh", "-c", "sleep 1"],
             }
         ))?;
@@ -919,7 +919,7 @@ mod test {
                 "restartPolicy": "Never",
                 "containers": [{
                   "name": "busybox",
-                  "image": "busybox:1.34.1",
+                  "image": "busybox:stable",
                   "command": ["sh", "-c", "sleep 30"],
                 }],
             }
