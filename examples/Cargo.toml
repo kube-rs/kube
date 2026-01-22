@@ -209,6 +209,10 @@ name = "pod_reflector"
 path = "pod_reflector.rs"
 
 [[example]]
+name = "prewarmed_reflector"
+path = "prewarmed_reflector.rs"
+
+[[example]]
 name = "pod_watcher"
 path = "pod_watcher.rs"
 

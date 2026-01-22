@@ -142,6 +142,8 @@ cargo run --example node_reflector
 cargo run --example secret_reflector
 # Watch namespaced foo crs for applied events and print store info in task
 cargo run --example crd_reflector
+# Controller watching Deployments with prewarmed ReplicaSet reflector
+cargo run --example prewarmed_reflector
 ```
 
 The `crd_reflector` will just await changes. You can run `kubectl apply -f crd-baz.yaml`, or `kubectl delete -f crd-baz.yaml -n default`, or `kubectl edit foos baz -n default` to verify that the events are being picked up.
