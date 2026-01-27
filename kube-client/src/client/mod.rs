@@ -23,8 +23,8 @@ use tokio_util::{
     codec::{FramedRead, LinesCodec, LinesCodecError},
     io::StreamReader,
 };
-use tower::{BoxError, Layer, Service, ServiceExt, buffer::Buffer, util::BoxService};
-use tower_http::map_response_body::MapResponseBodyLayer;
+use tower::{BoxError, Service, ServiceExt as _, buffer::Buffer};
+use tower_http::ServiceExt as _;
 
 pub use self::body::Body;
 use crate::{Config, Error, Result, api::WatchEvent, config::Kubeconfig};
@@ -155,11 +155,12 @@ impl Client {
         T: Into<String>,
     {
         // Transform response body to `crate::client::Body` and use type erased error to avoid type parameters.
-        let service = MapResponseBodyLayer::new(Body::wrap_body)
-            .layer(service)
-            .map_err(|e| e.into());
+        let service = service
+            .map_response_body(Body::wrap_body)
+            .map_err(Into::into)
+            .boxed();
         Self {
-            inner: Buffer::new(BoxService::new(service), 1024),
+            inner: Buffer::new(service, 1024),
             default_ns: default_namespace.into(),
             valid_until: None,
         }
