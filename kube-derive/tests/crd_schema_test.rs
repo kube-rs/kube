@@ -515,9 +515,16 @@ pub struct IntOrStringTestSpec {
 // Test for deny_unknown_fields handling (issue #1828)
 #[derive(CustomResource, Deserialize, Serialize, Clone, Debug, JsonSchema)]
 #[kube(group = "clux.dev", version = "v1", kind = "DenyUnknown")]
-#[serde(deny_unknown_fields)]
 pub struct DenyUnknownSpec {
-    pub foo: String,
+    pub subitem: SubItemDenyUnknown,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SubItemDenyUnknown {
+    pub one: String,
+    pub two: bool,
+    pub three: i32,
 }
 
 #[test]
@@ -535,7 +542,8 @@ fn deny_unknown_fields() {
         .as_ref()
         .unwrap()["spec"];
 
-    assert!(spec_schema.additional_properties.is_none());
+    let subitem_schema = &spec_schema.properties.as_ref().unwrap()["subitem"];
+    assert!(subitem_schema.additional_properties.is_none());
 }
 
 #[test]
