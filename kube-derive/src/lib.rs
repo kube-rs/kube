@@ -164,8 +164,26 @@ mod resource;
 /// The deprecated way of customizing the scale subresource using a raw JSON string is still
 /// support for backwards-compatibility.
 ///
-/// ## `#[kube(printcolumn = r#"json"#)]`
-/// Allows adding straight json to [printcolumns](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#additional-printer-columns).
+/// ## `#[kube(printcolumn(...))]`
+///
+/// Allows adding a custom column to the [printcolumns](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#additional-printer-columns).
+///
+/// ```ignore
+/// #[kube(printcolumn(
+///     name = "CustomColumn",
+///     type_ = "integer",
+///     json_path = ".spec.someField",
+///     description = "a custom column", // optional
+///     format = "int32",                // optional
+///     priority = "1",                  // optional
+/// ))]
+/// ```
+///
+/// The older method of supplying raw json is still supported:
+///
+/// ```ignore
+/// printcolumn = r#"{"name":"Spec", "type":"string", "description":"name of foo", "jsonPath":".spec.name"}"#,
+/// ```
 ///
 /// ## `#[kube(shortname = "sn")]`
 /// Add a single shortname to the generated crd.
@@ -231,7 +249,12 @@ mod resource;
 ///     plural = "feetz",
 ///     shortname = "f",
 ///     scale = r#"{"specReplicasPath":".spec.replicas", "statusReplicasPath":".status.replicas"}"#,
-///     printcolumn = r#"{"name":"Spec", "type":"string", "description":"name of foo", "jsonPath":".spec.name"}"#,
+///     printcolumn(
+///         name = "Spec",
+///         type_ = "string",
+///         description = "name of foo",
+///         json_path = ".spec.name"
+///     ),
 ///     selectable = "spec.replicasCount"
 /// )]
 /// #[serde(rename_all = "camelCase")]
