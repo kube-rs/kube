@@ -219,6 +219,25 @@ pub mod conditions {
         }
     }
 
+    /// An await condition for `Pod` that returns `true` once an in-place resize operation has completed
+    ///
+    /// A resize is considered complete when the `status.resize` field is either absent or empty.
+    /// This indicates that the kubelet has finished applying the resource changes to the container(s).
+    ///
+    /// See: https://kubernetes.io/docs/tasks/configure-pod-container/resize-container-resources/
+    #[must_use]
+    pub fn is_pod_resized() -> impl Condition<Pod> {
+        |obj: Option<&Pod>| {
+            if let Some(pod) = obj
+                && let Some(status) = &pod.status
+            {
+                // Resize is complete when the field is absent or empty
+                return status.resize.as_ref().map_or(true, |r| r.is_empty());
+            }
+            false
+        }
+    }
+
     /// An await condition for `Job` that returns `true` once it is completed
     #[must_use]
     pub fn is_job_completed() -> impl Condition<Job> {
@@ -541,6 +560,109 @@ pub mod conditions {
             use super::{Condition, is_pod_running};
 
             assert!(!is_pod_running().matches_object(None))
+        }
+
+        #[test]
+        /// pass when pod resize is complete (resize field is empty)
+        fn pod_resized_complete() {
+            use super::{Condition, is_pod_resized};
+
+            let pod = r#"
+                apiVersion: v1
+                kind: Pod
+                metadata:
+                  name: resize-demo
+                  namespace: default
+                spec:
+                  containers:
+                  - name: app
+                    image: nginx:1.14.2
+                status:
+                  phase: Running
+                  resize: ""
+            "#;
+
+            let p = serde_yaml::from_str(pod).unwrap();
+            assert!(is_pod_resized().matches_object(Some(&p)))
+        }
+
+        #[test]
+        /// pass when pod resize field is absent
+        fn pod_resized_no_field() {
+            use super::{Condition, is_pod_resized};
+
+            let pod = r#"
+                apiVersion: v1
+                kind: Pod
+                metadata:
+                  name: resize-demo
+                  namespace: default
+                spec:
+                  containers:
+                  - name: app
+                    image: nginx:1.14.2
+                status:
+                  phase: Running
+            "#;
+
+            let p = serde_yaml::from_str(pod).unwrap();
+            assert!(is_pod_resized().matches_object(Some(&p)))
+        }
+
+        #[test]
+        /// fail when pod resize is in progress
+        fn pod_resized_in_progress() {
+            use super::{Condition, is_pod_resized};
+
+            let pod = r#"
+                apiVersion: v1
+                kind: Pod
+                metadata:
+                  name: resize-demo
+                  namespace: default
+                spec:
+                  containers:
+                  - name: app
+                    image: nginx:1.14.2
+                status:
+                  phase: Running
+                  resize: InProgress
+            "#;
+
+            let p = serde_yaml::from_str(pod).unwrap();
+            assert!(!is_pod_resized().matches_object(Some(&p)))
+        }
+
+        #[test]
+        /// fail when pod resize is proposed
+        fn pod_resized_proposed() {
+            use super::{Condition, is_pod_resized};
+
+            let pod = r#"
+                apiVersion: v1
+                kind: Pod
+                metadata:
+                  name: resize-demo
+                  namespace: default
+                spec:
+                  containers:
+                  - name: app
+                    image: nginx:1.14.2
+                status:
+                  phase: Running
+                  resize: Proposed
+            "#;
+
+            let p = serde_yaml::from_str(pod).unwrap();
+            assert!(!is_pod_resized().matches_object(Some(&p)))
+        }
+
+        #[test]
+        /// fail if pod does not exist
+        fn pod_resized_missing() {
+            use super::{Condition, is_pod_resized};
+
+            assert!(!is_pod_resized().matches_object(None))
         }
 
         #[test]
