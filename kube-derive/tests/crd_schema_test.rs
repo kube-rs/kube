@@ -512,6 +512,32 @@ pub struct IntOrStringTestSpec {
     pub optional_int_or_string: Option<k8s_openapi::apimachinery::pkg::util::intstr::IntOrString>,
 }
 
+// Test for deny_unknown_fields handling (issue #1828)
+#[derive(CustomResource, Deserialize, Serialize, Clone, Debug, JsonSchema)]
+#[kube(group = "clux.dev", version = "v1", kind = "DenyUnknown")]
+#[serde(deny_unknown_fields)]
+pub struct DenyUnknownSpec {
+    pub foo: String,
+}
+
+#[test]
+fn deny_unknown_fields() {
+    use kube::core::CustomResourceExt;
+    let crd = DenyUnknown::crd();
+    let spec_schema = &crd.spec.versions[0]
+        .schema
+        .as_ref()
+        .unwrap()
+        .open_api_v3_schema
+        .as_ref()
+        .unwrap()
+        .properties
+        .as_ref()
+        .unwrap()["spec"];
+
+    assert!(spec_schema.additional_properties.is_none());
+}
+
 #[test]
 fn test_optional_int_or_string_nullable() {
     use kube::core::CustomResourceExt;
