@@ -224,7 +224,7 @@ pub mod conditions {
     /// A resize is considered complete when the `status.resize` field is either absent or empty.
     /// This indicates that the kubelet has finished applying the resource changes to the container(s).
     ///
-    /// See: https://kubernetes.io/docs/tasks/configure-pod-container/resize-container-resources/
+    /// See: <https://kubernetes.io/docs/tasks/configure-pod-container/resize-container-resources/>
     #[must_use]
     pub fn is_pod_resized() -> impl Condition<Pod> {
         |obj: Option<&Pod>| {
@@ -232,7 +232,7 @@ pub mod conditions {
                 && let Some(status) = &pod.status
             {
                 // Resize is complete when the field is absent or empty
-                return status.resize.as_ref().map_or(true, |r| r.is_empty());
+                return status.resize.as_ref().is_none_or(String::is_empty);
             }
             false
         }
