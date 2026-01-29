@@ -1,8 +1,8 @@
 use k8s_openapi::api::core::v1::Pod;
 use kube::{
+    Client,
     api::{Api, DeleteParams, Patch, PatchParams, PostParams, ResourceExt},
     runtime::wait::{await_condition, conditions},
-    Client,
 };
 use tracing::*;
 
@@ -105,7 +105,10 @@ async fn main() -> anyhow::Result<()> {
             if let Some(status) = &pod.status {
                 info!("Resize status: {:?}", status.resize);
                 if let Some(container_status) = status.container_statuses.as_ref().and_then(|cs| cs.first()) {
-                    info!("Container resources after CPU resize: {:?}", container_status.resources);
+                    info!(
+                        "Container resources after CPU resize: {:?}",
+                        container_status.resources
+                    );
                     info!("Container restart count: {}", container_status.restart_count);
                 }
             }
@@ -120,8 +123,10 @@ async fn main() -> anyhow::Result<()> {
                 if let Some(conditions) = &status.conditions {
                     for cond in conditions {
                         if cond.type_ == "PodResizePending" || cond.type_ == "PodResizeInProgress" {
-                            warn!("Resize condition: type={}, status={}, reason={:?}, message={:?}",
-                                cond.type_, cond.status, cond.reason, cond.message);
+                            warn!(
+                                "Resize condition: type={}, status={}, reason={:?}, message={:?}",
+                                cond.type_, cond.status, cond.reason, cond.message
+                            );
                         }
                     }
                 }
@@ -159,8 +164,14 @@ async fn main() -> anyhow::Result<()> {
             if let Some(status) = &pod.status {
                 info!("Resize status: {:?}", status.resize);
                 if let Some(container_status) = status.container_statuses.as_ref().and_then(|cs| cs.first()) {
-                    info!("Container resources after memory resize: {:?}", container_status.resources);
-                    info!("Container restart count: {} (should be >0)", container_status.restart_count);
+                    info!(
+                        "Container resources after memory resize: {:?}",
+                        container_status.resources
+                    );
+                    info!(
+                        "Container restart count: {} (should be >0)",
+                        container_status.restart_count
+                    );
                 }
             }
         }

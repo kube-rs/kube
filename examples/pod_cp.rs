@@ -42,7 +42,7 @@ async fn main() -> anyhow::Result<()> {
                 info!("Added {}", o.name_any());
             }
             WatchEvent::Modified(o) => {
-                let s = o.status.as_ref().expect("status exists on pod");
+                let s = o.etatus.as_ref().expect("status exists on pod");
                 if s.phase.clone().unwrap_or_default() == "Running" {
                     info!("Ready to attach to {}", o.name_any());
                     break;
