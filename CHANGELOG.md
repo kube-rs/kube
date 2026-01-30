@@ -7,6 +7,19 @@ UNRELEASED
 ===================
  * see https://github.com/kube-rs/kube/compare/3.0.1...main
 
+[3.0.1](https://github.com/kube-rs/kube/releases/tag/3.0.1) / 2026-01-30
+===================
+<!-- Release notes generated using configuration in .github/release.yml at 3.0.1 -->
+
+## What's Changed
+Bugfix release for schemas, admission, and docs. Minor internal improvements listed in the [milestone](https://github.com/kube-rs/kube/milestone/53?closed=1). Important fixes below.
+
+### Fixed
+* Update API version of [`AdmissionResponse`](https://docs.rs/kube/3.0.1/kube/core/admission/struct.AdmissionResponse.html) created via invalid call by @Magicloud in https://github.com/kube-rs/kube/pull/1905
+* Fix [`OptionalEnum`](https://docs.rs/kube/3.0.1/kube/core/schema/struct.OptionalEnum.html) transform skipping schemas with description by @doxxx93 in https://github.com/kube-rs/kube/pull/1908
+* Remove conflicting `additionalProperties: false` from schema by @doxxx93 in https://github.com/kube-rs/kube/pull/1920
+
+
 3.0.1 / 2026-01-30
 ===================
 
