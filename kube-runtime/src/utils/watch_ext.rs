@@ -1,4 +1,5 @@
 use crate::{
+    Index,
     utils::{
         event_decode::EventDecode,
         event_modify::EventModify,
@@ -16,6 +17,7 @@ use crate::{
 
 use crate::watcher::DefaultBackoff;
 use futures::{Stream, TryStream};
+use std::sync::Arc;
 
 /// Extension trait for streams returned by [`watcher`](watcher()) or [`reflector`](crate::reflector::reflector)
 pub trait WatchStreamExt: Stream {
@@ -273,6 +275,15 @@ pub trait WatchStreamExt: Stream {
         K::DynamicType: Eq + std::hash::Hash + Clone,
     {
         crate::reflector(writer, self)
+    }
+
+    fn index<K, I: Index<K>>(self, index: Arc<I>) -> impl Stream<Item = Self::Item>
+    where
+        Self: Stream<Item = watcher::Result<watcher::Event<K>>> + Sized,
+        K: Resource + Clone + 'static,
+        K::DynamicType: Eq + std::hash::Hash + Clone,
+    {
+        crate::indexer(index, self)
     }
 }
 

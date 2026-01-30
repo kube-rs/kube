@@ -24,6 +24,7 @@ pub mod controller;
 pub mod events;
 
 pub mod finalizer;
+pub mod indexer;
 pub mod reflector;
 pub mod scheduler;
 pub mod utils;
@@ -32,6 +33,7 @@ pub mod watcher;
 
 pub use controller::{Config, Controller, applier};
 pub use finalizer::finalizer;
+pub use indexer::{Index, indexer};
 pub use reflector::reflector;
 pub use scheduler::scheduler;
 pub use utils::WatchStreamExt;
