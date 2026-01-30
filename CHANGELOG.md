@@ -19,10 +19,6 @@ Bugfix release for schemas, admission, and docs. Minor internal improvements lis
 * Fix [`OptionalEnum`](https://docs.rs/kube/3.0.1/kube/core/schema/struct.OptionalEnum.html) transform skipping schemas with description by @doxxx93 in https://github.com/kube-rs/kube/pull/1908
 * Remove conflicting `additionalProperties: false` from schema by @doxxx93 in https://github.com/kube-rs/kube/pull/1920
 
-
-3.0.1 / 2026-01-30
-===================
-
 [3.0.0](https://github.com/kube-rs/kube/releases/tag/3.0.0) / 2026-01-12
 ===================
 <!-- Release notes generated using configuration in .github/release.yml at 3.0.0 -->
