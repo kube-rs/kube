@@ -345,16 +345,23 @@ impl Transform for StructuralSchemaRewriter {
             }
         }
 
-        // check for maps without with properties (i.e. flattened maps)
-        // and allow these to persist dynamically
         if let Some(object) = &mut schema.object
             && !object.properties.is_empty()
-            && object.additional_properties.as_deref() == Some(&Schema::Bool(true))
         {
-            object.additional_properties = None;
-            schema
-                .extensions
-                .insert("x-kubernetes-preserve-unknown-fields".into(), true.into());
+            // check for maps without with properties (i.e. flattened maps)
+            // and allow these to persist dynamically
+            match object.additional_properties.as_deref() {
+                Some(&Schema::Bool(true)) => {
+                    object.additional_properties = None;
+                    schema
+                        .extensions
+                        .insert("x-kubernetes-preserve-unknown-fields".into(), true.into());
+                }
+                Some(&Schema::Bool(false)) => {
+                    object.additional_properties = None;
+                }
+                _ => {}
+            }
         }
 
         // As of version 1.30 Kubernetes does not support setting `uniqueItems` to `true`,
