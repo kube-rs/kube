@@ -35,8 +35,12 @@ struct KubeAttrs {
     categories: Vec<String>,
     #[darling(multiple, rename = "shortname")]
     shortnames: Vec<String>,
+
+    /// Add additional print columns, see [Kubernetes docs][1].
+    ///
+    /// [1]: https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#additional-printer-columns
     #[darling(multiple, rename = "printcolumn")]
-    printcolums: Vec<PrintColumn>,
+    printcolumns: Vec<PrintColumn>,
     #[darling(multiple)]
     selectable: Vec<String>,
 
@@ -219,7 +223,14 @@ struct PrintColumn {
     type_: String,
 }
 
+// The reasoning for this custom FromMeta implementation is parallel to the one for the
+// scale subresource. The two reasons are:
+//
+// - For backwards-compatibility by keeping the option to supply a JSON string.
+// - To be able to declare the printcolumn as a list of typed fields.
 impl FromMeta for PrintColumn {
+    /// This is implemented for backwards-compatibility. It allows that the printcolumn can be
+    /// deserialized from a JSON string.
     fn from_string(value: &str) -> darling::Result<Self> {
         serde_json::from_str(value).map_err(darling::Error::custom)
     }
@@ -331,11 +342,11 @@ impl PrintColumn {
         let description = self
             .description
             .as_ref()
-            .map_or_else(|| quote! { None }, |p| quote! { Some(#p.into()) });
+            .map_or_else(|| quote! { None }, |d| quote! { Some(#d.into()) });
         let format = self
             .format
             .as_ref()
-            .map_or_else(|| quote! { None }, |p| quote! { Some(#p.into()) });
+            .map_or_else(|| quote! { None }, |f| quote! { Some(#f.into()) });
         let priority = self
             .priority
             .as_ref()
@@ -548,7 +559,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         singular,
         categories,
         shortnames,
-        printcolums,
+        printcolumns,
         selectable,
         scale,
         validations,
@@ -772,12 +783,9 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
 
     // Compute a bunch of crd props
     let printers = {
-        let printers: Vec<_> = printcolums
+        let printers: Vec<_> = printcolumns
             .iter()
-            .map(|p| {
-                let column = p.to_tokens(&k8s_openapi);
-                quote! { #column }
-            })
+            .map(|p| { p.to_tokens(&k8s_openapi)})
             .collect();
         quote! { vec![ #(#printers),* ] }
     };
