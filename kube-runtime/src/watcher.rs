@@ -978,8 +978,7 @@ mod tests {
     }
 
     fn approx_eq(a: Duration, b: Duration) -> bool {
-        let diff = if a > b { a - b } else { b - a };
-        diff < Duration::from_micros(100)
+        a.abs_diff(b) < Duration::from_micros(100)
     }
 
     #[test]
