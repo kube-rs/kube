@@ -153,7 +153,6 @@ struct CacheEntry {
     last_seen: Instant,
 }
 
-#[allow(clippy::pedantic)]
 #[pin_project]
 /// Stream returned by the [`predicate_filter`](super::WatchStreamExt::predicate_filter) method.
 #[must_use = "streams do nothing unless polled"]
