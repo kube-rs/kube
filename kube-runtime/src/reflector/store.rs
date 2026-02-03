@@ -1,3 +1,4 @@
+//! A reader/writer split store for reflectors
 use super::{Lookup, ObjectRef, dispatcher::Dispatcher};
 #[cfg(feature = "unstable-runtime-subscribe")]
 use crate::reflector::ReflectHandle;
@@ -191,6 +192,7 @@ where
     ready_rx: Arc<DelayedInit<()>>,
 }
 
+/// The error returned by `Store::wait_until_ready`
 #[derive(Debug, Error)]
 #[error("writer was dropped before store became ready")]
 pub struct WriterDropped(delayed_init::InitDropped);
