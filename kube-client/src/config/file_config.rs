@@ -482,14 +482,13 @@ fn kubeconfig_from_yaml(text: &str) -> Result<Vec<Kubeconfig>, KubeconfigError> 
     Ok(documents)
 }
 
-#[allow(clippy::redundant_closure)]
 fn append_new_named<T, F>(base: &mut Vec<T>, next: Vec<T>, f: F)
 where
     F: Fn(&T) -> &String,
 {
     use std::collections::HashSet;
     base.extend({
-        let existing = base.iter().map(|x| f(x)).collect::<HashSet<_>>();
+        let existing = base.iter().map(&f).collect::<HashSet<_>>();
         next.into_iter()
             .filter(|x| !existing.contains(f(x)))
             .collect::<Vec<_>>()

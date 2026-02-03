@@ -108,7 +108,6 @@ pub enum Error {
 }
 
 #[derive(Debug, Clone)]
-#[allow(clippy::large_enum_variant)]
 pub(crate) enum Auth {
     None,
     Basic(String, SecretString),
