@@ -663,9 +663,6 @@ fn default_kube_path() -> Option<PathBuf> {
     // Rust 1.85.0 fixed the problem (https://doc.rust-lang.org/1.85.0/std/env/fn.home_dir.html),
     // Rust 1.87.0 removed the function deprecation.
     // As the MSRV was bumped to 1.85.0 we are safe to use the fixed std function.
-    // Note: We intentionally use `allow` over `expect` to support compilation on Rust >= 1.87.0
-    // Note: This can be removed once the MSRV is bumped to >= 1.87.0
-    #[allow(deprecated)]
     std::env::home_dir().map(|h| h.join(".kube").join("config"))
 }
 
