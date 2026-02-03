@@ -320,7 +320,6 @@ fn optional_enum() {
     );
 }
 
-
 #[test]
 fn normal_enum_without_descriptions() {
     assert_json_eq!(
