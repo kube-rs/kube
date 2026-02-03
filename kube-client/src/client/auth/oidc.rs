@@ -1,7 +1,7 @@
 use super::TEN_SEC;
 use form_urlencoded::Serializer;
 use http::{
-    Method, Request, Uri, Version,
+    Request, Uri, Version,
     header::{AUTHORIZATION, CONTENT_TYPE, HeaderValue},
 };
 use http_body_util::BodyExt;
@@ -378,9 +378,7 @@ impl Refresher {
         endpoint: &str,
         auth_style: AuthStyle,
     ) -> Result<Request<String>, errors::RefreshError> {
-        let mut builder = Request::builder()
-            .uri(endpoint)
-            .method(Method::POST)
+        let mut builder = Request::post(endpoint)
             .header(
                 CONTENT_TYPE,
                 HeaderValue::from_static("application/x-www-form-urlencoded"),
