@@ -153,6 +153,7 @@ impl<T> CancelableJoinHandle<T>
 where
     T: Send + 'static,
 {
+    /// Wrap a future in a cancelable handle, and spawn in a runtime
     pub fn spawn(future: impl Future<Output = T> + Send + 'static, runtime: &Handle) -> Self {
         CancelableJoinHandle {
             inner: runtime.spawn(future),

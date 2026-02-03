@@ -44,6 +44,7 @@ where
     //
     // N.B messages are eagerly broadcasted, meaning no active receivers are
     // required for a message to be broadcasted.
+    #[cfg(feature = "unstable-runtime-subscribe")]
     pub(crate) fn new(buf_size: usize) -> Dispatcher<K> {
         // Create a broadcast (tx, rx) pair
         let (mut dispatch_tx, dispatch_rx) = async_broadcast::broadcast(buf_size);
@@ -67,6 +68,7 @@ where
     // N.B: the new receiver will be fast-forwarded to the _latest_ event.
     // The receiver won't have access to any events that are currently waiting
     // to be acked by listeners.
+    #[cfg(feature = "unstable-runtime-subscribe")]
     pub(crate) fn subscribe(&self, reader: Store<K>) -> ReflectHandle<K> {
         ReflectHandle::new(reader, self.dispatch_tx.new_receiver())
     }
@@ -116,6 +118,7 @@ where
         Self { rx, reader }
     }
 
+    /// Get a reader from a reflect handle
     #[must_use]
     pub fn reader(&self) -> Store<K> {
         self.reader.clone()
