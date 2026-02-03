@@ -204,15 +204,14 @@ pub mod prelude {
     //!
     //! The prelude may grow over time as additional items see ubiquitous use.
 
-    #[cfg(feature = "client")]
-    #[allow(unreachable_pub)]
-    pub use crate::client::ConfigExt as _;
+    #[cfg(feature = "client")] pub use crate::client::ConfigExt as _;
 
     #[cfg(feature = "unstable-client")] pub use crate::client::scope::NamespacedRef;
 
-    #[allow(unreachable_pub)] pub use crate::core::PartialObjectMetaExt as _;
-    #[allow(unreachable_pub)] pub use crate::core::SelectorExt as _;
-    pub use crate::{Resource as _, ResourceExt as _, core::crd::CustomResourceExt as _};
+    pub use crate::{
+        Resource as _, ResourceExt as _,
+        core::{PartialObjectMetaExt as _, SelectorExt as _, crd::CustomResourceExt as _},
+    };
 
     #[cfg(feature = "runtime")] pub use crate::runtime::utils::WatchStreamExt as _;
 }

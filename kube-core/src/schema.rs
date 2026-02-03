@@ -98,7 +98,6 @@ pub struct OptionalEnum;
 pub struct OptionalIntOrString;
 
 /// A JSON Schema.
-#[allow(clippy::large_enum_variant)]
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema)]
 #[serde(untagged)]
 enum Schema {

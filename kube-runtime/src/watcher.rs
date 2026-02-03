@@ -801,7 +801,6 @@ pub fn watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
 /// that we have seen on the stream. If this is successful then the stream is simply resumed from where it left off.
 /// If this fails because the resource version is no longer valid then we start over with a new stream, starting with
 /// an [`Event::Init`]. The internals mechanics of recovery should be considered an implementation detail.
-#[allow(clippy::module_name_repetitions)]
 pub fn metadata_watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
     api: Api<K>,
     watcher_config: Config,
@@ -978,8 +977,7 @@ mod tests {
     }
 
     fn approx_eq(a: Duration, b: Duration) -> bool {
-        let diff = if a > b { a - b } else { b - a };
-        diff < Duration::from_micros(100)
+        a.abs_diff(b) < Duration::from_micros(100)
     }
 
     #[test]
