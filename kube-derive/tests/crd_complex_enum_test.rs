@@ -394,7 +394,6 @@ fn normal_enum_without_descriptions() {
 
 #[test]
 fn optional_complex_enum() {
-    // This test reproduces issue #1906 - Optional ComplexEnum
     assert_json_eq!(
         OptionalComplexEnumTest::crd(),
         json!({
