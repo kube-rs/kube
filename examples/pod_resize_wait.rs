@@ -7,10 +7,15 @@ use kube::{
 use tracing::*;
 
 fn inspect_pod_resize(pod: &Pod) {
+    if let Some(spec) = &pod.spec {
+        if let Some(container) = spec.containers.first() {
+            info!("Spec resources (desired): {:?}", container.resources);
+        }
+    }
     if let Some(status) = &pod.status {
         info!("Resize status: {:?}", status.resize);
         if let Some(container_status) = status.container_statuses.as_ref().and_then(|cs| cs.first()) {
-            info!("Container resources: {:?}", container_status.resources);
+            info!("Status resources (actual): {:?}", container_status.resources);
             info!("Container restart count: {}", container_status.restart_count);
         }
     }

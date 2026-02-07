@@ -221,13 +221,13 @@ pub mod conditions {
 
     /// An await condition for `Pod` that returns `true` once an in-place resize operation has completed
     ///
-    /// A resize is considered complete when neither `PodResizePending` nor `PodResizeInProgress`
-    /// conditions are present with status `True`. These conditions indicate the state of resource
-    /// resize requests:
-    /// - `PodResizePending`: The kubelet cannot immediately grant the request
-    /// - `PodResizeInProgress`: The resize is being applied
+    /// A resize is considered complete when, for every container in `spec.containers`,
+    /// the corresponding entry in `status.containerStatuses` reports the same `resources`
+    /// (both `requests` and `limits`).
     ///
-    /// When neither condition is present (or both are `False`), the resize is complete.
+    /// This avoids a race condition where checking only for the absence of
+    /// `PodResizePending`/`PodResizeInProgress` conditions could return `true` before the
+    /// kubelet has even started processing the resize.
     ///
     /// See: <https://kubernetes.io/docs/tasks/configure-pod-container/resize-container-resources/#pod-resize-status>
     #[must_use]
@@ -235,14 +235,25 @@ pub mod conditions {
         |obj: Option<&Pod>| {
             if let Some(pod) = obj
                 && let Some(status) = &pod.status
+                && let Some(spec) = &pod.spec
+                && let Some(container_statuses) = &status.container_statuses
             {
-                let has_active_resize = status.conditions.as_ref().is_some_and(|conds| {
-                    conds.iter().any(|c| {
-                        (c.type_ == "PodResizePending" || c.type_ == "PodResizeInProgress")
-                            && c.status == "True"
-                    })
+                return spec.containers.iter().all(|container| {
+                    container_statuses
+                        .iter()
+                        .find(|cs| cs.name == container.name)
+                        .is_some_and(|cs| {
+                            let spec_resources = container.resources.as_ref();
+                            let status_resources = cs.resources.as_ref();
+
+                            let requests_match = spec_resources.and_then(|r| r.requests.as_ref())
+                                == status_resources.and_then(|r| r.requests.as_ref());
+                            let limits_match = spec_resources.and_then(|r| r.limits.as_ref())
+                                == status_resources.and_then(|r| r.limits.as_ref());
+
+                            requests_match && limits_match
+                        })
                 });
-                return !has_active_resize;
             }
             false
         }
@@ -573,7 +584,7 @@ pub mod conditions {
         }
 
         #[test]
-        /// pass when pod has no active resize conditions
+        /// pass when spec and status resources match (resize complete)
         fn pod_resized_complete() {
             use super::{Condition, is_pod_resized};
 
@@ -586,9 +597,26 @@ pub mod conditions {
                 spec:
                   containers:
                   - name: app
-                    image: nginx:1.14.2
+                    image: alpine:3.23
+                    resources:
+                      requests:
+                        cpu: "200m"
+                        memory: "256Mi"
+                      limits:
+                        cpu: "400m"
+                        memory: "512Mi"
                 status:
                   phase: Running
+                  containerStatuses:
+                  - name: app
+                    image: alpine:3.23
+                    resources:
+                      requests:
+                        cpu: "200m"
+                        memory: "256Mi"
+                      limits:
+                        cpu: "400m"
+                        memory: "512Mi"
             "#;
 
             let p = serde_yaml::from_str(pod).unwrap();
@@ -596,8 +624,8 @@ pub mod conditions {
         }
 
         #[test]
-        /// pass when pod resize field is absent
-        fn pod_resized_no_field() {
+        /// pass when containers have no resources defined
+        fn pod_resized_no_resources() {
             use super::{Condition, is_pod_resized};
 
             let pod = r#"
@@ -609,9 +637,12 @@ pub mod conditions {
                 spec:
                   containers:
                   - name: app
-                    image: nginx:1.14.2
+                    image: alpine:3.23
                 status:
                   phase: Running
+                  containerStatuses:
+                  - name: app
+                    image: alpine:3.23
             "#;
 
             let p = serde_yaml::from_str(pod).unwrap();
@@ -627,8 +658,8 @@ pub mod conditions {
         }
 
         #[test]
-        /// fail when PodResizePending condition is True
-        fn pod_resize_pending_condition() {
+        /// fail when spec resources differ from status (resize in progress)
+        fn pod_resize_in_progress() {
             use super::{Condition, is_pod_resized};
 
             let pod = r#"
@@ -640,14 +671,26 @@ pub mod conditions {
                 spec:
                   containers:
                   - name: app
-                    image: nginx:1.14.2
+                    image: alpine:3.23
+                    resources:
+                      requests:
+                        cpu: "200m"
+                        memory: "256Mi"
+                      limits:
+                        cpu: "400m"
+                        memory: "512Mi"
                 status:
                   phase: Running
-                  conditions:
-                  - type: PodResizePending
-                    status: "True"
-                    reason: Deferred
-                    message: "Resize deferred due to insufficient resources"
+                  containerStatuses:
+                  - name: app
+                    image: alpine:3.23
+                    resources:
+                      requests:
+                        cpu: "100m"
+                        memory: "128Mi"
+                      limits:
+                        cpu: "200m"
+                        memory: "256Mi"
             "#;
 
             let p = serde_yaml::from_str(pod).unwrap();
@@ -655,8 +698,8 @@ pub mod conditions {
         }
 
         #[test]
-        /// fail when PodResizeInProgress condition is True
-        fn pod_resize_in_progress_condition() {
+        /// fail when only limits differ (partial resize)
+        fn pod_resize_limits_differ() {
             use super::{Condition, is_pod_resized};
 
             let pod = r#"
@@ -668,14 +711,22 @@ pub mod conditions {
                 spec:
                   containers:
                   - name: app
-                    image: nginx:1.14.2
+                    image: alpine:3.23
+                    resources:
+                      requests:
+                        cpu: "200m"
+                      limits:
+                        cpu: "400m"
                 status:
                   phase: Running
-                  conditions:
-                  - type: PodResizeInProgress
-                    status: "True"
-                    reason: InProgress
-                    message: "Applying resource changes"
+                  containerStatuses:
+                  - name: app
+                    image: alpine:3.23
+                    resources:
+                      requests:
+                        cpu: "200m"
+                      limits:
+                        cpu: "200m"
             "#;
 
             let p = serde_yaml::from_str(pod).unwrap();
@@ -683,8 +734,8 @@ pub mod conditions {
         }
 
         #[test]
-        /// pass when PodResizePending condition is False
-        fn pod_resize_pending_false() {
+        /// fail when container status is missing for a spec container
+        fn pod_resize_missing_container_status() {
             use super::{Condition, is_pod_resized};
 
             let pod = r#"
@@ -696,12 +747,61 @@ pub mod conditions {
                 spec:
                   containers:
                   - name: app
-                    image: nginx:1.14.2
+                    image: alpine:3.23
+                    resources:
+                      requests:
+                        cpu: "200m"
                 status:
                   phase: Running
-                  conditions:
-                  - type: PodResizePending
-                    status: "False"
+                  containerStatuses:
+                  - name: other
+                    image: alpine:3.23
+            "#;
+
+            let p = serde_yaml::from_str(pod).unwrap();
+            assert!(!is_pod_resized().matches_object(Some(&p)))
+        }
+
+        #[test]
+        /// pass when multiple containers all have matching resources
+        fn pod_resize_multiple_containers_complete() {
+            use super::{Condition, is_pod_resized};
+
+            let pod = r#"
+                apiVersion: v1
+                kind: Pod
+                metadata:
+                  name: resize-demo
+                  namespace: default
+                spec:
+                  containers:
+                  - name: app
+                    image: alpine:3.23
+                    resources:
+                      requests:
+                        cpu: "200m"
+                      limits:
+                        cpu: "400m"
+                  - name: sidecar
+                    image: busybox
+                    resources:
+                      requests:
+                        memory: "64Mi"
+                status:
+                  phase: Running
+                  containerStatuses:
+                  - name: app
+                    image: alpine:3.23
+                    resources:
+                      requests:
+                        cpu: "200m"
+                      limits:
+                        cpu: "400m"
+                  - name: sidecar
+                    image: busybox
+                    resources:
+                      requests:
+                        memory: "64Mi"
             "#;
 
             let p = serde_yaml::from_str(pod).unwrap();
@@ -709,8 +809,8 @@ pub mod conditions {
         }
 
         #[test]
-        /// pass when neither resize condition is present
-        fn pod_resize_no_conditions() {
+        /// fail when one of multiple containers has mismatched resources
+        fn pod_resize_multiple_containers_partial() {
             use super::{Condition, is_pod_resized};
 
             let pod = r#"
@@ -722,16 +822,32 @@ pub mod conditions {
                 spec:
                   containers:
                   - name: app
-                    image: nginx:1.14.2
+                    image: alpine:3.23
+                    resources:
+                      requests:
+                        cpu: "200m"
+                  - name: sidecar
+                    image: busybox
+                    resources:
+                      requests:
+                        memory: "128Mi"
                 status:
                   phase: Running
-                  conditions:
-                  - type: Ready
-                    status: "True"
+                  containerStatuses:
+                  - name: app
+                    image: alpine:3.23
+                    resources:
+                      requests:
+                        cpu: "200m"
+                  - name: sidecar
+                    image: busybox
+                    resources:
+                      requests:
+                        memory: "64Mi"
             "#;
 
             let p = serde_yaml::from_str(pod).unwrap();
-            assert!(is_pod_resized().matches_object(Some(&p)))
+            assert!(!is_pod_resized().matches_object(Some(&p)))
         }
 
         #[test]
