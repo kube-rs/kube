@@ -316,5 +316,8 @@ fn main() {
         bench_init_with_modify(&mut results).await;
     });
 
-    println!("{}", serde_json::to_string_pretty(&results).expect("failed to serialize results"));
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&results).expect("failed to serialize results")
+    );
 }
