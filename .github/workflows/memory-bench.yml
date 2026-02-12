@@ -18,15 +18,19 @@ jobs:
       - name: Run memory benchmark
         run: cargo bench -p kube-runtime --bench memory > bench-result.json
 
+      - name: Restore benchmark baseline
+        uses: actions/cache@v4
+        with:
+          path: ./bench-data
+          key: memory-bench-data
+
       - name: Compare benchmarks
         uses: benchmark-action/github-action-benchmark@v1
         with:
           tool: customSmallerIsBetter
           output-file-path: bench-result.json
+          external-data-json-path: ./bench-data/data.json
           github-token: ${{ secrets.GITHUB_TOKEN }}
           comment-on-alert: true
           alert-threshold: "150%"
-          # Only push baseline data on main branch merges
-          auto-push: false
-          save-data-file: true
-          gh-pages-branch: gh-pages
+          fail-on-alert: true
