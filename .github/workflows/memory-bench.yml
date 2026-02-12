@@ -1,0 +1,32 @@
+name: memory-bench
+on:
+  pull_request:
+
+# Spend CI time only on latest ref: https://docs.github.com/en/actions/using-jobs/using-concurrency
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  memory-bench:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Run memory benchmark
+        run: cargo bench -p kube-runtime --bench memory > bench-result.json
+
+      - name: Compare benchmarks
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          tool: customSmallerIsBetter
+          output-file-path: bench-result.json
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          comment-on-alert: true
+          alert-threshold: "150%"
+          # Only push baseline data on main branch merges
+          auto-push: false
+          save-data-file: true
+          gh-pages-branch: gh-pages
