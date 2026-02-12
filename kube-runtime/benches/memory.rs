@@ -189,15 +189,34 @@ async fn run_reflector_with_modify(
 const NUM_OBJECTS: usize = 10_000;
 const NUM_UPDATES: usize = 5_000;
 
-fn print_stats(scenario: &str, extra: &str) {
-    let stats = dhat::HeapStats::get();
-    println!(
-        "scenario={scenario} {extra}peak_bytes={} total_allocated={} alloc_count={}",
-        stats.max_bytes, stats.total_bytes, stats.total_blocks
-    );
+/// Single benchmark metric in github-action-benchmark's `customSmallerIsBetter` format.
+#[derive(serde::Serialize)]
+struct BenchMetric {
+    name: String,
+    unit: &'static str,
+    value: u64,
 }
 
-async fn bench_init_listwatch() {
+fn collect_stats(scenario: &str, results: &mut Vec<BenchMetric>) {
+    let stats = dhat::HeapStats::get();
+    results.push(BenchMetric {
+        name: format!("{scenario} - peak_bytes"),
+        unit: "bytes",
+        value: stats.max_bytes as u64,
+    });
+    results.push(BenchMetric {
+        name: format!("{scenario} - total_allocated"),
+        unit: "bytes",
+        value: stats.total_bytes as u64,
+    });
+    results.push(BenchMetric {
+        name: format!("{scenario} - alloc_count"),
+        unit: "allocations",
+        value: stats.total_blocks as u64,
+    });
+}
+
+async fn bench_init_listwatch(results: &mut Vec<BenchMetric>) {
     let _profiler = dhat::Profiler::builder().testing().build();
 
     let cms = generate_configmaps(NUM_OBJECTS);
@@ -209,10 +228,10 @@ async fn bench_init_listwatch() {
         NUM_OBJECTS,
         "store should contain all objects"
     );
-    print_stats("init_listwatch", &format!("objects={NUM_OBJECTS} "));
+    collect_stats("init_listwatch", results);
 }
 
-async fn bench_steady_state() {
+async fn bench_steady_state(results: &mut Vec<BenchMetric>) {
     let _profiler = dhat::Profiler::builder().testing().build();
 
     let cms = generate_configmaps(NUM_OBJECTS);
@@ -226,13 +245,10 @@ async fn bench_steady_state() {
         "store should contain at least {expected_min} objects, got {}",
         store.state().len()
     );
-    print_stats(
-        "steady_state",
-        &format!("objects={NUM_OBJECTS} updates={NUM_UPDATES} "),
-    );
+    collect_stats("steady_state", results);
 }
 
-async fn bench_relist() {
+async fn bench_relist(results: &mut Vec<BenchMetric>) {
     let _profiler = dhat::Profiler::builder().testing().build();
 
     let cms = generate_configmaps(NUM_OBJECTS);
@@ -244,10 +260,10 @@ async fn bench_relist() {
         NUM_OBJECTS,
         "store should contain all objects after relist"
     );
-    print_stats("relist", &format!("objects={NUM_OBJECTS} updates={NUM_UPDATES} "));
+    collect_stats("relist", results);
 }
 
-async fn bench_init_without_modify() {
+async fn bench_init_without_modify(results: &mut Vec<BenchMetric>) {
     let _profiler = dhat::Profiler::builder().testing().build();
 
     let cms = generate_configmaps_with_managed_fields(NUM_OBJECTS);
@@ -259,10 +275,10 @@ async fn bench_init_without_modify() {
         NUM_OBJECTS,
         "store should contain all objects without modify"
     );
-    print_stats("init_without_modify", &format!("objects={NUM_OBJECTS} "));
+    collect_stats("init_without_modify", results);
 }
 
-async fn bench_init_with_modify() {
+async fn bench_init_with_modify(results: &mut Vec<BenchMetric>) {
     let _profiler = dhat::Profiler::builder().testing().build();
 
     let cms = generate_configmaps_with_managed_fields(NUM_OBJECTS);
@@ -282,7 +298,7 @@ async fn bench_init_with_modify() {
             "managed_fields should be stripped by modify()"
         );
     }
-    print_stats("init_with_modify", &format!("objects={NUM_OBJECTS} "));
+    collect_stats("init_with_modify", results);
 }
 
 fn main() {
@@ -291,11 +307,14 @@ fn main() {
         .build()
         .expect("failed to build tokio runtime");
 
+    let mut results = Vec::new();
     rt.block_on(async {
-        bench_init_listwatch().await;
-        bench_steady_state().await;
-        bench_relist().await;
-        bench_init_without_modify().await;
-        bench_init_with_modify().await;
+        bench_init_listwatch(&mut results).await;
+        bench_steady_state(&mut results).await;
+        bench_relist(&mut results).await;
+        bench_init_without_modify(&mut results).await;
+        bench_init_with_modify(&mut results).await;
     });
+
+    println!("{}", serde_json::to_string_pretty(&results).expect("failed to serialize results"));
 }
