@@ -1,25 +1,24 @@
 //! Publishes events for objects for kubernetes >= 1.19
-use std::{
-    collections::HashMap,
-    hash::{Hash, Hasher},
-    sync::Arc,
-};
-
 use k8s_openapi::{
     api::{
         core::v1::ObjectReference,
         events::v1::{Event as K8sEvent, EventSeries},
     },
     apimachinery::pkg::apis::meta::v1::{MicroTime, ObjectMeta},
-    chrono::{Duration, Utc},
+    jiff::{SignedDuration, Timestamp},
 };
 use kube_client::{
     Client, ResourceExt,
     api::{Api, Patch, PatchParams, PostParams},
 };
+use std::{
+    collections::HashMap,
+    hash::{Hash, Hasher},
+    sync::Arc,
+};
 use tokio::sync::RwLock;
 
-const CACHE_TTL: Duration = Duration::minutes(6);
+const CACHE_TTL: SignedDuration = SignedDuration::from_mins(6);
 
 /// Minimal event type for publishing through [`Recorder::publish`].
 ///
@@ -255,11 +254,11 @@ impl Recorder {
         }
     }
 
-    // See https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.22/#event-v1-events-k8s-io
+    // See https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.35/#event-v1-events-k8s-io
     // for more detail on the fields
     // and what's expected: https://kubernetes.io/docs/reference/using-api/deprecation-guide/#event-v125
     fn generate_event(&self, ev: &Event, reference: &ObjectReference) -> K8sEvent {
-        let now = Utc::now();
+        let now = Timestamp::now();
         K8sEvent {
             action: Some(ev.action.clone()),
             reason: Some(ev.reason.clone()),
@@ -275,7 +274,7 @@ impl Recorder {
                 name: Some(format!(
                     "{}.{:x}",
                     reference.name.as_ref().unwrap_or(&self.reporter.controller),
-                    now.timestamp_nanos_opt().unwrap_or_else(|| now.timestamp())
+                    now.as_nanosecond()
                 )),
                 ..Default::default()
             },
@@ -307,7 +306,7 @@ impl Recorder {
     ///
     /// Returns an [`Error`](`kube_client::Error`) if the event is rejected by Kubernetes.
     pub async fn publish(&self, ev: &Event, reference: &ObjectReference) -> Result<(), kube_client::Error> {
-        let now = Utc::now();
+        let now = Timestamp::now();
 
         // gc past events older than now + CACHE_TTL
         self.cache.write().await.retain(|_, v| {
@@ -365,7 +364,7 @@ mod test {
             events::v1::Event as K8sEvent,
         },
         apimachinery::pkg::apis::meta::v1::MicroTime,
-        chrono::{Duration, Utc},
+        jiff::{SignedDuration, Timestamp},
     };
     use kube::{Api, Client, Resource};
 
@@ -509,8 +508,8 @@ mod test {
         let recorder = Recorder::new(client.clone(), reporter);
 
         recorder.publish(&ev, &s.object_ref(&())).await?;
-        let now = Utc::now();
-        let past = now - Duration::minutes(10);
+        let now = Timestamp::now();
+        let past = now - SignedDuration::from_mins(10);
         recorder.cache.write().await.entry(key).and_modify(|e| {
             e.event_time = Some(MicroTime(past));
         });

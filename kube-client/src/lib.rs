@@ -135,7 +135,6 @@ mod test {
         client::ConfigExt,
     };
     use futures::{AsyncBufRead, AsyncBufReadExt, StreamExt, TryStreamExt};
-    use hyper::Uri;
     use k8s_openapi::api::core::v1::{EphemeralContainer, Pod, PodSpec};
     use kube_core::{
         params::{DeleteParams, Patch, PatchParams, PostParams, WatchParams},
@@ -313,7 +312,7 @@ mod test {
                 "restartPolicy": "Never",
                 "containers": [{
                   "name": "busybox",
-                  "image": "busybox:1.34.1",
+                  "image": "busybox:stable",
                   "command": ["sh", "-c", "sleep 30"],
                 }],
             }
@@ -395,7 +394,7 @@ mod test {
                 "restartPolicy": "Never",
                 "containers": [{
                   "name": "busybox",
-                  "image": "busybox:1.34.1",
+                  "image": "busybox:stable",
                   "command": ["sh", "-c", "sleep 30"],
                 }],
             }
@@ -542,7 +541,7 @@ mod test {
                 "restartPolicy": "Never",
                 "containers": [{
                   "name": "busybox",
-                  "image": "busybox:1.34.1",
+                  "image": "busybox:stable",
                   "command": ["sh", "-c", "for i in $(seq 1 5); do echo kube $i; sleep 0.1; done"],
                 }],
             }
@@ -628,7 +627,7 @@ mod test {
                 "restartPolicy": "Never",
                 "containers": [{
                   "name": "busybox",
-                  "image": "busybox:1.34.1",
+                  "image": "busybox:stable",
                   "command": ["sh", "-c", "sleep 30s"],
                 }],
             }
@@ -769,7 +768,7 @@ mod test {
                 "restartPolicy": "Never",
                 "containers": [{
                   "name": "busybox",
-                  "image": "busybox:1.34.1",
+                  "image": "busybox:stable",
                   "command": ["sh", "-c", "sleep 2"],
                 }],
             }
@@ -808,7 +807,7 @@ mod test {
         let mut busybox_eph: EphemeralContainer = serde_json::from_value(json!(
             {
                 "name": "myephemeralcontainer1",
-                "image": "busybox:1.34.1",
+                "image": "busybox:stable",
                 "command": ["sh", "-c", "sleep 2"],
             }
         ))?;
@@ -842,7 +841,7 @@ mod test {
         busybox_eph = serde_json::from_value(json!(
             {
                 "name": "myephemeralcontainer2",
-                "image": "busybox:1.35.0",
+                "image": "busybox:stable",
                 "command": ["sh", "-c", "sleep 1"],
             }
         ))?;
@@ -920,7 +919,7 @@ mod test {
                 "restartPolicy": "Never",
                 "containers": [{
                   "name": "busybox",
-                  "image": "busybox:1.34.1",
+                  "image": "busybox:stable",
                   "command": ["sh", "-c", "sleep 30"],
                 }],
             }
@@ -954,7 +953,7 @@ mod test {
 
         let mut config = Config::infer().await?;
         config.accept_invalid_certs = true;
-        config.cluster_url = "https://localhost:10250".to_string().parse::<Uri>().unwrap();
+        config.cluster_url = "https://localhost:10250".parse().unwrap();
         let kubelet_client: Client = config.try_into()?;
 
         // Verify exec works and we can get the output

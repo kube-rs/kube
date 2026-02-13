@@ -8,6 +8,9 @@
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ListMeta, ObjectMeta};
 use serde::{Deserialize, Serialize};
 
+/// Content negotiation Accept header for Aggregated Discovery API v2
+pub const ACCEPT_AGGREGATED_DISCOVERY_V2: &str = "application/json;g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList,application/json;g=apidiscovery.k8s.io;v=v2beta1;as=APIGroupDiscoveryList,application/json";
+
 /// APIGroupDiscoveryList is a resource containing a list of APIGroupDiscovery.
 /// This is one of the types that can be returned from the /api and /apis endpoint
 /// and contains an aggregated list of API resources (built-ins, Custom Resource Definitions, resources from aggregated servers)
