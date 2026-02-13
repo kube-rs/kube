@@ -73,7 +73,11 @@ async fn reconcile(generator: Arc<ConfigMapGenerator>, ctx: Arc<Data>) -> Result
 }
 
 /// The controller triggers this on reconcile errors
-fn error_policy(_object: Arc<ConfigMapGenerator>, _error: &Error, _ctx: Arc<Data>) -> Action {
+fn error_policy(_object: Arc<ConfigMapGenerator>, error: &Error, _ctx: Arc<Data>) -> Action {
+    match error {
+        Error::ConfigMapCreationFailed(e) => warn!("cf creation failed: {e:?}"),
+        Error::MissingObjectKey(s) => warn!("missing key {s}"),
+    }
     Action::requeue(Duration::from_secs(1))
 }
 
