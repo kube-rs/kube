@@ -205,6 +205,10 @@ name = "pod_resize"
 path = "pod_resize.rs"
 
 [[example]]
+name = "pod_resize_wait"
+path = "pod_resize_wait.rs"
+
+[[example]]
 name = "pod_reflector"
 path = "pod_reflector.rs"
 
