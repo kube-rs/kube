@@ -18,19 +18,36 @@ use std::{clone::Clone, collections::VecDeque, fmt::Debug, future, time::Duratio
 use thiserror::Error;
 use tracing::{debug, error, warn};
 
+/// Errors that a watcher can emit
+///
+/// These are all considered retryable from a watcher's point of view,
+/// even though they may require patching of rbac/netpols in the background to fix.
+///
+/// To avoid constantly looping errors, make sure backoff is applied.
 #[derive(Debug, Error)]
 pub enum Error {
+    /// Received a raw error while performing an api.list
     #[error("failed to perform initial object list: {0}")]
     InitialListFailed(#[source] kube_client::Error),
+
+    /// Received a raw error while starting an api.watch
     #[error("failed to start watching object: {0}")]
     WatchStartFailed(#[source] kube_client::Error),
+
+    /// Received a `WatchEvent::Error` from the apiserver
     #[error("error returned by apiserver during watch: {0}")]
     WatchError(#[source] Box<Status>),
+
+    /// Received a raw error while watching
     #[error("watch stream failed: {0}")]
     WatchFailed(#[source] kube_client::Error),
+
+    /// Missing resource version field from api server
     #[error("no metadata.resourceVersion in watch result (does resource support watch?)")]
     NoResourceVersion,
 }
+
+/// Type alias for Result with a `watcher::Error` as default.
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 #[derive(Debug, Clone)]
@@ -864,6 +881,7 @@ pub fn watch_object<K: Resource + Clone + DeserializeOwned + Debug + Send + 'sta
         })
 }
 
+/// A struct with a manually configured exponential backoff
 pub struct ExponentialBackoff {
     inner: backon::ExponentialBackoff,
     builder: backon::ExponentialBuilder,

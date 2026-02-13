@@ -16,7 +16,9 @@ use tokio_util::time::delay_queue::{self, DelayQueue};
 /// A request to re-emit `message` at a given `Instant` (`run_at`).
 #[derive(Debug)]
 pub struct ScheduleRequest<T> {
+    /// The message to be scheduled (typically a `ReconcileRequest`)
     pub message: T,
+    /// The time the message is scheduled for
     pub run_at: Instant,
 }
 
@@ -26,6 +28,10 @@ struct ScheduledEntry {
     queue_key: delay_queue::Key,
 }
 
+/// A scheduler with all internal state
+///
+/// Only expected to be constructed internally.
+/// Constructors are `scheduler` and `debounced_scheduler`.
 #[pin_project(project = SchedulerProj)]
 pub struct Scheduler<T, R> {
     /// Queue of already-scheduled messages.
