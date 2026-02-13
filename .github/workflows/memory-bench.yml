@@ -2,7 +2,19 @@ name: memory-bench
 on:
   push:
     branches: [main]
+    paths:
+      - kube-runtime/**
+      - kube-client/**
+      - kube-core/**
+      - Cargo.toml
+      - Cargo.lock
   pull_request:
+    paths:
+      - kube-runtime/**
+      - kube-client/**
+      - kube-core/**
+      - Cargo.toml
+      - Cargo.lock
 
 # Spend CI time only on latest ref: https://docs.github.com/en/actions/using-jobs/using-concurrency
 concurrency:
