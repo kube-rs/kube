@@ -1,0 +1,50 @@
+name: memory-bench
+on:
+  push:
+    branches: [main]
+    paths:
+      - kube-runtime/**
+      - kube-client/**
+      - kube-core/**
+      - Cargo.toml
+      - Cargo.lock
+  pull_request:
+    paths:
+      - kube-runtime/**
+      - kube-client/**
+      - kube-core/**
+      - Cargo.toml
+      - Cargo.lock
+
+# Spend CI time only on latest ref: https://docs.github.com/en/actions/using-jobs/using-concurrency
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  memory-bench:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Run memory benchmark
+        run: cargo bench -p kube-runtime --bench memory > bench-result.json
+
+      - name: Restore benchmark baseline
+        uses: actions/cache@v4
+        with:
+          path: ./bench-data
+          key: memory-bench-data
+
+      - name: Compare benchmarks
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          tool: customSmallerIsBetter
+          output-file-path: bench-result.json
+          external-data-json-path: ./bench-data/data.json
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          comment-on-alert: true
+          alert-threshold: "150%"
+          fail-on-alert: true
