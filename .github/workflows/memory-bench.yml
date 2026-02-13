@@ -1,5 +1,7 @@
 name: memory-bench
 on:
+  push:
+    branches: [main]
   pull_request:
 
 # Spend CI time only on latest ref: https://docs.github.com/en/actions/using-jobs/using-concurrency
