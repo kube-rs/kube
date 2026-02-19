@@ -36,7 +36,7 @@ use tracing::{Instrument, info_span};
 mod future_hash_map;
 mod runner;
 
-/// The reasons the `Runner` can fail
+/// The reasons the internal runner can fail
 pub type RunnerError = runner::Error<reflector::store::WriterDropped>;
 
 /// Errors returned by the applier and visible in a controller stream if inspecting it
@@ -76,7 +76,7 @@ pub enum Error<ReconcilerErr: 'static, QueueErr: 'static> {
     #[error("event queue error")]
     QueueError(#[source] QueueErr),
 
-    /// The `Runner` returned an error
+    /// The internal runner returned an error
     #[error("runner error")]
     RunnerError(#[source] RunnerError),
 }
