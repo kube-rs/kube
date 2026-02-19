@@ -9,8 +9,10 @@ use thiserror::Error;
 
 use crate::watcher::{self, watch_object};
 
+/// Errors from `await_condition`
 #[derive(Debug, Error)]
 pub enum Error {
+    /// The underlying watcher failed to probe the stream
     #[error("failed to probe for whether the condition is fulfilled yet: {0}")]
     ProbeFailed(#[source] watcher::Error),
 }
@@ -91,6 +93,7 @@ where
 /// }
 /// ```
 pub trait Condition<K> {
+    /// The main trait condition that must be implemented
     fn matches_object(&self, obj: Option<&K>) -> bool;
 
     /// Returns a `Condition` that holds if `self` does not
@@ -1015,12 +1018,18 @@ pub mod delete {
     use std::fmt::Debug;
     use thiserror::Error;
 
+    /// Errors from `delete_and_finalize`
     #[derive(Debug, Error)]
     pub enum Error {
+        /// No uid found on metadata.uid on deleted object
         #[error("deleted object has no UID to wait for")]
         NoUid,
+
+        /// Apiserver returned an error to the delete call
         #[error("failed to delete object: {0}")]
         Delete(#[source] kube_client::Error),
+
+        /// A watcher failed to probe the object for the `is_deleted` condition
         #[error("failed to wait for object to be deleted: {0}")]
         Await(#[source] super::Error),
     }

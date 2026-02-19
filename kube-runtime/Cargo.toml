@@ -23,10 +23,7 @@ features = ["k8s-openapi/latest", "unstable-runtime"]
 rustdoc-args = ["--cfg", "docsrs"]
 
 [lints]
-#workspace = true
-rust.unsafe_code = "forbid"
-# TODO: make this pass and switch to workspace lints
-#rust.missing_docs = "warn"
+workspace = true
 
 [dependencies]
 futures = { workspace = true, features = ["async-await"] }
