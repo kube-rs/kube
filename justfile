@@ -62,8 +62,8 @@ hack:
 
 minimal-versions:
   cargo hack --remove-dev-deps --workspace
-  cargo +nightly update -Z minimal-versions
-  cargo check --workspace --all-features
+  cargo +nightly update -Z direct-minimal-versions
+  K8S_OPENAPI_ENABLED_VERSION=1.31 cargo check --all-features
 
 readme:
   rustdoc README.md --test --edition=2024
