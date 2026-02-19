@@ -41,7 +41,10 @@ pub type RunnerError = runner::Error<reflector::store::WriterDropped>;
 
 /// Errors returned by the applier and visible in a controller stream if inspecting it
 ///
-/// These are not passed to the reconciler, and only provided as a debug.
+/// WARNING: These errors do not terminate `Controller::run`, and are not passed to the `reconcile` fn
+/// as they exist primarily for diagnostics.
+///
+/// To inspect these errors, you can run a for_each on the run stream:
 ///
 /// ```compile_fail
 ///    Controller::new(api, watcher_config)
