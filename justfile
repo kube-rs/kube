@@ -60,6 +60,11 @@ hack:
   # Without any grouping this test takes an hour and has to test >11k combinations.
   # Skipped oauth and oidc, as these compile fails without a tls stack.
 
+minimal-versions:
+  cargo hack --remove-dev-deps --workspace
+  cargo +nightly update -Z minimal-versions
+  cargo check --workspace --all-features
+
 readme:
   rustdoc README.md --test --edition=2024
 
