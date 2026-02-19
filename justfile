@@ -60,6 +60,11 @@ hack:
   # Without any grouping this test takes an hour and has to test >11k combinations.
   # Skipped oauth and oidc, as these compile fails without a tls stack.
 
+minimal-versions:
+  cargo hack --remove-dev-deps --workspace
+  cargo +nightly update -Z direct-minimal-versions
+  K8S_OPENAPI_ENABLED_VERSION=1.31 cargo check --all-features
+
 readme:
   rustdoc README.md --test --edition=2024
 
@@ -121,4 +126,6 @@ bump-k8s:
   # bump mk8sv badge
   badge="[![Tested against Kubernetes ${min_dots} and above](https://img.shields.io/badge/MK8SV-${min_dots}-326ce5.svg)](https://kube.rs/kubernetes-version)"
   sd "^.+badge/MK8SV.+$" "${badge}" README.md
+  # bump K8S_OPENAPI_ENABLED_VERSION in minimal-versions recipe
+  sd "K8S_OPENAPI_ENABLED_VERSION=\S+" "K8S_OPENAPI_ENABLED_VERSION=${min_dots}" justfile
   echo "remember to bump kubernetes-version.md in kube-rs/website"
