@@ -65,7 +65,7 @@ pub enum Error<ReconcilerErr: 'static, QueueErr: 'static> {
     #[error("tried to reconcile object {0} that was not found in local store")]
     ObjectNotFound(ObjectRef<DynamicObject>),
 
-    /// Users reconcile fn failed for the object
+    /// User's reconcile fn failed for the object
     #[error("reconciler for object {1} failed")]
     ReconcilerFailed(#[source] ReconcilerErr, ObjectRef<DynamicObject>),
 
