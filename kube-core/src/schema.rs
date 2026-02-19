@@ -403,11 +403,13 @@ impl Transform for OptionalEnum {
             return;
         };
 
-        if first.contains_key("enum")
-            && !first.contains_key("nullable")
+        // Check if this is an Option<T> pattern:
+        // anyOf with two elements where second is { "enum": [null], "nullable": true }
+        if !first.contains_key("nullable")
             && second.get("enum") == Some(&json!([null]))
             && second.get("nullable") == Some(&json!(true))
         {
+            // Remove anyOf and hoist first element's properties to root
             obj.remove("anyOf");
             obj.append(&mut first.clone());
             obj.insert("nullable".to_string(), Value::Bool(true));

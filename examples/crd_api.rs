@@ -23,7 +23,7 @@ use kube::{
     spec_replicas_path = ".spec.replicas",
     status_replicas_path = ".status.replicas"
 ))]
-#[kube(printcolumn = r#"{"name":"Team", "jsonPath": ".spec.metadata.team", "type": "string"}"#)]
+#[kube(printcolumn(name = "Team", json_path = ".spec.metadata.team", type_ = "string"))]
 pub struct FooSpec {
     #[schemars(length(min = 3))]
     #[garde(length(min = 3))]

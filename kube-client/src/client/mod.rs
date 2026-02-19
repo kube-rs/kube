@@ -11,7 +11,8 @@ use either::{Either, Left, Right};
 use futures::{AsyncBufRead, StreamExt, TryStream, TryStreamExt, future::BoxFuture};
 use http::{self, Request, Response};
 use http_body_util::BodyExt;
-#[cfg(feature = "ws")] use hyper_util::rt::TokioIo;
+#[cfg(feature = "ws")]
+use hyper_util::rt::TokioIo;
 use jiff::Timestamp;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1 as k8s_meta_v1;
 use kube_core::{discovery::v2::ACCEPT_AGGREGATED_DISCOVERY_V2, response::Status};
@@ -48,12 +49,15 @@ pub use config_ext::ConfigExt;
 pub mod middleware;
 pub mod retry;
 
-#[cfg(any(feature = "rustls-tls", feature = "openssl-tls"))] mod tls;
+#[cfg(any(feature = "rustls-tls", feature = "openssl-tls"))]
+mod tls;
 
 #[cfg(feature = "openssl-tls")]
 pub use tls::openssl_tls::Error as OpensslTlsError;
-#[cfg(feature = "rustls-tls")] pub use tls::rustls_tls::Error as RustlsTlsError;
-#[cfg(feature = "ws")] mod upgrade;
+#[cfg(feature = "rustls-tls")]
+pub use tls::rustls_tls::Error as RustlsTlsError;
+#[cfg(feature = "ws")]
+mod upgrade;
 
 #[cfg(feature = "oauth")]
 #[cfg_attr(docsrs, doc(cfg(feature = "oauth")))]
@@ -63,7 +67,8 @@ pub use auth::OAuthError;
 #[cfg_attr(docsrs, doc(cfg(feature = "oidc")))]
 pub use auth::oidc_errors;
 
-#[cfg(feature = "ws")] pub use upgrade::UpgradeConnectionError;
+#[cfg(feature = "ws")]
+pub use upgrade::UpgradeConnectionError;
 
 #[cfg(feature = "kubelet-debug")]
 #[cfg_attr(docsrs, doc(cfg(feature = "kubelet-debug")))]
@@ -407,24 +412,14 @@ impl Client {
 impl Client {
     /// Returns apiserver version.
     pub async fn apiserver_version(&self) -> Result<k8s_openapi::apimachinery::pkg::version::Info> {
-        self.request(
-            Request::builder()
-                .uri("/version")
-                .body(vec![])
-                .map_err(Error::HttpError)?,
-        )
-        .await
+        self.request(Request::get("/version").body(vec![]).map_err(Error::HttpError)?)
+            .await
     }
 
     /// Lists api groups that apiserver serves.
     pub async fn list_api_groups(&self) -> Result<k8s_meta_v1::APIGroupList> {
-        self.request(
-            Request::builder()
-                .uri("/apis")
-                .body(vec![])
-                .map_err(Error::HttpError)?,
-        )
-        .await
+        self.request(Request::get("/apis").body(vec![]).map_err(Error::HttpError)?)
+            .await
     }
 
     /// Lists resources served in given API group.
@@ -447,36 +442,21 @@ impl Client {
     /// ```
     pub async fn list_api_group_resources(&self, apiversion: &str) -> Result<k8s_meta_v1::APIResourceList> {
         let url = format!("/apis/{apiversion}");
-        self.request(
-            Request::builder()
-                .uri(url)
-                .body(vec![])
-                .map_err(Error::HttpError)?,
-        )
-        .await
+        self.request(Request::get(url).body(vec![]).map_err(Error::HttpError)?)
+            .await
     }
 
     /// Lists versions of `core` a.k.a. `""` legacy API group.
     pub async fn list_core_api_versions(&self) -> Result<k8s_meta_v1::APIVersions> {
-        self.request(
-            Request::builder()
-                .uri("/api")
-                .body(vec![])
-                .map_err(Error::HttpError)?,
-        )
-        .await
+        self.request(Request::get("/api").body(vec![]).map_err(Error::HttpError)?)
+            .await
     }
 
     /// Lists resources served in particular `core` group version.
     pub async fn list_core_api_resources(&self, version: &str) -> Result<k8s_meta_v1::APIResourceList> {
         let url = format!("/api/{version}");
-        self.request(
-            Request::builder()
-                .uri(url)
-                .body(vec![])
-                .map_err(Error::HttpError)?,
-        )
-        .await
+        self.request(Request::get(url).body(vec![]).map_err(Error::HttpError)?)
+            .await
     }
 }
 
@@ -512,8 +492,7 @@ impl Client {
     /// ```
     pub async fn list_api_groups_aggregated(&self) -> Result<APIGroupDiscoveryList> {
         self.request(
-            Request::builder()
-                .uri("/apis")
+            Request::get("/apis")
                 .header(http::header::ACCEPT, ACCEPT_AGGREGATED_DISCOVERY_V2)
                 .body(vec![])
                 .map_err(Error::HttpError)?,
@@ -545,8 +524,7 @@ impl Client {
     /// ```
     pub async fn list_core_api_versions_aggregated(&self) -> Result<APIGroupDiscoveryList> {
         self.request(
-            Request::builder()
-                .uri("/api")
+            Request::get("/api")
                 .header(http::header::ACCEPT, ACCEPT_AGGREGATED_DISCOVERY_V2)
                 .body(vec![])
                 .map_err(Error::HttpError)?,
@@ -676,11 +654,7 @@ mod tests {
                 }
             }))
             .unwrap();
-            send.send_response(
-                Response::builder()
-                    .body(Body::from(serde_json::to_vec(&pod).unwrap()))
-                    .unwrap(),
-            );
+            send.send_response(Response::new(Body::from(serde_json::to_vec(&pod).unwrap())));
         });
 
         let pods: Api<Pod> = Api::default_namespaced(Client::new(mock_service, "default"));
