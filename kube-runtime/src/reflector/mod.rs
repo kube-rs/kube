@@ -141,7 +141,7 @@ mod tests {
     use futures::{StreamExt, TryStreamExt, stream};
     use k8s_openapi::{api::core::v1::ConfigMap, apimachinery::pkg::apis::meta::v1::ObjectMeta};
     use rand::{
-        Rng,
+        RngExt,
         distr::{Bernoulli, Uniform},
     };
     use std::collections::{BTreeMap, HashMap};

@@ -301,7 +301,7 @@ where
                 }
 
                 // Odd channels are for errors for (n - 1)/2 th port
-                if ch % 2 != 0 {
+                if !ch.is_multiple_of(2) {
                     // A port sends at most one error message because it's considered unusable after this.
                     if let Some(sender) = error_senders[port_index].take() {
                         let s = String::from_utf8(bytes.into_iter().collect())

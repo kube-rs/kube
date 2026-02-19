@@ -13,10 +13,8 @@ use hyper_util::{
 
 use jiff::Timestamp;
 use std::time::Duration;
-use tower::{BoxError, Layer, Service, ServiceBuilder, util::BoxService};
-use tower_http::{
-    classify::ServerErrorsFailureClass, map_response_body::MapResponseBodyLayer, trace::TraceLayer,
-};
+use tower::{BoxError, Layer, Service, ServiceBuilder, ServiceExt as _, util::BoxService};
+use tower_http::{ServiceExt as _, classify::ServerErrorsFailureClass, trace::TraceLayer};
 use tracing::Span;
 
 use super::body::Body;
@@ -256,12 +254,11 @@ where
     let (_, expiration) = config.exec_identity_pem();
 
     let client = ClientBuilder::new(
-        BoxService::new(
-            MapResponseBodyLayer::new(|body| {
+        service
+            .map_response_body(|body| {
                 Box::new(http_body_util::BodyExt::map_err(body, BoxError::from)) as Box<DynBody>
             })
-            .layer(service),
-        ),
+            .boxed(),
         default_ns,
     )
     .with_valid_until(expiration);

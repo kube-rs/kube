@@ -9,7 +9,6 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
-
 // See `crd_derive_schema` example for how the schema generated from this struct affects defaulting and validation.
 #[derive(CustomResource, Serialize, Deserialize, Debug, PartialEq, Clone, KubeSchema)]
 #[kube(
@@ -81,6 +80,9 @@ struct FooSpec {
     x_kubernetes_set: Vec<String>,
 
     optional_enum: Option<Gender>,
+
+    /// Preferred gender
+    optional_enum_with_doc: Option<Gender>,
 }
 
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize, JsonSchema)]
@@ -192,6 +194,7 @@ fn test_serialized_matches_expected() {
             set: HashSet::from(["foo".to_owned()]),
             x_kubernetes_set: vec![],
             optional_enum: Some(Gender::Other),
+            optional_enum_with_doc: Some(Gender::Other),
         }))
         .unwrap(),
         serde_json::json!({
@@ -228,6 +231,7 @@ fn test_serialized_matches_expected() {
                 "set": ["foo"],
                 "xKubernetesSet": [],
                 "optionalEnum": "Other",
+                "optionalEnumWithDoc": "Other",
             }
         })
     )
@@ -428,6 +432,16 @@ fn test_crd_schema_matches_expected() {
                                                     "Male",
                                                     "Other"
                                                 ],
+                                            },
+                                            "optionalEnumWithDoc": {
+                                                "description": "Preferred gender",
+                                                "nullable": true,
+                                                "type": "string",
+                                                "enum": [
+                                                    "Female",
+                                                    "Male",
+                                                    "Other"
+                                                ],
                                             }
                                         },
                                         "required": [
@@ -493,4 +507,74 @@ fn flattening() {
         .unwrap()["spec"];
     assert_eq!(spec.x_kubernetes_preserve_unknown_fields, Some(true));
     assert_eq!(spec.additional_properties, None);
+}
+
+// Test for Option<IntOrString> nullable handling (issue #1869)
+#[derive(CustomResource, Deserialize, Serialize, Clone, Debug, JsonSchema)]
+#[kube(group = "clux.dev", version = "v1", kind = "IntOrStringTest")]
+pub struct IntOrStringTestSpec {
+    pub required_int_or_string: k8s_openapi::apimachinery::pkg::util::intstr::IntOrString,
+    pub optional_int_or_string: Option<k8s_openapi::apimachinery::pkg::util::intstr::IntOrString>,
+}
+
+// Test for deny_unknown_fields handling (issue #1828)
+#[derive(CustomResource, Deserialize, Serialize, Clone, Debug, JsonSchema)]
+#[kube(group = "clux.dev", version = "v1", kind = "DenyUnknown")]
+pub struct DenyUnknownSpec {
+    pub subitem: SubItemDenyUnknown,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SubItemDenyUnknown {
+    pub one: String,
+    pub two: bool,
+    pub three: i32,
+}
+
+#[test]
+fn deny_unknown_fields() {
+    use kube::core::CustomResourceExt;
+    let crd = DenyUnknown::crd();
+    let spec_schema = &crd.spec.versions[0]
+        .schema
+        .as_ref()
+        .unwrap()
+        .open_api_v3_schema
+        .as_ref()
+        .unwrap()
+        .properties
+        .as_ref()
+        .unwrap()["spec"];
+
+    let subitem_schema = &spec_schema.properties.as_ref().unwrap()["subitem"];
+    assert!(subitem_schema.additional_properties.is_none());
+}
+
+#[test]
+fn test_optional_int_or_string_nullable() {
+    use kube::core::CustomResourceExt;
+    let crd = IntOrStringTest::crd();
+    let spec_schema = &crd.spec.versions[0]
+        .schema
+        .as_ref()
+        .unwrap()
+        .open_api_v3_schema
+        .as_ref()
+        .unwrap()
+        .properties
+        .as_ref()
+        .unwrap()["spec"];
+
+    let properties = spec_schema.properties.as_ref().unwrap();
+
+    // Required field should have x-kubernetes-int-or-string but not nullable
+    let required = &properties["required_int_or_string"];
+    assert_eq!(required.x_kubernetes_int_or_string, Some(true));
+    assert_eq!(required.nullable, None);
+
+    // Optional field should have both x-kubernetes-int-or-string and nullable
+    let optional = &properties["optional_int_or_string"];
+    assert_eq!(optional.x_kubernetes_int_or_string, Some(true));
+    assert_eq!(optional.nullable, Some(true));
 }

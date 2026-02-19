@@ -66,8 +66,38 @@ pub struct StructuralSchemaRewriter;
 #[derive(Debug, Clone, Default)]
 pub struct OptionalEnum;
 
+/// Recursively restructures JSON Schema objects so that the `Option<T>` object
+/// where `T` uses `x-kubernetes-int-or-string` is returned per k8s CRD schema expectations.
+///
+/// In kube 2.x with k8s-openapi 0.26.x, the schema output behavior for `Option<Quantity>`
+/// and similar `x-kubernetes-int-or-string` types changed.
+///
+/// Previously given an optional Quantity field:
+///
+/// ```json
+/// { "nullable": true, "type": "string" }
+/// ```
+///
+/// Now, schemars generates `anyOf` for `Option<Quantity>` like:
+///
+/// ```json
+/// {
+///   "anyOf": [
+///     { "x-kubernetes-int-or-string": true },
+///     { "enum": [null], "nullable": true }
+///   ]
+/// }
+/// ```
+///
+/// This transform converts it to:
+///
+/// ```json
+/// { "x-kubernetes-int-or-string": true, "nullable": true }
+/// ```
+#[derive(Debug, Clone, Default)]
+pub struct OptionalIntOrString;
+
 /// A JSON Schema.
-#[allow(clippy::large_enum_variant)]
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema)]
 #[serde(untagged)]
 enum Schema {
@@ -314,16 +344,23 @@ impl Transform for StructuralSchemaRewriter {
             }
         }
 
-        // check for maps without with properties (i.e. flattened maps)
-        // and allow these to persist dynamically
         if let Some(object) = &mut schema.object
             && !object.properties.is_empty()
-            && object.additional_properties.as_deref() == Some(&Schema::Bool(true))
         {
-            object.additional_properties = None;
-            schema
-                .extensions
-                .insert("x-kubernetes-preserve-unknown-fields".into(), true.into());
+            // check for maps without with properties (i.e. flattened maps)
+            // and allow these to persist dynamically
+            match object.additional_properties.as_deref() {
+                Some(&Schema::Bool(true)) => {
+                    object.additional_properties = None;
+                    schema
+                        .extensions
+                        .insert("x-kubernetes-preserve-unknown-fields".into(), true.into());
+                }
+                Some(&Schema::Bool(false)) => {
+                    object.additional_properties = None;
+                }
+                _ => {}
+            }
         }
 
         // As of version 1.30 Kubernetes does not support setting `uniqueItems` to `true`,
@@ -347,7 +384,7 @@ impl Transform for OptionalEnum {
     fn transform(&mut self, schema: &mut schemars::Schema) {
         transform_subschemas(self, schema);
 
-        let Some(obj) = schema.as_object_mut().filter(|o| o.len() == 1) else {
+        let Some(obj) = schema.as_object_mut() else {
             return;
         };
 
@@ -366,14 +403,56 @@ impl Transform for OptionalEnum {
             return;
         };
 
-        if first.contains_key("enum")
-            && !first.contains_key("nullable")
+        // Check if this is an Option<T> pattern:
+        // anyOf with two elements where second is { "enum": [null], "nullable": true }
+        if !first.contains_key("nullable")
             && second.get("enum") == Some(&json!([null]))
             && second.get("nullable") == Some(&json!(true))
         {
+            // Remove anyOf and hoist first element's properties to root
             obj.remove("anyOf");
             obj.append(&mut first.clone());
             obj.insert("nullable".to_string(), Value::Bool(true));
+        }
+    }
+}
+
+impl Transform for OptionalIntOrString {
+    fn transform(&mut self, schema: &mut schemars::Schema) {
+        transform_subschemas(self, schema);
+
+        let Some(obj) = schema.as_object_mut() else {
+            return;
+        };
+
+        // Get required fields list
+        let required: BTreeSet<String> = obj
+            .get("required")
+            .and_then(|v| v.as_array())
+            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+            .unwrap_or_default();
+
+        // Get mutable properties
+        let Some(properties) = obj.get_mut("properties").and_then(|v| v.as_object_mut()) else {
+            return;
+        };
+
+        // For each property that is NOT required and has x-kubernetes-int-or-string,
+        // add nullable: true if not already present
+        for (name, prop_schema) in properties.iter_mut() {
+            if required.contains(name) {
+                continue;
+            }
+
+            let Some(prop_obj) = prop_schema.as_object_mut() else {
+                continue;
+            };
+
+            if prop_obj.get("x-kubernetes-int-or-string") == Some(&json!(true))
+                && !prop_obj.contains_key("nullable")
+            {
+                prop_obj.insert("nullable".to_string(), Value::Bool(true));
+            }
         }
     }
 }

@@ -33,8 +33,6 @@ pub struct ConvertAdmissionReviewError;
 pub const META_KIND: &str = "AdmissionReview";
 /// The `api_version` field in [`TypeMeta`] on the v1 version.
 pub const META_API_VERSION_V1: &str = "admission.k8s.io/v1";
-/// The `api_version` field in [`TypeMeta`] on the v1beta1 version.
-pub const META_API_VERSION_V1BETA1: &str = "admission.k8s.io/v1beta1";
 
 /// The top level struct used for Serializing and Deserializing AdmissionReview
 /// requests and responses.
@@ -234,7 +232,7 @@ pub enum Operation {
 ///     .into_review();
 ///
 /// ```
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct AdmissionResponse {
@@ -301,7 +299,7 @@ impl AdmissionResponse {
             // supported and we won't be using any of the new fields.
             types: TypeMeta {
                 kind: META_KIND.to_owned(),
-                api_version: META_API_VERSION_V1BETA1.to_owned(),
+                api_version: META_API_VERSION_V1.to_owned(),
             },
             uid: Default::default(),
             allowed: false,

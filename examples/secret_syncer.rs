@@ -7,7 +7,6 @@ use futures::StreamExt;
 use k8s_openapi::api::core::v1::{ConfigMap, Secret};
 use kube::{
     api::{Api, DeleteParams, ObjectMeta, Patch, PatchParams, Resource},
-    error::ErrorResponse,
     runtime::{
         controller::{Action, Controller},
         finalizer::{Event, finalizer},
@@ -66,7 +65,7 @@ async fn cleanup(cm: Arc<ConfigMap>, secrets: &kube::Api<Secret>) -> Result<Acti
         .map(|_| ())
         .or_else(|err| match err {
             // Object is already deleted
-            kube::Error::Api(ErrorResponse { code: 404, .. }) => Ok(()),
+            kube::Error::Api(status) if status.is_not_found() => Ok(()),
             err => Err(err),
         })
         .map_err(Error::DeleteSecret)?;

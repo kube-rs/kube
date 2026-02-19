@@ -25,13 +25,18 @@ jobs:
           tool: cargo-tarpaulin@0.32.8
       - uses: nolar/setup-k3d-k3s@v1
         with:
-          version: "v1.30" # MK8SV
+          version: "v1.31" # MK8SV
           # k3d-kube
           k3d-name: kube
           # Used to avoid rate limits when fetching the releases from k3s repo.
           # Anonymous access is limited to 60 requests / hour / worker
           # github-token: ${{ secrets.GITHUB_TOKEN }}
           k3d-args: "-p 10250:10250 --no-rollback --k3s-arg --disable=traefik,servicelb,metrics-server@server:*"
+
+      - name: Import test images into k3d
+        run: |
+          docker pull busybox:stable
+          k3d image import busybox:stable -c kube
 
       - name: Run cargo-tarpaulin
         run: |

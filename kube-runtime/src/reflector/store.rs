@@ -293,7 +293,6 @@ where
 /// A buffer size is used for the underlying message channel. When the buffer is
 /// full, backpressure will be applied by waiting for capacity.
 #[must_use]
-#[allow(clippy::module_name_repetitions)]
 #[cfg(feature = "unstable-runtime-subscribe")]
 pub fn store_shared<K>(buf_size: usize) -> (Store<K>, Writer<K>)
 where
@@ -371,7 +370,6 @@ mod tests {
             },
             ..ConfigMap::default()
         };
-        #[allow(clippy::redundant_clone)] // false positive
         let mut nsed_cm = cm.clone();
         nsed_cm.metadata.namespace = Some("ns".to_string());
         let mut store_w = Writer::default();

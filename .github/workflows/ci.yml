@@ -133,7 +133,7 @@ jobs:
       matrix:
         # Run these tests against older clusters as well
         k8s:
-        - "v1.30" # MK8SV
+        - "v1.31" # MK8SV
         - "latest"
     steps:
       - uses: actions/checkout@v6
@@ -154,6 +154,11 @@ jobs:
           # github-token: ${{ secrets.GITHUB_TOKEN }}
           k3d-args: "-p 10250:10250 --no-rollback --k3s-arg --disable=traefik,servicelb,metrics-server@server:*"
 
+      - name: Import test images into k3d
+        run: |
+          docker pull busybox:stable
+          k3d image import busybox:stable -c kube
+
       # Real CI work starts here
       - name: Build workspace
         run: cargo build
@@ -167,7 +172,7 @@ jobs:
         run: cargo run -p kube-examples --example crd_derive
 
   mk8sv:
-    # comile check e2e tests against mk8sv
+    # compile check e2e tests against mk8sv
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -196,7 +201,7 @@ jobs:
 
       - uses: nolar/setup-k3d-k3s@v1
         with:
-          version: "v1.30" # MK8SV
+          version: "v1.31" # MK8SV
           # k3d-kube
           k3d-name: kube
           # Used to avoid rate limits when fetching the releases from k3s repo.

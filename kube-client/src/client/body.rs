@@ -31,12 +31,12 @@ enum Kind {
 }
 
 impl Body {
-    fn new(kind: Kind) -> Self {
+    const fn new(kind: Kind) -> Self {
         Body { kind }
     }
 
     /// Create an empty body
-    pub fn empty() -> Self {
+    pub const fn empty() -> Self {
         Self::new(Kind::Once(None))
     }
 
