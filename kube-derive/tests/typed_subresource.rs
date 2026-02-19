@@ -10,11 +10,7 @@ use serde::{Deserialize, Serialize};
     version = "v1",
     kind = "Foo",
     status = "Status",
-    printcolumn(
-        json_path = ".spec.name",
-        name = "Spec",
-        type_ = "string",
-    ),
+    printcolumn(json_path = ".spec.name", name = "Spec", type_ = "string"),
     scale(
         spec_replicas_path = ".spec.replicas",
         status_replicas_path = ".status.replicas",
@@ -56,7 +52,13 @@ fn test_scale_backwards_compatible() {
     use kube::core::CustomResourceExt;
     // Check that the typed version of scale matches the backwards compatible raw json string
     assert_eq!(
-        Compat::crd().spec.versions[0].subresources.as_ref().map(|sr| sr.scale.clone()),
-        Foo::crd().spec.versions[0].subresources.as_ref().map(|sr| sr.scale.clone())
+        Compat::crd().spec.versions[0]
+            .subresources
+            .as_ref()
+            .map(|sr| sr.scale.clone()),
+        Foo::crd().spec.versions[0]
+            .subresources
+            .as_ref()
+            .map(|sr| sr.scale.clone())
     );
 }

@@ -32,7 +32,7 @@ use serde::{Deserialize, Serialize};
         name = "Spec",
         type_ = "string",
         description = "name of foo",
-        json_path = ".spec.name"
+        json_path = ".spec.name",
     ),
     selectable = "spec.name"
 )]

@@ -33,11 +33,7 @@ use std::collections::{HashMap, HashSet};
     label("clux.dev/persistence", "disabled"),
     validation = "self.metadata.name == 'singleton'",
     status = "Status",
-    printcolumn(
-        json_path = ".spec.name",
-        name = "Spec",
-        type_ = "string",
-    ),
+    printcolumn(json_path = ".spec.name", name = "Spec", type_ = "string"),
     scale(
         spec_replicas_path = ".spec.replicas",
         status_replicas_path = ".status.replicas",

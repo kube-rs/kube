@@ -783,10 +783,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
 
     // Compute a bunch of crd props
     let printers = {
-        let printers: Vec<_> = printcolumns
-            .iter()
-            .map(|p| { p.to_tokens(&k8s_openapi)})
-            .collect();
+        let printers: Vec<_> = printcolumns.iter().map(|p| p.to_tokens(&k8s_openapi)).collect();
         quote! { vec![ #(#printers),* ] }
     };
     let fields: Vec<String> = selectable
