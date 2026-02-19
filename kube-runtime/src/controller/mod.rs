@@ -44,7 +44,7 @@ pub type RunnerError = runner::Error<reflector::store::WriterDropped>;
 /// WARNING: These errors do not terminate `Controller::run`, and are not passed to the `reconcile` fn
 /// as they exist primarily for diagnostics.
 ///
-/// To inspect these errors, you can run a for_each on the run stream:
+/// To inspect these errors, you can run a `for_each` on the run stream:
 ///
 /// ```compile_fail
 ///    Controller::new(api, watcher_config)
