@@ -31,7 +31,7 @@ unsafe_code = "forbid"
 missing_docs = "deny"
 
 [workspace.dependencies]
-ahash = "0.8"
+ahash = "0.8.7"
 anyhow = "1.0.71"
 assert-json-diff = "2.0.2"
 async-broadcast = "0.7.0"
