@@ -32,6 +32,7 @@ use std::collections::{HashMap, HashSet};
     label("clux.dev/persistence", "disabled"),
     validation = "self.metadata.name == 'singleton'",
     status = "Status",
+    printcolumn(json_path = ".spec.name", name = "Spec", type_ = "string"),
     scale(
         spec_replicas_path = ".spec.replicas",
         status_replicas_path = ".status.replicas",
@@ -272,7 +273,11 @@ fn test_crd_schema_matches_expected() {
                         "storage": false,
                         "deprecated": true,
                         "deprecationWarning": "my warning",
-                        "additionalPrinterColumns": [],
+                        "additionalPrinterColumns": [{
+                            "jsonPath": ".spec.name",
+                            "name": "Spec",
+                            "type": "string",
+                        }],
                         "selectableFields": [{
                             "jsonPath": ".spec.nonNullable"
                         }, {

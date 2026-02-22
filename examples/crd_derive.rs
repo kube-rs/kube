@@ -28,7 +28,12 @@ use serde::{Deserialize, Serialize};
         spec_replicas_path = ".spec.replicas",
         status_replicas_path = ".status.replicas"
     ),
-    printcolumn = r#"{"name":"Spec", "type":"string", "description":"name of foo", "jsonPath":".spec.name"}"#,
+    printcolumn(
+        name = "Spec",
+        type_ = "string",
+        description = "name of foo",
+        json_path = ".spec.name",
+    ),
     selectable = "spec.name"
 )]
 pub struct MyFoo {

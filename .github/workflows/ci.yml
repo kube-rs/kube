@@ -91,6 +91,18 @@ jobs:
         env:
           RUSTDOCFLAGS: --cfg docsrs
 
+  minimal-versions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install nightly toolchain
+        uses: dtolnay/rust-toolchain@nightly
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@cargo-hack
+      - uses: extractions/setup-just@v3
+      - name: Check minimal versions
+        run: just minimal-versions
+
   msrv:
     # Run `cargo check` on our minimum supported Rust version
     runs-on: ubuntu-latest

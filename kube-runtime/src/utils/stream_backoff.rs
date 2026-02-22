@@ -31,6 +31,7 @@ enum State {
 }
 
 impl<S: TryStream, B: Backoff> StreamBackoff<S, B> {
+    /// Create a stream backoff wrapper for a `Backoff` implementing object and a stream
     pub fn new(stream: S, backoff: B) -> Self {
         Self {
             stream,

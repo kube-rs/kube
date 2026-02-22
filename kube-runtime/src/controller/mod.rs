@@ -36,16 +36,47 @@ use tracing::{Instrument, info_span};
 mod future_hash_map;
 mod runner;
 
+/// The reasons the internal runner can fail
 pub type RunnerError = runner::Error<reflector::store::WriterDropped>;
 
+/// Errors returned by the applier and visible in a controller stream if inspecting it
+///
+/// WARNING: These errors do not terminate `Controller::run`, and are not passed to the `reconcile` fn
+/// as they exist primarily for diagnostics.
+///
+/// To inspect these errors, you can run a `for_each` on the run stream:
+///
+/// ```compile_fail
+///    Controller::new(api, watcher_config)
+///        .run(reconcile, error_policy, context)
+///        .for_each(|res| async move {
+///            match res {
+///                Ok(o) => info!("reconciled {:?}", o),
+///                /// Reconciler errors visible here:
+///                Err(e) => warn!("reconcile failed: {}", e),
+///            }
+///        })
+///        .await;
+/// ```
 #[derive(Debug, Error)]
 pub enum Error<ReconcilerErr: 'static, QueueErr: 'static> {
+    /// A scheduled reconcile for an object refers to an object that no longer exists
+    ///
+    /// This is usually not a problem and often expected with certain relations.
+    /// See <https://github.com/kube-rs/kube/issues/1167#issuecomment-1636773541>
+    /// for a more detailed explaination of how/why this happens.
     #[error("tried to reconcile object {0} that was not found in local store")]
     ObjectNotFound(ObjectRef<DynamicObject>),
+
+    /// User's reconcile fn failed for the object
     #[error("reconciler for object {1} failed")]
     ReconcilerFailed(#[source] ReconcilerErr, ObjectRef<DynamicObject>),
+
+    /// The queue stream contained an error
     #[error("event queue error")]
     QueueError(#[source] QueueErr),
+
+    /// The internal runner returned an error
     #[error("runner error")]
     RunnerError(#[source] RunnerError),
 }
@@ -274,7 +305,9 @@ where
     Hash(bound("K::DynamicType: Hash"))
 )]
 pub struct ReconcileRequest<K: Resource> {
+    /// A reference to the object to be reconciled
     pub obj_ref: ObjectRef<K>,
+    /// The reason for why reconciliation was requested
     #[educe(PartialEq(ignore), Hash(ignore))]
     pub reason: ReconcileReason,
 }
@@ -290,15 +323,43 @@ impl<K: Resource> From<ObjectRef<K>> for ReconcileRequest<K> {
     }
 }
 
+/// The reason a reconcile was requested
+///
+/// Note that this reason is deliberately hidden from the reconciler.
+/// See <https://kube.rs/controllers/reconciler/#reasons-for-reconciliation>.
 #[derive(Debug, Clone)]
 pub enum ReconcileReason {
+    /// A custom reconcile triggered via `reconcile_on`
     Unknown,
+
+    /// The main object was updated.
     ObjectUpdated,
-    RelatedObjectUpdated { obj_ref: Box<ObjectRef<DynamicObject>> },
+
+    /// A related object was updated through a mapper
+    ///
+    /// The related object traversed its relation up to the object kind you are reconciling.
+    /// Your object may not have changed, but you may need to update child objects.
+    RelatedObjectUpdated {
+        /// An object ref to the related object
+        obj_ref: Box<ObjectRef<DynamicObject>>,
+    },
+
+    /// The users `reconcile` scheduled a reconciliation via an `Action`
     ReconcilerRequestedRetry,
+
+    /// The users `error_policy` scheduled a reconciliation via an `Action`
     ErrorPolicyRequestedRetry,
+
+    /// A bulk reconcile was requested via `reconcile_all_on`
     BulkReconcile,
-    Custom { reason: String },
+
+    /// A custom reconcile reason for custom integrations.
+    ///
+    /// Can be used when injecting elements into the queue stream directly.
+    Custom {
+        /// A user provided reason through a custom integration
+        reason: String,
+    },
 }
 
 impl Display for ReconcileReason {
