@@ -26,7 +26,7 @@ async fn main() -> anyhow::Result<()> {
     // 0. Ensure the CRD is installed (you probably just want to do this on CI)
     // (crd file can be created by piping `Foo::crd`'s yaml ser to kubectl apply)
     let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
-    info!("Creating crd: {}", serde_yaml::to_string(&Foo::crd())?);
+    info!("Creating crd: {}", yaml_serde::to_string(&Foo::crd())?);
     let ssapply = PatchParams::apply("crd_reflector_example").force();
     crds.patch("foos.clux.dev", &ssapply, &Patch::Apply(Foo::crd()))
         .await?;

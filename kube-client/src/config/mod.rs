@@ -63,11 +63,11 @@ pub enum KubeconfigError {
 
     /// Failed to parse kubeconfig YAML
     #[error("failed to parse kubeconfig YAML: {0}")]
-    Parse(#[source] serde_yaml::Error),
+    Parse(#[source] yaml_serde::Error),
 
     /// The structure of the parsed kubeconfig is invalid
     #[error("the structure of the parsed kubeconfig is invalid: {0}")]
-    InvalidStructure(#[source] serde_yaml::Error),
+    InvalidStructure(#[source] yaml_serde::Error),
 
     /// Cluster url is missing on selected cluster
     #[error("cluster url is missing on selected cluster")]

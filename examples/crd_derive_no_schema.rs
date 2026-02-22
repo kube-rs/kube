@@ -35,7 +35,7 @@ properties:
 impl Bar {
     fn crd_with_manual_schema() -> CustomResourceDefinition {
         use kube::CustomResourceExt;
-        let schema: JSONSchemaProps = serde_yaml::from_str(MANUAL_SCHEMA).expect("invalid schema");
+        let schema: JSONSchemaProps = yaml_serde::from_str(MANUAL_SCHEMA).expect("invalid schema");
 
         let mut crd = <Self as CustomResourceExt>::crd();
         crd.spec.versions.iter_mut().for_each(|v| {
@@ -50,7 +50,7 @@ impl Bar {
 fn main() {
     tracing_subscriber::fmt::init();
     let crd = Bar::crd_with_manual_schema();
-    println!("{}", serde_yaml::to_string(&crd).unwrap());
+    println!("{}", yaml_serde::to_string(&crd).unwrap());
 }
 
 // Verify CustomResource derivable still

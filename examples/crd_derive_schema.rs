@@ -148,7 +148,7 @@ fn default_nullable() -> Option<String> {
 #[tokio::main]
 async fn main() -> Result<()> {
     // Show the generated CRD
-    println!("Foo CRD:\n{}\n", serde_yaml::to_string(&Foo::crd())?);
+    println!("Foo CRD:\n{}\n", yaml_serde::to_string(&Foo::crd())?);
 
     // Creating CRD v1 works as expected.
     println!("Creating CRD v1");

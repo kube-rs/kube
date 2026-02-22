@@ -222,9 +222,9 @@ pub mod v1 {
                 served: true
                 storage: false"#;
 
-            let c1: Crd = serde_yaml::from_str(crd1).unwrap();
-            let c2: Crd = serde_yaml::from_str(crd2).unwrap();
-            let ce: Crd = serde_yaml::from_str(expected).unwrap();
+            let c1: Crd = yaml_serde::from_str(crd1).unwrap();
+            let c2: Crd = yaml_serde::from_str(crd2).unwrap();
+            let ce: Crd = yaml_serde::from_str(expected).unwrap();
             let combined = merge_crds(vec![c1, c2], "v2").unwrap();
 
             let combo_json = serde_json::to_value(&combined).unwrap();

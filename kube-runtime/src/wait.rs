@@ -380,7 +380,7 @@ pub mod conditions {
                   - v1
             "#;
 
-            let c = serde_yaml::from_str(crd).unwrap();
+            let c = yaml_serde::from_str(crd).unwrap();
             assert!(is_crd_established().matches_object(Some(&c)))
         }
 
@@ -433,7 +433,7 @@ pub mod conditions {
                   - v1
             "#;
 
-            let c = serde_yaml::from_str(crd).unwrap();
+            let c = yaml_serde::from_str(crd).unwrap();
             assert!(!is_crd_established().matches_object(Some(&c)))
         }
 
@@ -500,7 +500,7 @@ pub mod conditions {
                   qosClass: Burstable
             "#;
 
-            let p = serde_yaml::from_str(pod).unwrap();
+            let p = yaml_serde::from_str(pod).unwrap();
             assert!(is_pod_running().matches_object(Some(&p)))
         }
 
@@ -534,7 +534,7 @@ pub mod conditions {
                   qosClass: Burstable
             "#;
 
-            let p = serde_yaml::from_str(pod).unwrap();
+            let p = yaml_serde::from_str(pod).unwrap();
             assert!(!is_pod_running().matches_object(Some(&p)))
         }
 
@@ -591,7 +591,7 @@ pub mod conditions {
                   uncountedTerminatedPods: {}
             "#;
 
-            let j = serde_yaml::from_str(job).unwrap();
+            let j = yaml_serde::from_str(job).unwrap();
             assert!(is_job_completed().matches_object(Some(&j)))
         }
 
@@ -631,7 +631,7 @@ pub mod conditions {
                   uncountedTerminatedPods: {}
             "#;
 
-            let j = serde_yaml::from_str(job).unwrap();
+            let j = yaml_serde::from_str(job).unwrap();
             assert!(!is_job_completed().matches_object(Some(&j)))
         }
 
@@ -703,7 +703,7 @@ pub mod conditions {
                   updatedReplicas: 3
             "#;
 
-            let d = serde_yaml::from_str(depl).unwrap();
+            let d = yaml_serde::from_str(depl).unwrap();
             assert!(is_deployment_completed().matches_object(Some(&d)))
         }
 
@@ -766,7 +766,7 @@ pub mod conditions {
                   updatedReplicas: 3
             "#;
 
-            let d = serde_yaml::from_str(depl).unwrap();
+            let d = yaml_serde::from_str(depl).unwrap();
             assert!(!is_deployment_completed().matches_object(Some(&d)))
         }
 
@@ -803,7 +803,7 @@ pub mod conditions {
                       - ip: 192.0.2.127
             ";
 
-            let s = serde_yaml::from_str(service).unwrap();
+            let s = yaml_serde::from_str(service).unwrap();
             assert!(is_service_loadbalancer_provisioned().matches_object(Some(&s)))
         }
 
@@ -832,7 +832,7 @@ pub mod conditions {
                       - hostname: example.exposed.service
             ";
 
-            let s = serde_yaml::from_str(service).unwrap();
+            let s = yaml_serde::from_str(service).unwrap();
             assert!(is_service_loadbalancer_provisioned().matches_object(Some(&s)))
         }
 
@@ -859,7 +859,7 @@ pub mod conditions {
                   loadBalancer: {}
             ";
 
-            let s = serde_yaml::from_str(service).unwrap();
+            let s = yaml_serde::from_str(service).unwrap();
             assert!(!is_service_loadbalancer_provisioned().matches_object(Some(&s)))
         }
 
@@ -885,7 +885,7 @@ pub mod conditions {
                   loadBalancer: {}
             ";
 
-            let s = serde_yaml::from_str(service).unwrap();
+            let s = yaml_serde::from_str(service).unwrap();
             assert!(is_service_loadbalancer_provisioned().matches_object(Some(&s)))
         }
 
@@ -928,7 +928,7 @@ pub mod conditions {
                       - ip: 10.89.7.3
             "#;
 
-            let i = serde_yaml::from_str(ingress).unwrap();
+            let i = yaml_serde::from_str(ingress).unwrap();
             assert!(is_ingress_provisioned().matches_object(Some(&i)))
         }
 
@@ -963,7 +963,7 @@ pub mod conditions {
                       - hostname: example.exposed.service
             "#;
 
-            let i = serde_yaml::from_str(ingress).unwrap();
+            let i = yaml_serde::from_str(ingress).unwrap();
             assert!(is_ingress_provisioned().matches_object(Some(&i)))
         }
 
@@ -996,7 +996,7 @@ pub mod conditions {
                   loadBalancer: {}
             "#;
 
-            let i = serde_yaml::from_str(ingress).unwrap();
+            let i = yaml_serde::from_str(ingress).unwrap();
             assert!(!is_ingress_provisioned().matches_object(Some(&i)))
         }
 
