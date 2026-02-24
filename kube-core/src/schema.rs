@@ -549,7 +549,9 @@ fn hoist_subschema_properties(
             variant_obj.additional_properties = None;
 
             merge_metadata(instance_type, variant_type.take());
-        } else if let Schema::Object(SchemaObject {
+        }
+        // Removes the type/description from oneOf and anyOf subschemas
+        else if let Schema::Object(SchemaObject {
             metadata: variant_metadata,
             instance_type: variant_type,
             enum_values: None,
@@ -559,7 +561,6 @@ fn hoist_subschema_properties(
             ..
         }) = variant
         {
-            // This removes the type/description from untagged variants without fields.
             std::mem::take(&mut *variant_type);
             std::mem::take(&mut *variant_metadata);
         }
