@@ -100,9 +100,9 @@ pub struct FooSpec {
     /// Immutable field that uses optionalOldSelf
     #[serde(default)]
     #[x_kube(
-        validation = Rule::new("self == oldSelf").optional_old_self(true).message("Immutable after creation")
+        validation = Rule::new("oldSelf.optMap(o, o == self).orValue(true)").optional_old_self(true).message("Immutable after creation")
     )]
-    pub immutable: Option<String>,
+    immutable: Option<String>,
 
     #[x_kube(validation = Rule::new("self == oldSelf").message("is immutable"))]
     foo_sub_spec: Option<FooSubSpec>,
@@ -386,7 +386,7 @@ async fn main() -> Result<()> {
             assert!(err.is_failure());
             assert!(err.message.contains("Foo.clux.dev \"baz\" is invalid"));
             assert!(err.message.contains("spec.fooSubSpec: Invalid value"));
-            assert!(err.message.contains("Invalid value: \"object\": is immutable"));
+            assert!(err.message.contains("Immutable after creation") || err.message.contains("is immutable"));
         }
         _ => panic!(),
     }

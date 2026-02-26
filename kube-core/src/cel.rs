@@ -26,7 +26,7 @@ pub struct Rule {
     /// reason is a machine-readable value providing more detail about why a field failed the validation.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reason: Option<Reason>,
-    /// optionalOldSelf allow transition rules (using oldSelf) to also evaluate during object creation
+    /// optionalOldSelf allows transition rules (using oldSelf) to also evaluate during object creation
     #[serde(skip_serializing_if = "Option::is_none")]
     pub optional_old_self: Option<bool>,
 }
