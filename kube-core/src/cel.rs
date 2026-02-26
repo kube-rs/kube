@@ -27,6 +27,7 @@ pub struct Rule {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reason: Option<Reason>,
     /// optionalOldSelf allows transition rules (using oldSelf) to also evaluate during object creation
+    /// When enabled, `oldSelf` becomes a CEL `optional_type`. You must use functions like `optMap()`, `hasValue()`, or `orValue()` to safely compare it against `self`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub optional_old_self: Option<bool>,
 }
@@ -97,8 +98,7 @@ impl Rule {
     /// ```rust
     /// use kube_core::Rule;
     ///
-    /// let r = Rule::new("self == oldSelf").optional_old_self(true);
-    /// assert_eq!(r.rule, "self == oldSelf".to_string());
+    /// let r = Rule::new("oldSelf.optMap(o, o == self).orValue(true)").optional_old_self(true);
     /// assert_eq!(r.optional_old_self, Some(true));
     /// ```
     pub fn optional_old_self(mut self, optional: bool) -> Self {
@@ -448,21 +448,22 @@ mod tests {
 
     #[test]
     fn test_rule_serialization_optional_old_self() {
-        let r = Rule::new("self == oldSelf").optional_old_self(true);
+        let rule_str = "oldSelf.optMap(o, o == self).orValue(true)";
+        let r = Rule::new(rule_str).optional_old_self(true);
 
         // Test Serialization
         let json = serde_json::to_value(&r).unwrap();
         assert_eq!(
             json,
             json!({
-                "rule": "self == oldSelf",
+                "rule": rule_str,
                 "optionalOldSelf": true
             })
         );
 
         // Test Round-trip (Deserialization)
         let r2: Rule = serde_json::from_value(json).unwrap();
-        assert_eq!(r2.rule, "self == oldSelf");
+        assert_eq!(r2.rule, rule_str);
         assert_eq!(r2.optional_old_self, Some(true));
     }
 }
