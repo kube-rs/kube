@@ -26,6 +26,9 @@ pub struct Rule {
     /// reason is a machine-readable value providing more detail about why a field failed the validation.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reason: Option<Reason>,
+    /// optionalOldSelf allow transition rules (using oldSelf) to also evaluate during object creation
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub optional_old_self: Option<bool>,
 }
 
 impl Rule {
@@ -86,6 +89,20 @@ impl Rule {
     /// ```
     pub fn field_path(mut self, field_path: impl Into<String>) -> Self {
         self.field_path = Some(field_path.into());
+        self
+    }
+
+    /// Set the optionalOldSelf configuration.
+    ///
+    /// ```rust
+    /// use kube_core::Rule;
+    ///
+    /// let r = Rule::new("self == oldSelf").optional_old_self(true);
+    /// assert_eq!(r.rule, "self == oldSelf".to_string());
+    /// assert_eq!(r.optional_old_self, Some(true));
+    /// ```
+    pub fn optional_old_self(mut self, optional: bool) -> Self {
+        self.optional_old_self = Some(optional);
         self
     }
 }
@@ -421,5 +438,31 @@ impl SchemaExt for Schema {
             .entry("properties")
             .or_insert_with(|| Value::Object(Default::default()))
             .as_object_mut()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn test_rule_serialization_optional_old_self() {
+        let r = Rule::new("self == oldSelf").optional_old_self(true);
+
+        // Test Serialization
+        let json = serde_json::to_value(&r).unwrap();
+        assert_eq!(
+            json,
+            json!({
+                "rule": "self == oldSelf",
+                "optionalOldSelf": true
+            })
+        );
+
+        // Test Round-trip (Deserialization)
+        let r2: Rule = serde_json::from_value(json).unwrap();
+        assert_eq!(r2.rule, "self == oldSelf");
+        assert_eq!(r2.optional_old_self, Some(true));
     }
 }

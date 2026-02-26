@@ -97,6 +97,13 @@ pub struct FooSpec {
     )]
     cel_validated: Option<String>,
 
+    /// Immutable field that uses optionalOldSelf
+    #[serde(default)]
+    #[x_kube(
+        validation = Rule::new("self == oldSelf").optional_old_self(true).message("Immutable after creation")
+    )]
+    pub immutable: Option<String>,
+
     #[x_kube(validation = Rule::new("self == oldSelf").message("is immutable"))]
     foo_sub_spec: Option<FooSubSpec>,
 
@@ -181,6 +188,7 @@ async fn main() -> Result<()> {
         default_listable: Default::default(),
         set_listable: Default::default(),
         cel_validated: Default::default(),
+        immutable: Default::default(),
         foo_sub_spec: Default::default(),
         associated_default: Default::default(),
     });
