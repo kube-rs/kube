@@ -254,16 +254,16 @@ struct TokenResponse {
     id_token: Option<String>,
 }
 
-#[cfg(not(any(feature = "rustls-tls", feature = "openssl-tls")))]
+#[cfg(not(any(feature = "__rustls", feature = "openssl-tls")))]
 compile_error!(
     "At least one of rustls-tls or openssl-tls feature must be enabled to use refresh-oidc feature"
 );
 // Current TLS feature precedence when more than one are set:
 // 1. rustls-tls
 // 2. openssl-tls
-#[cfg(feature = "rustls-tls")]
+#[cfg(feature = "__rustls")]
 type HttpsConnector = hyper_rustls::HttpsConnector<HttpConnector>;
-#[cfg(all(not(feature = "rustls-tls"), feature = "openssl-tls"))]
+#[cfg(all(not(feature = "__rustls"), feature = "openssl-tls"))]
 type HttpsConnector = hyper_openssl::HttpsConnector<HttpConnector>;
 
 /// Struct for refreshing the ID token with the refresh token.
@@ -308,14 +308,14 @@ impl Refresher {
         let client_id = get_field(Self::CONFIG_CLIENT_ID)?.into();
         let client_secret = get_field(Self::CONFIG_CLIENT_SECRET)?.into();
 
-        #[cfg(feature = "rustls-tls")]
+        #[cfg(feature = "__rustls")]
         let https = hyper_rustls::HttpsConnectorBuilder::new()
             .with_native_roots()
             .map_err(|_| errors::RefreshInitError::NoValidNativeRootCA)?
             .https_only()
             .enable_http1()
             .build();
-        #[cfg(all(not(feature = "rustls-tls"), feature = "openssl-tls"))]
+        #[cfg(all(not(feature = "__rustls"), feature = "openssl-tls"))]
         let https = hyper_openssl::HttpsConnector::new()?;
 
         let https_client = hyper_util::client::legacy::Client::builder(TokioExecutor::new()).build(https);
@@ -498,7 +498,7 @@ mod tests {
             .expect_err("token without expiration timestamp passed validation");
     }
 
-    #[cfg(any(feature = "openssl-tls", feature = "rustls-tls"))]
+    #[cfg(any(feature = "openssl-tls", feature = "__rustls"))]
     #[test]
     fn from_minimal_config() {
         let minimal_config = [(Oidc::CONFIG_ID_TOKEN.into(), "some_id_token".into())]
@@ -511,7 +511,7 @@ mod tests {
         assert!(oidc.refresher.is_err());
     }
 
-    #[cfg(any(feature = "openssl-tls", feature = "rustls-tls"))]
+    #[cfg(any(feature = "openssl-tls", feature = "__rustls"))]
     #[test]
     fn from_full_config() {
         let full_config = [

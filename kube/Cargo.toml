@@ -18,6 +18,7 @@ default = ["client", "rustls-tls"]
 client = ["kube-client/client", "config"]
 config = ["kube-client/config"]
 rustls-tls = ["kube-client/rustls-tls"]
+rustls-tls-aws-lc = ["kube-client/rustls-tls-aws-lc"]
 
 # alternative features
 openssl-tls = ["kube-client/openssl-tls"]

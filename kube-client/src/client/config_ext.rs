@@ -6,7 +6,7 @@ use hyper_util::client::legacy::connect::HttpConnector;
 use secrecy::ExposeSecret;
 use tower::{filter::AsyncFilterLayer, util::Either};
 
-#[cfg(any(feature = "rustls-tls", feature = "openssl-tls"))] use super::tls;
+#[cfg(any(feature = "__rustls", feature = "openssl-tls"))] use super::tls;
 use super::{
     auth::Auth,
     middleware::{AddAuthorizationLayer, AuthLayer, BaseUriLayer, ExtraHeadersLayer},
@@ -43,7 +43,7 @@ pub trait ConfigExt: private::Sealed {
     /// # }
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "rustls-tls")))]
-    #[cfg(feature = "rustls-tls")]
+    #[cfg(feature = "__rustls")]
     fn rustls_https_connector(&self) -> Result<hyper_rustls::HttpsConnector<HttpConnector>>;
 
     /// Create [`hyper_rustls::HttpsConnector`] based on config and `connector`.
@@ -63,7 +63,7 @@ pub trait ConfigExt: private::Sealed {
     /// # }
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "rustls-tls")))]
-    #[cfg(feature = "rustls-tls")]
+    #[cfg(feature = "__rustls")]
     fn rustls_https_connector_with_connector<H>(
         &self,
         connector: H,
@@ -87,7 +87,7 @@ pub trait ConfigExt: private::Sealed {
     /// # }
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "rustls-tls")))]
-    #[cfg(feature = "rustls-tls")]
+    #[cfg(feature = "__rustls")]
     fn rustls_client_config(&self) -> Result<rustls::ClientConfig>;
 
     /// Create [`hyper_openssl::HttpsConnector`] based on config.
@@ -205,7 +205,7 @@ impl ConfigExt for Config {
         })
     }
 
-    #[cfg(feature = "rustls-tls")]
+    #[cfg(feature = "__rustls")]
     fn rustls_client_config(&self) -> Result<rustls::ClientConfig> {
         let identity = self.exec_identity_pem().or_else(|| self.identity_pem());
         tls::rustls_tls::rustls_client_config(
@@ -216,14 +216,14 @@ impl ConfigExt for Config {
         .map_err(Error::RustlsTls)
     }
 
-    #[cfg(feature = "rustls-tls")]
+    #[cfg(feature = "__rustls")]
     fn rustls_https_connector(&self) -> Result<hyper_rustls::HttpsConnector<HttpConnector>> {
         let mut connector = HttpConnector::new();
         connector.enforce_http(false);
         self.rustls_https_connector_with_connector(connector)
     }
 
-    #[cfg(feature = "rustls-tls")]
+    #[cfg(feature = "__rustls")]
     fn rustls_https_connector_with_connector<H>(
         &self,
         connector: H,

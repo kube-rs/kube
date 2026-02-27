@@ -148,7 +148,7 @@ mod test {
     #[cfg(feature = "when_rustls_works_with_k3d")]
     #[tokio::test]
     #[ignore = "needs cluster (lists pods)"]
-    #[cfg(feature = "rustls-tls")]
+    #[cfg(feature = "__rustls")]
     async fn custom_client_rustls_configuration() -> Result<(), Box<dyn std::error::Error>> {
         let config = Config::infer().await?;
         let https = config.rustls_https_connector()?;

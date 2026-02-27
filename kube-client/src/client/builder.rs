@@ -125,11 +125,11 @@ where
         // 2. openssl-tls
         // Create a custom client to use something else.
         // If TLS features are not enabled, http connector will be used.
-        #[cfg(feature = "rustls-tls")]
+        #[cfg(feature = "__rustls")]
         let connector = config.rustls_https_connector_with_connector(connector)?;
-        #[cfg(all(not(feature = "rustls-tls"), feature = "openssl-tls"))]
+        #[cfg(all(not(feature = "__rustls"), feature = "openssl-tls"))]
         let connector = config.openssl_https_connector_with_connector(connector)?;
-        #[cfg(all(not(feature = "rustls-tls"), not(feature = "openssl-tls")))]
+        #[cfg(all(not(feature = "__rustls"), not(feature = "openssl-tls")))]
         if config.cluster_url.scheme() == Some(&http::uri::Scheme::HTTPS) {
             // no tls stack situation only works with http scheme
             return Err(Error::TlsRequired);

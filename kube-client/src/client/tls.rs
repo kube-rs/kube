@@ -1,4 +1,4 @@
-#[cfg(feature = "rustls-tls")]
+#[cfg(feature = "__rustls")]
 pub mod rustls_tls {
     use hyper_rustls::ConfigBuilderExt;
     use rustls::{

@@ -66,8 +66,8 @@ pub enum Error {
     OpensslTls(#[source] crate::client::OpensslTlsError),
 
     /// Errors from Rustls TLS
-    #[cfg(feature = "rustls-tls")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "rustls-tls")))]
+    #[cfg(feature = "__rustls")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "__rustls")))]
     #[error("rustls tls error: {0}")]
     RustlsTls(#[source] crate::client::RustlsTlsError),
 

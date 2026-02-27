@@ -111,21 +111,21 @@ impl Gcp {
             Ok(TokenOrRequest::Request {
                 request, scope_hash, ..
             }) => {
-                #[cfg(not(any(feature = "rustls-tls", feature = "openssl-tls")))]
+                #[cfg(not(any(feature = "__rustls", feature = "openssl-tls")))]
                 compile_error!(
                     "At least one of rustls-tls or openssl-tls feature must be enabled to use oauth feature"
                 );
                 // Current TLS feature precedence when more than one are set:
                 // 1. rustls-tls
                 // 2. openssl-tls
-                #[cfg(feature = "rustls-tls")]
+                #[cfg(feature = "__rustls")]
                 let https = hyper_rustls::HttpsConnectorBuilder::new()
                     .with_native_roots()
                     .map_err(Error::NoValidNativeRootCA)?
                     .https_only()
                     .enable_http1()
                     .build();
-                #[cfg(all(not(feature = "rustls-tls"), feature = "openssl-tls"))]
+                #[cfg(all(not(feature = "__rustls"), feature = "openssl-tls"))]
                 let https =
                     hyper_openssl::HttpsConnector::new().map_err(Error::CreateOpensslHttpsConnector)?;
 

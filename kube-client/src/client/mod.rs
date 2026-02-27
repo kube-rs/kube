@@ -42,11 +42,11 @@ pub use auth::Error as AuthError;
 pub use config_ext::ConfigExt;
 pub mod middleware;
 
-#[cfg(any(feature = "rustls-tls", feature = "openssl-tls"))] mod tls;
+#[cfg(any(feature = "__rustls", feature = "openssl-tls"))] mod tls;
 
 #[cfg(feature = "openssl-tls")]
 pub use tls::openssl_tls::Error as OpensslTlsError;
-#[cfg(feature = "rustls-tls")] pub use tls::rustls_tls::Error as RustlsTlsError;
+#[cfg(feature = "__rustls")] pub use tls::rustls_tls::Error as RustlsTlsError;
 #[cfg(feature = "ws")] mod upgrade;
 
 #[cfg(feature = "oauth")]
