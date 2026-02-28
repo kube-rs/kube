@@ -11,7 +11,7 @@ main() {
   local -r RELEASE="$(curl -sSL -H "Accept: application/vnd.github.v3+json" "https://api.github.com/repos/kube-rs/kube/releases/tags/${RELNAME}")"
   # local -r RELREG="$(echo "${RELNAME}" | sd -s "." "\.")"
   local -r HURL="$(echo "${RELEASE}" | jq '.html_url' -r)"
-  # Skipping New Contributors highight from CHANGELOG + across repos for brevity and to avoid pinging them excessively
+  # Skipping New Contributors highlight from CHANGELOG + across repos for brevity and to avoid pinging them excessively
   local -r BODY="$(echo "${RELEASE}" | jq '.body' -r | sd "## New Contributors[\w\W]*$" "")"
 
   # Add in the body first

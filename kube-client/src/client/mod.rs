@@ -2,7 +2,7 @@
 //!
 //! The [`Client`] uses standard kube error handling.
 //!
-//! This client can be used on its own or in conjuction with the [`Api`][crate::api::Api]
+//! This client can be used on its own or in conjunction with the [`Api`][crate::api::Api]
 //! type for more structured interaction with the kubernetes API.
 //!
 //! The [`Client`] can also be used with [`Discovery`](crate::Discovery) to dynamically

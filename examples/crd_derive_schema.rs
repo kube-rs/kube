@@ -126,7 +126,7 @@ fn set_listable_schema(_: &mut schemars::generate::SchemaGenerator) -> schemars:
         "type": "array",
         "items": {
             "format": "u32",
-            "minium": 0,
+            "minimum": 0,
             "type": "integer"
         },
         "x-kubernetes-list-type": "set"

@@ -218,7 +218,7 @@ mod resource;
 /// #[kube(deprecated)]
 /// ```
 ///
-/// Aditionally, you can provide a `deprecationWarning` using the following example.
+/// Additionally, you can provide a `deprecationWarning` using the following example.
 ///
 /// ```ignore
 /// #[kube(deprecated = "Replaced by other CRD")]
@@ -337,7 +337,7 @@ mod resource;
 /// - similarly; [nested / must_match / credit_card were unhandled by schemars at time of writing](https://github.com/GREsau/schemars/pull/78)
 /// - encoding validations specified through garde (i.e. #[garde(ascii)]), are currently not supported by schemars
 /// - to validate required attributes client-side, garde requires a custom validation function (`#[garde(custom(my_required_check))]`)
-/// - when using garde, fields that should not be validated need to be explictly skipped through the `#[garde(skip)]` attr
+/// - when using garde, fields that should not be validated need to be explicitly skipped through the `#[garde(skip)]` attr
 ///
 /// For sanity, you should review the generated schema before sending it to kubernetes.
 ///
@@ -414,7 +414,7 @@ pub fn derive_custom_resource(input: proc_macro::TokenStream) -> proc_macro::Tok
 ///     group = "kube.rs",
 ///     version = "v1",
 ///     kind = "Struct",
-///     validation = "self.matadata.name == 'singleton'",
+///     validation = "self.metadata.name == 'singleton'",
 /// )]
 /// #[x_kube(validation = "self == oldSelf")]
 /// struct MyStruct {
@@ -432,7 +432,7 @@ pub fn derive_custom_resource(input: proc_macro::TokenStream) -> proc_macro::Tok
 /// assert!(serde_json::to_string(&Struct::crd()).unwrap().contains(r#""rule":"self != ''""#));
 /// assert!(serde_json::to_string(&Struct::crd()).unwrap().contains(r#""message":"failure message""#));
 /// assert!(serde_json::to_string(&Struct::crd()).unwrap().contains(r#""default":"value""#));
-/// assert!(serde_json::to_string(&Struct::crd()).unwrap().contains(r#""rule":"self.matadata.name == 'singleton'""#));
+/// assert!(serde_json::to_string(&Struct::crd()).unwrap().contains(r#""rule":"self.metadata.name == 'singleton'""#));
 /// ```
 #[proc_macro_derive(KubeSchema, attributes(x_kube, schemars, validate))]
 pub fn derive_schema_validation(input: proc_macro::TokenStream) -> proc_macro::TokenStream {

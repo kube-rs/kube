@@ -35,7 +35,7 @@ For a list of tooling that we glue together everything see [TOOLS.md](https://ku
 
 1. **Please try to keep each PR small, and minimal for the relevant change.**
 
-Each line has be reviewed, so unnecessary changes increase the difficulty threshold for maintainers (and decreases the likelyhood that your PR will be expedited).
+Each line has be reviewed, so unnecessary changes increase the difficulty threshold for maintainers (and decreases the likelihood that your PR will be expedited).
 
 I.e. try to not not move files, or reformat files while also changing the logic in those same files. Github does not highlight moved lines very well.
 
@@ -106,7 +106,7 @@ In general: **use the least powerful method** of testing available to you:
 
 - use unit tests in `kube-core`
 - use unit tests in `kube-client` (and in rare cases integration tests)
-- use unit tests in `kube-runtime` (and occassionally integration tests)
+- use unit tests in `kube-runtime` (and occasionally integration tests)
 - use e2e tests when testing differences between in-cluster and local configuration
 
 ## Support
