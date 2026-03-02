@@ -64,7 +64,7 @@ pub enum Error<ReconcilerErr: 'static, QueueErr: 'static> {
     ///
     /// This is usually not a problem and often expected with certain relations.
     /// See <https://github.com/kube-rs/kube/issues/1167#issuecomment-1636773541>
-    /// for a more detailed explaination of how/why this happens.
+    /// for a more detailed explanation of how/why this happens.
     #[error("tried to reconcile object {0} that was not found in local store")]
     ObjectNotFound(ObjectRef<DynamicObject>),
 
@@ -971,7 +971,7 @@ where
 
     /// Specify the backoff policy for "trigger" watches
     ///
-    /// This includes the core watch, as well as auxilary watches introduced by [`Self::owns`] and [`Self::watches`].
+    /// This includes the core watch, as well as auxiliary watches introduced by [`Self::owns`] and [`Self::watches`].
     ///
     /// The [`default_backoff`](crate::watcher::default_backoff) follows client-go conventions,
     /// but can be overridden by calling this method.

@@ -21,7 +21,7 @@ pub use store::{Store, store};
 /// It passes the raw [`watcher()`] stream through unmodified.
 ///
 /// ## Usage
-/// Create a [`Store`] through e.g. [`store::store()`]. The `writer` part is not-clonable,
+/// Create a [`Store`] through e.g. [`store::store()`]. The `writer` part is not-cloneable,
 /// and must be moved into the reflector. The `reader` part is the [`Store`] interface
 /// that you can send to other parts of your program as state.
 ///

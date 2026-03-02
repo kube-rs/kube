@@ -972,7 +972,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
 ///
 /// * `ident`: The identity (name) of the spec struct
 /// * `root ident`: The identity (name) of the main CRD struct (the one we generate in this macro)
-/// * `kube_core`: The path stream for the analagous kube::core import location from users POV
+/// * `kube_core`: The path stream for the analogous kube::core import location from users POV
 fn generate_hasspec(spec_ident: &Ident, root_ident: &Ident, kube_core: &Path) -> TokenStream {
     quote! {
         impl #kube_core::object::HasSpec for #root_ident {
@@ -1014,7 +1014,7 @@ struct StatusInformation {
 /// * `root ident`: The identity (name) of the main CRD struct (the one we generate in this macro)
 /// * `status`: The optional name of the `status` struct to use
 /// * `visibility`: Desired visibility of the generated field
-/// * `kube_core`: The path stream for the analagous kube::core import location from users POV
+/// * `kube_core`: The path stream for the analogous kube::core import location from users POV
 ///
 /// returns: A `StatusInformation` struct
 fn process_status(

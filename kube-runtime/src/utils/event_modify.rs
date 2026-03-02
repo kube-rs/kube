@@ -52,7 +52,7 @@ pub(crate) mod test {
     use futures::{StreamExt, poll, stream};
 
     #[tokio::test]
-    async fn eventmodify_modifies_innner_value_of_event() {
+    async fn eventmodify_modifies_inner_value_of_event() {
         let st = stream::iter([
             Ok(Event::Apply(0)),
             Err(Error::NoResourceVersion),

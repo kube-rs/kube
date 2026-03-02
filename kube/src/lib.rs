@@ -105,7 +105,7 @@
 //! - [`runtime`] for abstractions that help with more complicated Kubernetes application
 //!
 //! # Examples
-//! A large list of complete, runnable examples with explainations are available in the [examples folder](https://github.com/kube-rs/kube/tree/main/examples).
+//! A large list of complete, runnable examples with explanations are available in the [examples folder](https://github.com/kube-rs/kube/tree/main/examples).
 //!
 //! # Features
 //! Documented at [kube.rs/features](https://kube.rs/features/).
@@ -162,7 +162,7 @@ cfg_config! {
 cfg_error! {
     pub use kube_client::error;
     #[doc(inline)] pub use error::Error;
-    /// Convient alias for `Result<T, Error>`
+    /// Convenient alias for `Result<T, Error>`
     pub type Result<T, E = Error> = std::result::Result<T, E>;
 }
 
@@ -271,7 +271,7 @@ mod test {
     #[tokio::test]
     #[ignore = "needs cluster (creates + patches foo crd)"]
     #[cfg(all(feature = "derive", feature = "runtime"))]
-    async fn derived_resource_queriable_and_has_subresources() -> Result<(), Box<dyn std::error::Error>> {
+    async fn derived_resource_queryable_and_has_subresources() -> Result<(), Box<dyn std::error::Error>> {
         use crate::runtime::wait::{await_condition, conditions};
 
         use serde_json::json;
@@ -446,7 +446,7 @@ mod test {
         assert!(discovery.has_group("kube.rs"), "missing group kube.rs");
         let (ar, _caps) = discovery.resolve_gvk(&gvk).unwrap();
         assert_eq!(ar.group, gvk.group, "unexpected discovered group");
-        assert_eq!(ar.version, gvk.version, "unexcepted discovered ver");
+        assert_eq!(ar.version, gvk.version, "unexpected discovered ver");
         assert_eq!(ar.kind, gvk.kind, "unexpected discovered kind");
 
         // check all non-excluded groups that are iterable
