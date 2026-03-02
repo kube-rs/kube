@@ -213,8 +213,14 @@ impl RefreshableToken {
                 // Add some wiggle room onto the current timestamp so we don't get any race
                 // conditions where the token expires while we are refreshing
                 if Timestamp::now() + SIXTY_SEC >= locked_data.1 {
+                    // Run blocking exec command on the blocking threadpool to avoid
+                    // stalling the tokio worker during token refresh.
                     // TODO Improve refreshing exec to avoid `Auth::try_from`
-                    match Auth::try_from(&locked_data.2)? {
+                    let auth_info = locked_data.2.clone();
+                    let auth = tokio::task::spawn_blocking(move || Auth::try_from(&auth_info))
+                        .await
+                        .map_err(|e| Error::AuthExec(format!("failed to spawn blocking auth task: {e}")))??;
+                    match auth {
                         Auth::None | Auth::Basic(_, _) | Auth::Bearer(_) | Auth::Certificate(_, _, _) => {
                             return Err(Error::UnrefreshableTokenResponse);
                         }
