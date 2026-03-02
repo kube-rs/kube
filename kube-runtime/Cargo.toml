@@ -49,7 +49,7 @@ hostname.workspace = true
 [dev-dependencies]
 kube = { path = "../kube", features = ["derive", "client", "runtime"], version = ">=2" }
 serde_json.workspace = true
-serde_yaml.workspace = true
+yaml_serde.workspace = true
 tokio = { workspace = true, features = ["full", "test-util"] }
 rand.workspace = true
 schemars.workspace = true

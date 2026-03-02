@@ -118,7 +118,7 @@ async fn main() -> anyhow::Result<()> {
 
 async fn apply_crd(client: Client, crd: CustomResourceDefinition) -> anyhow::Result<()> {
     let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
-    info!("Creating crd: {}", serde_yaml::to_string(&crd)?);
+    info!("Creating crd: {}", yaml_serde::to_string(&crd)?);
     let ssapply = PatchParams::apply("crd_derive_multi").force();
     crds.patch("manyderives.kube.rs", &ssapply, &Patch::Apply(&crd))
         .await?;

@@ -42,4 +42,4 @@ derive_more = { workspace = true, features = ["from"] }
 k8s-openapi = { workspace = true, features = ["latest"] }
 assert-json-diff.workspace = true
 kube = { path = "../kube", version = ">=2" }
-serde_yaml.workspace = true
+yaml_serde.workspace = true

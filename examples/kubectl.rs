@@ -99,7 +99,7 @@ impl App {
         result.iter_mut().for_each(|x| x.managed_fields_mut().clear()); // hide managed fields
 
         match self.output {
-            OutputMode::Yaml => println!("{}", serde_yaml::to_string(&result)?),
+            OutputMode::Yaml => println!("{}", yaml_serde::to_string(&result)?),
             OutputMode::Pretty => {
                 // Display style; size columns according to longest name
                 let max_name = result.iter().map(|x| x.name_any().len() + 2).max().unwrap_or(63);
@@ -151,12 +151,12 @@ impl App {
         if let Some(n) = &self.name {
             let mut orig = api.get(n).await?;
             orig.managed_fields_mut().clear(); // hide managed fields
-            let input = serde_yaml::to_string(&orig)?;
+            let input = yaml_serde::to_string(&orig)?;
             debug!("opening {} in {:?}", orig.name_any(), edit::get_editor());
             let edited = edit::edit(&input)?;
             if edited != input {
                 info!("updating changed object {}", orig.name_any());
-                let data: DynamicObject = serde_yaml::from_str(&edited)?;
+                let data: DynamicObject = yaml_serde::from_str(&edited)?;
                 // NB: simplified kubectl constructs a merge-patch of differences
                 api.replace(n, &Default::default(), &data).await?;
             }
@@ -172,7 +172,7 @@ impl App {
         let yaml =
             std::fs::read_to_string(&pth).with_context(|| format!("Failed to read {}", pth.display()))?;
         for doc in multidoc_deserialize(&yaml)? {
-            let obj: DynamicObject = serde_yaml::from_value(doc)?;
+            let obj: DynamicObject = yaml_serde::from_value(doc)?;
             let namespace = obj.metadata.namespace.as_deref().or(self.namespace.as_deref());
             let gvk = if let Some(tm) = &obj.types {
                 GroupVersionKind::try_from(tm)?
@@ -182,7 +182,7 @@ impl App {
             let name = obj.name_any();
             if let Some((ar, caps)) = discovery.resolve_gvk(&gvk) {
                 let api = dynamic_api(ar, caps, client.clone(), namespace, false);
-                trace!("Applying {}: \n{}", gvk.kind, serde_yaml::to_string(&obj)?);
+                trace!("Applying {}: \n{}", gvk.kind, yaml_serde::to_string(&obj)?);
                 let data: serde_json::Value = serde_json::to_value(&obj)?;
                 let _r = api.patch(&name, &ssapply, &Patch::Apply(data)).await?;
                 info!("applied {} {}", gvk.kind, name);
@@ -266,11 +266,11 @@ fn format_creation(time: Time) -> std::result::Result<String, jiff::Error> {
     })
 }
 
-pub fn multidoc_deserialize(data: &str) -> Result<Vec<serde_yaml::Value>> {
+pub fn multidoc_deserialize(data: &str) -> Result<Vec<yaml_serde::Value>> {
     use serde::Deserialize;
     let mut docs = vec![];
-    for de in serde_yaml::Deserializer::from_str(data) {
-        docs.push(serde_yaml::Value::deserialize(de)?);
+    for de in yaml_serde::Deserializer::from_str(data) {
+        docs.push(yaml_serde::Value::deserialize(de)?);
     }
     Ok(docs)
 }
