@@ -639,12 +639,12 @@ fn auth_exec(auth: &ExecConfig) -> Result<ExecCredential, Error> {
 #[cfg(test)]
 mod test {
     use crate::config::Kubeconfig;
+    use std::time::{Duration, Instant};
 
     use super::*;
-    #[tokio::test]
-    #[ignore = "fails on windows mysteriously"]
-    async fn exec_auth_command() -> Result<(), Error> {
-        let expiry = (Timestamp::now() + SIXTY_SEC).to_string();
+
+    /// Build an `AuthInfo` whose gcp auth-provider runs `cmd_path cmd_args` to emit credential JSON.
+    fn gcp_auth_info(cmd_path: &str, cmd_args: &str) -> AuthInfo {
         let test_file = format!(
             r#"
         apiVersion: v1
@@ -666,17 +666,29 @@ mod test {
           user:
             auth-provider:
               config:
-                cmd-args: '{{"something": "else", "credential": {{"access_token": "my_token", "token_expiry": "{expiry}"}}}}'
-                cmd-path: echo
+                cmd-args: {cmd_args}
+                cmd-path: {cmd_path}
                 expiry-key: '{{.credential.token_expiry}}'
                 token-key: '{{.credential.access_token}}'
               name: gcp
         "#
         );
-
         let config: Kubeconfig = serde_yaml::from_str(&test_file).unwrap();
-        let auth_info = config.auth_infos[0].auth_info.as_ref().unwrap();
-        match Auth::try_from(auth_info).unwrap() {
+        config.auth_infos[0].auth_info.clone().unwrap()
+    }
+
+    fn cred_json(token: &str, expiry: &str) -> String {
+        format!(
+            r#"{{"something": "else", "credential": {{"access_token": "{token}", "token_expiry": "{expiry}"}}}}"#
+        )
+    }
+
+    #[tokio::test]
+    #[ignore = "fails on windows mysteriously"]
+    async fn exec_auth_command() -> Result<(), Error> {
+        let expiry = (Timestamp::now() + SIXTY_SEC).to_string();
+        let auth_info = gcp_auth_info("echo", &format!("'{}'", cred_json("my_token", &expiry)));
+        match Auth::try_from(&auth_info).unwrap() {
             Auth::RefreshableToken(RefreshableToken::Exec(refreshable)) => {
                 let (token, _expire, info) = Arc::try_unwrap(refreshable).unwrap().into_inner();
                 assert_eq!(token.expose_secret(), &"my_token".to_owned());
@@ -685,6 +697,71 @@ mod test {
             }
             _ => unreachable!(),
         }
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[ignore = "shells out to echo/sh; skipped on windows"]
+    async fn exec_token_refresh_via_to_header() -> Result<(), Error> {
+        let fresh_expiry = (Timestamp::now() + SignedDuration::from_secs(3600)).to_string();
+        let auth_info = gcp_auth_info("echo", &format!("'{}'", cred_json("my_token", &fresh_expiry)));
+        // Seed with a stale token + past expiry to force the refresh branch.
+        let stale_expiry = Timestamp::now() - SIXTY_SEC;
+        let refreshable = RefreshableToken::Exec(Arc::new(Mutex::new((
+            SecretString::from("stale"),
+            stale_expiry,
+            auth_info,
+        ))));
+
+        let header = refreshable.to_header().await?;
+        assert_eq!(header, HeaderValue::from_static("Bearer my_token"));
+
+        // Cached state should have been updated in place.
+        if let RefreshableToken::Exec(data) = &refreshable {
+            let locked = data.lock().await;
+            assert_eq!(locked.0.expose_secret(), "my_token");
+            assert!(locked.1 > Timestamp::now(), "expiry should be in the future");
+        } else {
+            unreachable!();
+        }
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    #[ignore = "shells out to echo/sh; skipped on windows"]
+    async fn exec_token_refresh_does_not_block_runtime() -> Result<(), Error> {
+        use std::io::Write;
+        let fresh_expiry = (Timestamp::now() + SignedDuration::from_secs(3600)).to_string();
+        // Write a script that sleeps ~300ms before emitting credentials; the gcp provider
+        // splits cmd-args on spaces so we can't inline this via `sh -c`.
+        let mut script = tempfile::NamedTempFile::new().unwrap();
+        writeln!(script, "#!/bin/sh").unwrap();
+        writeln!(script, "sleep 0.3").unwrap();
+        writeln!(script, "echo '{}'", cred_json("my_token", &fresh_expiry)).unwrap();
+        script.flush().unwrap();
+        let script_path = script.path().to_str().unwrap().to_owned();
+
+        let auth_info = gcp_auth_info("sh", &script_path);
+        let stale_expiry = Timestamp::now() - SIXTY_SEC;
+        let refreshable = RefreshableToken::Exec(Arc::new(Mutex::new((
+            SecretString::from("stale"),
+            stale_expiry,
+            auth_info,
+        ))));
+
+        // On a current_thread runtime, if to_header() blocked the worker the 50ms
+        // timer below could not fire until the 300ms exec completed.
+        let start = Instant::now();
+        let (header, timer_elapsed) = tokio::join!(refreshable.to_header(), async {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+            start.elapsed()
+        });
+
+        assert!(
+            timer_elapsed < Duration::from_millis(200),
+            "timer took {timer_elapsed:?}; to_header likely blocked the runtime"
+        );
+        assert_eq!(header?, HeaderValue::from_static("Bearer my_token"));
         Ok(())
     }
 
