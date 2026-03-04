@@ -35,7 +35,7 @@ pub use finalizer::finalizer;
 pub use reflector::reflector;
 pub use scheduler::scheduler;
 pub use utils::WatchStreamExt;
-pub use watcher::{metadata_watcher, watcher};
+#[allow(deprecated)] pub use watcher::{metadata_watcher, watcher};
 
 pub use utils::{Predicate, PredicateConfig, predicates};
 pub use wait::conditions;
