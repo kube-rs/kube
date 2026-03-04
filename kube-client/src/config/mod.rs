@@ -128,6 +128,7 @@ pub enum LoadDataError {
 /// If you are looking to parse the kubeconfig found in a user's home directory see [`Kubeconfig`].
 #[cfg_attr(docsrs, doc(cfg(feature = "config")))]
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct Config {
     /// The configured cluster url
     pub cluster_url: http::Uri,
@@ -135,6 +136,15 @@ pub struct Config {
     pub default_namespace: String,
     /// The configured root certificate
     pub root_cert: Option<Vec<Vec<u8>>>,
+    /// Path to the root certificate bundle file.
+    ///
+    /// When set and the `rustls-tls` feature is enabled, the file is re-read
+    /// periodically (~60 s) to pick up CA rotation, mirroring how
+    /// `token_file` is reloaded. This takes precedence over `root_cert` for
+    /// server certificate verification.
+    ///
+    /// Set automatically by [`Config::incluster`].
+    pub root_cert_file: Option<PathBuf>,
     /// Set the timeout for connecting to the Kubernetes API.
     ///
     /// A value of `None` means no timeout
@@ -174,6 +184,7 @@ impl Config {
             cluster_url,
             default_namespace: String::from("default"),
             root_cert: None,
+            root_cert_file: None,
             connect_timeout: Some(DEFAULT_CONNECT_TIMEOUT),
             read_timeout: Some(DEFAULT_READ_TIMEOUT),
             write_timeout: Some(DEFAULT_WRITE_TIMEOUT),
@@ -254,6 +265,7 @@ impl Config {
             cluster_url,
             default_namespace,
             root_cert: Some(root_cert),
+            root_cert_file: Some(PathBuf::from(incluster_config::cert_file())),
             connect_timeout: Some(DEFAULT_CONNECT_TIMEOUT),
             read_timeout: Some(DEFAULT_READ_TIMEOUT),
             write_timeout: Some(DEFAULT_WRITE_TIMEOUT),
@@ -318,6 +330,7 @@ impl Config {
             cluster_url,
             default_namespace,
             root_cert,
+            root_cert_file: None,
             connect_timeout: Some(DEFAULT_CONNECT_TIMEOUT),
             read_timeout: Some(DEFAULT_READ_TIMEOUT),
             write_timeout: Some(DEFAULT_WRITE_TIMEOUT),
@@ -374,7 +387,7 @@ impl Config {
     }
 }
 
-fn certs(data: &[u8]) -> Result<Vec<Vec<u8>>, pem::PemError> {
+pub(crate) fn certs(data: &[u8]) -> Result<Vec<Vec<u8>>, pem::PemError> {
     Ok(pem::parse_many(data)?
         .into_iter()
         .filter_map(|p| {
