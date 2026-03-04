@@ -4,12 +4,12 @@ use serde::{Serialize, de::DeserializeOwned};
 use std::fmt::Debug;
 
 use crate::{Error, Result, api::Api};
-use kube_core::{WatchEvent, metadata::PartialObjectMeta, object::ObjectList, params::*, response::Status};
+use kube_core::{Resource, WatchEvent, metadata::PartialObjectMeta, object::ObjectList, params::*, response::Status};
 
 /// PUSH/PUT/POST/GET abstractions
 impl<K> Api<K>
 where
-    K: Clone + DeserializeOwned + Debug,
+    K: Resource + Clone + DeserializeOwned + Debug,
 {
     /// Get a named resource
     ///
@@ -80,7 +80,12 @@ where
     /// This function assumes that the object is expected to always exist, and returns [`Error`] if it does not.
     /// Consider using [`Api::get_opt`] if you need to handle missing objects.
     pub async fn get_with(&self, name: &str, gp: &GetParams) -> Result<K> {
-        let mut req = self.request.get(name, gp).map_err(Error::BuildRequest)?;
+        let mut req = if K::metadata_api() {
+            self.request.get_metadata(name, gp)
+        } else {
+            self.request.get(name, gp)
+        }
+        .map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("get");
         self.client.request::<K>(req).await
     }
@@ -215,7 +220,12 @@ where
     /// # }
     /// ```
     pub async fn list(&self, lp: &ListParams) -> Result<ObjectList<K>> {
-        let mut req = self.request.list(lp).map_err(Error::BuildRequest)?;
+        let mut req = if K::metadata_api() {
+            self.request.list_metadata(lp)
+        } else {
+            self.request.list(lp)
+        }
+        .map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("list");
         self.client.request::<ObjectList<K>>(req).await
     }
@@ -381,7 +391,12 @@ where
         pp: &PatchParams,
         patch: &Patch<P>,
     ) -> Result<K> {
-        let mut req = self.request.patch(name, pp, patch).map_err(Error::BuildRequest)?;
+        let mut req = if K::metadata_api() {
+            self.request.patch_metadata(name, pp, patch)
+        } else {
+            self.request.patch(name, pp, patch)
+        }
+        .map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("patch");
         self.client.request::<K>(req).await
     }
@@ -538,7 +553,12 @@ where
         wp: &WatchParams,
         version: &str,
     ) -> Result<impl Stream<Item = Result<WatchEvent<K>>> + use<K>> {
-        let mut req = self.request.watch(wp, version).map_err(Error::BuildRequest)?;
+        let mut req = if K::metadata_api() {
+            self.request.watch_metadata(wp, version)
+        } else {
+            self.request.watch(wp, version)
+        }
+        .map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("watch");
         self.client.request_events::<K>(req).await
     }
