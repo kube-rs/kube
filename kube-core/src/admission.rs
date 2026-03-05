@@ -236,7 +236,7 @@ pub enum Operation {
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct AdmissionResponse {
-    /// Copied from the corresponding consructing [`AdmissionRequest`].
+    /// Copied from the corresponding constructing [`AdmissionRequest`].
     #[serde(skip)]
     pub types: TypeMeta,
     /// Identifier for the individual request/response. This must be copied over

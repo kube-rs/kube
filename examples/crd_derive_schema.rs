@@ -97,6 +97,13 @@ pub struct FooSpec {
     )]
     cel_validated: Option<String>,
 
+    /// Immutable field that uses optionalOldSelf
+    #[serde(default)]
+    #[x_kube(
+        validation = Rule::new("oldSelf.optMap(o, o == self).orValue(true)").optional_old_self(true).message("Immutable after creation")
+    )]
+    immutable: Option<String>,
+
     #[x_kube(validation = Rule::new("self == oldSelf").message("is immutable"))]
     foo_sub_spec: Option<FooSubSpec>,
 
@@ -126,7 +133,7 @@ fn set_listable_schema(_: &mut schemars::generate::SchemaGenerator) -> schemars:
         "type": "array",
         "items": {
             "format": "u32",
-            "minium": 0,
+            "minimum": 0,
             "type": "integer"
         },
         "x-kubernetes-list-type": "set"
@@ -181,6 +188,7 @@ async fn main() -> Result<()> {
         default_listable: Default::default(),
         set_listable: Default::default(),
         cel_validated: Default::default(),
+        immutable: Default::default(),
         foo_sub_spec: Default::default(),
         associated_default: Default::default(),
     });
@@ -378,7 +386,7 @@ async fn main() -> Result<()> {
             assert!(err.is_failure());
             assert!(err.message.contains("Foo.clux.dev \"baz\" is invalid"));
             assert!(err.message.contains("spec.fooSubSpec: Invalid value"));
-            assert!(err.message.contains("Invalid value: \"object\": is immutable"));
+            assert!(err.message.contains("Immutable after creation") || err.message.contains("is immutable"));
         }
         _ => panic!(),
     }

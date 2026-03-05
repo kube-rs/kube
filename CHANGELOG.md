@@ -72,7 +72,7 @@ There affect `Api::create_subresource`, `Api::replace_subresource`, [`Api::repla
 +    let o = foos.replace_status("qux", &pp, &object).await?;
 ```
 
-See some more shifts in examples in the implementaion; https://github.com/kube-rs/kube/pull/1884
+See some more shifts in examples in the implementation; https://github.com/kube-rs/kube/pull/1884
 
 
 ## Improvements
@@ -109,7 +109,7 @@ Change https://github.com/kube-rs/kube/pull/1856 + https://github.com/kube-rs/ku
 ### New Client [`RetryPolicy`](https://docs.rs/kube/latest/kube/client/retry/struct.RetryPolicy.html) opt-in
 Allows custom clients (for now) to enable exponential backoff'd retries for retryable errors by exposing a [`tower::retry::Policy`](https://tower-rs.github.io/tower/tower/retry/trait.Policy.html) for a [`tower::retry::Layer`](https://tower-rs.github.io/tower/tower/retry/struct.RetryLayer.html). See the new [custom_client_retry](https://github.com/kube-rs/kube/blob/main/examples/custom_client_retry.rs#L24-L37) example for details.
 
-Enabled by a [clonable body](https://github.com/kube-rs/kube/pull/1867) + the new [RetryPolicy](https://github.com/kube-rs/kube/pull/1894) based on mirrord's solution[*](https://github.com/metalbear-co/mirrord/blob/a9e4c52a720fd5a833e30aee1ac650360031b7a7/mirrord/kube/src/retry.rs#L41-L135).
+Enabled by a [cloneable body](https://github.com/kube-rs/kube/pull/1867) + the new [RetryPolicy](https://github.com/kube-rs/kube/pull/1894) based on mirrord's solution[*](https://github.com/metalbear-co/mirrord/blob/a9e4c52a720fd5a833e30aee1ac650360031b7a7/mirrord/kube/src/retry.rs#L41-L135).
 
 ## Fixes
 - streaming list bug fix - https://github.com/kube-rs/kube/pull/1882
@@ -354,7 +354,7 @@ See [kube.rs docs on validation](https://kube.rs/controllers/admission/#validati
 - Feature use:
   *  Client proxy feature-set misuse prevention [#1626](https://github.com/kube-rs/kube/issues/1626)
   * Allow disabling `gzip` via `Config` [#1627](https://github.com/kube-rs/kube/issues/1627)
-- Depedency minors: `thiserror`, `hashbrown`, `jsonptr`, `json-patch`. Killed `lazy_static` / `once_cell`
+- Dependency minors: `thiserror`, `hashbrown`, `jsonptr`, `json-patch`. Killed `lazy_static` / `once_cell`
 
 ## What's Changed
 ### Added
@@ -523,7 +523,7 @@ Thanks to @aviramha via [MetalBear](https://metalbear.co/) for the support in ht
 * Align `watcher::Event` init/page variants by @clux in https://github.com/kube-rs/kube/pull/1504
 * Update json-patch to 2.0.0 by @bobsongplus in https://github.com/kube-rs/kube/pull/1507
 ### Fixed
-* Fix potentially panicing unchecked duration adds in runtime by @clux in https://github.com/kube-rs/kube/pull/1489
+* Fix potentially panicking unchecked duration adds in runtime by @clux in https://github.com/kube-rs/kube/pull/1489
 * ObjectList now accepts null metadata like upstream k8s does by @aviramha in https://github.com/kube-rs/kube/pull/1492
 * rename http_proxy feature to http-proxy and add it to the umbrella crate by @aviramha in https://github.com/kube-rs/kube/pull/1501
 * move from `hyper-proxy2` to `hyper-http-proxy` by @aviramha in https://github.com/kube-rs/kube/pull/1502
@@ -1184,7 +1184,7 @@ The previous `native-tls` default  was there because we used to depend on `reqwe
 ### [Support for EC keys with rustls](https://github.com/kube-rs/kube/pull/804)
 
 This was one of the big blockers for using `rustls` against clusters like `k3d` or `k3s`
-While __not sufficient__ to fix using those clusters out of the box, it is now __possible__ to use them [with a workarodund](https://github.com/kube-rs/kube/issues/153)
+While __not sufficient__ to fix using those clusters out of the box, it is now __possible__ to use them [with a workaround](https://github.com/kube-rs/kube/issues/153)
 
 ### [More ergonomic reconciler](https://github.com/kube-rs/kube/pull/851)
 The signature and end the `Ok` action in `reconcile` fns has been simplified slightly, and requires the following user updates:
@@ -1327,7 +1327,7 @@ To aid users picking the most appropriate version of a `kind` from [api discover
 Merged PRs from [github release](https://github.com/kube-rs/kube/releases/tag/0.66.0).
 ### Added
 * Add `DeleteParams` constructors for easily setting `PropagationPolicy` by @kate-goldenring in https://github.com/kube-rs/kube/pull/757
-* Add Serialize to ObjecList and add field-selector and jsonpath example by @ChinYing-Li in https://github.com/kube-rs/kube/pull/760
+* Add Serialize to ObjectList and add field-selector and jsonpath example by @ChinYing-Li in https://github.com/kube-rs/kube/pull/760
 * Implement cordon/uncordon for Node by @ChinYing-Li in https://github.com/kube-rs/kube/pull/762
 * Export Version priority parser with Ord impls in kube_core by @clux in https://github.com/kube-rs/kube/pull/764
 * Add Api fns for arbitrary subresources and approval subresource for CertificateSigningRequest by @ChinYing-Li in https://github.com/kube-rs/kube/pull/773
@@ -1374,7 +1374,7 @@ The following is the summary of changes to `kube::Error` included in this releas
 * Added `Error::BuildRequest(kube::core::request::Error)` (errors building request from `kube::core`)
 * Added `Error::InferConfig(kube::config::InferConfigError)` (for `Client::try_default`)
 * Added `Error::OpensslTls(kube::client::OpensslTlsError)` (new `openssl-tls` feature) - [#700](https://github.com/kube-rs/kube/issues/700)
-* Added `Error::UpgradeConnection(kube::client::UpgradeConnectinError)` (`ws` feature, errors from upgrading a connection)
+* Added `Error::UpgradeConnection(kube::client::UpgradeConnectionError)` (`ws` feature, errors from upgrading a connection)
 * Removed `Error::Connection` (was unused)
 * Removed `Error::RequestBuild` (was unused)
 * Removed `Error::RequestSend` (was unused)
@@ -1414,7 +1414,7 @@ The following breaking changes were made as a part of an effort to refine errors
 * Added `kube::config::InferConfigError` which is an error from `Config::infer()` and `kube::Error::InferConfig(kube::config::InferConfigError)` - [#696](https://github.com/kube-rs/kube/issues/696)
 * Added `kube::config::InClusterError` for errors related to loading in-cluster configuration by splitting `kube::ConfigError` and adding more variants to preserve context. - [#696](https://github.com/kube-rs/kube/issues/696)
 * Added `kube::config::KubeconfigError` for errors related to loading kubeconfig by splitting `kube::ConfigError` and adding more variants to preserve context. - [#696](https://github.com/kube-rs/kube/issues/696)
-* Changed methods of `kube::Config` to return these erorrs instead of `kube::Error` - [#696](https://github.com/kube-rs/kube/issues/696)
+* Changed methods of `kube::Config` to return these errors instead of `kube::Error` - [#696](https://github.com/kube-rs/kube/issues/696)
 * Removed `kube::Error::InvalidUri` which was replaced by error variants preserving context, such as `KubeconfigError::ParseProxyUrl` - [#696](https://github.com/kube-rs/kube/issues/696)
 * Moved all errors from upgrading to a WebSocket connection into `kube::Error::UpgradeConnection(kube::client::UpgradeConnectionError)` - [#696](https://github.com/kube-rs/kube/issues/696)
 
@@ -1567,7 +1567,7 @@ The following breaking changes were made as a part of an effort to refine errors
  * `kube`: `api` BREAKING: `discovery` module's `Group` renamed to `ApiGroup`
  * `kube`: `client` BREAKING: `kube::client::Status` moved to `kube::core::Status` (accidental, re-adding in 0.56)
  * `kube-core` crate factored out of `kube` to reduce dependencies - [#516](https://github.com/kube-rs/kube/issues/516) via [#517](https://github.com/kube-rs/kube/issues/517) + [#519](https://github.com/kube-rs/kube/issues/519) + [#522](https://github.com/kube-rs/kube/issues/522) + [#528](https://github.com/kube-rs/kube/issues/528) + [#530](https://github.com/kube-rs/kube/issues/530)
- * `kube`: `kube::Service` removed to allow `kube::Client` to take an abritrary `Service<http::Request<hyper::Body>>` - [#532](https://github.com/kube-rs/kube/issues/532)
+ * `kube`: `kube::Service` removed to allow `kube::Client` to take an arbitrary `Service<http::Request<hyper::Body>>` - [#532](https://github.com/kube-rs/kube/issues/532)
 
 0.54.0 / 2021-05-19
 ===================
@@ -1588,7 +1588,7 @@ The following breaking changes were made as a part of an effort to refine errors
 The most likely issue you'll run into is from `kube` when using `Resource` trait which has been split:
 
 ```diff
-+use kube::api::ResouceExt;
++use kube::api::ResourceExt;
 -    let name = Resource::name(&foo);
 -    let ns = Resource::namespace(&foo).expect("foo is namespaced");
 +    let name = ResourceExt::name(&foo);
@@ -1646,7 +1646,7 @@ The following constants from `k8s_openapi::Resource` no longer exist. Please `us
 
 0.51.0 / 2021-02-28
 ===================
- * `kube` `Config` now allows arbirary extension objects - [#425](https://github.com/kube-rs/kube/issues/425)
+ * `kube` `Config` now allows arbitrary extension objects - [#425](https://github.com/kube-rs/kube/issues/425)
  * `kube` `Config` now allows multiple yaml documents per kubeconfig - [#440](https://github.com/kube-rs/kube/issues/440) via [#441](https://github.com/kube-rs/kube/issues/441)
  * `kube-derive` now more robust and is using `darling` - [#435](https://github.com/kube-rs/kube/issues/435)
  * docs improvements to patch + runtime
@@ -1720,7 +1720,7 @@ The following constants from `k8s_openapi::Resource` no longer exist. Please `us
 0.44.0 / 2020-12-23
 ===================
   * feat: `kube-derive` now generates openapi v3 schemas and is thus usable with v1 `CustomResourceDefinition` - [#129](https://github.com/kube-rs/kube/issues/129) and [#264](https://github.com/kube-rs/kube/issues/264) via [#348](https://github.com/kube-rs/kube/pull/348)
-    * BREAKING: `kube-derive` types now require `JsonSchema` derived via `schemars` libray (not breaking if going to 0.45.0)
+    * BREAKING: `kube-derive` types now require `JsonSchema` derived via `schemars` library (not breaking if going to 0.45.0)
   * feat: `kube_runtime::controller`: now reconciles objects in parallel - [#346](https://github.com/kube-rs/kube/issues/346)
     * BREAKING: `kube_runtime::controller::applier` now requires that the `reconciler`'s `Future` is `Unpin`,
                 `Box::pin` it or submit it to a runtime if this is not acceptable
@@ -1760,7 +1760,7 @@ The following constants from `k8s_openapi::Resource` no longer exist. Please `us
   * `kube::DynamicResource` exposed at top level
   * Bug: `PatchParams::default_apply()` now requires a manager and renamed to `PatchParams::apply(manager: &str)` for [#300](https://github.com/kube-rs/kube/issues/300)
   * Bug: `DeleteParams` no longer missing for `Api::delete_collection` - [#53](https://github.com/kube-rs/kube/issues/53)
-  * Removed paramter `ListParams::include_uninitialized` deprecated since 1.14
+  * Removed parameter `ListParams::include_uninitialized` deprecated since 1.14
   * Added optional `PostParams::field_manager` was missing for `Api::create` case
 
 0.39.0 / 2020-08-05

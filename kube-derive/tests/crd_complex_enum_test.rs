@@ -43,6 +43,34 @@ enum ComplexEnum {
     },
 }
 
+/// An untagged enum with a nested enum inside
+#[derive(Serialize, Deserialize, Debug, Clone, JsonSchema)]
+#[serde(untagged)]
+enum UntaggedEnum {
+    /// Used in case the `one` field of type [`u32`] is present
+    ///
+    /// This should not appear in the schema because the "variant" disappears
+    /// and this comment cannot pertain to all fields within the struct variant.
+    A { one: String },
+    /// Used in case the `two` field of type [`NormalEnum`] is present
+    ///
+    /// This should not appear in the schema because the "variant" disappears
+    /// and this comment cannot pertain to all fields within the struct variant.
+    B { two: NormalEnum, three: String },
+    /// Used in case no fields are present
+    ///
+    /// This should not appear in the schema because the "variant" disappears
+    /// and this comment cannot pertain to all fields within the struct variant.
+    C {},
+}
+
+/// Put a [`UntaggedEnum`] behind `#[serde(flatten)]`
+#[derive(Serialize, Deserialize, Debug, Clone, JsonSchema)]
+struct FlattenedUntaggedEnum {
+    #[serde(flatten)]
+    inner: UntaggedEnum,
+}
+
 // CRD definitions
 
 #[derive(CustomResource, Serialize, Deserialize, Debug, Clone, JsonSchema)]
@@ -77,7 +105,15 @@ struct ComplexEnumTestSpec {
 #[kube(group = "clux.dev", version = "v1", kind = "OptionalComplexEnumTest")]
 struct OptionalComplexEnumTestSpec {
     /// Optional complex enum field
+    // When this doc-comment is missing, we suggest using the doc-comment of the
+    // inner type - though that is debatable
     foo: Option<ComplexEnum>,
+}
+
+#[derive(CustomResource, Serialize, Deserialize, Debug, Clone, JsonSchema)]
+#[kube(group = "clux.dev", version = "v1", kind = "FlattenedUntaggedEnumTest")]
+struct FlattenedUntaggedEnumTestSpec {
+    foo: FlattenedUntaggedEnum,
 }
 
 #[test]
@@ -475,5 +511,97 @@ fn optional_complex_enum() {
                 }]
             }
         })
+    );
+}
+
+#[test]
+fn flattened_untagged_enum() {
+    assert_json_eq!(
+        FlattenedUntaggedEnumTest::crd(),
+        json!(
+          {
+            "apiVersion": "apiextensions.k8s.io/v1",
+            "kind": "CustomResourceDefinition",
+            "metadata": {
+              "name": "flatteneduntaggedenumtests.clux.dev"
+            },
+            "spec": {
+              "group": "clux.dev",
+              "names": {
+                "categories": [],
+                "kind": "FlattenedUntaggedEnumTest",
+                "plural": "flatteneduntaggedenumtests",
+                "shortNames": [],
+                "singular": "flatteneduntaggedenumtest"
+              },
+              "scope": "Cluster",
+              "versions": [
+                {
+                  "additionalPrinterColumns": [],
+                  "name": "v1",
+                  "schema": {
+                    "openAPIV3Schema": {
+                      "description": "Auto-generated derived type for FlattenedUntaggedEnumTestSpec via `CustomResource`",
+                      "properties": {
+                        "spec": {
+                          "properties": {
+                            "foo": {
+                              "anyOf": [
+                                {
+                                  "required": [
+                                    "one"
+                                  ]
+                                },
+                                {
+                                  "required": [
+                                    "three",
+                                    "two"
+                                  ]
+                                },
+                                {}
+                              ],
+                              "description": "Put a [`UntaggedEnum`] behind `#[serde(flatten)]`",
+                              "properties": {
+                                "one": {
+                                  "type": "string"
+                                },
+                                "two": {
+                                  "description": "A very simple enum with unit variants",
+                                  "enum": [
+                                    "C",
+                                    "D",
+                                    "A",
+                                    "B"
+                                  ],
+                                  "type": "string"
+                                },
+                                "three": {
+                                  "type": "string"
+                                },
+                              },
+                              "type": "object"
+                            }
+                          },
+                          "required": [
+                            "foo"
+                          ],
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "spec"
+                      ],
+                      "title": "FlattenedUntaggedEnumTest",
+                      "type": "object"
+                    }
+                  },
+                  "served": true,
+                  "storage": true,
+                  "subresources": {}
+                }
+              ]
+            }
+          }
+        )
     );
 }

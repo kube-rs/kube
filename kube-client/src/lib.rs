@@ -115,7 +115,7 @@ cfg_config! {
 cfg_error! {
     pub mod error;
     #[doc(inline)] pub use error::Error;
-    /// Convient alias for `Result<T, Error>`
+    /// Convenient alias for `Result<T, Error>`
     pub type Result<T, E = Error> = std::result::Result<T, E>;
 }
 
@@ -786,7 +786,7 @@ mod test {
             .await
             .map(|v| v.map_left(|pdel| assert_eq!(pdel.name_any(), pod.name_any())));
 
-        // Ephemeral containes can only be applied to a running pod, so one must
+        // Ephemeral containers can only be applied to a running pod, so one must
         // be created before any operations are tested.
         match pods.create(&Default::default(), &pod).await {
             Ok(o) => assert_eq!(pod.name_unchecked(), o.name_unchecked()),

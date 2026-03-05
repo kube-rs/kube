@@ -1086,7 +1086,7 @@ pub mod conditions {
         }
 
         #[test]
-        /// pass if loadbalancer service has recieved a loadbalancer IP
+        /// pass if loadbalancer service has received a loadbalancer IP
         fn service_lb_provisioned_ok_ip() {
             use super::{Condition, is_service_loadbalancer_provisioned};
 
@@ -1115,7 +1115,7 @@ pub mod conditions {
         }
 
         #[test]
-        /// pass if loadbalancer service has recieved a loadbalancer hostname
+        /// pass if loadbalancer service has received a loadbalancer hostname
         fn service_lb_provisioned_ok_hostname() {
             use super::{Condition, is_service_loadbalancer_provisioned};
 
@@ -1205,7 +1205,7 @@ pub mod conditions {
         }
 
         #[test]
-        /// pass when ingress has recieved a loadbalancer IP
+        /// pass when ingress has received a loadbalancer IP
         fn ingress_provisioned_ok_ip() {
             use super::{Condition, is_ingress_provisioned};
 
@@ -1240,7 +1240,7 @@ pub mod conditions {
         }
 
         #[test]
-        /// pass when ingress has recieved a loadbalancer hostname
+        /// pass when ingress has received a loadbalancer hostname
         fn ingress_provisioned_ok_hostname() {
             use super::{Condition, is_ingress_provisioned};
 

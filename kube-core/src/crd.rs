@@ -1,4 +1,4 @@
-//! Traits and tyes for CustomResources
+//! Traits and types for CustomResources
 
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions as apiexts;
 
