@@ -57,9 +57,11 @@ unstable-runtime = ["kube-runtime/unstable-runtime", "runtime"]
 unstable-client = ["kube-client/unstable-client", "client"]
 ## enable the kubelet debug interface
 kubelet-debug = ["kube-client/kubelet-debug", "kube-core/kubelet-debug"]
+## enable CEL validation runtime
+cel = ["kube-core/cel"]
 
 [package.metadata.docs.rs]
-features = ["client", "rustls-tls", "openssl-tls", "derive", "ws", "oauth", "jsonpatch", "admission", "runtime", "k8s-openapi/latest", "unstable-runtime", "socks5", "http-proxy"]
+features = ["client", "rustls-tls", "openssl-tls", "derive", "ws", "oauth", "jsonpatch", "admission", "runtime", "k8s-openapi/latest", "unstable-runtime", "socks5", "http-proxy", "cel"]
 # Define the configuration attribute `docsrs`. Used to enable `doc_cfg` feature.
 rustdoc-args = ["--cfg", "docsrs"]
 
