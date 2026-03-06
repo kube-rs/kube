@@ -13,6 +13,7 @@ use std::{collections::BTreeMap, str::FromStr};
 #[cfg(feature = "cel")] pub mod lists;
 #[cfg(feature = "cel")] pub mod sets;
 #[cfg(feature = "cel")] pub mod strings;
+#[cfg(feature = "cel")] pub mod validation;
 #[cfg(feature = "cel")] mod value_ops;
 #[cfg(feature = "cel")] pub mod values;
 
