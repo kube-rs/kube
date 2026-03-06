@@ -11,11 +11,6 @@ db-urls = ["https://github.com/rustsec/advisory-db"]
 # https://embarkstudios.github.io/cargo-deny/checks/advisories/cfg.html#the-version-field-optional
 # remove them when we have to
 yanked = "warn"
-ignore = [
-    # paste is unmaintained; already fixed on cel-rust main (paste → pastey),
-    # pending next cel release. Remove once cel >= 0.13 is published.
-    "RUSTSEC-2024-0436",
-]
 
 [licenses]
 # See https://spdx.org/licenses/ for list of possible licenses
