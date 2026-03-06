@@ -9,6 +9,7 @@ use std::{collections::BTreeMap, str::FromStr};
 
 #[cfg(feature = "cel")] pub mod compilation;
 #[cfg(feature = "cel")] pub mod escaping;
+#[cfg(feature = "cel")] pub mod strings;
 #[cfg(feature = "cel")] mod value_ops;
 #[cfg(feature = "cel")] pub mod values;
 
