@@ -771,8 +771,6 @@ where
     /// This allows for customized and pre-filtered watch streams to be used as a trigger,
     /// as well as sharing input streams between multiple controllers.
     ///
-    /// **NB**: This is constructor requires an [`unstable`](https://github.com/kube-rs/kube/blob/main/kube-runtime/Cargo.toml#L17-L21) feature.
-    ///
     /// # Example:
     ///
     /// ```no_run
@@ -818,8 +816,6 @@ where
     /// This allows for customized and pre-filtered watch streams to be used as a trigger,
     /// as well as sharing input streams between multiple controllers.
     ///
-    /// **NB**: This is constructor requires an [`unstable`](https://github.com/kube-rs/kube/blob/main/kube-runtime/Cargo.toml#L17-L21) feature.
-    ///
     /// Prefer [`Controller::new`] if you do not need to share the stream, or do not need pre-filtering.
     ///
     /// This variant constructor is for [`dynamic`] types found through discovery. Prefer [`Controller::for_stream`] for static types.
@@ -856,10 +852,6 @@ where
     /// streams can be created out-of-band by subscribing on a store `Writer`.
     /// Through this interface, multiple controllers can use the same root
     /// (shared) input stream of resources to keep memory overheads smaller.
-    ///
-    /// **N.B**: This constructor requires an
-    /// [`unstable`](https://github.com/kube-rs/kube/blob/main/kube-runtime/Cargo.toml#L17-L21)
-    /// feature.
     ///
     /// Prefer [`Controller::new`] or [`Controller::for_stream`] if you do not
     /// need to share the stream.
@@ -923,10 +915,6 @@ where
     /// streams can be created out-of-band by subscribing on a store `Writer`.
     /// Through this interface, multiple controllers can use the same root
     /// (shared) input stream of resources to keep memory overheads smaller.
-    ///
-    /// **N.B**: This constructor requires an
-    /// [`unstable`](https://github.com/kube-rs/kube/blob/main/kube-runtime/Cargo.toml#L17-L21)
-    /// feature.
     ///
     /// Prefer [`Controller::new`] or [`Controller::for_stream`] if you do not
     /// need to share the stream.
@@ -1034,8 +1022,6 @@ where
     /// This allows for customized and pre-filtered watch streams to be used as a trigger,
     /// as well as sharing input streams between multiple controllers.
     ///
-    /// **NB**: This is constructor requires an [`unstable`](https://github.com/kube-rs/kube/blob/main/kube-runtime/Cargo.toml#L17-L21) feature.
-    ///
     /// Watcher streams passed in here should be filtered first through `touched_objects`.
     ///
     /// # Example:
@@ -1078,8 +1064,6 @@ where
     /// This allows for customized and pre-filtered watch streams to be used as a trigger,
     /// as well as sharing input streams between multiple controllers.
     ///
-    /// **NB**: This is constructor requires an [`unstable`](https://github.com/kube-rs/kube/blob/main/kube-runtime/Cargo.toml#L17-L21) feature.
-    ///
     /// Same as [`Controller::owns_stream`], but accepts a `DynamicType` so it can be used with dynamic resources.
     #[cfg(feature = "unstable-runtime-stream-control")]
     #[must_use]
@@ -1102,10 +1086,6 @@ where
     /// Through this interface, multiple controllers can use the same root
     /// (shared) input stream of resources to keep memory overheads smaller.
     ///
-    /// **N.B**: This constructor requires an
-    /// [`unstable`](https://github.com/kube-rs/kube/blob/main/kube-runtime/Cargo.toml#L17-L21)
-    /// feature.
-    ///
     /// Prefer [`Controller::new`] or [`Controller::for_stream`] if you do not
     /// need to share the stream.
     ///
@@ -1122,8 +1102,6 @@ where
     /// Conceptually the same as [`Controller::owns`], but a stream is used
     /// instead of an `Api`. This interface behaves similarly to its non-shared
     /// counterpart [`Controller::owns_stream`].
-    ///
-    /// **NB**: This is constructor requires an [`unstable`](https://github.com/kube-rs/kube/blob/main/kube-runtime/Cargo.toml#L17-L21) feature.
     ///
     /// # Example:
     ///
@@ -1182,8 +1160,6 @@ where
     /// Same as [`Controller::owns`], but instead of an `Api`, a shared stream of resources is used.
     /// The source stream can be shared between multiple controllers, optimising
     /// resource usage.
-    ///
-    /// **NB**: This is constructor requires an [`unstable`](https://github.com/kube-rs/kube/blob/main/kube-runtime/Cargo.toml#L17-L21) feature.
     ///
     /// Same as [`Controller::owns_shared_stream`], but accepts a `DynamicType` so it can be used with dynamic resources.
     #[cfg(feature = "unstable-runtime-subscribe")]
@@ -1309,8 +1285,6 @@ where
     /// This allows for customized and pre-filtered watch streams to be used as a trigger,
     /// as well as sharing input streams between multiple controllers.
     ///
-    /// **NB**: This is constructor requires an [`unstable`](https://github.com/kube-rs/kube/blob/main/kube-runtime/Cargo.toml#L17-L21) feature.
-    ///
     /// Watcher streams passed in here should be filtered first through `touched_objects`.
     ///
     /// # Example:
@@ -1363,8 +1337,6 @@ where
     /// This allows for customized and pre-filtered watch streams to be used as a trigger,
     /// as well as sharing input streams between multiple controllers.
     ///
-    /// **NB**: This is constructor requires an [`unstable`](https://github.com/kube-rs/kube/blob/main/kube-runtime/Cargo.toml#L17-L21) feature.
-    ///
     /// Same as [`Controller::watches_stream`], but accepts a `DynamicType` so it can be used with dynamic resources.
     #[cfg(feature = "unstable-runtime-stream-control")]
     #[must_use]
@@ -1391,8 +1363,6 @@ where
     /// Same as [`Controller::watches`], but instead of an `Api`, a shared
     /// stream of resources is used. This allows for sharing input streams
     /// between multiple controllers.
-    ///
-    /// **NB**: This is constructor requires an [`unstable`](https://github.com/kube-rs/kube/blob/main/kube-runtime/Cargo.toml#L17-L21) feature.
     ///
     /// Watcher streams passed in here should be filtered first through `touched_objects`.
     ///
@@ -1460,8 +1430,6 @@ where
     /// Same as [`Controller::watches`], but instead of an `Api`, a shared
     /// stream of resources is used. This allows for sharing of streams between
     /// multiple controllers.
-    ///
-    /// **NB**: This is constructor requires an [`unstable`](https://github.com/kube-rs/kube/blob/main/kube-runtime/Cargo.toml#L17-L21) feature.
     ///
     /// Same as [`Controller::watches_shared_stream`], but accepts a `DynamicType` so it can be used with dynamic resources.
     #[cfg(feature = "unstable-runtime-subscribe")]
