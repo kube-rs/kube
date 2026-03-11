@@ -141,7 +141,11 @@ pub struct Config {
     pub connect_timeout: Option<std::time::Duration>,
     /// Set the timeout for the Kubernetes API response.
     ///
-    /// A value of `None` means no timeout
+    /// A value of `None` means no timeout.
+    ///
+    /// Defaults to `None` to avoid breaking long-lived connections such as
+    /// exec, attach and port-forward sessions.  Watch streams are protected
+    /// by a watcher-level idle timeout instead.
     pub read_timeout: Option<std::time::Duration>,
     /// Set the timeout for the Kubernetes API request.
     ///
@@ -175,7 +179,7 @@ impl Config {
             default_namespace: String::from("default"),
             root_cert: None,
             connect_timeout: Some(DEFAULT_CONNECT_TIMEOUT),
-            read_timeout: Some(DEFAULT_READ_TIMEOUT),
+            read_timeout: None,
             write_timeout: Some(DEFAULT_WRITE_TIMEOUT),
             accept_invalid_certs: false,
             auth_info: AuthInfo::default(),
@@ -255,7 +259,7 @@ impl Config {
             default_namespace,
             root_cert: Some(root_cert),
             connect_timeout: Some(DEFAULT_CONNECT_TIMEOUT),
-            read_timeout: Some(DEFAULT_READ_TIMEOUT),
+            read_timeout: None,
             write_timeout: Some(DEFAULT_WRITE_TIMEOUT),
             accept_invalid_certs: false,
             auth_info: AuthInfo {
@@ -319,7 +323,7 @@ impl Config {
             default_namespace,
             root_cert,
             connect_timeout: Some(DEFAULT_CONNECT_TIMEOUT),
-            read_timeout: Some(DEFAULT_READ_TIMEOUT),
+            read_timeout: None,
             write_timeout: Some(DEFAULT_WRITE_TIMEOUT),
             accept_invalid_certs,
             disable_compression,
@@ -398,7 +402,6 @@ impl TryFrom<Kubeconfig> for Config {
 
 // https://github.com/kube-rs/kube/issues/146#issuecomment-590924397
 const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
-const DEFAULT_READ_TIMEOUT: Duration = Duration::from_secs(295);
 const DEFAULT_WRITE_TIMEOUT: Duration = Duration::from_secs(295);
 
 // Expose raw config structs
