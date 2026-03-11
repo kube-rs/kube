@@ -12,7 +12,7 @@ keywords = ["kubernetes", "apimachinery"]
 categories = ["api-bindings", "encoding", "parser-implementations"]
 
 [package.metadata.docs.rs]
-features = ["ws", "admission", "jsonpatch", "k8s-openapi/latest"]
+features = ["ws", "admission", "jsonpatch", "cel", "k8s-openapi/latest"]
 rustdoc-args = ["--cfg", "docsrs"]
 
 [lints]
@@ -24,6 +24,7 @@ admission = ["json-patch"]
 jsonpatch = ["json-patch"]
 schema = ["schemars"]
 kubelet-debug = ["ws"]
+cel = ["dep:kube-cel"]
 
 [dependencies]
 serde = { workspace = true, features = ["derive"] }
@@ -37,6 +38,7 @@ schemars = { workspace = true, optional = true }
 k8s-openapi.workspace = true
 serde-value.workspace = true
 derive_more = { workspace = true, features = ["from"] }
+kube-cel = { version = "0.4", optional = true, features = ["validation"] }
 
 [dev-dependencies]
 k8s-openapi = { workspace = true, features = ["latest"] }
