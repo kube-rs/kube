@@ -1,6 +1,7 @@
 //! Runs a user-supplied reconciler function on objects when they (or related objects) are updated
 
 use self::runner::Runner;
+#[allow(deprecated)] use crate::watcher::metadata_watcher;
 use crate::{
     reflector::{
         self, ObjectRef, reflector,
@@ -10,7 +11,7 @@ use crate::{
     utils::{
         Backoff, CancelableJoinHandle, KubeRuntimeStreamExt, StreamBackoff, WatchStreamExt, trystream_try_via,
     },
-    watcher::{self, DefaultBackoff, metadata_watcher, watcher},
+    watcher::{self, DefaultBackoff, watcher},
 };
 use educe::Educe;
 use futures::{
@@ -1007,6 +1008,7 @@ where
         Child::DynamicType: Debug + Eq + Hash + Clone,
     {
         // TODO: call owns_stream_with when it's stable
+        #[allow(deprecated)]
         let child_watcher = trigger_owners(
             metadata_watcher(api, wc).touched_objects(),
             self.dyntype.clone(),
@@ -1712,11 +1714,14 @@ mod tests {
     use crate::{
         Config, Controller, applier,
         reflector::{self, ObjectRef},
-        watcher::{self, Event, metadata_watcher, watcher},
+        watcher::{self, Event, watcher},
     };
     use futures::{Stream, StreamExt, TryStreamExt};
     use k8s_openapi::api::core::v1::ConfigMap;
-    use kube_client::{Api, Resource, core::ObjectMeta};
+    use kube_client::{
+        Api, Resource,
+        core::{ObjectMeta, PartialObjectMeta},
+    };
     use serde::de::DeserializeOwned;
     use tokio::time::timeout;
 
@@ -1755,13 +1760,13 @@ mod tests {
     // not #[test] because we don't want to actually run it, we just want to
     // assert that it typechecks
     //
-    // will check return types for `watcher` and `watch_metadata` do not drift
+    // will check return types for `watcher` and `watcher with PartialObjectMeta` do not drift
     // given an arbitrary K that implements `Resource` (e.g ConfigMap)
     #[allow(dead_code, unused_must_use)]
     fn test_watcher_stream_type_drift() {
         assert_stream(watcher(mock_type::<Api<ConfigMap>>(), Default::default()));
-        assert_stream(metadata_watcher(
-            mock_type::<Api<ConfigMap>>(),
+        assert_stream(watcher(
+            mock_type::<Api<PartialObjectMeta<ConfigMap>>>(),
             Default::default(),
         ));
     }

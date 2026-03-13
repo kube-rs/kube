@@ -54,6 +54,32 @@ pub trait Resource {
     /// This is known as the resource in apimachinery, we rename it for disambiguation.
     fn plural(dt: &Self::DynamicType) -> Cow<'_, str>;
 
+    /// Returns whether this type should use metadata-only API requests
+    ///
+    /// When `true`, [`Api`] methods like `get`, `list`, `watch`, and `patch` will
+    /// automatically use metadata-optimized Accept headers (e.g.
+    /// `application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1`), so the API
+    /// server only returns object metadata instead of the full object.
+    ///
+    /// This is overridden to return `true` for [`PartialObjectMeta<K>`], making
+    /// `Api<PartialObjectMeta<K>>` automatically efficient without any caller changes.
+    ///
+    /// ```
+    /// # use kube_core::{Resource, metadata::PartialObjectMeta};
+    /// # use k8s_openapi::api::core::v1::Pod;
+    /// // Regular resources use full object requests
+    /// assert!(!Pod::metadata_api());
+    ///
+    /// // PartialObjectMeta wraps any resource for metadata-only requests
+    /// assert!(PartialObjectMeta::<Pod>::metadata_api());
+    /// ```
+    ///
+    /// [`Api`]: https://docs.rs/kube/latest/kube/struct.Api.html
+    /// [`PartialObjectMeta<K>`]: crate::metadata::PartialObjectMeta
+    fn metadata_api() -> bool {
+        false
+    }
+
     /// Creates a url path for http requests for this resource
     fn url_path(dt: &Self::DynamicType, namespace: Option<&str>) -> String {
         let n = if let Some(ns) = namespace {
