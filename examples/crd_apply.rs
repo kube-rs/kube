@@ -41,7 +41,7 @@ async fn main() -> anyhow::Result<()> {
     // 0. Ensure the CRD is installed (you probably just want to do this on CI)
     // (crd file can be created by piping `Foo::crd`'s yaml ser to kubectl apply)
     let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
-    info!("Creating crd: {}", serde_yaml::to_string(&Foo::crd())?);
+    info!("Creating crd: {}", yaml_serde::to_string(&Foo::crd())?);
     crds.patch("foos.clux.dev", &ssapply, &Patch::Apply(Foo::crd()))
         .await?;
 
@@ -58,7 +58,7 @@ async fn main() -> anyhow::Result<()> {
         info: Some("old baz".into()),
         replicas: 3,
     });
-    info!("Applying 1: \n{}", serde_yaml::to_string(&foo)?);
+    info!("Applying 1: \n{}", yaml_serde::to_string(&foo)?);
     let o = foos.patch("baz", &ssapply, &Patch::Apply(&foo)).await?;
     // NB: kubernetes < 1.20 will fail to admit scale subresources - see #387
     info!("Applied 1 {}: {:?}", o.name_any(), o.spec);
@@ -73,7 +73,7 @@ async fn main() -> anyhow::Result<()> {
         }
     });
 
-    info!("Applying 2: \n{}", serde_yaml::to_string(&patch)?);
+    info!("Applying 2: \n{}", yaml_serde::to_string(&patch)?);
     let o2 = foos.patch("baz", &ssapply, &Patch::Apply(patch)).await?;
     info!("Applied 2 {}: {:?}", o2.name_any(), o2.spec);
 

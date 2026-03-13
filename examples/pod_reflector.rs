@@ -25,7 +25,7 @@ async fn main() -> anyhow::Result<()> {
             info!("Current pod count: {}", reader.state().len());
             // full information with debug logs
             for p in reader.state() {
-                let yaml = serde_yaml::to_string(p.as_ref()).unwrap();
+                let yaml = yaml_serde::to_string(p.as_ref()).unwrap();
                 debug!("Pod {}: \n{}", p.name_any(), yaml);
             }
         }

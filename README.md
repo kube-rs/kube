@@ -86,7 +86,7 @@ Then you can use the generated wrapper struct `Document` as a [`kube::Resource`]
 let docs: Api<Document> = Api::default_namespaced(client);
 let d = Document::new("guide", DocumentSpec::default());
 println!("doc: {:?}", d);
-println!("crd: {:?}", serde_yaml::to_string(&Document::crd()));
+println!("crd: {:?}", yaml_serde::to_string(&Document::crd()));
 ```
 
 There are a ton of kubebuilder-like instructions that you can annotate with here. See the [documentation](https://docs.rs/kube/latest/kube/derive.CustomResource.html) or the `crd_` prefixed [examples](https://github.com/kube-rs/kube/blob/main/examples) for more.

@@ -6,6 +6,7 @@
 UNRELEASED
 ===================
  * see https://github.com/kube-rs/kube/compare/3.0.1...main
+ * Replace `serde_yaml`  0.9 to `yaml_serde` 0.10 by @kazan417
 
 [3.0.1](https://github.com/kube-rs/kube/releases/tag/3.0.1) / 2026-01-30
 ===================

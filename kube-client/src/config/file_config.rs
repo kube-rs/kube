@@ -398,7 +398,7 @@ impl Kubeconfig {
 
     /// Read a Config from an arbitrary YAML string
     ///
-    /// This is preferable to using serde_yaml::from_str() because it will correctly
+    /// This is preferable to using yaml_serde::from_str() because it will correctly
     /// parse multi-document YAML text and merge them into a single `Kubeconfig`
     pub fn from_yaml(text: &str) -> Result<Kubeconfig, KubeconfigError> {
         kubeconfig_from_yaml(text)?
@@ -474,9 +474,9 @@ impl Kubeconfig {
 
 fn kubeconfig_from_yaml(text: &str) -> Result<Vec<Kubeconfig>, KubeconfigError> {
     let mut documents = vec![];
-    for doc in serde_yaml::Deserializer::from_str(text) {
-        let value = serde_yaml::Value::deserialize(doc).map_err(KubeconfigError::Parse)?;
-        let kubeconfig = serde_yaml::from_value(value).map_err(KubeconfigError::InvalidStructure)?;
+    for doc in yaml_serde::Deserializer::from_str(text) {
+        let value = yaml_serde::Value::deserialize(doc).map_err(KubeconfigError::Parse)?;
+        let kubeconfig = yaml_serde::from_value(value).map_err(KubeconfigError::InvalidStructure)?;
         documents.push(kubeconfig);
     }
     Ok(documents)
@@ -929,7 +929,7 @@ users:
 username: user
 password: 
 "#;
-        let authinfo: AuthInfo = serde_yaml::from_str(authinfo_yaml).unwrap();
+        let authinfo: AuthInfo = yaml_serde::from_str(authinfo_yaml).unwrap();
         assert_eq!(authinfo.username, Some("user".to_string()));
         assert!(authinfo.password.is_none());
     }
@@ -940,7 +940,7 @@ password:
 username: user
 password: kube_rs
 "#;
-        let authinfo: AuthInfo = serde_yaml::from_str(authinfo_yaml).unwrap();
+        let authinfo: AuthInfo = yaml_serde::from_str(authinfo_yaml).unwrap();
         let authinfo_debug_output = format!("{authinfo:?}");
         let expected_output = "AuthInfo { \
         username: Some(\"user\"), \

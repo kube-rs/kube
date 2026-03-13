@@ -35,7 +35,7 @@ mod resource;
 ///     info: "informative info".into(),
 /// });
 /// println!("foo: {:?}", f); // debug print on root type
-/// println!("crd: {}", serde_yaml::to_string(&Foo::crd()).unwrap()); // crd yaml
+/// println!("crd: {}", yaml_serde::to_string(&Foo::crd()).unwrap()); // crd yaml
 /// ```
 ///
 /// This example generates a `struct Foo` containing metadata, the spec,

@@ -206,7 +206,7 @@ fn verify_crd() {
       }
     });
     let crd = serde_json::to_value(FooCrd::crd()).unwrap();
-    println!("got crd: {}", serde_yaml::to_string(&FooCrd::crd()).unwrap());
+    println!("got crd: {}", yaml_serde::to_string(&FooCrd::crd()).unwrap());
     use assert_json_diff::assert_json_include;
     assert_json_include!(actual: output, expected: crd);
 }
@@ -231,7 +231,7 @@ async fn verify_url_gen() {
 #[test]
 fn verify_default() {
     let fdef = FooCrd::default();
-    let ser = serde_yaml::to_string(&fdef).unwrap();
+    let ser = yaml_serde::to_string(&fdef).unwrap();
     let exp = r#"
 apiVersion: clux.dev/v1
 kind: Foo
