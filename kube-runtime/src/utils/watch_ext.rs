@@ -201,10 +201,6 @@ pub trait WatchStreamExt: Stream {
     /// the root stream have been observed. This means [`ReflectHandle`] streams
     /// can still be polled after the root stream has been dropped.
     ///
-    /// **NB**: This adapter requires an
-    /// [`unstable`](https://github.com/kube-rs/kube/blob/main/kube-runtime/Cargo.toml#L17-L21)
-    /// feature
-    ///
     /// ## Warning
     ///
     /// If the root [`Stream`] is not polled, [`ReflectHandle`] streams will

@@ -109,10 +109,6 @@ pub use store::{Store, store};
 /// as [`store_shared()`]. When the store supports being subscribed on, it will
 /// broadcast an event to all active listeners after caching any object
 /// contained in the event.
-///
-/// Creating subscribers requires an
-/// [`unstable`](https://github.com/kube-rs/kube/blob/main/kube-runtime/Cargo.toml#L17-L21)
-/// feature
 pub fn reflector<K, W>(mut writer: store::Writer<K>, stream: W) -> impl Stream<Item = W::Item>
 where
     K: Lookup + Clone,
