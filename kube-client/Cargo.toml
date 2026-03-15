@@ -58,7 +58,7 @@ pem = { workspace = true, optional = true }
 openssl = { workspace = true, optional = true }
 rustls = { workspace = true, optional = true }
 bytes = { workspace = true, optional = true }
-tokio = { workspace = true, features = ["time", "signal", "sync"], optional = true }
+tokio = { workspace = true, features = ["time", "signal", "sync", "rt"], optional = true }
 kube-core = { path = "../kube-core", version = "=3.0.1" }
 jsonpath-rust = { workspace = true, optional = true }
 tokio-util = { workspace = true, features = ["io", "codec"], optional = true }
