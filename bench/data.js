@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773616866261,
+  "lastUpdate": 1773618153313,
   "repoUrl": "https://github.com/kube-rs/kube",
   "entries": {
     "Benchmark": [
@@ -518,6 +518,105 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/kube-rs/kube/commit/9ad27a9691948d90c27e687cec6bf4a499112ef8"
         },
         "date": 1773616864722,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "init_listwatch - peak_bytes",
+            "value": 55194619,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - total_allocated",
+            "value": 76715088,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - alloc_count",
+            "value": 578023,
+            "unit": "allocations"
+          },
+          {
+            "name": "steady_state - peak_bytes",
+            "value": 71381202,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - total_allocated",
+            "value": 109519220,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - alloc_count",
+            "value": 799021,
+            "unit": "allocations"
+          },
+          {
+            "name": "relist - peak_bytes",
+            "value": 99797302,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - total_allocated",
+            "value": 174518628,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - alloc_count",
+            "value": 1189035,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_without_modify - peak_bytes",
+            "value": 141298836,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - total_allocated",
+            "value": 205865000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - alloc_count",
+            "value": 1298020,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_with_modify - peak_bytes",
+            "value": 134853452,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - total_allocated",
+            "value": 162895000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - alloc_count",
+            "value": 1058021,
+            "unit": "allocations"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "5624864+blakelawson@users.noreply.github.com",
+            "name": "Blake Lawson",
+            "username": "blakelawson"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "7424ee37d2cf77026a9ec2ecedbc909278c31601",
+          "message": "fix(kube-client): Avoid blocking tokio worker during exec auth token refresh (#1950)\n\n* fix(kube-client): avoid blocking tokio worker during exec auth token refresh\n\nWhen exec-based auth (e.g. aws eks get-token, gcp cmd-path) refreshes its\ntoken, std::process::Command::output() was called synchronously inside an\nasync future's poll, blocking the tokio worker thread for the duration of\nthe exec command (~500ms-2s).\n\nWrap the Auth::try_from call in RefreshableToken::to_header with\ntokio::task::spawn_blocking so the exec command runs on the blocking\nthreadpool instead. The tokio::sync::Mutex guard is held across the await,\ncorrectly serializing concurrent refreshes. Client-construction callers\nremain sync — this only affects the per-request refresh path.\n\nAlso add \"rt\" to tokio features explicitly (already relied on transitively\nvia tokio::spawn usage elsewhere in the crate).\n\nSigned-off-by: Blake Lawson <blake@anthropic.com>\nSigned-off-by: blake <blake@anthropic.com>\n\n* Add tests for async token refresh.\n\nPreviously, there was no test coverage for this code, so this commit\nalso adds a basic correctness test.\n\nSigned-off-by: blake <blake@anthropic.com>\n\n---------\n\nSigned-off-by: Blake Lawson <blake@anthropic.com>\nSigned-off-by: blake <blake@anthropic.com>",
+          "timestamp": "2026-03-15T23:41:39Z",
+          "tree_id": "88bf607acbd5cc939bc1c0fd30ae9f0f3022600b",
+          "url": "https://github.com/kube-rs/kube/commit/7424ee37d2cf77026a9ec2ecedbc909278c31601"
+        },
+        "date": 1773618152180,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
