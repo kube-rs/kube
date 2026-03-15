@@ -124,8 +124,20 @@ impl TryFrom<Config> for ClientBuilder<GenericService> {
             Some(proxy_url) if proxy_url.scheme_str() == Some("http") => {
                 #[cfg(feature = "http-proxy")]
                 {
-                    let connector =
+                    let mut connector =
                         hyper_util::client::legacy::connect::proxy::Tunnel::new(proxy_url.clone(), connector);
+
+                    if let Some(authority) = proxy_url.authority() {
+                        if let Some((userinfo, _)) = authority.as_str().split_once('@') {
+                            use base64::Engine;
+                            use http::HeaderValue;
+
+                            let value = format!("Basic {}", base64::engine::general_purpose::STANDARD.encode(userinfo));
+                            let header = HeaderValue::from_str(&value).unwrap();
+                            connector = connector.with_auth(header);
+                        } 
+                    }
+
                     make_generic_builder(connector, config)
                 }
 
