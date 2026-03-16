@@ -775,7 +775,10 @@ mod test {
         let url = corev1::Pod::url_path(&(), Some("ns"));
         let gp = ListParams::default().limit(50).match_any();
         let req = Request::new(url).list(&gp).unwrap();
-        assert_eq!(req.uri().query().unwrap(), "&limit=50");
+        assert_eq!(
+            req.uri().query().unwrap(),
+            "&limit=50&resourceVersion=0&resourceVersionMatch=NotOlderThan"
+        );
     }
 
     #[test]
