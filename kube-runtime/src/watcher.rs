@@ -220,6 +220,20 @@ pub struct Config {
     /// Defaults to everything if `None`.
     pub field_selector: Option<String>,
 
+    /// An optional field selector override used only for the initial LIST request.
+    ///
+    /// When set, the initial LIST uses this selector while the ongoing WATCH uses
+    /// `field_selector`. This is useful when you want to exclude certain objects
+    /// from the initial list (e.g., completed pods) but still observe their
+    /// transitions via the watch stream.
+    ///
+    /// The resourceVersion returned by the LIST is a cluster-wide etcd revision,
+    /// not tied to the query filter, so starting a WATCH with a different selector
+    /// from that resourceVersion is safe and will not miss events.
+    ///
+    /// Defaults to `None`, meaning both LIST and WATCH use `field_selector`.
+    pub list_field_selector: Option<String>,
+
     /// Timeout for the list/watch call.
     ///
     /// This limits the duration of the call, regardless of any activity or inactivity.
@@ -269,6 +283,7 @@ impl Default for Config {
             bookmarks: true,
             label_selector: None,
             field_selector: None,
+            list_field_selector: None,
             timeout: None,
             list_semantic: ListSemantic::default(),
             // same default page size limit as client-go
@@ -307,6 +322,19 @@ impl Config {
     #[must_use]
     pub fn fields(mut self, field_selector: &str) -> Self {
         self.field_selector = Some(field_selector.to_string());
+        self
+    }
+
+    /// Configure a field selector override for the initial LIST request only.
+    ///
+    /// When set, the initial LIST uses this selector to populate the store,
+    /// while the ongoing WATCH uses the selector set via [`fields()`](Config::fields).
+    /// This allows excluding objects from the initial list that you still want
+    /// to observe transitions for (e.g., filtering out completed pods on LIST
+    /// but watching for pod completions).
+    #[must_use]
+    pub fn list_fields(mut self, field_selector: &str) -> Self {
+        self.list_field_selector = Some(field_selector.to_string());
         self
     }
 
@@ -396,7 +424,7 @@ impl Config {
         };
         ListParams {
             label_selector: self.label_selector.clone(),
-            field_selector: self.field_selector.clone(),
+            field_selector: self.list_field_selector.clone().or(self.field_selector.clone()),
             timeout: self.timeout,
             version_match,
             resource_version,
@@ -992,6 +1020,38 @@ mod tests {
         let params_resumed = config.to_watch_params(WatchPhase::Resumed);
         assert!(!params_initial.send_initial_events);
         assert!(!params_resumed.send_initial_events);
+    }
+
+    #[test]
+    fn list_field_selector_overrides_field_selector_for_list() {
+        let config = Config::default()
+            .fields("spec.nodeName=mynode")
+            .list_fields("spec.nodeName=mynode,status.phase!=Succeeded");
+        let list_params = config.to_list_params();
+        let watch_params = config.to_watch_params(WatchPhase::Resumed);
+        assert_eq!(
+            list_params.field_selector.as_deref(),
+            Some("spec.nodeName=mynode,status.phase!=Succeeded")
+        );
+        assert_eq!(
+            watch_params.field_selector.as_deref(),
+            Some("spec.nodeName=mynode")
+        );
+    }
+
+    #[test]
+    fn list_field_selector_unset_falls_back_to_field_selector() {
+        let config = Config::default().fields("spec.nodeName=mynode");
+        let list_params = config.to_list_params();
+        let watch_params = config.to_watch_params(WatchPhase::Resumed);
+        assert_eq!(
+            list_params.field_selector.as_deref(),
+            Some("spec.nodeName=mynode")
+        );
+        assert_eq!(
+            watch_params.field_selector.as_deref(),
+            Some("spec.nodeName=mynode")
+        );
     }
 
     fn approx_eq(a: Duration, b: Duration) -> bool {
