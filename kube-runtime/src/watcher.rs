@@ -1069,4 +1069,25 @@ mod tests {
             "With jitter enabled, delays should not all match exact exponential values"
         );
     }
+
+    #[tokio::test(start_paused = true)]
+    async fn idle_timeout_returns_item_when_stream_has_data() {
+        let mut stream = futures::stream::iter(vec![1, 2, 3]);
+        let result = next_with_idle_timeout(&mut stream, Some(290)).await;
+        assert_eq!(result, Some(1));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn idle_timeout_returns_none_on_dead_connection() {
+        let mut stream = futures::stream::pending::<i32>();
+        let result = next_with_idle_timeout(&mut stream, Some(290)).await;
+        assert_eq!(result, None);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn idle_timeout_returns_none_when_stream_ends() {
+        let mut stream = futures::stream::empty::<i32>();
+        let result = next_with_idle_timeout(&mut stream, Some(290)).await;
+        assert_eq!(result, None);
+    }
 }
