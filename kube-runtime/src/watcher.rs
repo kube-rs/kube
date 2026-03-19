@@ -194,7 +194,7 @@ pub enum ListSemantic {
 
 #[derive(Clone, Default, Debug, PartialEq)]
 pub enum InitialListStrategy {
-    /// List first, then watch from given resouce version
+    /// List first, then watch from given resource version
     ///
     /// This is the old and default way of watching. The watcher will do a paginated list call first before watching.
     /// When using this mode, you can configure the `page_size` on the watcher.

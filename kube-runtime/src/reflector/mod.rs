@@ -21,7 +21,7 @@ pub use store::{Store, store};
 /// It passes the raw [`watcher()`] stream through unmodified.
 ///
 /// ## Usage
-/// Create a [`Store`] through e.g. [`store::store()`]. The `writer` part is not-clonable,
+/// Create a [`Store`] through e.g. [`store::store()`]. The `writer` part is not-cloneable,
 /// and must be moved into the reflector. The `reader` part is the [`Store`] interface
 /// that you can send to other parts of your program as state.
 ///
@@ -109,10 +109,6 @@ pub use store::{Store, store};
 /// as [`store_shared()`]. When the store supports being subscribed on, it will
 /// broadcast an event to all active listeners after caching any object
 /// contained in the event.
-///
-/// Creating subscribers requires an
-/// [`unstable`](https://github.com/kube-rs/kube/blob/main/kube-runtime/Cargo.toml#L17-L21)
-/// feature
 pub fn reflector<K, W>(mut writer: store::Writer<K>, stream: W) -> impl Stream<Item = W::Item>
 where
     K: Lookup + Clone,

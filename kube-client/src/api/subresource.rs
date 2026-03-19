@@ -174,7 +174,7 @@ where
     /// See the Kubernetes [documentation](https://kubernetes.io/docs/concepts/workloads/pods/ephemeral-containers/#what-is-an-ephemeral-container) for more details.
     ///
     /// [`Api::patch_ephemeral_containers`] may be more ergonomic, as you can will avoid having to first fetch the
-    /// existing subresources with an approriate merge strategy, see the examples for more details.
+    /// existing subresources with an appropriate merge strategy, see the examples for more details.
     ///
     /// Example of using `replace_ephemeral_containers`:
     ///

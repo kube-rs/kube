@@ -27,14 +27,14 @@ pub struct Kubeconfig {
     /// General information to be use for cli interactions
     #[serde(skip_serializing_if = "Option::is_none")]
     pub preferences: Option<Preferences>,
-    /// Referencable names to cluster configs
+    /// Referenceable names to cluster configs
     #[serde(default, deserialize_with = "deserialize_null_as_default")]
     pub clusters: Vec<NamedCluster>,
-    /// Referencable names to user configs
+    /// Referenceable names to user configs
     #[serde(rename = "users")]
     #[serde(default, deserialize_with = "deserialize_null_as_default")]
     pub auth_infos: Vec<NamedAuthInfo>,
-    /// Referencable names to context configs
+    /// Referenceable names to context configs
     #[serde(default, deserialize_with = "deserialize_null_as_default")]
     pub contexts: Vec<NamedContext>,
     /// The name of the context that you would like to use by default
@@ -67,7 +67,7 @@ pub struct Preferences {
     pub extensions: Option<Vec<NamedExtension>>,
 }
 
-/// NamedExtention associates name with extension.
+/// NamedExtension associates name with extension.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct NamedExtension {
@@ -287,7 +287,7 @@ pub struct ExecConfig {
     #[serde(skip)]
     pub drop_env: Option<Vec<String>>,
 
-    /// Interative mode of the auth plugins
+    /// Interactive mode of the auth plugins
     #[serde(rename = "interactiveMode")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub interactive_mode: Option<ExecInteractiveMode>,

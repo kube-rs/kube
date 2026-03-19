@@ -328,7 +328,7 @@ impl Transform for StructuralSchemaRewriter {
         if let Some(subschemas) = &mut schema.subschemas {
             if let Some(one_of) = subschemas.one_of.as_mut() {
                 // Tagged enums are serialized using `one_of`
-                hoist_subschema_properties(one_of, &mut schema.object, &mut schema.instance_type);
+                hoist_subschema_properties(one_of, &mut schema.object, &mut schema.instance_type, true);
 
                 // "Plain" enums are serialized using `one_of` if they have doc tags
                 hoist_subschema_enum_values(one_of, &mut schema.enum_values, &mut schema.instance_type);
@@ -340,7 +340,8 @@ impl Transform for StructuralSchemaRewriter {
 
             if let Some(any_of) = &mut subschemas.any_of {
                 // Untagged enums are serialized using `any_of`
-                hoist_subschema_properties(any_of, &mut schema.object, &mut schema.instance_type);
+                // Variant descriptions are not pushed into properties (because they are not for the field).
+                hoist_subschema_properties(any_of, &mut schema.object, &mut schema.instance_type, false);
             }
         }
 
@@ -499,6 +500,7 @@ fn hoist_subschema_properties(
     subschemas: &mut Vec<Schema>,
     common_obj: &mut Option<Box<ObjectValidation>>,
     instance_type: &mut Option<SingleOrVec<InstanceType>>,
+    push_description_to_property: bool,
 ) {
     for variant in subschemas {
         if let Schema::Object(SchemaObject {
@@ -518,7 +520,9 @@ fn hoist_subschema_properties(
                 let metadata = variant_object
                     .metadata
                     .get_or_insert_with(Box::<Metadata>::default);
-                metadata.description = Some(description);
+                if push_description_to_property {
+                    metadata.description = Some(description);
+                }
             }
 
             // Move all properties
@@ -545,6 +549,20 @@ fn hoist_subschema_properties(
             variant_obj.additional_properties = None;
 
             merge_metadata(instance_type, variant_type.take());
+        }
+        // Removes the type/description from oneOf and anyOf subschemas
+        else if let Schema::Object(SchemaObject {
+            metadata: variant_metadata,
+            instance_type: variant_type,
+            enum_values: None,
+            subschemas: None,
+            array: None,
+            object: None,
+            ..
+        }) = variant
+        {
+            std::mem::take(&mut *variant_type);
+            std::mem::take(&mut *variant_metadata);
         }
     }
 }

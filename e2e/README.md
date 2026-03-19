@@ -16,7 +16,7 @@ A more advanced application that is containerised and deployed into a cluster on
 
 Functionally equivalent to the `job_api` example. Creates a noop job, waits for it to complete, then deletes it.
 
-Intended as a safety mechanism to ensure in-cluster authenication is working, not hanging, and its minimal work is is verifiable out-of-band.
+Intended as a safety mechanism to ensure in-cluster authentication is working, not hanging, and its minimal work is is verifiable out-of-band.
 
 ## Testing Strategy
 
