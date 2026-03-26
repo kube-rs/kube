@@ -55,6 +55,9 @@ pub struct Kubeconfig {
     pub api_version: Option<String>,
 
     /// Additional fields not explicitly modeled, preserved for round-trip serialization.
+    ///
+    /// If you are relying on this for standard fields present in upstream client-go,
+    /// please consider submitting a PR to add them as typed fields.
     #[serde(flatten)]
     pub other: BTreeMap<String, serde_json::Value>,
 }
@@ -71,6 +74,9 @@ pub struct Preferences {
     pub extensions: Option<Vec<NamedExtension>>,
 
     /// Additional fields not explicitly modeled, preserved for round-trip serialization.
+    ///
+    /// If you are relying on this for standard fields present in upstream client-go,
+    /// please consider submitting a PR to add them as typed fields.
     #[serde(flatten)]
     pub other: BTreeMap<String, serde_json::Value>,
 }
@@ -96,6 +102,9 @@ pub struct NamedCluster {
     pub cluster: Option<Cluster>,
 
     /// Additional fields not explicitly modeled, preserved for round-trip serialization.
+    ///
+    /// If you are relying on this for standard fields present in upstream client-go,
+    /// please consider submitting a PR to add them as typed fields.
     #[serde(flatten)]
     pub other: BTreeMap<String, serde_json::Value>,
 }
@@ -142,6 +151,9 @@ pub struct Cluster {
     pub extensions: Option<Vec<NamedExtension>>,
 
     /// Additional fields not explicitly modeled, preserved for round-trip serialization.
+    ///
+    /// If you are relying on this for standard fields present in upstream client-go,
+    /// please consider submitting a PR to add them as typed fields.
     #[serde(flatten)]
     pub other: BTreeMap<String, serde_json::Value>,
 }
@@ -158,6 +170,9 @@ pub struct NamedAuthInfo {
     pub auth_info: Option<AuthInfo>,
 
     /// Additional fields not explicitly modeled, preserved for round-trip serialization.
+    ///
+    /// If you are relying on this for standard fields present in upstream client-go,
+    /// please consider submitting a PR to add them as typed fields.
     #[serde(flatten)]
     pub other: BTreeMap<String, serde_json::Value>,
 }
@@ -261,6 +276,9 @@ pub struct AuthInfo {
     pub exec: Option<ExecConfig>,
 
     /// Additional fields not explicitly modeled, preserved for round-trip serialization.
+    ///
+    /// If you are relying on this for standard fields present in upstream client-go,
+    /// please consider submitting a PR to add them as typed fields.
     #[serde(flatten)]
     pub other: BTreeMap<String, serde_json::Value>,
 }
@@ -283,6 +301,9 @@ pub struct AuthProviderConfig {
     pub config: HashMap<String, String>,
 
     /// Additional fields not explicitly modeled, preserved for round-trip serialization.
+    ///
+    /// If you are relying on this for standard fields present in upstream client-go,
+    /// please consider submitting a PR to add them as typed fields.
     #[serde(flatten)]
     pub other: BTreeMap<String, serde_json::Value>,
 }
@@ -334,6 +355,9 @@ pub struct ExecConfig {
     pub cluster: Option<ExecAuthCluster>,
 
     /// Additional fields not explicitly modeled, preserved for round-trip serialization.
+    ///
+    /// If you are relying on this for standard fields present in upstream client-go,
+    /// please consider submitting a PR to add them as typed fields.
     #[serde(flatten)]
     pub other: BTreeMap<String, serde_json::Value>,
 }
@@ -361,6 +385,9 @@ pub struct NamedContext {
     pub context: Option<Context>,
 
     /// Additional fields not explicitly modeled, preserved for round-trip serialization.
+    ///
+    /// If you are relying on this for standard fields present in upstream client-go,
+    /// please consider submitting a PR to add them as typed fields.
     #[serde(flatten)]
     pub other: BTreeMap<String, serde_json::Value>,
 }
@@ -381,6 +408,9 @@ pub struct Context {
     pub extensions: Option<Vec<NamedExtension>>,
 
     /// Additional fields not explicitly modeled, preserved for round-trip serialization.
+    ///
+    /// If you are relying on this for standard fields present in upstream client-go,
+    /// please consider submitting a PR to add them as typed fields.
     #[serde(flatten)]
     pub other: BTreeMap<String, serde_json::Value>,
 }
@@ -1094,7 +1124,6 @@ users:
     exec:
       apiVersion: client.authentication.k8s.io/v1beta1
       command: gke-gcloud-auth-plugin
-      installHint: Install gke-gcloud-auth-plugin for kubectl
       provideClusterInfo: true
       interactiveMode: IfAvailable
       custom-exec-field: exec-extra
@@ -1102,7 +1131,7 @@ users:
 
         let config: Kubeconfig = Kubeconfig::from_yaml(yaml).unwrap();
 
-        // Verify installHint is captured in the catch-all `other` map
+        // Verify custom field is captured in the catch-all `other` map
         let exec = config.auth_infos[0]
             .auth_info
             .as_ref()
@@ -1111,8 +1140,8 @@ users:
             .as_ref()
             .unwrap();
         assert_eq!(
-            exec.other.get("installHint").and_then(|v| v.as_str()),
-            Some("Install gke-gcloud-auth-plugin for kubectl")
+            exec.other.get("custom-exec-field").and_then(|v| v.as_str()),
+            Some("exec-extra")
         );
 
         // Round-trip: serialize back to YAML
@@ -1134,10 +1163,6 @@ users:
         assert!(
             serialized.contains("custom-exec-field"),
             "exec unknown field was lost:\n{serialized}"
-        );
-        assert!(
-            serialized.contains("installHint"),
-            "installHint field was lost:\n{serialized}"
         );
 
         // Verify re-deserialization produces the same result
