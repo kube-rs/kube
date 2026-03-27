@@ -110,10 +110,6 @@ pub enum Error {
     #[error("Reference resolve error: {0}")]
     RefResolve(String),
 
-    /// Kubeconfig error
-    #[error("Kubeconfig error: {0}")]
-    Kubeconfig(#[source] crate::config::KubeconfigError),
-
     /// Failed to infer custom configuration
     #[error("Failed to infer provided configuration: {0}")]
     InferKubeconfig(#[from] crate::config::KubeconfigError),
