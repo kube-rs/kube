@@ -226,10 +226,22 @@ pub struct AuthInfo {
     #[serde(rename = "as")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub impersonate: Option<String>,
+    /// The uid to impersonate.
+    #[serde(rename = "as-uid")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub impersonate_uid: Option<String>,
     /// The groups to imperonate.
     #[serde(rename = "as-groups")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub impersonate_groups: Option<Vec<String>>,
+    /// Additional information for impersonated user.
+    #[serde(rename = "as-user-extra")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub impersonate_user_extra: Option<HashMap<String, Vec<String>>>,
+
+    /// Additional information for extenders so that reads and writes don't clobber unknown fields.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extensions: Option<Vec<NamedExtension>>,
 
     /// Specifies a custom authentication plugin for the kubernetes cluster.
     #[serde(rename = "auth-provider")]
@@ -286,6 +298,12 @@ pub struct ExecConfig {
     /// It has been suggested in client-go via <https://github.com/kubernetes/client-go/issues/1177>
     #[serde(skip)]
     pub drop_env: Option<Vec<String>>,
+
+    /// This text is shown to the user when the executable doesn't seem to be present.
+    /// For example, `brew install foo-cli` might be a good InstallHint for foo-cli on Mac OS systems.
+    #[serde(rename = "installHint")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub install_hint: Option<String>,
 
     /// Interactive mode of the auth plugins
     #[serde(rename = "interactiveMode")]
@@ -807,7 +825,21 @@ users:
       - eks
       command: aws
       env: null
+      installHint: Please install aws cli
       provideClusterInfo: false
+    as: admin
+    as-uid: '12345'
+    as-groups:
+    - group1
+    - group2
+    as-user-extra:
+      scopes:
+      - read
+      - write
+    extensions:
+    - name: authinfo_ext
+      extension:
+        key: value
 - name: minikube
   user:
     client-certificate: /home/kevin/.minikube/profiles/minikube/client.crt
@@ -823,6 +855,26 @@ users:
             cluster1.extensions.as_ref().unwrap()[0].extension.get("provider"),
             Some(&Value::String("minikube.sigs.k8s.io".to_owned()))
         );
+
+        // Verify new AuthInfo fields (impersonate_uid, impersonate_user_extra, extensions)
+        let auth_info = config.auth_infos[0].auth_info.as_ref().unwrap();
+        assert_eq!(auth_info.impersonate.as_deref(), Some("admin"));
+        assert_eq!(auth_info.impersonate_uid.as_deref(), Some("12345"));
+        assert_eq!(
+            auth_info.impersonate_groups.as_deref(),
+            Some(["group1".to_string(), "group2".to_string()].as_slice())
+        );
+        let extra = auth_info.impersonate_user_extra.as_ref().unwrap();
+        assert_eq!(extra.get("scopes").unwrap(), &vec![
+            "read".to_string(),
+            "write".to_string()
+        ]);
+        let auth_ext = auth_info.extensions.as_ref().unwrap();
+        assert_eq!(auth_ext[0].name, "authinfo_ext");
+
+        // Verify ExecConfig.install_hint
+        let exec = auth_info.exec.as_ref().unwrap();
+        assert_eq!(exec.install_hint.as_deref(), Some("Please install aws cli"));
     }
 
     #[test]
@@ -948,7 +1000,10 @@ password: kube_rs
         token: None, token_file: None, client_certificate: None, \
         client_certificate_data: None, client_key: None, \
         client_key_data: None, impersonate: None, \
+        impersonate_uid: None, \
         impersonate_groups: None, \
+        impersonate_user_extra: None, \
+        extensions: None, \
         auth_provider: None, \
         exec: None \
         }";
