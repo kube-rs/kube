@@ -91,6 +91,10 @@ pub fn token_file() -> String {
     SERVICE_TOKENFILE.to_owned()
 }
 
+pub fn cert_file() -> &'static str {
+    SERVICE_CERTFILE
+}
+
 /// Returns certification from specified path in cluster.
 pub fn load_cert() -> Result<Vec<Vec<u8>>, Error> {
     let certs = std::fs::read(SERVICE_CERTFILE).map_err(Error::ReadCertificateBundle)?;

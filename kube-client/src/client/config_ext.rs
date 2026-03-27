@@ -209,12 +209,27 @@ impl ConfigExt for Config {
     #[cfg(feature = "rustls-tls")]
     fn rustls_client_config(&self) -> Result<rustls::ClientConfig> {
         let identity = self.exec_identity_pem().0.or_else(|| self.identity_pem());
-        tls::rustls_tls::rustls_client_config(
+        let mut config = tls::rustls_tls::rustls_client_config(
             identity.as_deref(),
             self.root_cert.as_deref(),
             self.accept_invalid_certs,
         )
-        .map_err(Error::RustlsTls)
+        .map_err(Error::RustlsTls)?;
+
+        // When a CA file path is available (in-cluster), install a verifier
+        // that re-reads it periodically to survive CA rotation. `root_cert`
+        // bytes are still passed above so the builder typestate is satisfied,
+        // but verification is handed over here.
+        if !self.accept_invalid_certs
+            && let Some(path) = &self.root_cert_file
+        {
+            let verifier =
+                tls::rustls_tls::ReloadingVerifier::new(path.clone()).map_err(Error::RustlsTls)?;
+            config
+                .dangerous()
+                .set_certificate_verifier(Arc::new(verifier));
+        }
+        Ok(config)
     }
 
     #[cfg(feature = "rustls-tls")]
