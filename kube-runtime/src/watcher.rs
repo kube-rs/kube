@@ -477,7 +477,7 @@ where
 
 /// Client-side idle timeout margin added on top of the server-side watch timeout.
 ///
-/// The server closes the watch stream after `timeoutSeconds` (default 290s).
+/// The server closes the watch stream after the configured timeout (default 290s).
 /// We add a small margin so the client detects dead connections where the
 /// server's close never arrives (e.g. network failure).
 const WATCH_IDLE_TIMEOUT_MARGIN: Duration = Duration::from_secs(5);
@@ -485,14 +485,13 @@ const WATCH_IDLE_TIMEOUT_MARGIN: Duration = Duration::from_secs(5);
 /// Poll the next item from a watch stream with an idle timeout.
 ///
 /// Returns `None` when the stream ends **or** when no item arrives within
-/// `server_timeout + WATCH_IDLE_TIMEOUT_MARGIN`, causing the watcher to
+/// `timeout + WATCH_IDLE_TIMEOUT_MARGIN`, causing the watcher to
 /// treat the connection as dead and reconnect.
-async fn next_with_idle_timeout<S, T>(stream: &mut S, server_timeout: Option<u32>) -> Option<T>
+async fn next_with_idle_timeout<S, T>(stream: &mut S, timeout: Option<u32>) -> Option<T>
 where
     S: Stream<Item = T> + Unpin,
 {
-    let idle_timeout =
-        Duration::from_secs(u64::from(server_timeout.unwrap_or(290))) + WATCH_IDLE_TIMEOUT_MARGIN;
+    let idle_timeout = Duration::from_secs(u64::from(timeout.unwrap_or(290))) + WATCH_IDLE_TIMEOUT_MARGIN;
     match tokio::time::timeout(idle_timeout, stream.next()).await {
         Ok(item) => item,
         Err(_elapsed) => {
@@ -1080,6 +1079,7 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn idle_timeout_returns_none_on_dead_connection() {
         let mut stream = futures::stream::pending::<i32>();
+        // NB tokio auto-advances virtual time when the runtime is idle so next_with_idle_timeout resolves immediately
         let result = next_with_idle_timeout(&mut stream, Some(290)).await;
         assert_eq!(result, None);
     }
