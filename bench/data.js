@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774612232989,
+  "lastUpdate": 1774612812064,
   "repoUrl": "https://github.com/kube-rs/kube",
   "entries": {
     "Benchmark": [
@@ -815,6 +815,105 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/kube-rs/kube/commit/0019e54c981f99f7e0a0775be1d7022016f171ae"
         },
         "date": 1774612231663,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "init_listwatch - peak_bytes",
+            "value": 55194619,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - total_allocated",
+            "value": 76715088,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - alloc_count",
+            "value": 578023,
+            "unit": "allocations"
+          },
+          {
+            "name": "steady_state - peak_bytes",
+            "value": 71381202,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - total_allocated",
+            "value": 109519220,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - alloc_count",
+            "value": 799021,
+            "unit": "allocations"
+          },
+          {
+            "name": "relist - peak_bytes",
+            "value": 99797302,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - total_allocated",
+            "value": 174518628,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - alloc_count",
+            "value": 1189035,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_without_modify - peak_bytes",
+            "value": 141298836,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - total_allocated",
+            "value": 205865000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - alloc_count",
+            "value": 1298020,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_with_modify - peak_bytes",
+            "value": 134853452,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - total_allocated",
+            "value": 162895000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - alloc_count",
+            "value": 1058021,
+            "unit": "allocations"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexeylapuka@gmail.com",
+            "name": "Alex Lapuka",
+            "username": "alex-lapuka"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "cfa38f21f238e16c7b6b65135c42cf1161d4e510",
+          "message": "preserve unknown kubeconfig fields via serde(flatten) (#1964)\n\n* feat: preserve unknown kubeconfig fields via serde(flatten)\n\nAdd `#[serde(flatten)] pub other: BTreeMap<String, serde_json::Value>`\nto all kubeconfig structs (Kubeconfig, Cluster, AuthInfo, ExecConfig,\nContext, Preferences, AuthProviderConfig, and Named* wrappers) so that\nunmodeled fields survive deserialization and can be serialized back\nwithout data loss.\n\nAlso derive Default for ExecConfig, Preferences, and AuthProviderConfig.\n\nUpdate Kubeconfig::merge() to merge extra fields with first-wins-per-key\nsemantics. Add a round-trip test verifying unknown fields are preserved\nacross deserialize/serialize cycles.\n\nSigned-off-by: Alexey Lapuka <alexey@twingate.com>\n\n* Update documentation on all 'other' field catch-alls to suggest that consumers relying on standard client-go fields should submit PRs to add them as typed fields rather than using the generic fallback.\nAlso update the round-trip test to use only non-standard field names to avoid collision when standard fields like installHint are later added as typed fields.\n\nSigned-off-by: Alexey Lapuka <alexey@twingate.com>\n\n---------\n\nSigned-off-by: Alexey Lapuka <alexey@twingate.com>\nCo-authored-by: Eirik A <sszynrae@gmail.com>",
+          "timestamp": "2026-03-27T11:59:22Z",
+          "tree_id": "94cc5fe07965b0c4b77ab052ac5cba83fa61231b",
+          "url": "https://github.com/kube-rs/kube/commit/cfa38f21f238e16c7b6b65135c42cf1161d4e510"
+        },
+        "date": 1774612811100,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
