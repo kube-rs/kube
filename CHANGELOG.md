@@ -7,9 +7,37 @@ UNRELEASED
 ===================
  * see https://github.com/kube-rs/kube/compare/3.1.0...main
 
+[3.1.0](https://github.com/kube-rs/kube/releases/tag/3.1.0) / 2026-03-17
+===================
+<!-- Release notes generated using configuration in .github/release.yml at 3.1.0 -->
+
+## What's Changed
+Maintenance release with fixes for schemas/validation, client exec blocking and proxy handling, as well as some smaller new features listed below. Internal changes and documentation improvements listed in the [milestone](https://github.com/kube-rs/kube/milestone/54?closed=1).
+
+### Added
+* allow empty body in const context by @tottoto in https://github.com/kube-rs/kube/pull/1927
+* Add typed printcolumn argument to derive macro by @cchndl in https://github.com/kube-rs/kube/pull/1872
+* kube-core: add optionalOldSelf to CEL `Rule` by @Immortal-Beyond-Oblivion in https://github.com/kube-rs/kube/pull/1947
+* Re-add support for basic auth in Proxy by @goenning in https://github.com/kube-rs/kube/pull/1959
+### Fixed
+* Fix OptionalEnum transform for complex enums by @doxxx93 in https://github.com/kube-rs/kube/pull/1934
+* Bump tower-http dependency to 0.6.4 by @abustany in https://github.com/kube-rs/kube/pull/1939
+* Add minimal-versions CI check by @doxxx93 in https://github.com/kube-rs/kube/pull/1940
+* fix: Produce valid CRDs containing flattened untagged enums by @NickLarsenNZ in https://github.com/kube-rs/kube/pull/1942
+* kube-client: Avoid blocking tokio worker during exec auth token refresh by @blakelawson in https://github.com/kube-rs/kube/pull/1950
+
+
+* @abustany made their first contribution in https://github.com/kube-rs/kube/pull/1939
+* @cchndl made their first contribution in https://github.com/kube-rs/kube/pull/1872
+* @Immortal-Beyond-Oblivion made their first contribution in https://github.com/kube-rs/kube/pull/1947
+* @gauravgahlot made their first contribution in https://github.com/kube-rs/kube/pull/1949
+* @blakelawson made their first contribution in https://github.com/kube-rs/kube/pull/1950
+
+**Full Changelog**: https://github.com/kube-rs/kube/compare/3.0.1...3.1.0
+
 3.1.0 / 2026-03-17
 ===================
- * see https://github.com/kube-rs/kube/compare/3.0.1...main
+ * see https://github.com/kube-rs/kube/compare/3.1.0...main
 
 [3.0.1](https://github.com/kube-rs/kube/releases/tag/3.0.1) / 2026-01-30
 ===================

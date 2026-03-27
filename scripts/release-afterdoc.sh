@@ -15,7 +15,7 @@ main() {
   local -r BODY="$(echo "${RELEASE}" | jq '.body' -r | sd "## New Contributors[\w\W]*$" "")"
 
   # Add in the body first
-  sd "(^UNRELEASED\n===================\n \* see https://.*\.\.\.main)" "\${1}\n\nXXXYYYZZZ${BODY}" CHANGELOG.md
+  sd -Af "m" -n1 "(^UNRELEASED\n===================\n \* see https://.*\.\.\.main)" "\${1}\n\nXXXYYYZZZ${BODY}" CHANGELOG.md
   # fix newlines issues caused last jq/sd combo: (^M at end of lines)
   sd "\r" "" CHANGELOG.md
 
