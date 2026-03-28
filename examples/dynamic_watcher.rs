@@ -1,20 +1,16 @@
-use futures::{Stream, StreamExt, TryStreamExt};
+use futures::{StreamExt, TryStreamExt};
 use kube::{
-    api::{Api, ApiResource, DynamicObject, GroupVersionKind, Resource, ResourceExt},
-    runtime::{WatchStreamExt, metadata_watcher, watcher, watcher::Event},
+    api::{Api, DynamicObject, GroupVersionKind, ResourceExt},
+    runtime::{WatchStreamExt, watcher},
 };
-use serde::de::DeserializeOwned;
 use tracing::*;
 
-use std::{env, fmt::Debug};
+use std::env;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
     let client = kube::Client::try_default().await?;
-
-    // If set will receive only the metadata for watched resources
-    let watch_metadata = env::var("WATCH_METADATA").map(|s| s == "1").unwrap_or(false);
 
     // Take dynamic resource identifiers:
     let group = env::var("GROUP").unwrap_or_else(|_| "".into());
@@ -28,28 +24,15 @@ async fn main() -> anyhow::Result<()> {
 
     // Use the full resource info to create an Api with the ApiResource as its DynamicType
     let api = Api::<DynamicObject>::all_with(client, &ar);
-    let wc = watcher::Config::default();
 
-    // Start a metadata or a full resource watch
-    if watch_metadata {
-        handle_events(metadata_watcher(api, wc), &ar).await
-    } else {
-        handle_events(watcher(api, wc), &ar).await
-    }
-}
-
-async fn handle_events<
-    K: Resource<DynamicType = ApiResource> + Clone + Debug + Send + DeserializeOwned + 'static,
->(
-    stream: impl Stream<Item = watcher::Result<Event<K>>> + Send + 'static,
-    ar: &ApiResource,
-) -> anyhow::Result<()> {
-    let mut items = stream.applied_objects().boxed();
+    // For metadata-only watching, use Api::<PartialObjectMeta<DynamicObject>> instead.
+    // PartialObjectMeta-based Api automatically uses efficient metadata-only requests.
+    let mut items = watcher(api, watcher::Config::default()).applied_objects().boxed();
     while let Some(p) = items.try_next().await? {
         if let Some(ns) = p.namespace() {
-            info!("saw {} {} in {ns}", K::kind(ar), p.name_any());
+            info!("saw {kind} {} in {ns}", p.name_any());
         } else {
-            info!("saw {} {}", K::kind(ar), p.name_any());
+            info!("saw {kind} {}", p.name_any());
         }
         trace!("full obj: {p:?}");
     }

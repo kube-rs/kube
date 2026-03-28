@@ -594,6 +594,7 @@ mod tests {
 
     use http::{Request, Response};
     use k8s_openapi::api::core::v1::Pod;
+    use kube_core::metadata::PartialObjectMeta;
     use tower_test::mock;
 
     #[tokio::test]
@@ -663,6 +664,117 @@ mod tests {
         let pods: Api<Pod> = Api::default_namespaced(Client::new(mock_service, "default"));
         let pod = pods.get("test").await.unwrap();
         assert_eq!(pod.metadata.annotations.unwrap().get("kube-rs").unwrap(), "test");
+        spawned.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_partial_object_meta_get_uses_metadata_header() {
+        let (mock_service, handle) = mock::pair::<Request<Body>, Response<Body>>();
+        let spawned = tokio::spawn(async move {
+            let mut handle = pin!(handle);
+            let (request, send) = handle.next_request().await.expect("service not called");
+            // Verify the metadata-only Accept header is set
+            assert_eq!(
+                request.headers().get(http::header::ACCEPT).unwrap(),
+                "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1"
+            );
+            let pod_meta: PartialObjectMeta<Pod> =
+                serde_json::from_value(serde_json::json!({
+                    "apiVersion": "meta.k8s.io/v1",
+                    "kind": "PartialObjectMetadata",
+                    "metadata": {
+                        "name": "test",
+                    },
+                }))
+                .unwrap();
+            send.send_response(Response::new(Body::from(
+                serde_json::to_vec(&pod_meta).unwrap(),
+            )));
+        });
+
+        let pods: Api<PartialObjectMeta<Pod>> =
+            Api::default_namespaced(Client::new(mock_service, "default"));
+        let pod = pods.get("test").await.unwrap();
+        assert_eq!(pod.metadata.name, Some("test".to_string()));
+        spawned.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_partial_object_meta_list_uses_metadata_header() {
+        let (mock_service, handle) = mock::pair::<Request<Body>, Response<Body>>();
+        let spawned = tokio::spawn(async move {
+            let mut handle = pin!(handle);
+            let (request, send) = handle.next_request().await.expect("service not called");
+            assert_eq!(
+                request.headers().get(http::header::ACCEPT).unwrap(),
+                "application/json;as=PartialObjectMetadataList;g=meta.k8s.io;v=v1"
+            );
+            send.send_response(Response::new(Body::from(
+                serde_json::to_vec(&serde_json::json!({
+                    "apiVersion": "meta.k8s.io/v1",
+                    "kind": "PartialObjectMetadataList",
+                    "metadata": { "resourceVersion": "1" },
+                    "items": [],
+                }))
+                .unwrap(),
+            )));
+        });
+
+        let pods: Api<PartialObjectMeta<Pod>> =
+            Api::default_namespaced(Client::new(mock_service, "default"));
+        let list = pods.list(&Default::default()).await.unwrap();
+        assert_eq!(list.items.len(), 0);
+        spawned.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_partial_object_meta_patch_uses_metadata_header() {
+        use kube_core::params::{Patch, PatchParams};
+
+        let (mock_service, handle) = mock::pair::<Request<Body>, Response<Body>>();
+        let spawned = tokio::spawn(async move {
+            let mut handle = pin!(handle);
+            let (request, send) = handle.next_request().await.expect("service not called");
+            assert_eq!(request.method(), http::Method::PATCH);
+            assert_eq!(
+                request.headers().get(http::header::ACCEPT).unwrap(),
+                "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1"
+            );
+            send.send_response(Response::new(Body::from(
+                serde_json::to_vec(&serde_json::json!({
+                    "apiVersion": "meta.k8s.io/v1",
+                    "kind": "PartialObjectMetadata",
+                    "metadata": { "name": "test" },
+                }))
+                .unwrap(),
+            )));
+        });
+
+        let pods: Api<PartialObjectMeta<Pod>> =
+            Api::default_namespaced(Client::new(mock_service, "default"));
+        let patch = Patch::Merge(serde_json::json!({ "metadata": { "labels": { "a": "b" } } }));
+        let pod = pods.patch("test", &PatchParams::default(), &patch).await.unwrap();
+        assert_eq!(pod.metadata.name, Some("test".to_string()));
+        spawned.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_partial_object_meta_watch_uses_metadata_header() {
+        let (mock_service, handle) = mock::pair::<Request<Body>, Response<Body>>();
+        let spawned = tokio::spawn(async move {
+            let mut handle = pin!(handle);
+            let (request, send) = handle.next_request().await.expect("service not called");
+            assert_eq!(
+                request.headers().get(http::header::ACCEPT).unwrap(),
+                "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1"
+            );
+            // Send an empty response to close the stream
+            send.send_response(Response::new(Body::from(vec![])));
+        });
+
+        let pods: Api<PartialObjectMeta<Pod>> =
+            Api::default_namespaced(Client::new(mock_service, "default"));
+        let _ = pods.watch(&Default::default(), "0").await;
         spawned.await.unwrap();
     }
 }
