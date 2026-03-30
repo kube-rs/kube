@@ -634,27 +634,41 @@ impl Cluster {
             &self.certificate_authority,
         )
         .map_err(KubeconfigError::LoadCertificateAuthority)?;
-        Ok(Some(ca))
+        Ok(ca)
     }
 }
 
 impl AuthInfo {
-    pub(crate) fn identity_pem(&self) -> Result<Vec<u8>, KubeconfigError> {
-        let client_cert = &self.load_client_certificate()?;
-        let client_key = &self.load_client_key()?;
-        let mut buffer = client_key.clone();
-        buffer.extend_from_slice(client_cert);
-        Ok(buffer)
+    pub(crate) fn identity_pem(&self) -> Result<Option<Vec<u8>>, KubeconfigError> {
+        let client_cert = self.load_client_certificate()?;
+        let client_key = self.load_client_key()?;
+
+        match (client_cert, client_key) {
+            (None, None) => Ok(None),
+
+            (Some(_), None) => Err(KubeconfigError::LoadClientKey(
+                LoadDataError::NoBase64DataOrFile,
+            )),
+
+            (None, Some(_)) => Err(KubeconfigError::LoadClientCertificate(
+                LoadDataError::NoBase64DataOrFile,
+            )),
+
+            (Some(cert), Some(mut key)) => {
+                key.extend_from_slice(&cert);
+                Ok(Some(key))
+            },
+        }
     }
 
-    pub(crate) fn load_client_certificate(&self) -> Result<Vec<u8>, KubeconfigError> {
+    pub(crate) fn load_client_certificate(&self) -> Result<Option<Vec<u8>>, KubeconfigError> {
         // TODO Shouldn't error when `self.client_certificate_data.is_none() && self.client_certificate.is_none()`
 
         load_from_base64_or_file(&self.client_certificate_data.as_deref(), &self.client_certificate)
             .map_err(KubeconfigError::LoadClientCertificate)
     }
 
-    pub(crate) fn load_client_key(&self) -> Result<Vec<u8>, KubeconfigError> {
+    pub(crate) fn load_client_key(&self) -> Result<Option<Vec<u8>>, KubeconfigError> {
         // TODO Shouldn't error when `self.client_key_data.is_none() && self.client_key.is_none()`
 
         load_from_base64_or_file(
@@ -720,12 +734,14 @@ impl TryFrom<&Cluster> for ExecAuthCluster {
 fn load_from_base64_or_file<P: AsRef<Path>>(
     value: &Option<&str>,
     file: &Option<P>,
-) -> Result<Vec<u8>, LoadDataError> {
+) -> Result<Option<Vec<u8>>, LoadDataError> {
     let data = value
         .map(load_from_base64)
-        .or_else(|| file.as_ref().map(load_from_file))
-        .unwrap_or_else(|| Err(LoadDataError::NoBase64DataOrFile))?;
-    Ok(ensure_trailing_newline(data))
+        .or_else(|| file.as_ref().map(load_from_file));
+    match data {
+        Some(data) => Ok(Some(ensure_trailing_newline(data?))),
+        None => Ok(None),
+    }
 }
 
 fn load_from_base64(value: &str) -> Result<Vec<u8>, LoadDataError> {
