@@ -210,7 +210,7 @@ impl ConfigExt for Config {
     fn rustls_client_config(&self) -> Result<rustls::ClientConfig> {
         let identity = match self.exec_identity_pem().0 {
             Some(identity) => Some(identity),
-            None => Some(self.identity_pem()?),
+            None => self.identity_pem()?,
         };
 
         tls::rustls_tls::rustls_client_config(

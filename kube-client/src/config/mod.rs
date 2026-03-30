@@ -369,7 +369,7 @@ impl Config {
     }
 
     /// Client certificate and private key in PEM.
-    pub(crate) fn identity_pem(&self) -> Result<Vec<u8>, KubeconfigError> {
+    pub(crate) fn identity_pem(&self) -> Result<Option<Vec<u8>>, KubeconfigError> {
         self.auth_info.identity_pem()
     }
 }
