@@ -256,7 +256,7 @@ impl ConfigExt for Config {
     fn openssl_ssl_connector_builder(&self) -> Result<openssl::ssl::SslConnectorBuilder> {
         let identity = match self.exec_identity_pem().0 {
             Some(identity) => Some(identity),
-            None => Some(self.identity_pem()?),
+            None => self.identity_pem()?,
         };
         
         // TODO: pass self.tls_server_name for openssl
