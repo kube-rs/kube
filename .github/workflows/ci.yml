@@ -99,7 +99,7 @@ jobs:
         uses: dtolnay/rust-toolchain@nightly
       - uses: Swatinem/rust-cache@v2
       - uses: taiki-e/install-action@cargo-hack
-      - uses: extractions/setup-just@v3
+      - uses: extractions/setup-just@v4
       - name: Check minimal versions
         run: just minimal-versions
 
