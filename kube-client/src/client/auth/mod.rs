@@ -619,8 +619,16 @@ fn auth_exec(auth: &ExecConfig) -> Result<ExecCredential, Error> {
 
     #[cfg(target_os = "windows")]
     {
-        const CREATE_NO_WINDOW: u32 = 0x08000000;
-        cmd.creation_flags(CREATE_NO_WINDOW);
+        // Opt-in via env var; see https://github.com/kube-rs/kube/issues/1901 for why
+        // this is gated (CREATE_NO_WINDOW breaks stderr inheritance for interactive exec
+        // plugins like kubelogin.exe).
+        if std::env::var("KUBE_RS_UNSTABLE_CREATE_NO_WINDOW")
+            .map(|s| s == "1")
+            .unwrap_or(false)
+        {
+            const CREATE_NO_WINDOW: u32 = 0x08000000;
+            cmd.creation_flags(CREATE_NO_WINDOW);
+        }
     }
 
     let out = cmd.output().map_err(Error::AuthExecStart)?;
