@@ -1,5 +1,5 @@
 use bytes::Bytes;
-use http::{Request, Response, header::HeaderMap};
+use http::{Request, Response, Uri, header::HeaderMap};
 use hyper::{
     body::Incoming,
     rt::{Read, Write},
@@ -29,6 +29,7 @@ pub type DynBody = dyn http_body::Body<Data = Bytes, Error = BoxError> + Send + 
 pub struct ClientBuilder<Svc> {
     service: Svc,
     default_ns: String,
+    base_uri: Option<Uri>,
     valid_until: Option<Timestamp>,
 }
 
@@ -44,6 +45,7 @@ impl<Svc> ClientBuilder<Svc> {
         Self {
             service,
             default_ns: default_namespace.into(),
+            base_uri: None,
             valid_until: None,
         }
     }
@@ -53,12 +55,23 @@ impl<Svc> ClientBuilder<Svc> {
         let Self {
             service: stack,
             default_ns,
+            base_uri,
             valid_until,
         } = self;
         ClientBuilder {
             service: layer.layer(stack),
             default_ns,
+            base_uri,
             valid_until,
+        }
+    }
+
+    fn with_base_uri(self, base_uri: Uri) -> Self {
+        ClientBuilder {
+            service: self.service,
+            default_ns: self.default_ns,
+            base_uri: Some(base_uri),
+            valid_until: self.valid_until,
         }
     }
 
@@ -67,6 +80,7 @@ impl<Svc> ClientBuilder<Svc> {
         ClientBuilder {
             service: self.service,
             default_ns: self.default_ns,
+            base_uri: self.base_uri,
             valid_until,
         }
     }
@@ -80,7 +94,9 @@ impl<Svc> ClientBuilder<Svc> {
         B: http_body::Body<Data = bytes::Bytes> + Send + 'static,
         B::Error: Into<BoxError>,
     {
-        Client::new(self.service, self.default_ns).with_valid_until(self.valid_until)
+        Client::new(self.service, self.default_ns)
+            .with_base_uri(self.base_uri)
+            .with_valid_until(self.valid_until)
     }
 }
 
@@ -167,6 +183,7 @@ where
     H::Error: 'static + Send + Sync + std::error::Error,
 {
     let default_ns = config.default_namespace.clone();
+    let base_uri = config.cluster_url.clone();
     let auth_layer = config.auth_layer()?;
 
     let client: hyper_util::client::legacy::Client<_, Body> = {
@@ -273,6 +290,7 @@ where
             .boxed(),
         default_ns,
     )
+    .with_base_uri(base_uri)
     .with_valid_until(expiration);
 
     Ok(client)
