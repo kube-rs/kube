@@ -3,9 +3,9 @@ use serde_json::json;
 use tracing::*;
 
 use kube::{
+    Client,
     api::{Api, DeleteParams, ListParams, Patch, PatchParams, PostParams, ResourceExt},
     runtime::wait::{await_condition, conditions::is_pod_running},
-    Client,
 };
 
 #[tokio::main]

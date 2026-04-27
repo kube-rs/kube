@@ -1,12 +1,12 @@
 use crate::{
-    runtime::{
-        watcher::{watcher, Config},
-        WatchStreamExt,
-    },
     Api, Client,
+    runtime::{
+        WatchStreamExt,
+        watcher::{Config, watcher},
+    },
 };
 use anyhow::Result;
-use futures::{poll, StreamExt, TryStreamExt};
+use futures::{StreamExt, TryStreamExt, poll};
 use http::{Request, Response};
 use kube_client::client::Body;
 use kube_derive::CustomResource;
@@ -109,7 +109,7 @@ impl ApiServerVerifier {
                 "items": [Hack::test(1)]
             });
             let response = serde_json::to_vec(&respdata).unwrap(); // respond as the apiserver would have
-            send.send_response(Response::builder().body(Body::from(response)).unwrap());
+            send.send_response(Response::new(Body::from(response)));
         }
         {
             // we expect another list GET because we included a continue token
@@ -127,7 +127,7 @@ impl ApiServerVerifier {
                 "items": [Hack::test(2)]
             });
             let response = serde_json::to_vec(&respdata).unwrap(); // respond as the apiserver would have
-            send.send_response(Response::builder().body(Body::from(response)).unwrap());
+            send.send_response(Response::new(Body::from(response)));
         }
         {
             // we expect a final list GET because we included a continue token
@@ -145,7 +145,7 @@ impl ApiServerVerifier {
                 "items": [Hack::test(3)]
             });
             let response = serde_json::to_vec(&respdata).unwrap(); // respond as the apiserver would have
-            send.send_response(Response::builder().body(Body::from(response)).unwrap());
+            send.send_response(Response::new(Body::from(response)));
         }
         Ok(self)
     }

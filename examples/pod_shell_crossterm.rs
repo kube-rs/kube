@@ -1,10 +1,10 @@
-use futures::{channel::mpsc::Sender, SinkExt, StreamExt};
+use futures::{SinkExt, StreamExt, channel::mpsc::Sender};
 use k8s_openapi::api::core::v1::Pod;
 
 use kube::{
+    Client,
     api::{Api, AttachParams, AttachedProcess, DeleteParams, PostParams, ResourceExt, TerminalSize},
     runtime::wait::{await_condition, conditions::is_pod_running},
-    Client,
 };
 #[cfg(unix)] use tokio::signal;
 use tokio::{io::AsyncWriteExt, select};

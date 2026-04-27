@@ -3,13 +3,14 @@ use std::{future, ops::Deref, sync::Arc, time::Duration};
 use futures::StreamExt;
 use k8s_openapi::api::{apps::v1::Deployment, core::v1::Pod};
 use kube::{
+    Api, Client, ResourceExt,
     runtime::{
+        Config, Controller, WatchStreamExt,
         controller::Action,
         predicates,
         reflector::{self, ReflectHandle},
-        watcher, Config, Controller, WatchStreamExt,
+        watcher,
     },
-    Api, Client, ResourceExt,
 };
 use tracing::{debug, error, info, warn};
 

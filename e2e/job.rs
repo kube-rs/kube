@@ -1,8 +1,8 @@
 use k8s_openapi::api::batch::v1::Job;
 use kube::{
+    Client,
     api::{Api, DeleteParams, PostParams},
     runtime::wait::{await_condition, conditions},
-    Client,
 };
 use tracing::info;
 

@@ -1,5 +1,5 @@
 //! A port of request parameter *Optionals from apimachinery/types.go
-use crate::{request::Error, Selector};
+use crate::{Selector, request::Error};
 use serde::Serialize;
 
 /// Controls how the resource version parameter is applied for list calls
@@ -103,21 +103,19 @@ impl ListParams {
         }
         if let Some(continue_token) = &self.continue_token {
             qp.append_pair("continue", continue_token);
-        } else {
-            // When there's a continue token, we don't want to set resourceVersion
-            if let Some(rv) = &self.resource_version {
-                if rv != "0" || self.limit.is_none() {
-                    qp.append_pair("resourceVersion", rv.as_str());
+        } else if let Some(rv) = &self.resource_version
+            && (rv != "0" || self.limit.is_none())
+        {
+            // NB: When there's a continue token, we don't want to set resourceVersion
+            qp.append_pair("resourceVersion", rv.as_str());
 
-                    match &self.version_match {
-                        None => {}
-                        Some(VersionMatch::NotOlderThan) => {
-                            qp.append_pair("resourceVersionMatch", "NotOlderThan");
-                        }
-                        Some(VersionMatch::Exact) => {
-                            qp.append_pair("resourceVersionMatch", "Exact");
-                        }
-                    }
+            match &self.version_match {
+                None => {}
+                Some(VersionMatch::NotOlderThan) => {
+                    qp.append_pair("resourceVersionMatch", "NotOlderThan");
+                }
+                Some(VersionMatch::Exact) => {
+                    qp.append_pair("resourceVersionMatch", "Exact");
                 }
             }
         }
@@ -212,7 +210,7 @@ impl ListParams {
         self
     }
 
-    /// Sets an arbitary resource version match strategy
+    /// Sets an arbitrary resource version match strategy
     ///
     /// A non-default strategy such as `VersionMatch::Exact` or `VersionMatch::NotOlderThan`
     /// requires an explicit `resource_version` set to pass request validation.
@@ -225,7 +223,7 @@ impl ListParams {
     /// Use the semantic "any" resource version strategy
     ///
     /// This is a less taxing variant of the default list, returning data at any resource version.
-    /// It will prefer the newest avialable resource version, but strong consistency is not required;
+    /// It will prefer the newest available resource version, but strong consistency is not required;
     /// data at any resource version may be served.
     /// It is possible for the request to return data at a much older resource version than the client
     /// has previously observed, particularly in high availability configurations, due to partitions or stale caches.
@@ -242,7 +240,7 @@ pub struct GetParams {
     /// An explicit resourceVersion with implicit version matching strategies
     ///
     /// Default (unset) gives the most recent version. "0" gives a less
-    /// consistent, but more performant "Any" version. Specifing a version is
+    /// consistent, but more performant "Any" version. Specifying a version is
     /// like providing a `VersionMatch::NotOlderThan`.
     /// See <https://kubernetes.io/docs/reference/using-api/api-concepts/#resource-versions> for details.
     pub resource_version: Option<String>,
@@ -785,7 +783,7 @@ pub struct DeleteParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub propagation_policy: Option<PropagationPolicy>,
 
-    /// Condtions that must be fulfilled before a deletion is carried out
+    /// Conditions that must be fulfilled before a deletion is carried out
     ///
     /// If not possible, a `409 Conflict` status will be returned.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -816,7 +814,7 @@ impl DeleteParams {
     /// Construct `DeleteParams` with `PropagationPolicy::Orphan`.
     ///
     ///
-    /// This orpans the dependents.
+    /// This orphans the dependents.
     pub fn orphan() -> Self {
         Self {
             propagation_policy: Some(PropagationPolicy::Orphan),
@@ -838,7 +836,7 @@ impl DeleteParams {
         self
     }
 
-    /// Set the condtions that must be fulfilled before a deletion is carried out.
+    /// Set the conditions that must be fulfilled before a deletion is carried out.
     #[must_use]
     pub fn preconditions(mut self, preconditions: Preconditions) -> Self {
         self.preconditions = Some(preconditions);
@@ -876,7 +874,7 @@ where
 }
 #[cfg(test)]
 mod test {
-    use crate::{params::WatchParams, Expression, Selector};
+    use crate::{Expression, Selector, params::WatchParams};
 
     use super::{DeleteParams, ListParams, PatchParams};
     #[test]

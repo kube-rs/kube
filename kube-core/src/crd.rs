@@ -1,4 +1,4 @@
-//! Traits and tyes for CustomResources
+//! Traits and types for CustomResources
 
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions as apiexts;
 
@@ -141,7 +141,7 @@ pub mod v1 {
     mod tests {
         #[test]
         fn crd_merge() {
-            use super::{merge_crds, Crd};
+            use super::{Crd, merge_crds};
             let crd1 = r#"
             apiVersion: apiextensions.k8s.io/v1
             kind: CustomResourceDefinition
@@ -235,4 +235,4 @@ pub mod v1 {
 }
 
 // re-export current latest (v1)
-pub use v1::{merge_crds, CustomResourceExt, MergeError};
+pub use v1::{CustomResourceExt, MergeError, merge_crds};

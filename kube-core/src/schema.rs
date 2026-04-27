@@ -5,10 +5,13 @@
 // Used in docs
 #[allow(unused_imports)] use schemars::generate::SchemaSettings;
 
-use schemars::{transform::Transform, JsonSchema};
+use schemars::{
+    JsonSchema,
+    transform::{Transform, transform_subschemas},
+};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
-use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
+use serde_json::{Value, json};
+use std::collections::{BTreeMap, BTreeSet, btree_map::Entry};
 
 /// schemars [`Visitor`] that rewrites a [`Schema`] to conform to Kubernetes' "structural schema" rules
 ///
@@ -27,8 +30,74 @@ use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
 #[derive(Debug, Clone)]
 pub struct StructuralSchemaRewriter;
 
+/// Recursively restructures JSON Schema objects so that the Option<Enum> object
+/// is returned per k8s CRD schema expectations.
+///
+/// In kube 2.x the schema output behavior for `Option<Enum>` types changed.
+///
+/// Previously given an enum like:
+///
+/// ```rust
+/// enum LogLevel {
+///     Debug,
+///     Info,
+///     Error,
+/// }
+/// ```
+///
+/// The following would be generated for Optional<LogLevel>:
+///
+/// ```json
+/// { "enum": ["Debug", "Info", "Error"], "type": "string", "nullable": true }
+/// ```
+///
+/// Now, schemars generates `anyOf` for `Option<LogLevel>` like:
+///
+/// ```json
+/// {
+///   "anyOf": [
+///     { "enum": ["Debug", "Info", "Error"], "type": "string" },
+///     { "enum": [null], "nullable": true }
+///   ]
+/// }
+/// ```
+///
+/// This transform implementation prevents this specific case from happening.
+#[derive(Debug, Clone, Default)]
+pub struct OptionalEnum;
+
+/// Recursively restructures JSON Schema objects so that the `Option<T>` object
+/// where `T` uses `x-kubernetes-int-or-string` is returned per k8s CRD schema expectations.
+///
+/// In kube 2.x with k8s-openapi 0.26.x, the schema output behavior for `Option<Quantity>`
+/// and similar `x-kubernetes-int-or-string` types changed.
+///
+/// Previously given an optional Quantity field:
+///
+/// ```json
+/// { "nullable": true, "type": "string" }
+/// ```
+///
+/// Now, schemars generates `anyOf` for `Option<Quantity>` like:
+///
+/// ```json
+/// {
+///   "anyOf": [
+///     { "x-kubernetes-int-or-string": true },
+///     { "enum": [null], "nullable": true }
+///   ]
+/// }
+/// ```
+///
+/// This transform converts it to:
+///
+/// ```json
+/// { "x-kubernetes-int-or-string": true, "nullable": true }
+/// ```
+#[derive(Debug, Clone, Default)]
+pub struct OptionalIntOrString;
+
 /// A JSON Schema.
-#[allow(clippy::large_enum_variant)]
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema)]
 #[serde(untagged)]
 enum Schema {
@@ -259,7 +328,7 @@ impl Transform for StructuralSchemaRewriter {
         if let Some(subschemas) = &mut schema.subschemas {
             if let Some(one_of) = subschemas.one_of.as_mut() {
                 // Tagged enums are serialized using `one_of`
-                hoist_subschema_properties(one_of, &mut schema.object, &mut schema.instance_type);
+                hoist_subschema_properties(one_of, &mut schema.object, &mut schema.instance_type, true);
 
                 // "Plain" enums are serialized using `one_of` if they have doc tags
                 hoist_subschema_enum_values(one_of, &mut schema.enum_values, &mut schema.instance_type);
@@ -271,20 +340,27 @@ impl Transform for StructuralSchemaRewriter {
 
             if let Some(any_of) = &mut subschemas.any_of {
                 // Untagged enums are serialized using `any_of`
-                hoist_subschema_properties(any_of, &mut schema.object, &mut schema.instance_type);
+                // Variant descriptions are not pushed into properties (because they are not for the field).
+                hoist_subschema_properties(any_of, &mut schema.object, &mut schema.instance_type, false);
             }
         }
 
-        // check for maps without with properties (i.e. flattened maps)
-        // and allow these to persist dynamically
-        if let Some(object) = &mut schema.object {
-            if !object.properties.is_empty()
-                && object.additional_properties.as_deref() == Some(&Schema::Bool(true))
-            {
-                object.additional_properties = None;
-                schema
-                    .extensions
-                    .insert("x-kubernetes-preserve-unknown-fields".into(), true.into());
+        if let Some(object) = &mut schema.object
+            && !object.properties.is_empty()
+        {
+            // check for maps without with properties (i.e. flattened maps)
+            // and allow these to persist dynamically
+            match object.additional_properties.as_deref() {
+                Some(&Schema::Bool(true)) => {
+                    object.additional_properties = None;
+                    schema
+                        .extensions
+                        .insert("x-kubernetes-preserve-unknown-fields".into(), true.into());
+                }
+                Some(&Schema::Bool(false)) => {
+                    object.additional_properties = None;
+                }
+                _ => {}
             }
         }
 
@@ -297,9 +373,86 @@ impl Transform for StructuralSchemaRewriter {
             array.unique_items = None;
         }
 
-        if let Ok(schema) = serde_json::to_value(schema) {
-            if let Ok(transformed) = serde_json::from_value(schema) {
-                *transform_schema = transformed;
+        if let Ok(schema) = serde_json::to_value(schema)
+            && let Ok(transformed) = serde_json::from_value(schema)
+        {
+            *transform_schema = transformed;
+        }
+    }
+}
+
+impl Transform for OptionalEnum {
+    fn transform(&mut self, schema: &mut schemars::Schema) {
+        transform_subschemas(self, schema);
+
+        let Some(obj) = schema.as_object_mut() else {
+            return;
+        };
+
+        let arr = obj
+            .get("anyOf")
+            .iter()
+            .flat_map(|any_of| any_of.as_array())
+            .last()
+            .cloned()
+            .unwrap_or_default();
+
+        let [first, second] = arr.as_slice() else {
+            return;
+        };
+        let (Some(first), Some(second)) = (first.as_object(), second.as_object()) else {
+            return;
+        };
+
+        // Check if this is an Option<T> pattern:
+        // anyOf with two elements where second is { "enum": [null], "nullable": true }
+        if !first.contains_key("nullable")
+            && second.get("enum") == Some(&json!([null]))
+            && second.get("nullable") == Some(&json!(true))
+        {
+            // Remove anyOf and hoist first element's properties to root
+            obj.remove("anyOf");
+            obj.append(&mut first.clone());
+            obj.insert("nullable".to_string(), Value::Bool(true));
+        }
+    }
+}
+
+impl Transform for OptionalIntOrString {
+    fn transform(&mut self, schema: &mut schemars::Schema) {
+        transform_subschemas(self, schema);
+
+        let Some(obj) = schema.as_object_mut() else {
+            return;
+        };
+
+        // Get required fields list
+        let required: BTreeSet<String> = obj
+            .get("required")
+            .and_then(|v| v.as_array())
+            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+            .unwrap_or_default();
+
+        // Get mutable properties
+        let Some(properties) = obj.get_mut("properties").and_then(|v| v.as_object_mut()) else {
+            return;
+        };
+
+        // For each property that is NOT required and has x-kubernetes-int-or-string,
+        // add nullable: true if not already present
+        for (name, prop_schema) in properties.iter_mut() {
+            if required.contains(name) {
+                continue;
+            }
+
+            let Some(prop_obj) = prop_schema.as_object_mut() else {
+                continue;
+            };
+
+            if prop_obj.get("x-kubernetes-int-or-string") == Some(&json!(true))
+                && !prop_obj.contains_key("nullable")
+            {
+                prop_obj.insert("nullable".to_string(), Value::Bool(true));
             }
         }
     }
@@ -347,6 +500,7 @@ fn hoist_subschema_properties(
     subschemas: &mut Vec<Schema>,
     common_obj: &mut Option<Box<ObjectValidation>>,
     instance_type: &mut Option<SingleOrVec<InstanceType>>,
+    push_description_to_property: bool,
 ) {
     for variant in subschemas {
         if let Schema::Object(SchemaObject {
@@ -358,17 +512,16 @@ fn hoist_subschema_properties(
         {
             let common_obj = common_obj.get_or_insert_with(Box::<ObjectValidation>::default);
 
-            if let Some(variant_metadata) = variant_metadata {
-                // Move enum variant description from oneOf clause to its corresponding property
-                if let Some(description) = std::mem::take(&mut variant_metadata.description) {
-                    if let Some(Schema::Object(variant_object)) =
-                        only_item(variant_obj.properties.values_mut())
-                    {
-                        let metadata = variant_object
-                            .metadata
-                            .get_or_insert_with(Box::<Metadata>::default);
-                        metadata.description = Some(description);
-                    }
+            // Move enum variant description from oneOf clause to its corresponding property
+            if let Some(variant_metadata) = variant_metadata
+                && let Some(description) = std::mem::take(&mut variant_metadata.description)
+                && let Some(Schema::Object(variant_object)) = only_item(variant_obj.properties.values_mut())
+            {
+                let metadata = variant_object
+                    .metadata
+                    .get_or_insert_with(Box::<Metadata>::default);
+                if push_description_to_property {
+                    metadata.description = Some(description);
                 }
             }
 
@@ -381,10 +534,12 @@ fn hoist_subschema_properties(
                     }
                     Entry::Occupied(entry) => {
                         if &property != entry.get() {
-                            panic!("Property {:?} has the schema {:?} but was already defined as {:?} in another subschema. The schemas for a property used in multiple subschemas must be identical",
-                            entry.key(),
-                            &property,
-                            entry.get());
+                            panic!(
+                                "Property {:?} has the schema {:?} but was already defined as {:?} in another subschema. The schemas for a property used in multiple subschemas must be identical",
+                                entry.key(),
+                                &property,
+                                entry.get()
+                            );
                         }
                     }
                 }
@@ -394,6 +549,20 @@ fn hoist_subschema_properties(
             variant_obj.additional_properties = None;
 
             merge_metadata(instance_type, variant_type.take());
+        }
+        // Removes the type/description from oneOf and anyOf subschemas
+        else if let Schema::Object(SchemaObject {
+            metadata: variant_metadata,
+            instance_type: variant_type,
+            enum_values: None,
+            subschemas: None,
+            array: None,
+            object: None,
+            ..
+        }) = variant
+        {
+            std::mem::take(&mut *variant_type);
+            std::mem::take(&mut *variant_metadata);
         }
     }
 }

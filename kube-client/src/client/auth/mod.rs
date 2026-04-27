@@ -1,21 +1,20 @@
+use futures::future::BoxFuture;
+use http::{
+    HeaderValue, Request,
+    header::{AUTHORIZATION, InvalidHeaderValue},
+};
+use jiff::{SignedDuration, Timestamp};
+use jsonpath_rust::JsonPath;
+use secrecy::{ExposeSecret, SecretString};
+use serde::{Deserialize, Serialize};
 use std::{
     path::{Path, PathBuf},
     process::Command,
     sync::Arc,
 };
-
-use chrono::{DateTime, Duration, Utc};
-use futures::future::BoxFuture;
-use http::{
-    header::{InvalidHeaderValue, AUTHORIZATION},
-    HeaderValue, Request,
-};
-use jsonpath_rust::JsonPath;
-use secrecy::{ExposeSecret, SecretString};
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::sync::{Mutex, RwLock};
-use tower::{filter::AsyncPredicate, BoxError};
+use tower::{BoxError, filter::AsyncPredicate};
 
 use crate::config::{AuthInfo, AuthProviderConfig, ExecAuthCluster, ExecConfig, ExecInteractiveMode};
 
@@ -46,7 +45,7 @@ pub enum Error {
 
     /// Malformed token expiration date
     #[error("malformed token expiration date: {0}")]
-    MalformedTokenExpirationDate(#[source] chrono::ParseError),
+    MalformedTokenExpirationDate(#[source] jiff::Error),
 
     /// Failed to start auth exec
     #[error("unable to run auth exec: {0}")]
@@ -109,13 +108,12 @@ pub enum Error {
 }
 
 #[derive(Debug, Clone)]
-#[allow(clippy::large_enum_variant)]
 pub(crate) enum Auth {
     None,
     Basic(String, SecretString),
     Bearer(SecretString),
     RefreshableToken(RefreshableToken),
-    Certificate(String, SecretString, Option<DateTime<Utc>>),
+    Certificate(String, SecretString, Option<Timestamp>),
 }
 
 // Token file reference. Reloads at least once per minute.
@@ -123,7 +121,7 @@ pub(crate) enum Auth {
 pub struct TokenFile {
     path: PathBuf,
     token: SecretString,
-    expires_at: DateTime<Utc>,
+    expires_at: Timestamp,
 }
 
 impl TokenFile {
@@ -134,12 +132,12 @@ impl TokenFile {
             path: path.as_ref().to_owned(),
             token: SecretString::from(token),
             // Try to reload at least once a minute
-            expires_at: Utc::now() + SIXTY_SEC,
+            expires_at: Timestamp::now() + SIXTY_SEC,
         })
     }
 
     fn is_expiring(&self) -> bool {
-        Utc::now() + TEN_SEC > self.expires_at
+        Timestamp::now() + TEN_SEC > self.expires_at
     }
 
     /// Get the cached token. Returns `None` if it's expiring.
@@ -157,26 +155,16 @@ impl TokenFile {
             if let Ok(token) = std::fs::read_to_string(&self.path) {
                 self.token = SecretString::from(token);
             }
-            self.expires_at = Utc::now() + SIXTY_SEC;
+            self.expires_at = Timestamp::now() + SIXTY_SEC;
         }
         self.token.expose_secret()
     }
 }
 
-// Questionable decisions by chrono: https://github.com/chronotope/chrono/issues/1491
-macro_rules! const_unwrap {
-    ($e:expr) => {
-        match $e {
-            Some(v) => v,
-            None => panic!(),
-        }
-    };
-}
-
 /// Common constant for checking if an auth token is close to expiring
-pub const TEN_SEC: chrono::TimeDelta = const_unwrap!(Duration::try_seconds(10));
+pub const TEN_SEC: SignedDuration = SignedDuration::from_secs(10);
 /// Common duration for time between reloads
-const SIXTY_SEC: chrono::TimeDelta = const_unwrap!(Duration::try_seconds(60));
+const SIXTY_SEC: SignedDuration = SignedDuration::from_secs(60);
 
 // See https://github.com/kubernetes/kubernetes/tree/master/staging/src/k8s.io/client-go/plugin/pkg/client/auth
 // for the list of auth-plugins supported by client-go.
@@ -190,7 +178,7 @@ const SIXTY_SEC: chrono::TimeDelta = const_unwrap!(Duration::try_seconds(60));
 // It's not accessible from outside and not shown on docs.
 #[derive(Debug, Clone)]
 pub enum RefreshableToken {
-    Exec(Arc<Mutex<(SecretString, DateTime<Utc>, AuthInfo)>>),
+    Exec(Arc<Mutex<(SecretString, Timestamp, AuthInfo)>>),
     File(Arc<RwLock<TokenFile>>),
     #[cfg(feature = "oauth")]
     GcpOauth(Arc<Mutex<oauth::Gcp>>),
@@ -224,9 +212,15 @@ impl RefreshableToken {
                 let mut locked_data = data.lock().await;
                 // Add some wiggle room onto the current timestamp so we don't get any race
                 // conditions where the token expires while we are refreshing
-                if Utc::now() + SIXTY_SEC >= locked_data.1 {
+                if Timestamp::now() + SIXTY_SEC >= locked_data.1 {
+                    // Run blocking exec command on the blocking threadpool to avoid
+                    // stalling the tokio worker during token refresh.
                     // TODO Improve refreshing exec to avoid `Auth::try_from`
-                    match Auth::try_from(&locked_data.2)? {
+                    let auth_info = locked_data.2.clone();
+                    let auth = tokio::task::spawn_blocking(move || Auth::try_from(&auth_info))
+                        .await
+                        .map_err(|e| Error::AuthExec(format!("failed to spawn blocking auth task: {e}")))??;
+                    match auth {
                         Auth::None | Auth::Basic(_, _) | Auth::Bearer(_) | Auth::Certificate(_, _, _) => {
                             return Err(Error::UnrefreshableTokenResponse);
                         }
@@ -311,7 +305,8 @@ impl TryFrom<&AuthInfo> for Auth {
                     let mut info = auth_info.clone();
                     let mut provider = provider.clone();
                     provider.config.insert("access-token".into(), token.clone());
-                    provider.config.insert("expiry".into(), expiry.to_rfc3339());
+                    // `jiff::Timestamp` provides RFC3339 via `Display`, docs: https://docs.rs/jiff/latest/jiff/struct.Timestamp.html#impl-Display-for-Timestamp
+                    provider.config.insert("expiry".into(), expiry.to_string());
                     info.auth_provider = Some(provider);
                     return Ok(Self::RefreshableToken(RefreshableToken::Exec(Arc::new(
                         Mutex::new((SecretString::from(token), expiry, info)),
@@ -356,7 +351,6 @@ impl TryFrom<&AuthInfo> for Auth {
                 .transpose()
                 .map_err(Error::MalformedTokenExpirationDate)?;
 
-
             if let (Some(client_certificate_data), Some(client_key_data)) =
                 (status.client_certificate_data, status.client_key_data)
             {
@@ -387,7 +381,7 @@ enum ProviderToken {
     #[cfg(not(feature = "oidc"))]
     Oidc(String),
     // "access-token", "expiry" (RFC3339)
-    GcpCommand(String, Option<DateTime<Utc>>),
+    GcpCommand(String, Option<Timestamp>),
     #[cfg(feature = "oauth")]
     GcpOauth(oauth::Gcp),
     // "access-token", "expires-on" (timestamp)
@@ -431,14 +425,14 @@ fn token_from_gcp_provider(provider: &AuthProviderConfig) -> Result<ProviderToke
     }
 
     // Return cached access token if it's still valid
-    if let Some(access_token) = provider.config.get("access-token") {
-        if let Some(expiry) = provider.config.get("expiry") {
-            let expiry_date = expiry
-                .parse::<DateTime<Utc>>()
-                .map_err(Error::MalformedTokenExpirationDate)?;
-            if Utc::now() + SIXTY_SEC < expiry_date {
-                return Ok(ProviderToken::GcpCommand(access_token.clone(), Some(expiry_date)));
-            }
+    if let Some(access_token) = provider.config.get("access-token")
+        && let Some(expiry) = provider.config.get("expiry")
+    {
+        let expiry_date = expiry
+            .parse::<Timestamp>()
+            .map_err(Error::MalformedTokenExpirationDate)?;
+        if Timestamp::now() + SIXTY_SEC < expiry_date {
+            return Ok(ProviderToken::GcpCommand(access_token.clone(), Some(expiry_date)));
         }
     }
 
@@ -474,7 +468,7 @@ fn token_from_gcp_provider(provider: &AuthProviderConfig) -> Result<ProviderToke
             if let Some(field) = provider.config.get("expiry-key") {
                 let expiry = extract_value(&json_output, "expiry-key", field)?;
                 let expiry = expiry
-                    .parse::<DateTime<Utc>>()
+                    .parse::<Timestamp>()
                     .map_err(Error::MalformedTokenExpirationDate)?;
                 return Ok(ProviderToken::GcpCommand(token, Some(expiry)));
             } else {
@@ -505,25 +499,30 @@ fn token_from_gcp_provider(provider: &AuthProviderConfig) -> Result<ProviderToke
 }
 
 fn extract_value(json: &serde_json::Value, context: &str, path: &str) -> Result<String, Error> {
-    let parsed_path = path
-        .trim_matches(|c| c == '"' || c == '{' || c == '}')
-        .parse::<JsonPath>()
-        .map_err(|err| {
-            Error::AuthExec(format!(
-                "Failed to parse {context:?} as a JsonPath: {path}\n
-                 Error: {err}"
-            ))
-        })?;
+    let path = {
+        let p = path.trim_matches(|c| c == '"' || c == '{' || c == '}');
+        if p.starts_with('$') {
+            p
+        } else if p.starts_with('.') {
+            &format!("${p}")
+        } else {
+            &format!("$.{p}")
+        }
+    };
 
-    let res = parsed_path.find_slice(json);
+    let res = json.query(path).map_err(|err| {
+        Error::AuthExec(format!(
+            "Failed to query {context:?} as a JsonPath: {path}\n
+             Error: {err}"
+        ))
+    })?;
 
-    let Some(res) = res.into_iter().next() else {
+    let Some(jval) = res.into_iter().next() else {
         return Err(Error::AuthExec(format!(
             "Target {context:?} value {path:?} not found"
         )));
     };
 
-    let jval = res.to_data();
     let val = jval.as_str().ok_or(Error::AuthExec(format!(
         "Target {context:?} value {path:?} is not a string"
     )))?;
@@ -620,8 +619,16 @@ fn auth_exec(auth: &ExecConfig) -> Result<ExecCredential, Error> {
 
     #[cfg(target_os = "windows")]
     {
-        const CREATE_NO_WINDOW: u32 = 0x08000000;
-        cmd.creation_flags(CREATE_NO_WINDOW);
+        // Opt-in via env var; see https://github.com/kube-rs/kube/issues/1901 for why
+        // this is gated (CREATE_NO_WINDOW breaks stderr inheritance for interactive exec
+        // plugins like kubelogin.exe).
+        if std::env::var("KUBE_RS_UNSTABLE_CREATE_NO_WINDOW")
+            .map(|s| s == "1")
+            .unwrap_or(false)
+        {
+            const CREATE_NO_WINDOW: u32 = 0x08000000;
+            cmd.creation_flags(CREATE_NO_WINDOW);
+        }
     }
 
     let out = cmd.output().map_err(Error::AuthExecStart)?;
@@ -640,12 +647,12 @@ fn auth_exec(auth: &ExecConfig) -> Result<ExecCredential, Error> {
 #[cfg(test)]
 mod test {
     use crate::config::Kubeconfig;
+    use std::time::{Duration, Instant};
 
     use super::*;
-    #[tokio::test]
-    #[ignore = "fails on windows mysteriously"]
-    async fn exec_auth_command() -> Result<(), Error> {
-        let expiry = (Utc::now() + SIXTY_SEC).to_rfc3339();
+
+    /// Build an `AuthInfo` whose gcp auth-provider runs `cmd_path cmd_args` to emit credential JSON.
+    fn gcp_auth_info(cmd_path: &str, cmd_args: &str) -> AuthInfo {
         let test_file = format!(
             r#"
         apiVersion: v1
@@ -667,17 +674,29 @@ mod test {
           user:
             auth-provider:
               config:
-                cmd-args: '{{"something": "else", "credential": {{"access_token": "my_token", "token_expiry": "{expiry}"}}}}'
-                cmd-path: echo
+                cmd-args: {cmd_args}
+                cmd-path: {cmd_path}
                 expiry-key: '{{.credential.token_expiry}}'
                 token-key: '{{.credential.access_token}}'
               name: gcp
         "#
         );
-
         let config: Kubeconfig = serde_saphyr::from_str(&test_file).unwrap();
-        let auth_info = config.auth_infos[0].auth_info.as_ref().unwrap();
-        match Auth::try_from(auth_info).unwrap() {
+        config.auth_infos[0].auth_info.clone().unwrap()
+    }
+
+    fn cred_json(token: &str, expiry: &str) -> String {
+        format!(
+            r#"{{"something": "else", "credential": {{"access_token": "{token}", "token_expiry": "{expiry}"}}}}"#
+        )
+    }
+
+    #[tokio::test]
+    #[ignore = "fails on windows mysteriously"]
+    async fn exec_auth_command() -> Result<(), Error> {
+        let expiry = (Timestamp::now() + SIXTY_SEC).to_string();
+        let auth_info = gcp_auth_info("echo", &format!("'{}'", cred_json("my_token", &expiry)));
+        match Auth::try_from(&auth_info).unwrap() {
             Auth::RefreshableToken(RefreshableToken::Exec(refreshable)) => {
                 let (token, _expire, info) = Arc::try_unwrap(refreshable).unwrap().into_inner();
                 assert_eq!(token.expose_secret(), &"my_token".to_owned());
@@ -686,6 +705,71 @@ mod test {
             }
             _ => unreachable!(),
         }
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[ignore = "shells out to echo/sh; skipped on windows"]
+    async fn exec_token_refresh_via_to_header() -> Result<(), Error> {
+        let fresh_expiry = (Timestamp::now() + SignedDuration::from_secs(3600)).to_string();
+        let auth_info = gcp_auth_info("echo", &format!("'{}'", cred_json("my_token", &fresh_expiry)));
+        // Seed with a stale token + past expiry to force the refresh branch.
+        let stale_expiry = Timestamp::now() - SIXTY_SEC;
+        let refreshable = RefreshableToken::Exec(Arc::new(Mutex::new((
+            SecretString::from("stale"),
+            stale_expiry,
+            auth_info,
+        ))));
+
+        let header = refreshable.to_header().await?;
+        assert_eq!(header, HeaderValue::from_static("Bearer my_token"));
+
+        // Cached state should have been updated in place.
+        if let RefreshableToken::Exec(data) = &refreshable {
+            let locked = data.lock().await;
+            assert_eq!(locked.0.expose_secret(), "my_token");
+            assert!(locked.1 > Timestamp::now(), "expiry should be in the future");
+        } else {
+            unreachable!();
+        }
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    #[ignore = "shells out to echo/sh; skipped on windows"]
+    async fn exec_token_refresh_does_not_block_runtime() -> Result<(), Error> {
+        use std::io::Write;
+        let fresh_expiry = (Timestamp::now() + SignedDuration::from_secs(3600)).to_string();
+        // Write a script that sleeps ~300ms before emitting credentials; the gcp provider
+        // splits cmd-args on spaces so we can't inline this via `sh -c`.
+        let mut script = tempfile::NamedTempFile::new().unwrap();
+        writeln!(script, "#!/bin/sh").unwrap();
+        writeln!(script, "sleep 0.3").unwrap();
+        writeln!(script, "echo '{}'", cred_json("my_token", &fresh_expiry)).unwrap();
+        script.flush().unwrap();
+        let script_path = script.path().to_str().unwrap().to_owned();
+
+        let auth_info = gcp_auth_info("sh", &script_path);
+        let stale_expiry = Timestamp::now() - SIXTY_SEC;
+        let refreshable = RefreshableToken::Exec(Arc::new(Mutex::new((
+            SecretString::from("stale"),
+            stale_expiry,
+            auth_info,
+        ))));
+
+        // On a current_thread runtime, if to_header() blocked the worker the 50ms
+        // timer below could not fire until the 300ms exec completed.
+        let start = Instant::now();
+        let (header, timer_elapsed) = tokio::join!(refreshable.to_header(), async {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+            start.elapsed()
+        });
+
+        assert!(
+            timer_elapsed < Duration::from_millis(200),
+            "timer took {timer_elapsed:?}; to_header likely blocked the runtime"
+        );
+        assert_eq!(header?, HeaderValue::from_static("Bearer my_token"));
         Ok(())
     }
 
@@ -701,7 +785,7 @@ mod test {
         std::fs::write(file.path(), "token2").unwrap();
         assert_eq!(token_file.token(), "token1");
 
-        token_file.expires_at = Utc::now();
+        token_file.expires_at = Timestamp::now();
         assert!(token_file.is_expiring());
         assert_eq!(token_file.cached_token(), None);
         assert_eq!(token_file.token(), "token2");

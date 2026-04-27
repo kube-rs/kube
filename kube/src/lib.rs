@@ -105,7 +105,7 @@
 //! - [`runtime`] for abstractions that help with more complicated Kubernetes application
 //!
 //! # Examples
-//! A large list of complete, runnable examples with explainations are available in the [examples folder](https://github.com/kube-rs/kube/tree/main/examples).
+//! A large list of complete, runnable examples with explanations are available in the [examples folder](https://github.com/kube-rs/kube/tree/main/examples).
 //!
 //! # Features
 //! Documented at [kube.rs/features](https://kube.rs/features/).
@@ -162,7 +162,7 @@ cfg_config! {
 cfg_error! {
     pub use kube_client::error;
     #[doc(inline)] pub use error::Error;
-    /// Convient alias for `Result<T, Error>`
+    /// Convenient alias for `Result<T, Error>`
     pub type Result<T, E = Error> = std::result::Result<T, E>;
 }
 
@@ -204,15 +204,14 @@ pub mod prelude {
     //!
     //! The prelude may grow over time as additional items see ubiquitous use.
 
-    #[cfg(feature = "client")]
-    #[allow(unreachable_pub)]
-    pub use crate::client::ConfigExt as _;
+    #[cfg(feature = "client")] pub use crate::client::ConfigExt as _;
 
     #[cfg(feature = "unstable-client")] pub use crate::client::scope::NamespacedRef;
 
-    #[allow(unreachable_pub)] pub use crate::core::PartialObjectMetaExt as _;
-    #[allow(unreachable_pub)] pub use crate::core::SelectorExt as _;
-    pub use crate::{core::crd::CustomResourceExt as _, Resource as _, ResourceExt as _};
+    pub use crate::{
+        Resource as _, ResourceExt as _,
+        core::{PartialObjectMetaExt as _, SelectorExt as _, crd::CustomResourceExt as _},
+    };
 
     #[cfg(feature = "runtime")] pub use crate::runtime::utils::WatchStreamExt as _;
 }
@@ -223,8 +222,8 @@ pub mod prelude {
 #[cfg(all(feature = "derive", feature = "client"))]
 mod test {
     use crate::{
-        api::{DeleteParams, Patch, PatchParams},
         Api, Client, CustomResourceExt, Resource, ResourceExt,
+        api::{DeleteParams, Patch, PatchParams},
     };
     use kube_derive::CustomResource;
     use schemars::JsonSchema;
@@ -272,7 +271,7 @@ mod test {
     #[tokio::test]
     #[ignore = "needs cluster (creates + patches foo crd)"]
     #[cfg(all(feature = "derive", feature = "runtime"))]
-    async fn derived_resource_queriable_and_has_subresources() -> Result<(), Box<dyn std::error::Error>> {
+    async fn derived_resource_queryable_and_has_subresources() -> Result<(), Box<dyn std::error::Error>> {
         use crate::runtime::wait::{await_condition, conditions};
 
         use serde_json::json;
@@ -350,8 +349,8 @@ mod test {
     async fn custom_serialized_objects_are_queryable_and_iterable() -> Result<(), Box<dyn std::error::Error>>
     {
         use crate::core::{
-            object::{HasSpec, HasStatus, NotUsed, Object},
             ApiResource,
+            object::{HasSpec, HasStatus, NotUsed, Object},
         };
         use k8s_openapi::api::core::v1::Pod;
         #[derive(Clone, Deserialize, Debug)]
@@ -403,8 +402,8 @@ mod test {
     async fn derived_resources_discoverable() -> Result<(), Box<dyn std::error::Error>> {
         use crate::{
             core::{DynamicObject, GroupVersion, GroupVersionKind},
-            discovery::{self, verbs, ApiGroup, Discovery, Scope},
-            runtime::wait::{await_condition, conditions, Condition},
+            discovery::{self, ApiGroup, Discovery, Scope, verbs},
+            runtime::wait::{Condition, await_condition, conditions},
         };
 
         #[derive(CustomResource, Deserialize, Serialize, Clone, Debug, JsonSchema)]
@@ -447,7 +446,7 @@ mod test {
         assert!(discovery.has_group("kube.rs"), "missing group kube.rs");
         let (ar, _caps) = discovery.resolve_gvk(&gvk).unwrap();
         assert_eq!(ar.group, gvk.group, "unexpected discovered group");
-        assert_eq!(ar.version, gvk.version, "unexcepted discovered ver");
+        assert_eq!(ar.version, gvk.version, "unexpected discovered ver");
         assert_eq!(ar.kind, gvk.kind, "unexpected discovered kind");
 
         // check all non-excluded groups that are iterable
@@ -478,9 +477,9 @@ mod test {
     #[cfg(feature = "runtime")]
     async fn pod_can_await_conditions() -> Result<(), Box<dyn std::error::Error>> {
         use crate::{
-            api::{DeleteParams, PostParams},
-            runtime::wait::{await_condition, conditions, delete::delete_and_finalize, Condition},
             Api, Client,
+            api::{DeleteParams, PostParams},
+            runtime::wait::{Condition, await_condition, conditions, delete::delete_and_finalize},
         };
         use k8s_openapi::api::core::v1::Pod;
         use std::time::Duration;
@@ -502,7 +501,7 @@ mod test {
                 "restartPolicy": "Never",
                 "containers": [{
                   "name": "busybox",
-                  "image": "busybox:1.34.1",
+                  "image": "busybox:stable",
                   "command": ["sh", "-c", "sleep 20"],
                 }],
             }
@@ -526,14 +525,12 @@ mod test {
         // TODO: remove these once we can write these functions generically
         fn is_each_container_ready() -> impl Condition<Pod> {
             |obj: Option<&Pod>| {
-                if let Some(o) = obj {
-                    if let Some(s) = &o.status {
-                        if let Some(conds) = &s.conditions {
-                            if let Some(pcond) = conds.iter().find(|c| c.type_ == "ContainersReady") {
-                                return pcond.status == "True";
-                            }
-                        }
-                    }
+                if let Some(o) = obj
+                    && let Some(s) = &o.status
+                    && let Some(conds) = &s.conditions
+                    && let Some(pcond) = conds.iter().find(|c| c.type_ == "ContainersReady")
+                {
+                    return pcond.status == "True";
                 }
                 false
             }

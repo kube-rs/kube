@@ -1,9 +1,10 @@
 //! Node proxy methods
 use crate::{
+    Request,
     request::Error,
     subresource::{AttachParams, LogParams},
-    Request,
 };
+use jiff::Unit;
 use std::fmt::Debug;
 
 /// Struct that hold all required parameters to call specific pod methods from node
@@ -142,8 +143,11 @@ impl Request {
         if let Some(ss) = &lp.since_seconds {
             qp.append_pair("sinceSeconds", &ss.to_string());
         } else if let Some(st) = &lp.since_time {
-            let ser_since = st.to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
-            qp.append_pair("sinceTime", &ser_since);
+            // Unwrapping here is ok as `round` only errors if a.) the smallest unit is larger than hour (we set second as smallest unit)
+            // or b.) a rounding increment is configured (which we don't set) that does not fit into 86400 seconds (a day)
+            // without any remainder.
+            // `jiff::Timestamp` provides RFC3339 via `Display`, docs: https://docs.rs/jiff/latest/jiff/struct.Timestamp.html#impl-Display-for-Timestamp
+            qp.append_pair("sinceTime", &st.round(Unit::Second).unwrap().to_string());
         }
 
         if let Some(tl) = &lp.tail_lines {
@@ -163,9 +167,9 @@ impl Request {
 #[cfg(test)]
 mod test {
     use crate::{
+        Request,
         kubelet_debug::KubeletDebugParams,
         subresource::{AttachParams, LogParams},
-        Request,
     };
     #[test]
     fn node_attach_test() {

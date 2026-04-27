@@ -1,10 +1,11 @@
 //! Utils and helpers
 
 use crate::{
+    Request,
     params::{Patch, PatchParams},
-    request, Request,
+    request,
 };
-use chrono::Utc;
+use jiff::Timestamp;
 use k8s_openapi::api::apps::v1::{DaemonSet, Deployment, ReplicaSet, StatefulSet};
 
 /// Restartable Resource marker trait
@@ -18,12 +19,13 @@ impl Restart for ReplicaSet {}
 impl Request {
     /// Restart a resource
     pub fn restart(&self, name: &str) -> Result<http::Request<Vec<u8>>, request::Error> {
+        // `jiff::Timestamp` provides RFC3339 via `Display`, docs: https://docs.rs/jiff/latest/jiff/struct.Timestamp.html#impl-Display-for-Timestamp
         let patch = serde_json::json!({
           "spec": {
             "template": {
               "metadata": {
                 "annotations": {
-                  "kube.kubernetes.io/restartedAt": Utc::now().to_rfc3339()
+                  "kube.kubernetes.io/restartedAt": Timestamp::now().to_string()
                 }
               }
             }

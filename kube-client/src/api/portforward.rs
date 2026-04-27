@@ -2,12 +2,13 @@ use std::collections::HashMap;
 
 use bytes::{Buf, Bytes};
 use futures::{
+    FutureExt, SinkExt, StreamExt,
     channel::{mpsc, oneshot},
-    future, FutureExt, SinkExt, StreamExt,
+    future,
 };
 use thiserror::Error;
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt, DuplexStream};
-use tokio_tungstenite::{tungstenite as ws, WebSocketStream};
+use tokio_tungstenite::{WebSocketStream, tungstenite as ws};
 use tokio_util::io::ReaderStream;
 
 /// Errors from Portforwarder.
@@ -300,7 +301,7 @@ where
                 }
 
                 // Odd channels are for errors for (n - 1)/2 th port
-                if ch % 2 != 0 {
+                if !ch.is_multiple_of(2) {
                     // A port sends at most one error message because it's considered unusable after this.
                     if let Some(sender) = error_senders[port_index].take() {
                         let s = String::from_utf8(bytes.into_iter().collect())

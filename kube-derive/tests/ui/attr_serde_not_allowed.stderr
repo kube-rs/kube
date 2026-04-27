@@ -1,0 +1,5 @@
+error: #[derive(CustomResource)] `kube(attr = "...")` does not support to set the attributes ["derive", "serde", "schemars"] as they might lead to unexpected behaviour.`
+ --> tests/ui/attr_serde_not_allowed.rs:7:15
+  |
+7 | #[kube(attr = "serde(rename_all=\"snake_case\")")]
+  |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

@@ -26,6 +26,10 @@ pub struct Rule {
     /// reason is a machine-readable value providing more detail about why a field failed the validation.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reason: Option<Reason>,
+    /// optionalOldSelf allows transition rules (using oldSelf) to also evaluate during object creation
+    /// When enabled, `oldSelf` becomes a CEL `optional_type`. You must use functions like `optMap()`, `hasValue()`, or `orValue()` to safely compare it against `self`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub optional_old_self: Option<bool>,
 }
 
 impl Rule {
@@ -86,6 +90,19 @@ impl Rule {
     /// ```
     pub fn field_path(mut self, field_path: impl Into<String>) -> Self {
         self.field_path = Some(field_path.into());
+        self
+    }
+
+    /// Set the optionalOldSelf configuration.
+    ///
+    /// ```rust
+    /// use kube_core::Rule;
+    ///
+    /// let r = Rule::new("oldSelf.optMap(o, o == self).orValue(true)").optional_old_self(true);
+    /// assert_eq!(r.optional_old_self, Some(true));
+    /// ```
+    pub fn optional_old_self(mut self, optional: bool) -> Self {
+        self.optional_old_self = Some(optional);
         self
     }
 }
@@ -187,7 +204,7 @@ impl FromStr for Reason {
 ///```
 #[cfg(feature = "schema")]
 #[cfg_attr(docsrs, doc(cfg(feature = "schema")))]
-pub fn validate(s: &mut Schema, rule: impl Into<Rule>) -> Result<(), serde_json::Error> {
+pub fn validate(s: &mut Schema, rule: impl Into<Rule>) -> serde_json::Result<()> {
     let rule: Rule = rule.into();
     let rule = serde_json::to_value(rule)?;
     s.ensure_object()
@@ -229,13 +246,8 @@ pub fn validate_property(
     s: &mut Schema,
     property_index: usize,
     rule: impl Into<Rule> + Clone,
-) -> Result<(), serde_json::Error> {
-    let obj = s.ensure_object();
-    if let Some(properties) = obj
-        .entry("properties")
-        .or_insert(serde_json::Value::Object(Default::default()))
-        .as_object_mut()
-    {
+) -> serde_json::Result<()> {
+    if let Some(properties) = s.properties_mut() {
         for (n, (_, schema)) in properties.iter_mut().enumerate() {
             if n == property_index {
                 let mut prop = Schema::try_from(schema.clone())?;
@@ -276,21 +288,11 @@ pub fn validate_property(
 #[cfg(feature = "schema")]
 #[cfg_attr(docsrs, doc(cfg(feature = "schema")))]
 pub fn merge_properties(s: &mut Schema, merge: &mut Schema) {
-    if let Some(properties) = s
-        .ensure_object()
-        .entry("properties")
-        .or_insert(serde_json::Value::Object(Default::default()))
-        .as_object_mut()
+    if let Some(properties) = s.properties_mut()
+        && let Some(merge_properties) = merge.properties_mut()
     {
-        if let Some(merge_properties) = merge
-            .ensure_object()
-            .entry("properties")
-            .or_insert(serde_json::Value::Object(Default::default()))
-            .as_object_mut()
-        {
-            for (k, v) in merge_properties {
-                properties.insert(k.clone(), v.clone());
-            }
+        for (k, v) in merge_properties {
+            properties.insert(k.clone(), v.clone());
         }
     }
 }
@@ -344,7 +346,7 @@ pub enum MergeStrategy {
 }
 
 impl MergeStrategy {
-    fn keys(self) -> Result<BTreeMap<String, Value>, serde_json::Error> {
+    fn keys(self) -> serde_json::Result<BTreeMap<String, Value>> {
         if let Self::ListType(ListMerge::Map(keys)) = self {
             let mut data = BTreeMap::new();
             data.insert("x-kubernetes-list-type".into(), "map".into());
@@ -386,13 +388,8 @@ pub fn merge_strategy_property(
     s: &mut Schema,
     property_index: usize,
     strategy: impl Into<MergeStrategy>,
-) -> Result<(), serde_json::Error> {
-    if let Some(properties) = s
-        .ensure_object()
-        .entry("properties")
-        .or_insert(serde_json::Value::Object(Default::default()))
-        .as_object_mut()
-    {
+) -> serde_json::Result<()> {
+    if let Some(properties) = s.properties_mut() {
         for (n, (_, schema)) in properties.iter_mut().enumerate() {
             if n == property_index {
                 return merge_strategy(schema, strategy.into());
@@ -420,11 +417,53 @@ pub fn merge_strategy_property(
 ///```
 #[cfg(feature = "schema")]
 #[cfg_attr(docsrs, doc(cfg(feature = "schema")))]
-pub fn merge_strategy(s: &mut Value, strategy: MergeStrategy) -> Result<(), serde_json::Error> {
+pub fn merge_strategy(s: &mut Value, strategy: MergeStrategy) -> serde_json::Result<()> {
     for (key, value) in strategy.keys()? {
         if let Some(s) = s.as_object_mut() {
             s.insert(key, value);
         }
     }
     Ok(())
+}
+
+#[cfg(feature = "schema")]
+trait SchemaExt {
+    fn properties_mut(&mut self) -> Option<&mut serde_json::Map<String, Value>>;
+}
+
+#[cfg(feature = "schema")]
+impl SchemaExt for Schema {
+    fn properties_mut(&mut self) -> Option<&mut serde_json::Map<String, Value>> {
+        self.ensure_object()
+            .entry("properties")
+            .or_insert_with(|| Value::Object(Default::default()))
+            .as_object_mut()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn test_rule_serialization_optional_old_self() {
+        let rule_str = "oldSelf.optMap(o, o == self).orValue(true)";
+        let r = Rule::new(rule_str).optional_old_self(true);
+
+        // Test Serialization
+        let json = serde_json::to_value(&r).unwrap();
+        assert_eq!(
+            json,
+            json!({
+                "rule": rule_str,
+                "optionalOldSelf": true
+            })
+        );
+
+        // Test Round-trip (Deserialization)
+        let r2: Rule = serde_json::from_value(json).unwrap();
+        assert_eq!(r2.rule, rule_str);
+        assert_eq!(r2.optional_old_self, Some(true));
+    }
 }

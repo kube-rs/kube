@@ -1,4 +1,4 @@
-use crate::{api::Api, Error, Result};
+use crate::{Error, Result, api::Api};
 use k8s_openapi::api::certificates::v1::CertificateSigningRequest;
 use kube_core::params::{Patch, PatchParams};
 

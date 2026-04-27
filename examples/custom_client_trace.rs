@@ -9,8 +9,8 @@ use tower_http::{decompression::DecompressionLayer, trace::TraceLayer};
 use tracing::{Span, *};
 
 use kube::{
-    client::{Body, ConfigExt},
     Api, Client, Config, ResourceExt,
+    client::{Body, ConfigExt},
 };
 
 #[tokio::main]

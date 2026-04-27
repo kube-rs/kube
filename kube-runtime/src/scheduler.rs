@@ -1,7 +1,7 @@
 //! Delays and deduplicates [`Stream`](futures::stream::Stream) items
 
-use futures::{stream::Fuse, Stream, StreamExt};
-use hashbrown::{hash_map::RawEntryMut, HashMap};
+use futures::{Stream, StreamExt, stream::Fuse};
+use hashbrown::{HashMap, hash_map::RawEntryMut};
 use pin_project::pin_project;
 use std::{
     collections::HashSet,
@@ -16,7 +16,9 @@ use tokio_util::time::delay_queue::{self, DelayQueue};
 /// A request to re-emit `message` at a given `Instant` (`run_at`).
 #[derive(Debug)]
 pub struct ScheduleRequest<T> {
+    /// The message to be scheduled (typically a `ReconcileRequest`)
     pub message: T,
+    /// The time the message is scheduled for
     pub run_at: Instant,
 }
 
@@ -26,6 +28,10 @@ struct ScheduledEntry {
     queue_key: delay_queue::Key,
 }
 
+/// A scheduler with all internal state
+///
+/// Only expected to be constructed internally.
+/// Constructors are `scheduler` and `debounced_scheduler`.
 #[pin_project(project = SchedulerProj)]
 pub struct Scheduler<T, R> {
     /// Queue of already-scheduled messages.
@@ -280,7 +286,6 @@ pub fn scheduler<T: Eq + Hash + Clone, S: Stream<Item = ScheduleRequest<T>>>(req
 /// to receive an uninterrupted request before actually emitting it.
 ///
 /// For more info, see [`scheduler()`].
-#[allow(clippy::module_name_repetitions)]
 pub fn debounced_scheduler<T: Eq + Hash + Clone, S: Stream<Item = ScheduleRequest<T>>>(
     requests: S,
     debounce: Duration,
@@ -299,11 +304,11 @@ pub(crate) fn max_schedule_time() -> Instant {
 mod tests {
     use crate::utils::KubeRuntimeStreamExt;
 
-    use super::{debounced_scheduler, scheduler, ScheduleRequest};
+    use super::{ScheduleRequest, debounced_scheduler, scheduler};
     use educe::Educe;
-    use futures::{channel::mpsc, future, poll, stream, FutureExt, SinkExt, StreamExt};
+    use futures::{FutureExt, SinkExt, StreamExt, channel::mpsc, future, poll, stream};
     use std::{pin::pin, task::Poll};
-    use tokio::time::{advance, pause, sleep, Duration, Instant};
+    use tokio::time::{Duration, Instant, advance, pause, sleep};
 
     fn unwrap_poll<T>(poll: Poll<T>) -> T {
         if let Poll::Ready(x) = poll {

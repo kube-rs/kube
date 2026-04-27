@@ -12,7 +12,7 @@ clippy:
 
 fmt:
   #rustup component add rustfmt --toolchain nightly
-  rustfmt +nightly --edition 2021 $(find . -type f -iname *.rs)
+  cargo +nightly fmt --all
 
 doc:
   RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --all-features --no-deps --open
@@ -60,8 +60,13 @@ hack:
   # Without any grouping this test takes an hour and has to test >11k combinations.
   # Skipped oauth and oidc, as these compile fails without a tls stack.
 
+minimal-versions:
+  cargo hack --remove-dev-deps --workspace
+  cargo +nightly update -Z direct-minimal-versions
+  K8S_OPENAPI_ENABLED_VERSION=1.31 cargo check --all-features
+
 readme:
-  rustdoc README.md --test --edition=2021
+  rustdoc README.md --test --edition=2024
 
 e2e: (e2e-mink8s) (e2e-incluster "rustls,latest")
 
@@ -73,9 +78,9 @@ e2e-mink8s:
   #cargo run -p e2e --bin boot --features=rustls,mk8sv
 
 e2e-incluster features:
-  just e2e-job-musl {{features}}
-  docker build -t clux/kube-e2e:{{VERSION}} e2e/
-  k3d image import clux/kube-e2e:{{VERSION}} --cluster main
+  docker build --build-arg FEATURES="{{features}}" \
+    -t clux/kube-e2e:{{VERSION}} . -f e2e/Dockerfile
+  k3d image import clux/kube-e2e:{{VERSION}} -c=$(k3d cluster list -ojson |jq '.[0].name' -r)
   sed -i 's/latest/{{VERSION}}/g' e2e/deployment.yaml
   kubectl apply -f e2e/deployment.yaml
   sed -i 's/{{VERSION}}/latest/g' e2e/deployment.yaml
@@ -84,14 +89,8 @@ e2e-incluster features:
   kubectl wait --for=condition=complete job/e2e -n apps --timeout=50s || kubectl logs -f job/e2e -n apps
   kubectl get all -n apps
   kubectl wait --for=condition=complete job/e2e -n apps --timeout=10s || kubectl get pods -n apps | grep e2e | grep Completed
-e2e-job-musl features:
-  #!/usr/bin/env bash
-  docker run \
-    -v cargo-cache:/root/.cargo/registry \
-    -v "$PWD:/volume" -w /volume \
-    --rm -it clux/muslrust:1.86.0-stable cargo build --release --features={{features}} -p e2e
-  cp target/x86_64-unknown-linux-musl/release/job e2e/job
-  chmod +x e2e/job
+  @echo "need to not commit a sha in the deployment.yaml"
+  rg "latest" e2e/deployment.yaml -q
 
 k3d:
   k3d cluster create main --servers 1 --registry-create main --image rancher/k3s:v1.27.3-k3s1 \
@@ -127,4 +126,6 @@ bump-k8s:
   # bump mk8sv badge
   badge="[![Tested against Kubernetes ${min_dots} and above](https://img.shields.io/badge/MK8SV-${min_dots}-326ce5.svg)](https://kube.rs/kubernetes-version)"
   sd "^.+badge/MK8SV.+$" "${badge}" README.md
+  # bump K8S_OPENAPI_ENABLED_VERSION in minimal-versions recipe
+  sd "K8S_OPENAPI_ENABLED_VERSION=\S+" "K8S_OPENAPI_ENABLED_VERSION=${min_dots}" justfile
   echo "remember to bump kubernetes-version.md in kube-rs/website"

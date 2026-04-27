@@ -1,9 +1,9 @@
 //! In this example we will implement something similar to `kubectl get all`.
 
 use kube::{
-    api::{Api, DynamicObject, ResourceExt},
-    discovery::{verbs, Discovery, Scope},
     Client,
+    api::{Api, DynamicObject, ResourceExt},
+    discovery::{Discovery, Scope, verbs},
 };
 use tracing::*;
 
@@ -12,7 +12,8 @@ async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
     let client = Client::try_default().await?;
 
-    let discovery = Discovery::new(client.clone()).run().await?;
+    // Uses Aggregated Discovery API for fewer API calls (2 instead of N+2)
+    let discovery = Discovery::new(client.clone()).run_aggregated().await?;
     for group in discovery.groups() {
         for (ar, caps) in group.recommended_resources() {
             if !caps.supports_operation(verbs::LIST) {

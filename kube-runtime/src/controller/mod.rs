@@ -3,21 +3,20 @@
 use self::runner::Runner;
 use crate::{
     reflector::{
-        self, reflector,
+        self, ObjectRef, reflector,
         store::{Store, Writer},
-        ObjectRef,
     },
-    scheduler::{debounced_scheduler, ScheduleRequest},
+    scheduler::{ScheduleRequest, debounced_scheduler},
     utils::{
-        trystream_try_via, Backoff, CancelableJoinHandle, KubeRuntimeStreamExt, StreamBackoff, WatchStreamExt,
+        Backoff, CancelableJoinHandle, KubeRuntimeStreamExt, StreamBackoff, WatchStreamExt, trystream_try_via,
     },
-    watcher::{self, metadata_watcher, watcher, DefaultBackoff},
+    watcher::{self, DefaultBackoff, metadata_watcher, watcher},
 };
 use educe::Educe;
 use futures::{
-    channel,
+    FutureExt, Stream, StreamExt, TryFuture, TryFutureExt, TryStream, TryStreamExt, channel,
     future::{self, BoxFuture},
-    stream, FutureExt, Stream, StreamExt, TryFuture, TryFutureExt, TryStream, TryStreamExt,
+    stream,
 };
 use kube_client::api::{Api, DynamicObject, Resource};
 use pin_project::pin_project;
@@ -26,27 +25,58 @@ use std::{
     fmt::{Debug, Display},
     hash::Hash,
     sync::Arc,
-    task::{ready, Poll},
+    task::{Poll, ready},
     time::Duration,
 };
 use stream::BoxStream;
 use thiserror::Error;
 use tokio::{runtime::Handle, time::Instant};
-use tracing::{info_span, Instrument};
+use tracing::{Instrument, info_span};
 
 mod future_hash_map;
 mod runner;
 
+/// The reasons the internal runner can fail
 pub type RunnerError = runner::Error<reflector::store::WriterDropped>;
 
+/// Errors returned by the applier and visible in a controller stream if inspecting it
+///
+/// WARNING: These errors do not terminate `Controller::run`, and are not passed to the `reconcile` fn
+/// as they exist primarily for diagnostics.
+///
+/// To inspect these errors, you can run a `for_each` on the run stream:
+///
+/// ```compile_fail
+///    Controller::new(api, watcher_config)
+///        .run(reconcile, error_policy, context)
+///        .for_each(|res| async move {
+///            match res {
+///                Ok(o) => info!("reconciled {:?}", o),
+///                /// Reconciler errors visible here:
+///                Err(e) => warn!("reconcile failed: {}", e),
+///            }
+///        })
+///        .await;
+/// ```
 #[derive(Debug, Error)]
 pub enum Error<ReconcilerErr: 'static, QueueErr: 'static> {
+    /// A scheduled reconcile for an object refers to an object that no longer exists
+    ///
+    /// This is usually not a problem and often expected with certain relations.
+    /// See <https://github.com/kube-rs/kube/issues/1167#issuecomment-1636773541>
+    /// for a more detailed explanation of how/why this happens.
     #[error("tried to reconcile object {0} that was not found in local store")]
     ObjectNotFound(ObjectRef<DynamicObject>),
+
+    /// User's reconcile fn failed for the object
     #[error("reconciler for object {1} failed")]
     ReconcilerFailed(#[source] ReconcilerErr, ObjectRef<DynamicObject>),
+
+    /// The queue stream contained an error
     #[error("event queue error")]
     QueueError(#[source] QueueErr),
+
+    /// The internal runner returned an error
     #[error("runner error")]
     RunnerError(#[source] RunnerError),
 }
@@ -275,7 +305,9 @@ where
     Hash(bound("K::DynamicType: Hash"))
 )]
 pub struct ReconcileRequest<K: Resource> {
+    /// A reference to the object to be reconciled
     pub obj_ref: ObjectRef<K>,
+    /// The reason for why reconciliation was requested
     #[educe(PartialEq(ignore), Hash(ignore))]
     pub reason: ReconcileReason,
 }
@@ -291,15 +323,43 @@ impl<K: Resource> From<ObjectRef<K>> for ReconcileRequest<K> {
     }
 }
 
+/// The reason a reconcile was requested
+///
+/// Note that this reason is deliberately hidden from the reconciler.
+/// See <https://kube.rs/controllers/reconciler/#reasons-for-reconciliation>.
 #[derive(Debug, Clone)]
 pub enum ReconcileReason {
+    /// A custom reconcile triggered via `reconcile_on`
     Unknown,
+
+    /// The main object was updated.
     ObjectUpdated,
-    RelatedObjectUpdated { obj_ref: Box<ObjectRef<DynamicObject>> },
+
+    /// A related object was updated through a mapper
+    ///
+    /// The related object traversed its relation up to the object kind you are reconciling.
+    /// Your object may not have changed, but you may need to update child objects.
+    RelatedObjectUpdated {
+        /// An object ref to the related object
+        obj_ref: Box<ObjectRef<DynamicObject>>,
+    },
+
+    /// The users `reconcile` scheduled a reconciliation via an `Action`
     ReconcilerRequestedRetry,
+
+    /// The users `error_policy` scheduled a reconciliation via an `Action`
     ErrorPolicyRequestedRetry,
+
+    /// A bulk reconcile was requested via `reconcile_all_on`
     BulkReconcile,
-    Custom { reason: String },
+
+    /// A custom reconcile reason for custom integrations.
+    ///
+    /// Can be used when injecting elements into the queue stream directly.
+    Custom {
+        /// A user provided reason through a custom integration
+        reason: String,
+    },
 }
 
 impl Display for ReconcileReason {
@@ -333,6 +393,7 @@ const APPLIER_REQUEUE_BUF_SIZE: usize = 100;
 /// (such as triggering from arbitrary [`Stream`]s), at the cost of being a bit more verbose.
 #[allow(clippy::needless_pass_by_value)]
 #[allow(clippy::type_complexity)]
+#[allow(clippy::result_large_err)] // see #1880 as an alt; https://github.com/kube-rs/kube/pull/1880
 pub fn applier<K, QueueStream, ReconcilerFut, Ctx>(
     mut reconciler: impl FnMut(Arc<K>, Arc<Ctx>) -> ReconcilerFut,
     error_policy: impl Fn(Arc<K>, &ReconcilerFut::Error, Arc<Ctx>) -> Action,
@@ -603,9 +664,9 @@ impl Config {
 /// }
 ///
 /// /// something to drive the controller
-/// #[tokio::main]
-/// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-///     let client = Client::try_default().await?;
+///
+/// async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
+/// #   let client: Client = todo!();
 ///     let context = Arc::new(()); // bad empty context - put client in here
 ///     let cmgs = Api::<ConfigMapGenerator>::all(client.clone());
 ///     let cms = Api::<ConfigMap>::all(client.clone());
@@ -619,8 +680,8 @@ impl Config {
 ///             }
 ///         })
 ///         .await; // controller does nothing unless polled
-///     Ok(())
-/// }
+/// #    Ok(())
+/// # }
 /// ```
 pub struct Controller<K>
 where
@@ -710,8 +771,6 @@ where
     /// This allows for customized and pre-filtered watch streams to be used as a trigger,
     /// as well as sharing input streams between multiple controllers.
     ///
-    /// **NB**: This is constructor requires an [`unstable`](https://github.com/kube-rs/kube/blob/main/kube-runtime/Cargo.toml#L17-L21) feature.
-    ///
     /// # Example:
     ///
     /// ```no_run
@@ -757,8 +816,6 @@ where
     /// This allows for customized and pre-filtered watch streams to be used as a trigger,
     /// as well as sharing input streams between multiple controllers.
     ///
-    /// **NB**: This is constructor requires an [`unstable`](https://github.com/kube-rs/kube/blob/main/kube-runtime/Cargo.toml#L17-L21) feature.
-    ///
     /// Prefer [`Controller::new`] if you do not need to share the stream, or do not need pre-filtering.
     ///
     /// This variant constructor is for [`dynamic`] types found through discovery. Prefer [`Controller::for_stream`] for static types.
@@ -795,10 +852,6 @@ where
     /// streams can be created out-of-band by subscribing on a store `Writer`.
     /// Through this interface, multiple controllers can use the same root
     /// (shared) input stream of resources to keep memory overheads smaller.
-    ///
-    /// **N.B**: This constructor requires an
-    /// [`unstable`](https://github.com/kube-rs/kube/blob/main/kube-runtime/Cargo.toml#L17-L21)
-    /// feature.
     ///
     /// Prefer [`Controller::new`] or [`Controller::for_stream`] if you do not
     /// need to share the stream.
@@ -863,10 +916,6 @@ where
     /// Through this interface, multiple controllers can use the same root
     /// (shared) input stream of resources to keep memory overheads smaller.
     ///
-    /// **N.B**: This constructor requires an
-    /// [`unstable`](https://github.com/kube-rs/kube/blob/main/kube-runtime/Cargo.toml#L17-L21)
-    /// feature.
-    ///
     /// Prefer [`Controller::new`] or [`Controller::for_stream`] if you do not
     /// need to share the stream.
     ///
@@ -910,7 +959,7 @@ where
 
     /// Specify the backoff policy for "trigger" watches
     ///
-    /// This includes the core watch, as well as auxilary watches introduced by [`Self::owns`] and [`Self::watches`].
+    /// This includes the core watch, as well as auxiliary watches introduced by [`Self::owns`] and [`Self::watches`].
     ///
     /// The [`default_backoff`](crate::watcher::default_backoff) follows client-go conventions,
     /// but can be overridden by calling this method.
@@ -973,8 +1022,6 @@ where
     /// This allows for customized and pre-filtered watch streams to be used as a trigger,
     /// as well as sharing input streams between multiple controllers.
     ///
-    /// **NB**: This is constructor requires an [`unstable`](https://github.com/kube-rs/kube/blob/main/kube-runtime/Cargo.toml#L17-L21) feature.
-    ///
     /// Watcher streams passed in here should be filtered first through `touched_objects`.
     ///
     /// # Example:
@@ -1017,8 +1064,6 @@ where
     /// This allows for customized and pre-filtered watch streams to be used as a trigger,
     /// as well as sharing input streams between multiple controllers.
     ///
-    /// **NB**: This is constructor requires an [`unstable`](https://github.com/kube-rs/kube/blob/main/kube-runtime/Cargo.toml#L17-L21) feature.
-    ///
     /// Same as [`Controller::owns_stream`], but accepts a `DynamicType` so it can be used with dynamic resources.
     #[cfg(feature = "unstable-runtime-stream-control")]
     #[must_use]
@@ -1041,10 +1086,6 @@ where
     /// Through this interface, multiple controllers can use the same root
     /// (shared) input stream of resources to keep memory overheads smaller.
     ///
-    /// **N.B**: This constructor requires an
-    /// [`unstable`](https://github.com/kube-rs/kube/blob/main/kube-runtime/Cargo.toml#L17-L21)
-    /// feature.
-    ///
     /// Prefer [`Controller::new`] or [`Controller::for_stream`] if you do not
     /// need to share the stream.
     ///
@@ -1061,8 +1102,6 @@ where
     /// Conceptually the same as [`Controller::owns`], but a stream is used
     /// instead of an `Api`. This interface behaves similarly to its non-shared
     /// counterpart [`Controller::owns_stream`].
-    ///
-    /// **NB**: This is constructor requires an [`unstable`](https://github.com/kube-rs/kube/blob/main/kube-runtime/Cargo.toml#L17-L21) feature.
     ///
     /// # Example:
     ///
@@ -1121,8 +1160,6 @@ where
     /// Same as [`Controller::owns`], but instead of an `Api`, a shared stream of resources is used.
     /// The source stream can be shared between multiple controllers, optimising
     /// resource usage.
-    ///
-    /// **NB**: This is constructor requires an [`unstable`](https://github.com/kube-rs/kube/blob/main/kube-runtime/Cargo.toml#L17-L21) feature.
     ///
     /// Same as [`Controller::owns_shared_stream`], but accepts a `DynamicType` so it can be used with dynamic resources.
     #[cfg(feature = "unstable-runtime-subscribe")]
@@ -1248,8 +1285,6 @@ where
     /// This allows for customized and pre-filtered watch streams to be used as a trigger,
     /// as well as sharing input streams between multiple controllers.
     ///
-    /// **NB**: This is constructor requires an [`unstable`](https://github.com/kube-rs/kube/blob/main/kube-runtime/Cargo.toml#L17-L21) feature.
-    ///
     /// Watcher streams passed in here should be filtered first through `touched_objects`.
     ///
     /// # Example:
@@ -1302,8 +1337,6 @@ where
     /// This allows for customized and pre-filtered watch streams to be used as a trigger,
     /// as well as sharing input streams between multiple controllers.
     ///
-    /// **NB**: This is constructor requires an [`unstable`](https://github.com/kube-rs/kube/blob/main/kube-runtime/Cargo.toml#L17-L21) feature.
-    ///
     /// Same as [`Controller::watches_stream`], but accepts a `DynamicType` so it can be used with dynamic resources.
     #[cfg(feature = "unstable-runtime-stream-control")]
     #[must_use]
@@ -1330,8 +1363,6 @@ where
     /// Same as [`Controller::watches`], but instead of an `Api`, a shared
     /// stream of resources is used. This allows for sharing input streams
     /// between multiple controllers.
-    ///
-    /// **NB**: This is constructor requires an [`unstable`](https://github.com/kube-rs/kube/blob/main/kube-runtime/Cargo.toml#L17-L21) feature.
     ///
     /// Watcher streams passed in here should be filtered first through `touched_objects`.
     ///
@@ -1399,8 +1430,6 @@ where
     /// Same as [`Controller::watches`], but instead of an `Api`, a shared
     /// stream of resources is used. This allows for sharing of streams between
     /// multiple controllers.
-    ///
-    /// **NB**: This is constructor requires an [`unstable`](https://github.com/kube-rs/kube/blob/main/kube-runtime/Cargo.toml#L17-L21) feature.
     ///
     /// Same as [`Controller::watches_shared_stream`], but accepts a `DynamicType` so it can be used with dynamic resources.
     #[cfg(feature = "unstable-runtime-subscribe")]
@@ -1679,16 +1708,15 @@ where
 mod tests {
     use std::{convert::Infallible, pin::pin, sync::Arc, time::Duration};
 
-    use super::{Action, APPLIER_REQUEUE_BUF_SIZE};
+    use super::{APPLIER_REQUEUE_BUF_SIZE, Action};
     use crate::{
-        applier,
+        Config, Controller, applier,
         reflector::{self, ObjectRef},
-        watcher::{self, metadata_watcher, watcher, Event},
-        Config, Controller,
+        watcher::{self, Event, metadata_watcher, watcher},
     };
     use futures::{Stream, StreamExt, TryStreamExt};
     use k8s_openapi::api::core::v1::ConfigMap;
-    use kube_client::{core::ObjectMeta, Api, Resource};
+    use kube_client::{Api, Resource, core::ObjectMeta};
     use serde::de::DeserializeOwned;
     use tokio::time::timeout;
 

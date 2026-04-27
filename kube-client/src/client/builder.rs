@@ -1,6 +1,5 @@
 use bytes::Bytes;
-use chrono::{DateTime, Utc};
-use http::{header::HeaderMap, Request, Response};
+use http::{Request, Response, header::HeaderMap};
 use hyper::{
     body::Incoming,
     rt::{Read, Write},
@@ -12,15 +11,14 @@ use hyper_util::{
     rt::TokioExecutor,
 };
 
+use jiff::Timestamp;
 use std::time::Duration;
-use tower::{util::BoxService, BoxError, Layer, Service, ServiceBuilder};
-use tower_http::{
-    classify::ServerErrorsFailureClass, map_response_body::MapResponseBodyLayer, trace::TraceLayer,
-};
+use tower::{BoxError, Layer, Service, ServiceBuilder, ServiceExt as _, util::BoxService};
+use tower_http::{ServiceExt as _, classify::ServerErrorsFailureClass, trace::TraceLayer};
 use tracing::Span;
 
 use super::body::Body;
-use crate::{client::ConfigExt, Client, Config, Error, Result};
+use crate::{Client, Config, Error, Result, client::ConfigExt};
 
 /// HTTP body of a dynamic backing type.
 ///
@@ -31,7 +29,7 @@ pub type DynBody = dyn http_body::Body<Data = Bytes, Error = BoxError> + Send + 
 pub struct ClientBuilder<Svc> {
     service: Svc,
     default_ns: String,
-    valid_until: Option<DateTime<Utc>>,
+    valid_until: Option<Timestamp>,
 }
 
 impl<Svc> ClientBuilder<Svc> {
@@ -65,7 +63,7 @@ impl<Svc> ClientBuilder<Svc> {
     }
 
     /// Sets an expiration timestamp for the client.
-    pub fn with_valid_until(self, valid_until: Option<DateTime<Utc>>) -> Self {
+    pub fn with_valid_until(self, valid_until: Option<Timestamp>) -> Self {
         ClientBuilder {
             service: self.service,
             default_ns: self.default_ns,
@@ -126,8 +124,20 @@ impl TryFrom<Config> for ClientBuilder<GenericService> {
             Some(proxy_url) if proxy_url.scheme_str() == Some("http") => {
                 #[cfg(feature = "http-proxy")]
                 {
-                    let connector =
+                    let mut connector =
                         hyper_util::client::legacy::connect::proxy::Tunnel::new(proxy_url.clone(), connector);
+
+                    if let Some(authority) = proxy_url.authority() {
+                        if let Some((userinfo, _)) = authority.as_str().split_once('@') {
+                            use base64::Engine;
+                            use http::HeaderValue;
+
+                            let value = format!("Basic {}", base64::engine::general_purpose::STANDARD.encode(userinfo));
+                            let header = HeaderValue::from_str(&value).unwrap();
+                            connector = connector.with_auth(header);
+                        } 
+                    }
+
                     make_generic_builder(connector, config)
                 }
 
@@ -256,12 +266,11 @@ where
     let (_, expiration) = config.exec_identity_pem();
 
     let client = ClientBuilder::new(
-        BoxService::new(
-            MapResponseBodyLayer::new(|body| {
+        service
+            .map_response_body(|body| {
                 Box::new(http_body_util::BodyExt::map_err(body, BoxError::from)) as Box<DynBody>
             })
-            .layer(service),
-        ),
+            .boxed(),
         default_ns,
     )
     .with_valid_until(expiration);
@@ -275,8 +284,8 @@ mod tests {
 
     #[cfg(feature = "gzip")]
     #[tokio::test]
-    async fn test_no_accept_encoding_header_sent_when_compression_disabled(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    async fn test_no_accept_encoding_header_sent_when_compression_disabled()
+    -> Result<(), Box<dyn std::error::Error>> {
         use http::Uri;
         use std::net::SocketAddr;
         use tokio::net::{TcpListener, TcpStream};

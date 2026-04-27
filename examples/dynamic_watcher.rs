@@ -1,7 +1,7 @@
 use futures::{Stream, StreamExt, TryStreamExt};
 use kube::{
     api::{Api, ApiResource, DynamicObject, GroupVersionKind, Resource, ResourceExt},
-    runtime::{metadata_watcher, watcher, watcher::Event, WatchStreamExt},
+    runtime::{WatchStreamExt, metadata_watcher, watcher, watcher::Event},
 };
 use serde::de::DeserializeOwned;
 use tracing::*;

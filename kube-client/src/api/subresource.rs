@@ -1,10 +1,10 @@
 use futures::AsyncBufRead;
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 use std::fmt::Debug;
 
 use crate::{
-    api::{Api, Patch, PatchParams, PostParams},
     Error, Result,
+    api::{Api, Patch, PatchParams, PostParams},
 };
 
 use kube_core::response::Status;
@@ -50,10 +50,15 @@ where
     }
 
     /// Replace the scale subresource
-    pub async fn replace_scale(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<Scale> {
+    pub async fn replace_scale(&self, name: &str, pp: &PostParams, data: &Scale) -> Result<Scale> {
         let mut req = self
             .request
-            .replace_subresource("scale", name, pp, data)
+            .replace_subresource(
+                "scale",
+                name,
+                pp,
+                serde_json::to_vec(data).map_err(Error::SerdeError)?,
+            )
             .map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("replace_scale");
         self.client.request::<Scale>(req).await
@@ -76,19 +81,25 @@ where
     }
 
     /// Create an instance of the subresource
-    pub async fn create_subresource<T>(
+    pub async fn create_subresource<I, T>(
         &self,
         subresource_name: &str,
         name: &str,
         pp: &PostParams,
-        data: Vec<u8>,
+        data: &I,
     ) -> Result<T>
     where
+        I: Serialize,
         T: DeserializeOwned,
     {
         let mut req = self
             .request
-            .create_subresource(subresource_name, name, pp, data)
+            .create_subresource(
+                subresource_name,
+                name,
+                pp,
+                serde_json::to_vec(data).map_err(Error::SerdeError)?,
+            )
             .map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("create_subresource");
         self.client.request::<T>(req).await
@@ -111,16 +122,24 @@ where
     }
 
     /// Replace an instance of the subresource
-    pub async fn replace_subresource(
+    pub async fn replace_subresource<I>(
         &self,
         subresource_name: &str,
         name: &str,
         pp: &PostParams,
-        data: Vec<u8>,
-    ) -> Result<K> {
+        data: &I,
+    ) -> Result<K>
+    where
+        I: Serialize,
+    {
         let mut req = self
             .request
-            .replace_subresource(subresource_name, name, pp, data)
+            .replace_subresource(
+                subresource_name,
+                name,
+                pp,
+                serde_json::to_vec(data).map_err(Error::SerdeError)?,
+            )
             .map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("replace_subresource");
         self.client.request::<K>(req).await
@@ -155,7 +174,7 @@ where
     /// See the Kubernetes [documentation](https://kubernetes.io/docs/concepts/workloads/pods/ephemeral-containers/#what-is-an-ephemeral-container) for more details.
     ///
     /// [`Api::patch_ephemeral_containers`] may be more ergonomic, as you can will avoid having to first fetch the
-    /// existing subresources with an approriate merge strategy, see the examples for more details.
+    /// existing subresources with an appropriate merge strategy, see the examples for more details.
     ///
     /// Example of using `replace_ephemeral_containers`:
     ///
@@ -178,7 +197,7 @@ where
     /// mypod.spec.as_mut().unwrap().ephemeral_containers = Some(serde_json::from_value(serde_json::json!([
     ///    {
     ///        "name": "myephemeralcontainer",
-    ///        "image": "busybox:1.34.1",
+    ///        "image": "busybox:stable",
     ///        "command": ["sh", "-c", "sleep 20"],
     ///    },
     /// ]))?);
@@ -243,7 +262,7 @@ where
     ///    "ephemeralContainers": [
     ///    {
     ///        "name": "myephemeralcontainer",
-    ///        "image": "busybox:1.34.1",
+    ///        "image": "busybox:stable",
     ///        "command": ["sh", "-c", "sleep 20"],
     ///    },
     ///    ]
@@ -280,6 +299,152 @@ where
 
         req.extensions_mut().insert("get_ephemeralcontainers");
         self.client.request::<K>(req).await
+    }
+}
+
+// ----------------------------------------------------------------------------
+// Resize subresource
+// ----------------------------------------------------------------------------
+
+/// Marker trait for objects that support the resize sub resource.
+///
+/// The resize subresource allows updating container resource requests/limits
+/// without restarting the pod. This is available in Kubernetes 1.33+.
+///
+/// See [`Api::get_resize`], [`Api::patch_resize`], and [`Api::replace_resize`].
+///
+/// See the Kubernetes [documentation](https://kubernetes.io/docs/tasks/configure-pod-container/resize-container-resources/)
+/// and [limitations](https://kubernetes.io/docs/tasks/configure-pod-container/resize-container-resources/#limitations)
+/// for more details.
+#[cfg_attr(docsrs, doc(cfg(feature = "k8s_if_ge_1_33")))]
+pub trait Resize {}
+
+k8s_openapi::k8s_if_ge_1_33! {
+    impl Resize for k8s_openapi::api::core::v1::Pod {}
+}
+
+k8s_openapi::k8s_if_ge_1_33! {
+    impl<K> Api<K>
+    where
+        K: Clone + DeserializeOwned + Resize,
+    {
+        /// Get the named resource with the resize subresource.
+        ///
+        /// This returns the whole Pod object with current resource allocations.
+        ///
+        /// See the Kubernetes [documentation](https://kubernetes.io/docs/tasks/configure-pod-container/resize-container-resources/)
+        /// and [limitations](https://kubernetes.io/docs/tasks/configure-pod-container/resize-container-resources/#limitations)
+        /// for more details.
+        pub async fn get_resize(&self, name: &str) -> Result<K> {
+            let mut req = self
+                .request
+                .get_subresource("resize", name)
+                .map_err(Error::BuildRequest)?;
+            req.extensions_mut().insert("get_resize");
+            self.client.request::<K>(req).await
+        }
+
+        /// Patch the resize sub resource.
+        ///
+        /// This allows you to update specific container resource requirements
+        /// without fetching the entire Pod object first.
+        ///
+        /// Note that only certain container resource fields can be modified. See the
+        /// [limitations](https://kubernetes.io/docs/tasks/configure-pod-container/resize-container-resources/#limitations)
+        /// for details on what can be changed.
+        ///
+        /// # Example
+        ///
+        /// ```no_run
+        /// use kube::api::{Api, PatchParams, Patch};
+        /// use k8s_openapi::api::core::v1::Pod;
+        /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
+        /// # let client = kube::Client::try_default().await?;
+        /// let pods: Api<Pod> = Api::namespaced(client, "default");
+        /// let pp = PatchParams::default();
+        ///
+        /// let patch = serde_json::json!({
+        ///     "spec": {
+        ///         "containers": [{
+        ///             "name": "mycontainer",
+        ///             "resources": {
+        ///                 "requests": {
+        ///                     "cpu": "200m",
+        ///                     "memory": "512Mi"
+        ///                 }
+        ///             }
+        ///         }]
+        ///     }
+        /// });
+        ///
+        /// pods.patch_resize("mypod", &pp, &Patch::Strategic(patch)).await?;
+        /// # Ok(())
+        /// # }
+        /// ```
+        pub async fn patch_resize<P: serde::Serialize>(
+            &self,
+            name: &str,
+            pp: &PatchParams,
+            patch: &Patch<P>,
+        ) -> Result<K> {
+            let mut req = self
+                .request
+                .patch_subresource("resize", name, pp, patch)
+                .map_err(Error::BuildRequest)?;
+            req.extensions_mut().insert("patch_resize");
+            self.client.request::<K>(req).await
+        }
+
+        /// Replace the resize sub resource entirely.
+        ///
+        /// This works similarly to [`Api::replace`] but uses the resize subresource.
+        /// Takes a full Pod object with updated container resource requirements.
+        ///
+        /// Note that only certain container resource fields can be modified. See the
+        /// [limitations](https://kubernetes.io/docs/tasks/configure-pod-container/resize-container-resources/#limitations)
+        /// for details on what can be changed.
+        ///
+        /// # Example
+        ///
+        /// ```no_run
+        /// use k8s_openapi::api::core::v1::Pod;
+        /// use kube::{Api, api::PostParams};
+        /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
+        /// # let client = kube::Client::try_default().await?;
+        /// let pods: Api<Pod> = Api::namespaced(client, "default");
+        /// let pp = PostParams::default();
+        ///
+        /// // Get current pod
+        /// let mut pod = pods.get("mypod").await?;
+        ///
+        /// // Modify resource requirements
+        /// if let Some(spec) = &mut pod.spec &&
+        ///    let Some(container) = spec.containers.get_mut(0) &&
+        ///    let Some(resources) = &mut container.resources {
+        ///         // Update CPU/memory limits or requests
+        ///         // ...
+        /// }
+        ///
+        /// pods.replace_resize("mypod", &pp, &pod).await?;
+        /// # Ok(())
+        /// # }
+        /// ```
+        pub async fn replace_resize(&self, name: &str, pp: &PostParams, data: &K) -> Result<K>
+        where
+            K: Serialize,
+        {
+            let mut req = self
+                .request
+                .replace_subresource(
+                    "resize",
+                    name,
+                    pp,
+                    serde_json::to_vec(data).map_err(Error::SerdeError)?,
+                )
+                .map_err(Error::BuildRequest)?;
+            req.extensions_mut().insert("replace_resize");
+            self.client.request::<K>(req).await
+        }
     }
 }
 
@@ -354,14 +519,22 @@ where
     /// let mut o = jobs.get_status("baz").await?; // retrieve partial object
     /// o.status = Some(JobStatus::default()); // update the job part
     /// let pp = PostParams::default();
-    /// let o = jobs.replace_status("baz", &pp, serde_json::to_vec(&o)?).await?;
+    /// let o = jobs.replace_status("baz", &pp, &o).await?;
     /// #    Ok(())
     /// # }
     /// ```
-    pub async fn replace_status(&self, name: &str, pp: &PostParams, data: Vec<u8>) -> Result<K> {
+    pub async fn replace_status(&self, name: &str, pp: &PostParams, data: &K) -> Result<K>
+    where
+        K: Serialize,
+    {
         let mut req = self
             .request
-            .replace_subresource("status", name, pp, data)
+            .replace_subresource(
+                "status",
+                name,
+                pp,
+                serde_json::to_vec(data).map_err(Error::SerdeError)?,
+            )
             .map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("replace_status");
         self.client.request::<K>(req).await
@@ -405,7 +578,7 @@ where
 
     /// Stream the logs via [`AsyncBufRead`].
     ///
-    /// Log stream can be processsed using [`AsyncReadExt`](futures::AsyncReadExt)
+    /// Log stream can be processed using [`AsyncReadExt`](futures::AsyncReadExt)
     /// and [`AsyncBufReadExt`](futures::AsyncBufReadExt).
     ///
     /// # Example
@@ -608,5 +781,21 @@ where
             .map_err(Error::BuildRequest)?;
         let connection = self.client.connect(req).await?;
         Ok(Portforwarder::new(connection.into_stream(), ports))
+    }
+}
+
+// ----------------------------------------------------------------------------
+// Resize subresource tests
+// ----------------------------------------------------------------------------
+
+#[test]
+fn resize_path() {
+    use crate::api::{Request, Resource};
+    use k8s_openapi::api::core::v1 as corev1;
+
+    k8s_openapi::k8s_if_ge_1_33! {
+        let url = corev1::Pod::url_path(&(), Some("ns"));
+        let req = Request::new(url).get_subresource("resize", "mypod").unwrap();
+        assert_eq!(req.uri(), "/api/v1/namespaces/ns/pods/mypod/resize");
     }
 }

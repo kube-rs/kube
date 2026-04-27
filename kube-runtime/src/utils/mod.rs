@@ -9,28 +9,28 @@ mod reflect;
 mod stream_backoff;
 mod watch_ext;
 
-pub use backoff_reset_timer::{Backoff, ResetTimerBackoff};
-pub use event_decode::EventDecode;
-pub use event_modify::EventModify;
-pub use predicate::{predicates, Config as PredicateConfig, Predicate, PredicateFilter};
-pub use reflect::Reflect;
-pub use stream_backoff::StreamBackoff;
-pub use watch_ext::WatchStreamExt;
 /// Deprecated type alias for `EventDecode`
 #[deprecated(
     since = "0.96.0",
     note = "renamed to by `EventDecode`. This alias will be removed in 0.100.0."
 )]
 pub use EventDecode as EventFlatten;
+pub use backoff_reset_timer::{Backoff, ResetTimerBackoff};
+pub use event_decode::EventDecode;
+pub use event_modify::EventModify;
+pub use predicate::{Config as PredicateConfig, Predicate, PredicateFilter, predicates};
+pub use reflect::Reflect;
+pub use stream_backoff::StreamBackoff;
+pub use watch_ext::WatchStreamExt;
 
 use futures::{
-    stream::{self, Peekable},
     FutureExt, Stream, StreamExt, TryStream, TryStreamExt,
+    stream::{self, Peekable},
 };
 use pin_project::pin_project;
 use std::{
     fmt::Debug,
-    pin::{pin, Pin},
+    pin::{Pin, pin},
     sync::{Arc, Mutex},
     task::Poll,
 };
@@ -67,15 +67,11 @@ where
 {
     type Item = Case;
 
-    #[allow(clippy::mut_mutex_lock)]
     fn poll_next(
         self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Option<Self::Item>> {
         let this = self.project();
-        // this code triggers false positive in Clippy
-        // https://github.com/rust-lang/rust-clippy/issues/9415
-        // TODO: remove #[allow] once fix reaches nightly.
         let inner = this.inner.lock().unwrap();
         let mut inner = Pin::new(inner);
         let inner_peek = pin!(inner.as_mut().peek());
@@ -105,7 +101,7 @@ where
 /// Splits a `TryStream` into separate `Ok` and `Error` streams.
 ///
 /// Note: This will deadlock if one branch outlives the other
-#[allow(clippy::type_complexity, clippy::arc_with_non_send_sync)]
+#[allow(clippy::type_complexity)]
 fn trystream_split_result<S>(
     stream: S,
 ) -> (
@@ -157,6 +153,7 @@ impl<T> CancelableJoinHandle<T>
 where
     T: Send + 'static,
 {
+    /// Wrap a future in a cancelable handle, and spawn in a runtime
     pub fn spawn(future: impl Future<Output = T> + Send + 'static, runtime: &Handle) -> Self {
         CancelableJoinHandle {
             inner: runtime.spawn(future),

@@ -1,4 +1,4 @@
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use either::Either::{Left, Right};
 use garde::Validate;
 use schemars::JsonSchema;
@@ -10,9 +10,9 @@ use tracing::*;
 
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
 use kube::{
+    Client, CustomResource,
     api::{Api, DeleteParams, ListParams, Patch, PatchParams, PostParams, ResourceExt},
     core::crd::CustomResourceExt,
-    Client, CustomResource,
 };
 
 // Own custom resource
@@ -23,7 +23,7 @@ use kube::{
     spec_replicas_path = ".spec.replicas",
     status_replicas_path = ".status.replicas"
 ))]
-#[kube(printcolumn = r#"{"name":"Team", "jsonPath": ".spec.metadata.team", "type": "string"}"#)]
+#[kube(printcolumn(name = "Team", json_path = ".spec.metadata.team", type_ = "string"))]
 pub struct FooSpec {
     #[schemars(length(min = 3))]
     #[garde(length(min = 3))]
@@ -137,17 +137,12 @@ async fn main() -> Result<()> {
 
     // Update status on qux (cannot be done through replace/create/patch direct)
     info!("Replace Status on Foo instance qux");
-    let fs = json!({
-        "apiVersion": "clux.dev/v1",
-        "kind": "Foo",
-        "metadata": {
-            "name": "qux",
-            // Updates need to provide our last observed version:
-            "resourceVersion": o.resource_version(),
-        },
-        "status": FooStatus { is_bad: true, replicas: 0 }
+    let mut o = o;
+    o.status = Some(FooStatus {
+        is_bad: true,
+        replicas: 0,
     });
-    let o = foos.replace_status("qux", &pp, serde_json::to_vec(&fs)?).await?;
+    let o = foos.replace_status("qux", &pp, &o).await?;
     info!("Replaced status {:?} for {}", o.status, o.name_any());
     assert!(o.status.unwrap().is_bad);
 
@@ -212,9 +207,10 @@ async fn main() -> Result<()> {
     match foos.create(&pp, &fx).await {
         Err(kube::Error::Api(ae)) => {
             assert_eq!(ae.code, 422);
-            assert!(ae
-                .message
-                .contains("spec.name in body should be at least 3 chars long"));
+            assert!(
+                ae.message
+                    .contains("spec.name in body should be at least 3 chars long")
+            );
         }
         Err(e) => bail!("somehow got unexpected error from validation: {:?}", e),
         Ok(o) => bail!("somehow created {:?} despite validation", o),

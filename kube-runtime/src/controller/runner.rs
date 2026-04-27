@@ -78,7 +78,6 @@ where
     }
 }
 
-#[allow(clippy::match_wildcard_for_single_variants)]
 impl<T, R, F, MkF, Ready, ReadyErr> Stream for Runner<T, R, F, MkF, Ready>
 where
     T: Eq + Hash + Clone + Unpin,
@@ -120,7 +119,7 @@ where
                 match scheduler.as_mut().hold().poll_next_unpin(cx) {
                     Poll::Pending | Poll::Ready(None) => break Poll::Pending,
                     // The above future never returns Poll::Ready(Some(_)).
-                    _ => unreachable!(),
+                    Poll::Ready(_) => unreachable!(),
                 }
             }
 
@@ -159,12 +158,13 @@ where
 mod tests {
     use super::{Error, Runner};
     use crate::{
-        scheduler::{scheduler, ScheduleRequest},
+        scheduler::{ScheduleRequest, scheduler},
         utils::delayed_init::{self, DelayedInit},
     };
     use futures::{
+        SinkExt, StreamExt, TryStreamExt,
         channel::{mpsc, oneshot},
-        future, poll, stream, SinkExt, StreamExt, TryStreamExt,
+        future, poll, stream,
     };
     use std::{
         cell::RefCell,
@@ -177,7 +177,7 @@ mod tests {
     use tokio::{
         runtime::Handle,
         task::yield_now,
-        time::{advance, pause, sleep, timeout, Instant},
+        time::{Instant, advance, pause, sleep, timeout},
     };
 
     #[tokio::test]
@@ -323,15 +323,17 @@ mod tests {
         *is_ready.lock().unwrap() = true;
         delayed_init.init(());
         let mut message_counts = HashMap::new();
-        assert!(timeout(
-            Duration::from_secs(1),
-            runner.try_for_each(|msg| {
-                *message_counts.entry(msg).or_default() += 1;
-                async { Ok(()) }
-            })
-        )
-        .await
-        .is_err());
+        assert!(
+            timeout(
+                Duration::from_secs(1),
+                runner.try_for_each(|msg| {
+                    *message_counts.entry(msg).or_default() += 1;
+                    async { Ok(()) }
+                })
+            )
+            .await
+            .is_err()
+        );
         assert_eq!(message_counts, HashMap::from([('a', 1), ('b', 1)]));
     }
 

@@ -1,5 +1,5 @@
 //! Middleware types returned from `ConfigExt` methods.
-use tower::{filter::AsyncFilterLayer, util::Either, Layer};
+use tower::{Layer, filter::AsyncFilterLayer, util::Either};
 pub(crate) use tower_http::auth::AddAuthorizationLayer;
 
 mod base_uri;
@@ -29,8 +29,8 @@ mod tests {
 
     use std::{matches, pin::pin, sync::Arc};
 
-    use chrono::{Duration, Utc};
-    use http::{header::AUTHORIZATION, HeaderValue, Request, Response};
+    use http::{HeaderValue, Request, Response, header::AUTHORIZATION};
+    use jiff::{SignedDuration, Timestamp};
     use secrecy::SecretString;
     use tokio::sync::Mutex;
     use tokio_test::assert_ready_ok;
@@ -57,12 +57,12 @@ mod tests {
                 request.headers().get(AUTHORIZATION).unwrap(),
                 HeaderValue::try_from(format!("Bearer {TOKEN}")).unwrap()
             );
-            send.send_response(Response::builder().body(Body::empty()).unwrap());
+            send.send_response(Response::new(Body::empty()));
         });
 
         assert_ready_ok!(service.poll_ready());
         service
-            .call(Request::builder().uri("/").body(Body::empty()).unwrap())
+            .call(Request::get("/").body(Body::empty()).unwrap())
             .await
             .unwrap();
         spawned.await.unwrap();
@@ -75,7 +75,7 @@ mod tests {
         let (mut service, _handle) =
             mock::spawn_layer::<Request<Body>, Response<Body>, _>(AsyncFilterLayer::new(auth));
         let err = service
-            .call(Request::builder().uri("/").body(Body::empty()).unwrap())
+            .call(Request::get("/").body(Body::empty()).unwrap())
             .await
             .unwrap_err();
 
@@ -87,7 +87,7 @@ mod tests {
     }
 
     fn test_token(token: String) -> RefreshableToken {
-        let expiry = Utc::now() + Duration::try_seconds(60 * 60).unwrap();
+        let expiry = Timestamp::now() + SignedDuration::from_secs(60 * 60);
         let secret_token = SecretString::from(token);
         let info = AuthInfo {
             token: Some(secret_token.clone()),

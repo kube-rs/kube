@@ -13,7 +13,7 @@ use async_stream::stream;
 use futures::{Stream, StreamExt};
 use std::hash::Hash;
 #[cfg(feature = "unstable-runtime-subscribe")] pub use store::store_shared;
-pub use store::{store, Store};
+pub use store::{Store, store};
 
 /// Cache objects from a [`watcher()`] stream into a local [`Store`]
 ///
@@ -21,7 +21,7 @@ pub use store::{store, Store};
 /// It passes the raw [`watcher()`] stream through unmodified.
 ///
 /// ## Usage
-/// Create a [`Store`] through e.g. [`store::store()`]. The `writer` part is not-clonable,
+/// Create a [`Store`] through e.g. [`store::store()`]. The `writer` part is not-cloneable,
 /// and must be moved into the reflector. The `reader` part is the [`Store`] interface
 /// that you can send to other parts of your program as state.
 ///
@@ -109,10 +109,6 @@ pub use store::{store, Store};
 /// as [`store_shared()`]. When the store supports being subscribed on, it will
 /// broadcast an event to all active listeners after caching any object
 /// contained in the event.
-///
-/// Creating subscribers requires an
-/// [`unstable`](https://github.com/kube-rs/kube/blob/main/kube-runtime/Cargo.toml#L17-L21)
-/// feature
 pub fn reflector<K, W>(mut writer: store::Writer<K>, stream: W) -> impl Stream<Item = W::Item>
 where
     K: Lookup + Clone,
@@ -136,13 +132,13 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{reflector, store, ObjectRef};
+    use super::{ObjectRef, reflector, store};
     use crate::watcher;
-    use futures::{stream, StreamExt, TryStreamExt};
+    use futures::{StreamExt, TryStreamExt, stream};
     use k8s_openapi::{api::core::v1::ConfigMap, apimachinery::pkg::apis::meta::v1::ObjectMeta};
     use rand::{
+        RngExt,
         distr::{Bernoulli, Uniform},
-        Rng,
     };
     use std::collections::{BTreeMap, HashMap};
 

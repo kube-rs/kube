@@ -4,12 +4,12 @@ use k8s_openapi::{
     apimachinery::pkg::apis::meta::v1::OwnerReference,
 };
 use kube_core::{
+    ApiResource, ClusterResourceScope, DynamicResourceScope, NamespaceResourceScope, Resource,
     object::ObjectList,
     params::{GetParams, ListParams},
     request::Request,
-    ApiResource, ClusterResourceScope, DynamicResourceScope, NamespaceResourceScope, Resource,
 };
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 use std::fmt::Debug;
 
 /// A marker trait to indicate cluster-wide operations are available
@@ -404,11 +404,11 @@ fn url_path(r: &ApiResource, namespace: Option<String>) -> String {
 #[cfg(test)]
 mod test {
     use crate::{
+        Client,
         client::{
             client_ext::NamespacedRef as _,
             scope::{Cluster, Namespace},
         },
-        Client,
     };
 
     use super::ListParams;

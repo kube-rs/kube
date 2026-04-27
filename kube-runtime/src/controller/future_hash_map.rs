@@ -80,7 +80,7 @@ mod tests {
     use std::{future, task::Poll};
 
     use super::FutureHashMap;
-    use futures::{channel::mpsc, poll, StreamExt};
+    use futures::{StreamExt, channel::mpsc, poll};
 
     #[tokio::test]
     async fn fhm_should_forward_all_values_and_shut_down() {

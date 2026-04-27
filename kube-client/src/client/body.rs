@@ -1,13 +1,13 @@
 use std::{
     error::Error as StdError,
     fmt,
-    pin::{pin, Pin},
+    pin::{Pin, pin},
     task::{Context, Poll},
 };
 
 use bytes::Bytes;
 use http_body::{Body as HttpBody, Frame, SizeHint};
-use http_body_util::{combinators::UnsyncBoxBody, BodyExt};
+use http_body_util::{BodyExt, combinators::UnsyncBoxBody};
 
 /// A request body.
 pub struct Body {
@@ -31,12 +31,12 @@ enum Kind {
 }
 
 impl Body {
-    fn new(kind: Kind) -> Self {
+    const fn new(kind: Kind) -> Self {
         Body { kind }
     }
 
     /// Create an empty body
-    pub fn empty() -> Self {
+    pub const fn empty() -> Self {
         Self::new(Kind::Once(None))
     }
 
@@ -52,6 +52,18 @@ impl Body {
     /// Collect all the data frames and trailers of this request body and return the data frame
     pub async fn collect_bytes(self) -> Result<Bytes, crate::Error> {
         Ok(self.collect().await?.to_bytes())
+    }
+
+    /// Tries to clone a [`Body`].
+    ///
+    /// Returns the cloned `Body` when it's [`Kind::Once`].
+    pub fn try_clone(&self) -> Option<Self> {
+        match &self.kind {
+            Kind::Once(bytes) => Some(Self {
+                kind: Kind::Once(bytes.clone()),
+            }),
+            Kind::Wrap(..) => None,
+        }
     }
 }
 

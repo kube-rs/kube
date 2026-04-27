@@ -1,9 +1,9 @@
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
 use kube::{
+    Client, CustomResource, CustomResourceExt, ResourceExt,
     api::{Api, Patch, PatchParams},
     core::crd::merge_crds,
     runtime::wait::{await_condition, conditions},
-    Client, CustomResource, CustomResourceExt, ResourceExt,
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -108,7 +108,7 @@ async fn main() -> anyhow::Result<()> {
         .await
         .unwrap_err();
     info!("cannot get old on v1 anymore: {:?}", v1err); // mandatory field oldprop truncated
-                                                        // ...but the change is still there:
+    // ...but the change is still there:
     let old_still_there = v2api.get("old").await?;
     assert_eq!(old_still_there.spec.name, "i am old2");
 

@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{BTreeMap, HashMap},
     fs, io,
     path::{Path, PathBuf},
 };
@@ -27,14 +27,14 @@ pub struct Kubeconfig {
     /// General information to be use for cli interactions
     #[serde(skip_serializing_if = "Option::is_none")]
     pub preferences: Option<Preferences>,
-    /// Referencable names to cluster configs
+    /// Referenceable names to cluster configs
     #[serde(default, deserialize_with = "deserialize_null_as_default")]
     pub clusters: Vec<NamedCluster>,
-    /// Referencable names to user configs
+    /// Referenceable names to user configs
     #[serde(rename = "users")]
     #[serde(default, deserialize_with = "deserialize_null_as_default")]
     pub auth_infos: Vec<NamedAuthInfo>,
-    /// Referencable names to context configs
+    /// Referenceable names to context configs
     #[serde(default, deserialize_with = "deserialize_null_as_default")]
     pub contexts: Vec<NamedContext>,
     /// The name of the context that you would like to use by default
@@ -53,10 +53,17 @@ pub struct Kubeconfig {
     #[serde(rename = "apiVersion")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub api_version: Option<String>,
+
+    /// Additional fields not explicitly modeled, preserved for round-trip serialization.
+    ///
+    /// If you are relying on this for standard fields present in upstream client-go,
+    /// please consider submitting a PR to add them as typed fields.
+    #[serde(flatten)]
+    pub other: BTreeMap<String, serde_json::Value>,
 }
 
 /// Preferences stores extensions for cli.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct Preferences {
     /// Enable colors
@@ -65,9 +72,16 @@ pub struct Preferences {
     /// Extensions holds additional information. This is useful for extenders so that reads and writes don't clobber unknown fields.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub extensions: Option<Vec<NamedExtension>>,
+
+    /// Additional fields not explicitly modeled, preserved for round-trip serialization.
+    ///
+    /// If you are relying on this for standard fields present in upstream client-go,
+    /// please consider submitting a PR to add them as typed fields.
+    #[serde(flatten)]
+    pub other: BTreeMap<String, serde_json::Value>,
 }
 
-/// NamedExtention associates name with extension.
+/// NamedExtension associates name with extension.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct NamedExtension {
@@ -86,6 +100,13 @@ pub struct NamedCluster {
     /// Information about how to communicate with a kubernetes cluster
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cluster: Option<Cluster>,
+
+    /// Additional fields not explicitly modeled, preserved for round-trip serialization.
+    ///
+    /// If you are relying on this for standard fields present in upstream client-go,
+    /// please consider submitting a PR to add them as typed fields.
+    #[serde(flatten)]
+    pub other: BTreeMap<String, serde_json::Value>,
 }
 
 /// Cluster stores information to connect Kubernetes cluster.
@@ -128,6 +149,13 @@ pub struct Cluster {
     /// Additional information for extenders so that reads and writes don't clobber unknown fields
     #[serde(skip_serializing_if = "Option::is_none")]
     pub extensions: Option<Vec<NamedExtension>>,
+
+    /// Additional fields not explicitly modeled, preserved for round-trip serialization.
+    ///
+    /// If you are relying on this for standard fields present in upstream client-go,
+    /// please consider submitting a PR to add them as typed fields.
+    #[serde(flatten)]
+    pub other: BTreeMap<String, serde_json::Value>,
 }
 
 /// NamedAuthInfo associates name with authentication.
@@ -140,6 +168,13 @@ pub struct NamedAuthInfo {
     #[serde(rename = "user")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub auth_info: Option<AuthInfo>,
+
+    /// Additional fields not explicitly modeled, preserved for round-trip serialization.
+    ///
+    /// If you are relying on this for standard fields present in upstream client-go,
+    /// please consider submitting a PR to add them as typed fields.
+    #[serde(flatten)]
+    pub other: BTreeMap<String, serde_json::Value>,
 }
 
 fn serialize_secretstring<S>(pw: &Option<SecretString>, serializer: S) -> Result<S::Ok, S::Error>
@@ -226,10 +261,22 @@ pub struct AuthInfo {
     #[serde(rename = "as")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub impersonate: Option<String>,
+    /// The uid to impersonate.
+    #[serde(rename = "as-uid")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub impersonate_uid: Option<String>,
     /// The groups to imperonate.
     #[serde(rename = "as-groups")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub impersonate_groups: Option<Vec<String>>,
+    /// Additional information for impersonated user.
+    #[serde(rename = "as-user-extra")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub impersonate_user_extra: Option<HashMap<String, Vec<String>>>,
+
+    /// Additional information for extenders so that reads and writes don't clobber unknown fields.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extensions: Option<Vec<NamedExtension>>,
 
     /// Specifies a custom authentication plugin for the kubernetes cluster.
     #[serde(rename = "auth-provider")]
@@ -239,6 +286,13 @@ pub struct AuthInfo {
     /// Specifies a custom exec-based authentication plugin for the kubernetes cluster.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub exec: Option<ExecConfig>,
+
+    /// Additional fields not explicitly modeled, preserved for round-trip serialization.
+    ///
+    /// If you are relying on this for standard fields present in upstream client-go,
+    /// please consider submitting a PR to add them as typed fields.
+    #[serde(flatten)]
+    pub other: BTreeMap<String, serde_json::Value>,
 }
 
 #[cfg(test)]
@@ -249,7 +303,7 @@ impl PartialEq for AuthInfo {
 }
 
 /// AuthProviderConfig stores auth for specified cloud provider.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct AuthProviderConfig {
     /// Name of the auth provider
@@ -257,10 +311,17 @@ pub struct AuthProviderConfig {
     /// Auth provider configuration
     #[serde(default)]
     pub config: HashMap<String, String>,
+
+    /// Additional fields not explicitly modeled, preserved for round-trip serialization.
+    ///
+    /// If you are relying on this for standard fields present in upstream client-go,
+    /// please consider submitting a PR to add them as typed fields.
+    #[serde(flatten)]
+    pub other: BTreeMap<String, serde_json::Value>,
 }
 
 /// ExecConfig stores credential-plugin configuration.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct ExecConfig {
     /// Preferred input version of the ExecInfo.
@@ -287,7 +348,13 @@ pub struct ExecConfig {
     #[serde(skip)]
     pub drop_env: Option<Vec<String>>,
 
-    /// Interative mode of the auth plugins
+    /// This text is shown to the user when the executable doesn't seem to be present.
+    /// For example, `brew install foo-cli` might be a good InstallHint for foo-cli on Mac OS systems.
+    #[serde(rename = "installHint")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub install_hint: Option<String>,
+
+    /// Interactive mode of the auth plugins
     #[serde(rename = "interactiveMode")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub interactive_mode: Option<ExecInteractiveMode>,
@@ -304,6 +371,13 @@ pub struct ExecConfig {
     /// Should be used only when `provide_cluster_info` is True.
     #[serde(skip)]
     pub cluster: Option<ExecAuthCluster>,
+
+    /// Additional fields not explicitly modeled, preserved for round-trip serialization.
+    ///
+    /// If you are relying on this for standard fields present in upstream client-go,
+    /// please consider submitting a PR to add them as typed fields.
+    #[serde(flatten)]
+    pub other: BTreeMap<String, serde_json::Value>,
 }
 
 /// ExecInteractiveMode define the interactity of the child process
@@ -327,6 +401,13 @@ pub struct NamedContext {
     /// Associations for the context
     #[serde(skip_serializing_if = "Option::is_none")]
     pub context: Option<Context>,
+
+    /// Additional fields not explicitly modeled, preserved for round-trip serialization.
+    ///
+    /// If you are relying on this for standard fields present in upstream client-go,
+    /// please consider submitting a PR to add them as typed fields.
+    #[serde(flatten)]
+    pub other: BTreeMap<String, serde_json::Value>,
 }
 
 /// Context stores tuple of cluster and user information.
@@ -343,6 +424,13 @@ pub struct Context {
     /// Additional information for extenders so that reads and writes don't clobber unknown fields
     #[serde(skip_serializing_if = "Option::is_none")]
     pub extensions: Option<Vec<NamedExtension>>,
+
+    /// Additional fields not explicitly modeled, preserved for round-trip serialization.
+    ///
+    /// If you are relying on this for standard fields present in upstream client-go,
+    /// please consider submitting a PR to add them as typed fields.
+    #[serde(flatten)]
+    pub other: BTreeMap<String, serde_json::Value>,
 }
 
 const KUBECONFIG: &str = "KUBECONFIG";
@@ -359,30 +447,29 @@ impl Kubeconfig {
         for mut config in kubeconfig_from_yaml(&data)? {
             if let Some(dir) = path.as_ref().parent() {
                 for named in config.clusters.iter_mut() {
-                    if let Some(cluster) = &mut named.cluster {
-                        if let Some(path) = &cluster.certificate_authority {
-                            if let Some(abs_path) = to_absolute(dir, path) {
-                                cluster.certificate_authority = Some(abs_path);
-                            }
-                        }
+                    if let Some(cluster) = &mut named.cluster
+                        && let Some(path) = &cluster.certificate_authority
+                        && let Some(abs_path) = to_absolute(dir, path)
+                    {
+                        cluster.certificate_authority = Some(abs_path);
                     }
                 }
                 for named in config.auth_infos.iter_mut() {
                     if let Some(auth_info) = &mut named.auth_info {
-                        if let Some(path) = &auth_info.client_certificate {
-                            if let Some(abs_path) = to_absolute(dir, path) {
-                                auth_info.client_certificate = Some(abs_path);
-                            }
+                        if let Some(path) = &auth_info.client_certificate
+                            && let Some(abs_path) = to_absolute(dir, path)
+                        {
+                            auth_info.client_certificate = Some(abs_path);
                         }
-                        if let Some(path) = &auth_info.client_key {
-                            if let Some(abs_path) = to_absolute(dir, path) {
-                                auth_info.client_key = Some(abs_path);
-                            }
+                        if let Some(path) = &auth_info.client_key
+                            && let Some(abs_path) = to_absolute(dir, path)
+                        {
+                            auth_info.client_key = Some(abs_path);
                         }
-                        if let Some(path) = &auth_info.token_file {
-                            if let Some(abs_path) = to_absolute(dir, path) {
-                                auth_info.token_file = Some(abs_path);
-                            }
+                        if let Some(path) = &auth_info.token_file
+                            && let Some(abs_path) = to_absolute(dir, path)
+                        {
+                            auth_info.token_file = Some(abs_path);
                         }
                     }
                 }
@@ -469,6 +556,10 @@ impl Kubeconfig {
         append_new_named(&mut self.contexts, next.contexts, |x| &x.name);
         self.current_context = self.current_context.or(next.current_context);
         self.extensions = self.extensions.or(next.extensions);
+        // Merge extra fields: first-wins per key
+        for (key, value) in next.other {
+            self.other.entry(key).or_insert(value);
+        }
         Ok(self)
     }
 }
@@ -477,14 +568,13 @@ fn kubeconfig_from_yaml(text: &str) -> Result<Vec<Kubeconfig>, KubeconfigError> 
     serde_saphyr::from_multiple(text).map_err(KubeconfigError::Parse)
 }
 
-#[allow(clippy::redundant_closure)]
 fn append_new_named<T, F>(base: &mut Vec<T>, next: Vec<T>, f: F)
 where
     F: Fn(&T) -> &String,
 {
     use std::collections::HashSet;
     base.extend({
-        let existing = base.iter().map(|x| f(x)).collect::<HashSet<_>>();
+        let existing = base.iter().map(&f).collect::<HashSet<_>>();
         next.into_iter()
             .filter(|x| !existing.contains(f(x)))
             .collect::<Vec<_>>()
@@ -659,9 +749,6 @@ fn default_kube_path() -> Option<PathBuf> {
     // Rust 1.85.0 fixed the problem (https://doc.rust-lang.org/1.85.0/std/env/fn.home_dir.html),
     // Rust 1.87.0 removed the function deprecation.
     // As the MSRV was bumped to 1.85.0 we are safe to use the fixed std function.
-    // Note: We intentionally use `allow` over `expect` to support compilation on Rust >= 1.87.0
-    // Note: This can be removed once the MSRV is bumped to >= 1.87.0
-    #[allow(deprecated)]
     std::env::home_dir().map(|h| h.join(".kube").join("config"))
 }
 
@@ -697,7 +784,7 @@ mod tests {
     use crate::config::file_loader::ConfigLoader;
 
     use super::*;
-    use serde_json::{json, Value};
+    use serde_json::{Value, json};
 
     #[test]
     fn kubeconfig_merge() {
@@ -709,6 +796,7 @@ mod tests {
                     token: Some(SecretString::new("first-token".into())),
                     ..Default::default()
                 }),
+                ..Default::default()
             }],
             ..Default::default()
         };
@@ -722,6 +810,7 @@ mod tests {
                         username: Some("red-user".into()),
                         ..Default::default()
                     }),
+                    ..Default::default()
                 },
                 NamedAuthInfo {
                     name: "green-user".into(),
@@ -729,6 +818,7 @@ mod tests {
                         token: Some(SecretString::new("new-token".into())),
                         ..Default::default()
                     }),
+                    ..Default::default()
                 },
             ],
             ..Default::default()
@@ -806,7 +896,21 @@ users:
       - eks
       command: aws
       env: null
+      installHint: Please install aws cli
       provideClusterInfo: false
+    as: admin
+    as-uid: '12345'
+    as-groups:
+    - group1
+    - group2
+    as-user-extra:
+      scopes:
+      - read
+      - write
+    extensions:
+    - name: authinfo_ext
+      extension:
+        key: value
 - name: minikube
   user:
     client-certificate: /home/kevin/.minikube/profiles/minikube/client.crt
@@ -822,6 +926,26 @@ users:
             cluster1.extensions.as_ref().unwrap()[0].extension.get("provider"),
             Some(&Value::String("minikube.sigs.k8s.io".to_owned()))
         );
+
+        // Verify new AuthInfo fields (impersonate_uid, impersonate_user_extra, extensions)
+        let auth_info = config.auth_infos[0].auth_info.as_ref().unwrap();
+        assert_eq!(auth_info.impersonate.as_deref(), Some("admin"));
+        assert_eq!(auth_info.impersonate_uid.as_deref(), Some("12345"));
+        assert_eq!(
+            auth_info.impersonate_groups.as_deref(),
+            Some(["group1".to_string(), "group2".to_string()].as_slice())
+        );
+        let extra = auth_info.impersonate_user_extra.as_ref().unwrap();
+        assert_eq!(extra.get("scopes").unwrap(), &vec![
+            "read".to_string(),
+            "write".to_string()
+        ]);
+        let auth_ext = auth_info.extensions.as_ref().unwrap();
+        assert_eq!(auth_ext[0].name, "authinfo_ext");
+
+        // Verify ExecConfig.install_hint
+        let exec = auth_info.exec.as_ref().unwrap();
+        assert_eq!(exec.install_hint.as_deref(), Some("Please install aws cli"));
     }
 
     #[test]
@@ -947,9 +1071,13 @@ password: kube_rs
         token: None, token_file: None, client_certificate: None, \
         client_certificate_data: None, client_key: None, \
         client_key_data: None, impersonate: None, \
+        impersonate_uid: None, \
         impersonate_groups: None, \
+        impersonate_user_extra: None, \
+        extensions: None, \
         auth_provider: None, \
-        exec: None \
+        exec: None, \
+        other: {} \
         }";
 
         assert_eq!(authinfo_debug_output, expected_output)
@@ -1018,5 +1146,76 @@ users:
             assert_eq!(cfg.contexts[0].name, "k3d-promstack");
             assert_eq!(cfg.auth_infos[0].name, "admin@k3d-k3s-default");
         }
+    }
+
+    #[test]
+    fn kubeconfig_round_trip_preserves_unknown_fields() {
+        let yaml = r#"
+apiVersion: v1
+kind: Config
+current-context: test
+custom-top-level-field: should-be-preserved
+clusters:
+- name: test-cluster
+  cluster:
+    server: https://localhost:6443
+    certificate-authority-data: dGVzdA==
+    custom-cluster-field: cluster-extra
+contexts:
+- name: test
+  context:
+    cluster: test-cluster
+    user: test-user
+    custom-context-field: context-extra
+users:
+- name: test-user
+  user:
+    exec:
+      apiVersion: client.authentication.k8s.io/v1beta1
+      command: gke-gcloud-auth-plugin
+      provideClusterInfo: true
+      interactiveMode: IfAvailable
+      custom-exec-field: exec-extra
+"#;
+
+        let config: Kubeconfig = Kubeconfig::from_yaml(yaml).unwrap();
+
+        // Verify custom field is captured in the catch-all `other` map
+        let exec = config.auth_infos[0]
+            .auth_info
+            .as_ref()
+            .unwrap()
+            .exec
+            .as_ref()
+            .unwrap();
+        assert_eq!(
+            exec.other.get("custom-exec-field").and_then(|v| v.as_str()),
+            Some("exec-extra")
+        );
+
+        // Round-trip: serialize back to YAML
+        let serialized = serde_yaml::to_string(&config).unwrap();
+
+        // Verify unknown fields are preserved
+        assert!(
+            serialized.contains("custom-top-level-field"),
+            "top-level unknown field was lost:\n{serialized}"
+        );
+        assert!(
+            serialized.contains("custom-cluster-field"),
+            "cluster unknown field was lost:\n{serialized}"
+        );
+        assert!(
+            serialized.contains("custom-context-field"),
+            "context unknown field was lost:\n{serialized}"
+        );
+        assert!(
+            serialized.contains("custom-exec-field"),
+            "exec unknown field was lost:\n{serialized}"
+        );
+
+        // Verify re-deserialization produces the same result
+        let reparsed = Kubeconfig::from_yaml(&serialized).unwrap();
+        assert_eq!(config, reparsed);
     }
 }

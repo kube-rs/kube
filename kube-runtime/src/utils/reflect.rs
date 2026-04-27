@@ -58,7 +58,7 @@ pub(crate) mod test {
 
     use super::{Error, Event, Reflect};
     use crate::reflector;
-    use futures::{poll, stream, StreamExt};
+    use futures::{StreamExt, poll, stream};
     use k8s_openapi::api::core::v1::Pod;
 
     fn testpod(name: &str) -> Pod {

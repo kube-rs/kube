@@ -1,25 +1,23 @@
-use std::collections::HashMap;
-
 use super::TEN_SEC;
-use chrono::{TimeZone, Utc};
 use form_urlencoded::Serializer;
 use http::{
-    header::{HeaderValue, AUTHORIZATION, CONTENT_TYPE},
-    Method, Request, Uri, Version,
+    Request, Uri, Version,
+    header::{AUTHORIZATION, CONTENT_TYPE, HeaderValue},
 };
 use http_body_util::BodyExt;
 use hyper_util::{
-    client::legacy::{connect::HttpConnector, Client},
+    client::legacy::{Client, connect::HttpConnector},
     rt::TokioExecutor,
 };
 use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Deserializer};
 use serde_json::Number;
+use std::collections::HashMap;
 
 /// Possible errors when handling OIDC authentication.
 pub mod errors {
     use super::Oidc;
-    use http::{uri::InvalidUri, StatusCode};
+    use http::{StatusCode, uri::InvalidUri};
     use thiserror::Error;
 
     /// Possible errors when extracting expiration time from an ID token.
@@ -43,8 +41,12 @@ pub mod errors {
             serde_json::Error,
         ),
         /// Expiration timestamp extracted from the ID token payload is not valid.
-        #[error("invalid expiration timestamp")]
-        InvalidExpirationTimestamp,
+        #[error("invalid expiration timestamp: {0}")]
+        InvalidExpirationTimestamp(
+            #[source]
+            #[from]
+            jiff::Error,
+        ),
     }
 
     /// Possible error when initializing the ID token refreshing.
@@ -153,6 +155,7 @@ const JWT_BASE64_ENGINE: base64::engine::GeneralPurpose = base64::engine::Genera
         .with_decode_padding_mode(base64::engine::DecodePaddingMode::Indifferent),
 );
 use base64::engine::general_purpose::STANDARD as STANDARD_BASE64_ENGINE;
+use jiff::Timestamp;
 
 #[derive(Debug)]
 pub struct Oidc {
@@ -174,12 +177,9 @@ impl Oidc {
             .ok_or(errors::IdTokenError::InvalidFormat)?;
         let payload = JWT_BASE64_ENGINE.decode(part)?;
         let expiry = serde_json::from_slice::<Claims>(&payload)?.expiry;
-        let timestamp = Utc
-            .timestamp_opt(expiry, 0)
-            .earliest()
-            .ok_or(errors::IdTokenError::InvalidExpirationTimestamp)?;
+        let timestamp = Timestamp::from_second(expiry)?;
 
-        let valid = Utc::now() + TEN_SEC < timestamp;
+        let valid = Timestamp::now() + TEN_SEC < timestamp;
 
         Ok(valid)
     }
@@ -378,9 +378,7 @@ impl Refresher {
         endpoint: &str,
         auth_style: AuthStyle,
     ) -> Result<Request<String>, errors::RefreshError> {
-        let mut builder = Request::builder()
-            .uri(endpoint)
-            .method(Method::POST)
+        let mut builder = Request::post(endpoint)
             .header(
                 CONTENT_TYPE,
                 HeaderValue::from_static("application/x-www-form-urlencoded"),

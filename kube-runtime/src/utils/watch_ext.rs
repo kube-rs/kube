@@ -201,10 +201,6 @@ pub trait WatchStreamExt: Stream {
     /// the root stream have been observed. This means [`ReflectHandle`] streams
     /// can still be polled after the root stream has been dropped.
     ///
-    /// **NB**: This adapter requires an
-    /// [`unstable`](https://github.com/kube-rs/kube/blob/main/kube-runtime/Cargo.toml#L17-L21)
-    /// feature
-    ///
     /// ## Warning
     ///
     /// If the root [`Stream`] is not polled, [`ReflectHandle`] streams will
@@ -282,7 +278,7 @@ impl<St: ?Sized> WatchStreamExt for St where St: Stream {}
 #[cfg(test)]
 pub(crate) mod tests {
     use super::watcher;
-    use crate::{predicates, WatchStreamExt as _};
+    use crate::{WatchStreamExt as _, predicates};
     use futures::prelude::*;
     use k8s_openapi::api::core::v1::Pod;
     use kube_client::{Api, Resource};

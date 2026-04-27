@@ -1,10 +1,10 @@
 //! Set base URI of requests.
-use http::{uri, Request};
+use http::{Request, uri};
 use tower::{Layer, Service};
 
 /// Layer that applies [`BaseUri`] which makes all requests relative to the URI.
 ///
-/// Path in the base URI is preseved.
+/// Path in the base URI is preserved.
 #[derive(Debug, Clone)]
 pub struct BaseUriLayer {
     base_uri: http::Uri,

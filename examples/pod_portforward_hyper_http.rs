@@ -2,9 +2,9 @@ use bytes::Bytes;
 use hyper_util::rt::TokioIo;
 use k8s_openapi::api::core::v1::Pod;
 use kube::{
+    Client, ResourceExt,
     api::{Api, DeleteParams, PostParams},
     runtime::wait::{await_condition, conditions::is_pod_running},
-    Client, ResourceExt,
 };
 use tracing::*;
 
@@ -47,11 +47,9 @@ async fn main() -> anyhow::Result<()> {
         }
     });
 
-    let http_req = Request::builder()
-        .uri("/")
+    let http_req = Request::get("/")
         .header("Connection", "close")
         .header("Host", "127.0.0.1")
-        .method("GET")
         .body(http_body_util::Empty::<Bytes>::new())
         .unwrap();
 

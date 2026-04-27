@@ -1,6 +1,6 @@
 use kube::{
-    api::{Api, ApiResource, NotUsed, Object, ResourceExt},
     Client,
+    api::{Api, ApiResource, NotUsed, Object, ResourceExt},
 };
 use serde::Deserialize;
 use tracing::*;

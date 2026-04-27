@@ -1,9 +1,9 @@
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::Condition;
 use kube::{
-    core::object::{HasSpec, HasStatus},
     CustomResource, CustomResourceExt, Resource,
+    core::object::{HasSpec, HasStatus},
 };
-use schemars::{json_schema, JsonSchema};
+use schemars::{JsonSchema, json_schema};
 use serde::{Deserialize, Serialize};
 
 /// Our spec for Foo
@@ -21,12 +21,19 @@ use serde::{Deserialize, Serialize};
     status = "FooStatus",
     derive = "PartialEq",
     derive = "Default",
+    attr = "allow(deprecated)",
+    attr = "cfg_attr(docsrs,doc(cfg(feature = \"latest\")))",
     shortname = "f",
     scale(
         spec_replicas_path = ".spec.replicas",
         status_replicas_path = ".status.replicas"
     ),
-    printcolumn = r#"{"name":"Spec", "type":"string", "description":"name of foo", "jsonPath":".spec.name"}"#,
+    printcolumn(
+        name = "Spec",
+        type_ = "string",
+        description = "name of foo",
+        json_path = ".spec.name",
+    ),
     selectable = "spec.name"
 )]
 pub struct MyFoo {

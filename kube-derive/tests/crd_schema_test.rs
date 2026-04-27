@@ -2,7 +2,7 @@
 #![recursion_limit = "256"]
 
 use assert_json_diff::assert_json_eq;
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use kube::KubeSchema;
 use kube_derive::CustomResource;
 use schemars::JsonSchema;
@@ -32,6 +32,7 @@ use std::collections::{HashMap, HashSet};
     label("clux.dev/persistence", "disabled"),
     validation = "self.metadata.name == 'singleton'",
     status = "Status",
+    printcolumn(json_path = ".spec.name", name = "Spec", type_ = "string"),
     scale(
         spec_replicas_path = ".spec.replicas",
         status_replicas_path = ".status.replicas",
@@ -57,8 +58,8 @@ struct FooSpec {
     #[serde(default = "default_nullable")]
     nullable_with_default: Option<String>,
 
-    // Using feature `chrono`
-    timestamp: DateTime<Utc>,
+    // Using feature `jiff`
+    timestamp: Timestamp,
 
     /// This is a complex enum with a description
     #[x_kube(validation = "!has(self.variantOne) || self.variantOne.int > 22")]
@@ -77,6 +78,11 @@ struct FooSpec {
 
     #[x_kube(merge_strategy = ListMerge::Set)]
     x_kubernetes_set: Vec<String>,
+
+    optional_enum: Option<Gender>,
+
+    /// Preferred gender
+    optional_enum_with_doc: Option<Gender>,
 }
 
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize, JsonSchema)]
@@ -177,7 +183,7 @@ fn test_serialized_matches_expected() {
             nullable: None,
             nullable_skipped_with_default: None,
             nullable_with_default: None,
-            timestamp: DateTime::from_timestamp(0, 0).unwrap(),
+            timestamp: Timestamp::new(0, 0).unwrap(),
             complex_enum: ComplexEnum::VariantOne { int: 23 },
             untagged_enum_person: UntaggedEnumPerson::GenderAndAge(GenderAndAge {
                 age: 42,
@@ -187,6 +193,8 @@ fn test_serialized_matches_expected() {
             my_list: vec!["".into()],
             set: HashSet::from(["foo".to_owned()]),
             x_kubernetes_set: vec![],
+            optional_enum: Some(Gender::Other),
+            optional_enum_with_doc: Some(Gender::Other),
         }))
         .unwrap(),
         serde_json::json!({
@@ -222,6 +230,8 @@ fn test_serialized_matches_expected() {
                 "myList": [""],
                 "set": ["foo"],
                 "xKubernetesSet": [],
+                "optionalEnum": "Other",
+                "optionalEnumWithDoc": "Other",
             }
         })
     )
@@ -263,7 +273,11 @@ fn test_crd_schema_matches_expected() {
                         "storage": false,
                         "deprecated": true,
                         "deprecationWarning": "my warning",
-                        "additionalPrinterColumns": [],
+                        "additionalPrinterColumns": [{
+                            "jsonPath": ".spec.name",
+                            "name": "Spec",
+                            "type": "string",
+                        }],
                         "selectableFields": [{
                             "jsonPath": ".spec.nonNullable"
                         }, {
@@ -410,6 +424,25 @@ fn test_crd_schema_matches_expected() {
                                                 },
                                                 "x-kubernetes-list-type": "set",
                                             },
+                                            "optionalEnum": {
+                                                "nullable": true,
+                                                "type": "string",
+                                                "enum": [
+                                                    "Female",
+                                                    "Male",
+                                                    "Other"
+                                                ],
+                                            },
+                                            "optionalEnumWithDoc": {
+                                                "description": "Preferred gender",
+                                                "nullable": true,
+                                                "type": "string",
+                                                "enum": [
+                                                    "Female",
+                                                    "Male",
+                                                    "Other"
+                                                ],
+                                            }
                                         },
                                         "required": [
                                             "complexEnum",
@@ -474,4 +507,74 @@ fn flattening() {
         .unwrap()["spec"];
     assert_eq!(spec.x_kubernetes_preserve_unknown_fields, Some(true));
     assert_eq!(spec.additional_properties, None);
+}
+
+// Test for Option<IntOrString> nullable handling (issue #1869)
+#[derive(CustomResource, Deserialize, Serialize, Clone, Debug, JsonSchema)]
+#[kube(group = "clux.dev", version = "v1", kind = "IntOrStringTest")]
+pub struct IntOrStringTestSpec {
+    pub required_int_or_string: k8s_openapi::apimachinery::pkg::util::intstr::IntOrString,
+    pub optional_int_or_string: Option<k8s_openapi::apimachinery::pkg::util::intstr::IntOrString>,
+}
+
+// Test for deny_unknown_fields handling (issue #1828)
+#[derive(CustomResource, Deserialize, Serialize, Clone, Debug, JsonSchema)]
+#[kube(group = "clux.dev", version = "v1", kind = "DenyUnknown")]
+pub struct DenyUnknownSpec {
+    pub subitem: SubItemDenyUnknown,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SubItemDenyUnknown {
+    pub one: String,
+    pub two: bool,
+    pub three: i32,
+}
+
+#[test]
+fn deny_unknown_fields() {
+    use kube::core::CustomResourceExt;
+    let crd = DenyUnknown::crd();
+    let spec_schema = &crd.spec.versions[0]
+        .schema
+        .as_ref()
+        .unwrap()
+        .open_api_v3_schema
+        .as_ref()
+        .unwrap()
+        .properties
+        .as_ref()
+        .unwrap()["spec"];
+
+    let subitem_schema = &spec_schema.properties.as_ref().unwrap()["subitem"];
+    assert!(subitem_schema.additional_properties.is_none());
+}
+
+#[test]
+fn test_optional_int_or_string_nullable() {
+    use kube::core::CustomResourceExt;
+    let crd = IntOrStringTest::crd();
+    let spec_schema = &crd.spec.versions[0]
+        .schema
+        .as_ref()
+        .unwrap()
+        .open_api_v3_schema
+        .as_ref()
+        .unwrap()
+        .properties
+        .as_ref()
+        .unwrap()["spec"];
+
+    let properties = spec_schema.properties.as_ref().unwrap();
+
+    // Required field should have x-kubernetes-int-or-string but not nullable
+    let required = &properties["required_int_or_string"];
+    assert_eq!(required.x_kubernetes_int_or_string, Some(true));
+    assert_eq!(required.nullable, None);
+
+    // Optional field should have both x-kubernetes-int-or-string and nullable
+    let optional = &properties["optional_int_or_string"];
+    assert_eq!(optional.x_kubernetes_int_or_string, Some(true));
+    assert_eq!(optional.nullable, Some(true));
 }

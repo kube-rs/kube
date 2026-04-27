@@ -2,7 +2,7 @@
 #![allow(clippy::manual_unwrap_or_default)]
 
 use darling::{FromDeriveInput, FromMeta};
-use syn::{parse_quote, Data, DeriveInput, Path};
+use syn::{Data, DeriveInput, Path, parse_quote};
 
 /// Values we can parse from #[kube(attrs)]
 #[derive(Debug, FromDeriveInput)]
@@ -49,7 +49,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         Data::Struct(_) | Data::Enum(_) => {}
         _ => {
             return syn::Error::new_spanned(&derive_input.ident, r#"Unions can not #[derive(Resource)]"#)
-                .to_compile_error()
+                .to_compile_error();
         }
     }
     let kube_attrs = match InheritAttrs::from_derive_input(&derive_input) {

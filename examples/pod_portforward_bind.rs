@@ -12,9 +12,9 @@ use tracing::*;
 
 use k8s_openapi::api::core::v1::Pod;
 use kube::{
+    Client, ResourceExt,
     api::{Api, DeleteParams, PostParams},
     runtime::wait::{await_condition, conditions::is_pod_running},
-    Client, ResourceExt,
 };
 
 #[tokio::main]

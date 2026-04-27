@@ -1,12 +1,10 @@
 use either::Either;
 use futures::Stream;
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 use std::fmt::Debug;
 
-use crate::{api::Api, Error, Result};
-use kube_core::{
-    metadata::PartialObjectMeta, object::ObjectList, params::*, response::Status, ErrorResponse, WatchEvent,
-};
+use crate::{Error, Result, api::Api};
+use kube_core::{WatchEvent, metadata::PartialObjectMeta, object::ObjectList, params::*, response::Status};
 
 /// PUSH/PUT/POST/GET abstractions
 impl<K> Api<K>
@@ -138,7 +136,7 @@ where
     pub async fn get_opt(&self, name: &str) -> Result<Option<K>> {
         match self.get(name).await {
             Ok(obj) => Ok(Some(obj)),
-            Err(Error::Api(ErrorResponse { reason, .. })) if &reason == "NotFound" => Ok(None),
+            Err(Error::Api(status)) if status.is_not_found() => Ok(None),
             Err(err) => Err(err),
         }
     }
@@ -193,7 +191,7 @@ where
     ) -> Result<Option<PartialObjectMeta<K>>> {
         match self.get_metadata_with(name, gp).await {
             Ok(meta) => Ok(Some(meta)),
-            Err(Error::Api(ErrorResponse { reason, .. })) if &reason == "NotFound" => Ok(None),
+            Err(Error::Api(status)) if status.is_not_found() => Ok(None),
             Err(err) => Err(err),
         }
     }

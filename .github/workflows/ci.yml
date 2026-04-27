@@ -19,7 +19,7 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
       - uses: taiki-e/install-action@v2
         with:
@@ -83,7 +83,7 @@ jobs:
     runs-on: ubuntu-latest
     name: doc
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - name: Install nightly
         uses: dtolnay/rust-toolchain@nightly
       - name: cargo doc
@@ -91,11 +91,23 @@ jobs:
         env:
           RUSTDOCFLAGS: --cfg docsrs
 
+  minimal-versions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install nightly toolchain
+        uses: dtolnay/rust-toolchain@nightly
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@cargo-hack
+      - uses: extractions/setup-just@v4
+      - name: Check minimal versions
+        run: just minimal-versions
+
   msrv:
     # Run `cargo check` on our minimum supported Rust version
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - name: Find MSRV
         id: msrv
         run: |
@@ -133,10 +145,10 @@ jobs:
       matrix:
         # Run these tests against older clusters as well
         k8s:
-        - "v1.30" # MK8SV
+        - "v1.31" # MK8SV
         - "latest"
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
       # Smart caching for Rust projects.
       # Includes workaround for macos cache corruption.
@@ -154,6 +166,11 @@ jobs:
           # github-token: ${{ secrets.GITHUB_TOKEN }}
           k3d-args: "-p 10250:10250 --no-rollback --k3s-arg --disable=traefik,servicelb,metrics-server@server:*"
 
+      - name: Import test images into k3d
+        run: |
+          docker pull busybox:stable
+          k3d image import busybox:stable -c kube
+
       # Real CI work starts here
       - name: Build workspace
         run: cargo build
@@ -167,10 +184,10 @@ jobs:
         run: cargo run -p kube-examples --example crd_derive
 
   mk8sv:
-    # comile check e2e tests against mk8sv
+    # compile check e2e tests against mk8sv
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - name: Find MK8SV
         id: mk8sv
@@ -196,7 +213,7 @@ jobs:
 
       - uses: nolar/setup-k3d-k3s@v1
         with:
-          version: "v1.30" # MK8SV
+          version: "v1.31" # MK8SV
           # k3d-kube
           k3d-name: kube
           # Used to avoid rate limits when fetching the releases from k3s repo.
@@ -226,41 +243,72 @@ jobs:
       matrix:
         tls: [openssl, rustls]
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/cache@v4
+      - uses: actions/checkout@v6
+
+      - name: Setup Docker buildx
+        id: setup-buildx
+        uses: docker/setup-buildx-action@v4
+
+      # clux: i can never get the buildkit cache dance seems to work reliably so commenting it out
+      # would like to get this to work long term, but at least the build is pretty fast
+      # - uses: actions/cache@v4
+      #   id: cache
+      #   with:
+      #     path: |
+      #       target
+      #       .cargo/registry
+      #       .cargo/git
+      #     key: docker-cargo4-${{matrix.tls}}-${{ hashFiles('**/Cargo.toml', 'e2e/Dockerfile') }}
+      #     restore-keys: |
+      #       docker-cargo4-${{matrix.tls}}-
+      - name: Create folders on cache miss (blank cache always atm)
+        run: mkdir -p ~/.cargo/{git,registry} && mkdir -p target
+
+      # - name: Inject cache into docker
+      #   uses: reproducible-containers/buildkit-cache-dance@v3
+      #   with:
+      #     dockerfile: e2e/Dockerfile
+      #     builder: ${{ steps.setup-buildx.outputs.name }}
+      #     cache-map: |
+      #       {
+      #         "target": {
+      #           "target": "/app/target",
+      #           "id": "target"
+      #         },
+      #         ".cargo/registry": "/root/.cargo/registry",
+      #         ".cargo/git": "/root/.cargo/git"
+      #       }
+      #     skip-extraction: ${{ steps.cache.outputs.cache-hit }}
+
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v7
         with:
-          path: |
-            ~/.cargo/registry/index
-            ~/.cargo/registry/cache
-            ~/.cargo/git
-            target
-          key: musl-cargo-${{ hashFiles('**/Cargo.toml') }}-${{matrix.tls}}
+          context: .
+          cache-from: type=gha
+          cache-to: type=gha,mode=min
+          platforms: linux/amd64
+          push: false
+          load: true
+          file: e2e/Dockerfile
+          tags: clux/kube-e2e:${{ github.sha }}
+          build-args: |
+            FEATURES=latest,${{matrix.tls}}
 
       - uses: nolar/setup-k3d-k3s@v1
         with:
           version: latest
-          # k3d-kube
           k3d-name: kube
           # Used to avoid rate limits when fetching the releases from k3s repo.
           # Anonymous access is limited to 60 requests / hour / worker
           # github-token: ${{ secrets.GITHUB_TOKEN }}
           k3d-args: "--no-lb --no-rollback --k3s-arg --disable=traefik,servicelb,metrics-server@server:*"
-      - name: Compile e2e job against ${{matrix.tls}}
-        run: |
-          mkdir -p ~/.cargo/{git,registry}
-          docker run --rm -t \
-              --mount type=bind,source=${{ github.workspace }},target=/volume \
-              --mount type=bind,source=$HOME/.cargo/registry,target=/root/.cargo/registry \
-              --mount type=bind,source=$HOME/.cargo/git,target=/root/.cargo/git \
-              clux/muslrust:1.86.0-stable \
-              cargo build -p e2e --release --bin=job --features=latest,${{matrix.tls}} -v
-          cp target/x86_64-unknown-linux-musl/release/job e2e/
-
-      - name: Build image
-        run: "docker build -t clux/kube-e2e:${{ github.sha }} e2e/"
       - name: Import image
         run: "k3d image import clux/kube-e2e:${{ github.sha }} --cluster kube"
-      - run: sed -i 's/latest/${{ github.sha }}/g' e2e/deployment.yaml
+      - name: Template the yaml and verify we are testing what we built
+        run: |
+          sed -i 's/latest/${{ github.sha }}/g' e2e/deployment.yaml
+          grep -q "${{ github.sha }}" e2e/deployment.yaml
 
       - name: Create resource
         run: kubectl apply -f e2e/deployment.yaml -n apps

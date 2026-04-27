@@ -1,13 +1,13 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
 use kube::{
+    Client, CustomResource, CustomResourceExt, KubeSchema,
     api::{
         Api, ApiResource, DeleteParams, DynamicObject, GroupVersionKind, Patch, PatchParams, PostParams,
         WatchEvent, WatchParams,
     },
     runtime::wait::{await_condition, conditions},
-    Client, CustomResource, CustomResourceExt, KubeSchema,
 };
 use schemars::json_schema;
 use serde::{Deserialize, Serialize};
@@ -97,6 +97,13 @@ pub struct FooSpec {
     )]
     cel_validated: Option<String>,
 
+    /// Immutable field that uses optionalOldSelf
+    #[serde(default)]
+    #[x_kube(
+        validation = Rule::new("oldSelf.optMap(o, o == self).orValue(true)").optional_old_self(true).message("Immutable after creation")
+    )]
+    immutable: Option<String>,
+
     #[x_kube(validation = Rule::new("self == oldSelf").message("is immutable"))]
     foo_sub_spec: Option<FooSubSpec>,
 
@@ -126,7 +133,7 @@ fn set_listable_schema(_: &mut schemars::generate::SchemaGenerator) -> schemars:
         "type": "array",
         "items": {
             "format": "u32",
-            "minium": 0,
+            "minimum": 0,
             "type": "integer"
         },
         "x-kubernetes-list-type": "set"
@@ -181,6 +188,7 @@ async fn main() -> Result<()> {
         default_listable: Default::default(),
         set_listable: Default::default(),
         cel_validated: Default::default(),
+        immutable: Default::default(),
         foo_sub_spec: Default::default(),
         associated_default: Default::default(),
     });
@@ -230,7 +238,7 @@ async fn main() -> Result<()> {
         Some(kube::Error::Api(err)) => {
             assert_eq!(err.code, 422);
             assert_eq!(err.reason, "Invalid");
-            assert_eq!(err.status, "Failure");
+            assert!(err.is_failure());
             assert!(err.message.contains("clux.dev \"qux\" is invalid"));
             assert!(err.message.contains("spec.nonNullable: Required value"));
         }
@@ -271,7 +279,7 @@ async fn main() -> Result<()> {
         Some(kube::Error::Api(err)) => {
             assert_eq!(err.code, 422);
             assert_eq!(err.reason, "Invalid");
-            assert_eq!(err.status, "Failure");
+            assert!(err.is_failure());
             assert!(err.message.contains("Foo.clux.dev \"baz\" is invalid"));
             assert!(err.message.contains("spec.celValidated: Forbidden"));
             assert!(err.message.contains("string cannot be illegal"));
@@ -293,7 +301,7 @@ async fn main() -> Result<()> {
         Some(kube::Error::Api(err)) => {
             assert_eq!(err.code, 422);
             assert_eq!(err.reason, "Invalid");
-            assert_eq!(err.status, "Failure");
+            assert!(err.is_failure());
             assert!(err.message.contains("Foo.clux.dev \"baz\" is invalid"));
             assert!(err.message.contains("spec.celValidated: Invalid value"));
             assert!(err.message.contains("failed rule: self != 'not legal'"));
@@ -316,7 +324,7 @@ async fn main() -> Result<()> {
         Some(kube::Error::Api(err)) => {
             assert_eq!(err.code, 422);
             assert_eq!(err.reason, "Invalid");
-            assert_eq!(err.status, "Failure");
+            assert!(err.is_failure());
             assert!(err.message.contains("Foo.clux.dev \"baz\" is invalid"));
             assert!(err.message.contains("spec.fooSubSpec.field: Invalid value"));
             assert!(err.message.contains("failed rule: self != 'not legal'"));
@@ -339,7 +347,7 @@ async fn main() -> Result<()> {
         Some(kube::Error::Api(err)) => {
             assert_eq!(err.code, 422);
             assert_eq!(err.reason, "Invalid");
-            assert_eq!(err.status, "Failure");
+            assert!(err.is_failure());
             assert!(err.message.contains("Foo.clux.dev \"baz\" is invalid"));
             assert!(err.message.contains("spec.fooSubSpec.field: Invalid value"));
             assert!(err.message.contains("some pretty good reason"));
@@ -375,10 +383,10 @@ async fn main() -> Result<()> {
         Some(kube::Error::Api(err)) => {
             assert_eq!(err.code, 422);
             assert_eq!(err.reason, "Invalid");
-            assert_eq!(err.status, "Failure");
+            assert!(err.is_failure());
             assert!(err.message.contains("Foo.clux.dev \"baz\" is invalid"));
             assert!(err.message.contains("spec.fooSubSpec: Invalid value"));
-            assert!(err.message.contains("Invalid value: \"object\": is immutable"));
+            assert!(err.message.contains("Immutable after creation") || err.message.contains("is immutable"));
         }
         _ => panic!(),
     }

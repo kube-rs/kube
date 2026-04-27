@@ -2,7 +2,7 @@ use std::{pin::Pin, task::Poll};
 
 use futures::{Stream, TryStream};
 use pin_project::pin_project;
-use tokio::time::{sleep, Instant, Sleep};
+use tokio::time::{Instant, Sleep, sleep};
 
 use crate::utils::Backoff;
 
@@ -24,7 +24,6 @@ pub struct StreamBackoff<S, B> {
 #[pin_project(project = StreamBackoffStateProj)]
 // It's expected to have relatively few but long-lived `StreamBackoff`s in a project, so we would rather have
 // cheaper sleeps than a smaller `StreamBackoff`.
-#[allow(clippy::large_enum_variant)]
 enum State {
     BackingOff(#[pin] Sleep),
     GivenUp,
@@ -32,6 +31,7 @@ enum State {
 }
 
 impl<S: TryStream, B: Backoff> StreamBackoff<S, B> {
+    /// Create a stream backoff wrapper for a `Backoff` implementing object and a stream
     pub fn new(stream: S, backoff: B) -> Self {
         Self {
             stream,
@@ -103,7 +103,7 @@ pub(crate) mod tests {
 
     use super::StreamBackoff;
     use backon::BackoffBuilder;
-    use futures::{channel::mpsc, poll, stream, StreamExt};
+    use futures::{StreamExt, channel::mpsc, poll, stream};
 
     pub struct ConstantBackoff {
         inner: backon::ConstantBackoff,

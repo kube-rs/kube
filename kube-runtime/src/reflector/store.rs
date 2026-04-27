@@ -1,4 +1,5 @@
-use super::{dispatcher::Dispatcher, Lookup, ObjectRef};
+//! A reader/writer split store for reflectors
+use super::{Lookup, ObjectRef, dispatcher::Dispatcher};
 #[cfg(feature = "unstable-runtime-subscribe")]
 use crate::reflector::ReflectHandle;
 use crate::{
@@ -191,6 +192,7 @@ where
     ready_rx: Arc<DelayedInit<()>>,
 }
 
+/// The error returned by `Store::wait_until_ready`
 #[derive(Debug, Error)]
 #[error("writer was dropped before store became ready")]
 pub struct WriterDropped(delayed_init::InitDropped);
@@ -293,7 +295,6 @@ where
 /// A buffer size is used for the underlying message channel. When the buffer is
 /// full, backpressure will be applied by waiting for capacity.
 #[must_use]
-#[allow(clippy::module_name_repetitions)]
 #[cfg(feature = "unstable-runtime-subscribe")]
 pub fn store_shared<K>(buf_size: usize) -> (Store<K>, Writer<K>)
 where
@@ -307,7 +308,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{store, Writer};
+    use super::{Writer, store};
     use crate::{reflector::ObjectRef, watcher};
     use k8s_openapi::api::core::v1::ConfigMap;
     use kube_client::api::ObjectMeta;
@@ -371,7 +372,6 @@ mod tests {
             },
             ..ConfigMap::default()
         };
-        #[allow(clippy::redundant_clone)] // false positive
         let mut nsed_cm = cm.clone();
         nsed_cm.metadata.namespace = Some("ns".to_string());
         let mut store_w = Writer::default();
