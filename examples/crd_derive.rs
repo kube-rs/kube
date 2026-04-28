@@ -237,7 +237,7 @@ apiVersion: clux.dev/v1
 kind: Foo
 metadata: {}
 spec:
-  name: ''
+  name: ""
 "#;
     assert_eq!(exp.trim(), ser.trim());
 }
