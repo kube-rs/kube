@@ -48,10 +48,6 @@ allow-git = ["https://github.com/Arnavion/k8s-openapi"]
 [bans]
 multiple-versions = "deny"
 
-[[bans.skip]]
-# base64 did some annoying breaking changes
-name = "base64"
-
 [[bans.skip-tree]]
 name = "windows-sys"
 
@@ -60,3 +56,7 @@ name = "windows-sys"
 name = "thiserror"
 [[bans.skip]]
 name = "thiserror-impl"
+
+[[bans.skip]]
+# ahash hasn't had a release in 12mo
+name = "getrandom"
