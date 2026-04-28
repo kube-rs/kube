@@ -565,7 +565,7 @@ impl Kubeconfig {
 }
 
 fn kubeconfig_from_yaml(text: &str) -> Result<Vec<Kubeconfig>, KubeconfigError> {
-    serde_saphyr::from_multiple(text).map_err(KubeconfigError::Parse)
+    serde_saphyr::from_multiple(text).map_err(|e| KubeconfigError::Parse(Box::new(e)))
 }
 
 fn append_new_named<T, F>(base: &mut Vec<T>, next: Vec<T>, f: F)
@@ -936,10 +936,10 @@ users:
             Some(["group1".to_string(), "group2".to_string()].as_slice())
         );
         let extra = auth_info.impersonate_user_extra.as_ref().unwrap();
-        assert_eq!(extra.get("scopes").unwrap(), &vec![
-            "read".to_string(),
-            "write".to_string()
-        ]);
+        assert_eq!(
+            extra.get("scopes").unwrap(),
+            &vec!["read".to_string(), "write".to_string()]
+        );
         let auth_ext = auth_info.extensions.as_ref().unwrap();
         assert_eq!(auth_ext[0].name, "authinfo_ext");
 
