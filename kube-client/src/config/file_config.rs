@@ -1194,7 +1194,7 @@ users:
         );
 
         // Round-trip: serialize back to YAML
-        let serialized = serde_yaml::to_string(&config).unwrap();
+        let serialized = serde_saphyr::to_string(&config).unwrap();
 
         // Verify unknown fields are preserved
         assert!(

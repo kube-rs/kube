@@ -1,7 +1,8 @@
 //! A crate for kube's derive macros.
 #![recursion_limit = "1024"]
 extern crate proc_macro;
-#[macro_use] extern crate quote;
+#[macro_use]
+extern crate quote;
 
 mod cel_schema;
 mod custom_resource;
@@ -35,7 +36,7 @@ mod resource;
 ///     info: "informative info".into(),
 /// });
 /// println!("foo: {:?}", f); // debug print on root type
-/// println!("crd: {}", serde_yaml::to_string(&Foo::crd()).unwrap()); // crd yaml
+/// println!("crd: {}", serde_saphyr::to_string(&Foo::crd()).unwrap()); // crd yaml
 /// ```
 ///
 /// This example generates a `struct Foo` containing metadata, the spec,
