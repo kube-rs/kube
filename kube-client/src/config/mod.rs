@@ -30,17 +30,6 @@ pub struct InferConfigError {
     kubeconfig: KubeconfigError,
 }
 
-// https://github.com/dtolnay/thiserror/issues/424
-macro_rules! boxed_from {
-    ($dst_ty:ident :: $variant:ident, $src_ty:ty) => {
-        impl From<$src_ty> for $dst_ty {
-            fn from(value: $src_ty) -> Self {
-                Self::$variant(Box::new(value))
-            }
-        }
-    };
-}
-
 /// Possible errors when loading kubeconfig
 #[derive(Error, Debug)]
 pub enum KubeconfigError {
@@ -74,7 +63,7 @@ pub enum KubeconfigError {
 
     /// Failed to parse kubeconfig YAML
     #[error("failed to parse kubeconfig YAML: {0}")]
-    Parse(Box<serde_saphyr::Error>),
+    Parse(#[source] Box<serde_saphyr::Error>),
 
     /// Cluster url is missing on selected cluster
     #[error("cluster url is missing on selected cluster")]
@@ -104,7 +93,6 @@ pub enum KubeconfigError {
     #[error("failed to parse PEM-encoded certificates: {0}")]
     ParseCertificates(#[source] pem::PemError),
 }
-boxed_from!(KubeconfigError::Parse, serde_saphyr::Error);
 
 /// Errors from loading data from a base64 string or a file
 #[derive(Debug, Error)]
