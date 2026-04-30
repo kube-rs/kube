@@ -175,6 +175,133 @@ pub mod rustls_tls {
             ]
         }
     }
+
+    /// HTTP/1.1-only HTTPS connector that mirrors `hyper_rustls::HttpsConnector`
+    /// but allows specifying both an explicit ALPN advertisement and a custom
+    /// TLS server name.
+    ///
+    /// Why this exists: hyper-rustls' builder asserts that the rustls
+    /// `ClientConfig`'s `alpn_protocols` is empty in `with_tls_config`, and
+    /// only `enable_http2()` populates it afterwards. The `enable_http1()`-only
+    /// builder path therefore leaves ALPN empty -- which means no ALPN
+    /// extension is sent on the wire and a modern apiserver may still
+    /// negotiate HTTP/2. We need an explicit `http/1.1` advertisement to force
+    /// HTTP/1.1 for the upgrade transport, otherwise upgrades break.
+    ///
+    /// The `From<(H, Arc<ClientConfig>)>` impl on `hyper_rustls::HttpsConnector`
+    /// would let us bypass the assertion, but it constructs the connector
+    /// with the *default* server-name resolver and there is no public API to
+    /// swap that resolver afterwards. Users who set `Config::tls_server_name`
+    /// would silently lose SNI override on the upgrade transport, breaking
+    /// cert validation against alternate-host clusters. So we reimplement
+    /// the small TCP-then-TLS dance here over public hyper-rustls types,
+    /// which lets us honour `tls_server_name` without an upstream change.
+    pub struct H1OnlyHttpsConnector<H> {
+        http: H,
+        tls_config: std::sync::Arc<ClientConfig>,
+        server_name: Option<ServerName<'static>>,
+    }
+
+    impl<H: Clone> Clone for H1OnlyHttpsConnector<H> {
+        fn clone(&self) -> Self {
+            Self {
+                http: self.http.clone(),
+                tls_config: self.tls_config.clone(),
+                server_name: self.server_name.clone(),
+            }
+        }
+    }
+
+    impl<H> H1OnlyHttpsConnector<H> {
+        pub fn new(http: H, mut tls_config: ClientConfig, server_name: Option<ServerName<'static>>) -> Self {
+            tls_config.alpn_protocols = vec![b"http/1.1".to_vec()];
+            Self {
+                http,
+                tls_config: std::sync::Arc::new(tls_config),
+                server_name,
+            }
+        }
+    }
+
+    impl<H> tower::Service<http::Uri> for H1OnlyHttpsConnector<H>
+    where
+        H: tower::Service<http::Uri> + Send + Clone + 'static,
+        H::Response: hyper::rt::Read
+            + hyper::rt::Write
+            + hyper_util::client::legacy::connect::Connection
+            + Unpin
+            + Send
+            + 'static,
+        H::Future: Send + 'static,
+        H::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
+    {
+        type Error = std::io::Error;
+        type Future = std::pin::Pin<
+            Box<dyn std::future::Future<Output = Result<Self::Response, std::io::Error>> + Send>,
+        >;
+        type Response = hyper_rustls::MaybeHttpsStream<H::Response>;
+
+        fn poll_ready(
+            &mut self,
+            cx: &mut std::task::Context<'_>,
+        ) -> std::task::Poll<Result<(), Self::Error>> {
+            self.http
+                .poll_ready(cx)
+                .map_err(|e| std::io::Error::other(e.into()))
+        }
+
+        fn call(&mut self, dst: http::Uri) -> Self::Future {
+            // Fall back to plain HTTP for `http://` URIs, matching
+            // hyper_rustls' default behaviour.
+            if dst.scheme() == Some(&http::uri::Scheme::HTTP) {
+                let fut = self.http.call(dst);
+                return Box::pin(async move {
+                    let s = fut.await.map_err(|e| std::io::Error::other(e.into()))?;
+                    Ok(hyper_rustls::MaybeHttpsStream::Http(s))
+                });
+            }
+            if dst.scheme() != Some(&http::uri::Scheme::HTTPS) {
+                let scheme = dst.scheme().map(|s| s.to_string()).unwrap_or_default();
+                return Box::pin(async move {
+                    Err(std::io::Error::other(format!("unsupported scheme {scheme}")))
+                });
+            }
+
+            // Resolve SNI: explicit override wins, else use the URI host.
+            let sni = match self.server_name.clone() {
+                Some(name) => Ok(name),
+                None => match dst.host() {
+                    Some(host) => {
+                        // Strip surrounding brackets on IPv6 literals.
+                        let host = host.trim_start_matches('[').trim_end_matches(']');
+                        ServerName::try_from(host.to_owned()).map_err(Error::InvalidServerName)
+                    }
+                    None => {
+                        return Box::pin(async move { Err(std::io::Error::other("missing host in URI")) });
+                    }
+                },
+            };
+            let sni = match sni {
+                Ok(s) => s,
+                Err(e) => {
+                    return Box::pin(async move { Err(std::io::Error::other(e)) });
+                }
+            };
+
+            let cfg = self.tls_config.clone();
+            let connecting = self.http.call(dst);
+            Box::pin(async move {
+                let tcp = connecting.await.map_err(|e| std::io::Error::other(e.into()))?;
+                let tls = tokio_rustls::TlsConnector::from(cfg)
+                    .connect(sni, hyper_util::rt::TokioIo::new(tcp))
+                    .await
+                    .map_err(std::io::Error::other)?;
+                Ok(hyper_rustls::MaybeHttpsStream::Https(
+                    hyper_util::rt::TokioIo::new(tls),
+                ))
+            })
+        }
+    }
 }
 
 #[cfg(feature = "openssl-tls")]

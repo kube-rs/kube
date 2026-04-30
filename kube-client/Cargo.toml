@@ -13,7 +13,7 @@ categories = ["web-programming::http-client", "network-programming", "api-bindin
 
 [features]
 default = ["client", "ring"]
-rustls-tls = ["rustls", "hyper-rustls"]
+rustls-tls = ["rustls", "hyper-rustls", "tokio-rustls"]
 webpki-roots = ["hyper-rustls/webpki-roots"]
 aws-lc-rs = ["hyper-rustls?/aws-lc-rs"]
 ring = ["hyper-rustls?/ring"]
@@ -57,6 +57,7 @@ jiff = { workspace = true, optional = true, features = ["std", "serde"] }
 pem = { workspace = true, optional = true }
 openssl = { workspace = true, optional = true }
 rustls = { workspace = true, optional = true }
+tokio-rustls = { version = "0.26", default-features = false, optional = true }
 bytes = { workspace = true, optional = true }
 tokio = { workspace = true, features = ["time", "signal", "sync", "rt"], optional = true }
 kube-core = { path = "../kube-core", version = "=3.1.0" }
