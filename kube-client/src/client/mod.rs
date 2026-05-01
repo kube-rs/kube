@@ -610,6 +610,7 @@ mod tests {
             auth_infos: vec![NamedAuthInfo {
                 name: "test-user".to_string(),
                 auth_info: Some(AuthInfo::default()), // <-- empty but valid
+                ..Default::default()
             }],
             contexts: vec![NamedContext {
                 name: "test-context".to_string(),
@@ -619,6 +620,7 @@ mod tests {
                     namespace: Some("test-namespace".to_string()),
                     ..Default::default()
                 }),
+                ..Default::default()
             }],
             clusters: vec![NamedCluster {
                 name: "test-cluster".to_string(),
@@ -626,6 +628,7 @@ mod tests {
                     server: Some("http://localhost:8080".to_string()),
                     ..Default::default()
                 }),
+                ..Default::default()
             }],
             ..Default::default()
         };
