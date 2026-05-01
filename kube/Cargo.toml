@@ -80,6 +80,7 @@ tokio = { workspace = true, features = ["full"] }
 futures.workspace = true
 serde_json.workspace = true
 serde = { workspace = true, features = ["derive"] }
+serde-saphyr.workspace = true
 schemars.workspace = true
 http.workspace = true
 tower-test.workspace = true

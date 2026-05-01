@@ -486,7 +486,7 @@ impl Kubeconfig {
 
     /// Read a Config from an arbitrary YAML string
     ///
-    /// This is preferable to using serde_yaml::from_str() because it will correctly
+    /// This is preferable to using serde_saphyr::from_str() because it will correctly
     /// parse multi-document YAML text and merge them into a single `Kubeconfig`
     pub fn from_yaml(text: &str) -> Result<Kubeconfig, KubeconfigError> {
         kubeconfig_from_yaml(text)?
@@ -565,13 +565,7 @@ impl Kubeconfig {
 }
 
 fn kubeconfig_from_yaml(text: &str) -> Result<Vec<Kubeconfig>, KubeconfigError> {
-    let mut documents = vec![];
-    for doc in serde_yaml::Deserializer::from_str(text) {
-        let value = serde_yaml::Value::deserialize(doc).map_err(KubeconfigError::Parse)?;
-        let kubeconfig = serde_yaml::from_value(value).map_err(KubeconfigError::InvalidStructure)?;
-        documents.push(kubeconfig);
-    }
-    Ok(documents)
+    serde_saphyr::from_multiple(text).map_err(|e| KubeconfigError::Parse(Box::new(e)))
 }
 
 fn append_new_named<T, F>(base: &mut Vec<T>, next: Vec<T>, f: F)
@@ -942,10 +936,10 @@ users:
             Some(["group1".to_string(), "group2".to_string()].as_slice())
         );
         let extra = auth_info.impersonate_user_extra.as_ref().unwrap();
-        assert_eq!(extra.get("scopes").unwrap(), &vec![
-            "read".to_string(),
-            "write".to_string()
-        ]);
+        assert_eq!(
+            extra.get("scopes").unwrap(),
+            &vec!["read".to_string(), "write".to_string()]
+        );
         let auth_ext = auth_info.extensions.as_ref().unwrap();
         assert_eq!(auth_ext[0].name, "authinfo_ext");
 
@@ -1058,7 +1052,7 @@ users:
 username: user
 password: 
 "#;
-        let authinfo: AuthInfo = serde_yaml::from_str(authinfo_yaml).unwrap();
+        let authinfo: AuthInfo = serde_saphyr::from_str(authinfo_yaml).unwrap();
         assert_eq!(authinfo.username, Some("user".to_string()));
         assert!(authinfo.password.is_none());
     }
@@ -1069,7 +1063,7 @@ password:
 username: user
 password: kube_rs
 "#;
-        let authinfo: AuthInfo = serde_yaml::from_str(authinfo_yaml).unwrap();
+        let authinfo: AuthInfo = serde_saphyr::from_str(authinfo_yaml).unwrap();
         let authinfo_debug_output = format!("{authinfo:?}");
         let expected_output = "AuthInfo { \
         username: Some(\"user\"), \
@@ -1200,7 +1194,7 @@ users:
         );
 
         // Round-trip: serialize back to YAML
-        let serialized = serde_yaml::to_string(&config).unwrap();
+        let serialized = serde_saphyr::to_string(&config).unwrap();
 
         // Verify unknown fields are preserved
         assert!(
