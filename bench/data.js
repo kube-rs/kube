@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776093211609,
+  "lastUpdate": 1777650250370,
   "repoUrl": "https://github.com/kube-rs/kube",
   "entries": {
     "Benchmark": [
@@ -1211,6 +1211,105 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/kube-rs/kube/commit/796b90d7a5f75d7f104dd2e5cda3eb337efe4ad1"
         },
         "date": 1776093210323,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "init_listwatch - peak_bytes",
+            "value": 55194619,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - total_allocated",
+            "value": 76715088,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - alloc_count",
+            "value": 578023,
+            "unit": "allocations"
+          },
+          {
+            "name": "steady_state - peak_bytes",
+            "value": 71381202,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - total_allocated",
+            "value": 109519220,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - alloc_count",
+            "value": 799021,
+            "unit": "allocations"
+          },
+          {
+            "name": "relist - peak_bytes",
+            "value": 99797302,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - total_allocated",
+            "value": 174518628,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - alloc_count",
+            "value": 1189035,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_without_modify - peak_bytes",
+            "value": 141298836,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - total_allocated",
+            "value": 205865000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - alloc_count",
+            "value": 1298020,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_with_modify - peak_bytes",
+            "value": 134853452,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - total_allocated",
+            "value": 162895000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - alloc_count",
+            "value": 1058021,
+            "unit": "allocations"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "sszynrae@gmail.com",
+            "name": "Eirik A",
+            "username": "clux"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e7060a8713aabaa209cb004f49f1ab4d13ff2226",
+          "message": "convert from serde-yaml to serde-saphyr (#1975)\n\n* Use serde-saphyr in kube-client\n\nSigned-off-by: John Vandenberg <jayvdb@gmail.com>\n\n* Update deny.toml\n\nSigned-off-by: John Vandenberg <jayvdb@gmail.com>\n\n* Apply suggestion from @clux\n\nSigned-off-by: Eirik A <sszynrae@gmail.com>\n\n* convert stray examples to saphyr\n\nSigned-off-by: clux <sszynrae@gmail.com>\n\n* minimal versions\n\nSigned-off-by: clux <sszynrae@gmail.com>\n\n* deny fix\n\nSigned-off-by: clux <sszynrae@gmail.com>\n\n* fmt + example test\n\nSigned-off-by: clux <sszynrae@gmail.com>\n\n* box big saphyr error\n\nSigned-off-by: clux <sszynrae@gmail.com>\n\n* actually don't need the boxed_from\n\nSigned-off-by: clux <sszynrae@gmail.com>\n\n* source does not add anything here\n\nSigned-off-by: clux <sszynrae@gmail.com>\n\n---------\n\nSigned-off-by: John Vandenberg <jayvdb@gmail.com>\nSigned-off-by: Eirik A <sszynrae@gmail.com>\nSigned-off-by: clux <sszynrae@gmail.com>\nCo-authored-by: John Vandenberg <jayvdb@gmail.com>",
+          "timestamp": "2026-05-01T16:42:00+01:00",
+          "tree_id": "36dd23f6fa0dffa44a53895d15b15bd58cb03705",
+          "url": "https://github.com/kube-rs/kube/commit/e7060a8713aabaa209cb004f49f1ab4d13ff2226"
+        },
+        "date": 1777650249370,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
