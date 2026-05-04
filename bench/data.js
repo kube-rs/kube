@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1777886521075,
+  "lastUpdate": 1777919939910,
   "repoUrl": "https://github.com/kube-rs/kube",
   "entries": {
     "Benchmark": [
@@ -1508,6 +1508,105 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/kube-rs/kube/commit/26a42f2b95d7276ee11e95de0d68a7776748b321"
         },
         "date": 1777886519148,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "init_listwatch - peak_bytes",
+            "value": 55194619,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - total_allocated",
+            "value": 76715088,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - alloc_count",
+            "value": 578023,
+            "unit": "allocations"
+          },
+          {
+            "name": "steady_state - peak_bytes",
+            "value": 71381202,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - total_allocated",
+            "value": 109519220,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - alloc_count",
+            "value": 799021,
+            "unit": "allocations"
+          },
+          {
+            "name": "relist - peak_bytes",
+            "value": 99797302,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - total_allocated",
+            "value": 174518628,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - alloc_count",
+            "value": 1189035,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_without_modify - peak_bytes",
+            "value": 141298836,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - total_allocated",
+            "value": 205865000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - alloc_count",
+            "value": 1298020,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_with_modify - peak_bytes",
+            "value": 134853452,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - total_allocated",
+            "value": 162895000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - alloc_count",
+            "value": 1058021,
+            "unit": "allocations"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "17420369+chrnorm@users.noreply.github.com",
+            "name": "Chris Norman",
+            "username": "chrnorm"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "819d08abb6311c5426993adc0290835aa43d47e6",
+          "message": "client: reload in-cluster CA bundle on rotation (rustls-tls) (#1962)\n\nfeat(client): reload in-cluster CA bundle on rotation (rustls-tls)\n\nConfig::incluster() reads /var/run/secrets/kubernetes.io/serviceaccount/ca.crt\nonce and bakes the bytes into a RootCertStore. After CA rotation, new TLS\nhandshakes fail until the process restarts.\n\nTokenFile already re-reads the sibling token file in that same projected\nvolume every 60s. This adds the symmetric piece for ca.crt:\n\n- Config.root_cert_file: Option<PathBuf>, set by Config::incluster()\n- ReloadingVerifier: ServerCertVerifier that rebuilds an inner\n  WebPkiServerVerifier on a 60s timer, keeps stale roots on reload failure\n- rustls-tls only; openssl-tls unchanged\n\nConfig is now #[non_exhaustive] so this field addition (and future ones)\ndoesn't break downstream struct literals again.\n\nCloses #1953\n\nSigned-off-by: Chris Norman <chrisnorman@anthropic.com>\nSigned-off-by: Eirik A <sszynrae@gmail.com>\nCo-authored-by: Eirik A <sszynrae@gmail.com>",
+          "timestamp": "2026-05-04T19:37:53+01:00",
+          "tree_id": "807cc1937055695abcd9e91b6c5282261b70f829",
+          "url": "https://github.com/kube-rs/kube/commit/819d08abb6311c5426993adc0290835aa43d47e6"
+        },
+        "date": 1777919938812,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
