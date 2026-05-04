@@ -24,6 +24,8 @@ rustls-tls = ["kube-client/rustls-tls", "client"]
 
 ## legacy tls stack (must disable rustls-tls to use)
 openssl-tls = ["kube-client/openssl-tls", "client"]
+## enable hyper-util's internal tracing spans in the HTTP client stack
+hyper-util-tracing = ["kube-client/hyper-util-tracing", "client"]
 ## aws rustls provider
 aws-lc-rs = ["kube-client?/aws-lc-rs"]
 ## ring rustls provider
