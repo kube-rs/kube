@@ -208,7 +208,11 @@ impl ConfigExt for Config {
 
     #[cfg(feature = "rustls-tls")]
     fn rustls_client_config(&self) -> Result<rustls::ClientConfig> {
-        let identity = self.exec_identity_pem().0.or_else(|| self.identity_pem());
+        let identity = match self.exec_identity_pem().0 {
+            Some(identity) => Some(identity),
+            None => self.identity_pem()?,
+        };
+
         tls::rustls_tls::rustls_client_config(
             identity.as_deref(),
             self.root_cert.as_deref(),
@@ -250,7 +254,11 @@ impl ConfigExt for Config {
 
     #[cfg(feature = "openssl-tls")]
     fn openssl_ssl_connector_builder(&self) -> Result<openssl::ssl::SslConnectorBuilder> {
-        let identity = self.exec_identity_pem().0.or_else(|| self.identity_pem());
+        let identity = match self.exec_identity_pem().0 {
+            Some(identity) => Some(identity),
+            None => self.identity_pem()?,
+        };
+        
         // TODO: pass self.tls_server_name for openssl
         tls::openssl_tls::ssl_connector_builder(identity.as_ref(), self.root_cert.as_ref())
             .map_err(|e| Error::OpensslTls(tls::openssl_tls::Error::CreateSslConnector(e)))
