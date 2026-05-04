@@ -133,10 +133,8 @@ pub mod rustls_tls {
         }
 
         fn load(path: &PathBuf) -> Result<Arc<WebPkiServerVerifier>, Error> {
-            let pem =
-                std::fs::read(path).map_err(|e| Error::AddRootCertificate(Box::new(e)))?;
-            let ders = crate::config::certs(&pem)
-                .map_err(|e| Error::AddRootCertificate(Box::new(e)))?;
+            let pem = std::fs::read(path).map_err(|e| Error::AddRootCertificate(Box::new(e)))?;
+            let ders = crate::config::certs(&pem).map_err(|e| Error::AddRootCertificate(Box::new(e)))?;
             let mut store = RootCertStore::empty();
             for der in ders {
                 store
@@ -150,7 +148,7 @@ pub mod rustls_tls {
 
         fn current(&self) -> Arc<WebPkiServerVerifier> {
             {
-                let guard = self.inner.read().unwrap();
+                let guard = self.inner.read().unwrap_or_else(|e| e.into_inner());
                 if guard.1.elapsed() < Self::RELOAD_INTERVAL {
                     return guard.0.clone();
                 }
@@ -240,8 +238,7 @@ FRU=
         fn expire(v: &ReloadingVerifier) {
             // Can't move Instant backwards; instead, reach past the guard.
             // The test pokes private state the same way auth::tests::token_file does.
-            v.inner.write().unwrap().1 =
-                Instant::now().checked_sub(Duration::from_secs(120)).unwrap();
+            v.inner.write().unwrap().1 = Instant::now().checked_sub(Duration::from_secs(120)).unwrap();
         }
 
         #[test]
