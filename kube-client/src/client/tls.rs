@@ -1,9 +1,18 @@
 #[cfg(feature = "rustls-tls")]
 pub mod rustls_tls {
+    use std::{
+        path::PathBuf,
+        sync::{Arc, RwLock},
+        time::{Duration, Instant},
+    };
+
     use hyper_rustls::ConfigBuilderExt;
     use rustls::{
-        self, ClientConfig, DigitallySignedStruct,
-        client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier},
+        self, ClientConfig, DigitallySignedStruct, RootCertStore,
+        client::{
+            WebPkiServerVerifier,
+            danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier},
+        },
         pki_types::{CertificateDer, InvalidDnsNameError, PrivateKeyDer, ServerName},
     };
     use thiserror::Error;
@@ -92,6 +101,174 @@ pub mod rustls_tls {
                 .map_err(|e| Error::AddRootCertificate(Box::new(e)))?;
         }
         Ok(root_store)
+    }
+
+    /// A [`ServerCertVerifier`] that re-reads the CA bundle file roughly once
+    /// per minute to pick up CA rotation.
+    ///
+    /// This mirrors the token-file reload behaviour in
+    /// [`crate::client::auth::TokenFile`]: the service-account `ca.crt` lives
+    /// in the same projected volume and rotates under the same mechanism.
+    /// Existing TLS connections are unaffected (they already handshook); new
+    /// connections use the freshly loaded roots.
+    ///
+    /// If a reload fails (file missing, parse error), the last successfully
+    /// loaded verifier is retained — same policy as `TokenFile`, per
+    /// <https://github.com/kubernetes/kubernetes/issues/68164>.
+    #[derive(Debug)]
+    pub(crate) struct ReloadingVerifier {
+        path: PathBuf,
+        inner: RwLock<(Arc<WebPkiServerVerifier>, Instant)>,
+    }
+
+    impl ReloadingVerifier {
+        const RELOAD_INTERVAL: Duration = Duration::from_secs(60);
+
+        pub(crate) fn new(path: PathBuf) -> Result<Self, Error> {
+            let verifier = Self::load(&path)?;
+            Ok(Self {
+                path,
+                inner: RwLock::new((verifier, Instant::now())),
+            })
+        }
+
+        fn load(path: &PathBuf) -> Result<Arc<WebPkiServerVerifier>, Error> {
+            let pem =
+                std::fs::read(path).map_err(|e| Error::AddRootCertificate(Box::new(e)))?;
+            let ders = crate::config::certs(&pem)
+                .map_err(|e| Error::AddRootCertificate(Box::new(e)))?;
+            let mut store = RootCertStore::empty();
+            for der in ders {
+                store
+                    .add(CertificateDer::from(der))
+                    .map_err(|e| Error::AddRootCertificate(Box::new(e)))?;
+            }
+            WebPkiServerVerifier::builder(Arc::new(store))
+                .build()
+                .map_err(|e| Error::AddRootCertificate(Box::new(e)))
+        }
+
+        fn current(&self) -> Arc<WebPkiServerVerifier> {
+            {
+                let guard = self.inner.read().unwrap();
+                if guard.1.elapsed() < Self::RELOAD_INTERVAL {
+                    return guard.0.clone();
+                }
+            }
+            let mut guard = self.inner.write().unwrap();
+            if guard.1.elapsed() < Self::RELOAD_INTERVAL {
+                return guard.0.clone();
+            }
+            if let Ok(fresh) = Self::load(&self.path) {
+                guard.0 = fresh;
+            } else {
+                tracing::warn!(path = ?self.path, "failed to reload CA bundle; keeping stale roots");
+            }
+            guard.1 = Instant::now();
+            guard.0.clone()
+        }
+    }
+
+    impl ServerCertVerifier for ReloadingVerifier {
+        fn verify_server_cert(
+            &self,
+            end_entity: &CertificateDer,
+            intermediates: &[CertificateDer],
+            server_name: &ServerName,
+            ocsp_response: &[u8],
+            now: rustls::pki_types::UnixTime,
+        ) -> Result<ServerCertVerified, rustls::Error> {
+            self.current()
+                .verify_server_cert(end_entity, intermediates, server_name, ocsp_response, now)
+        }
+
+        fn verify_tls12_signature(
+            &self,
+            message: &[u8],
+            cert: &CertificateDer,
+            dss: &DigitallySignedStruct,
+        ) -> Result<HandshakeSignatureValid, rustls::Error> {
+            self.current().verify_tls12_signature(message, cert, dss)
+        }
+
+        fn verify_tls13_signature(
+            &self,
+            message: &[u8],
+            cert: &CertificateDer,
+            dss: &DigitallySignedStruct,
+        ) -> Result<HandshakeSignatureValid, rustls::Error> {
+            self.current().verify_tls13_signature(message, cert, dss)
+        }
+
+        fn supported_verify_schemes(&self) -> Vec<rustls::SignatureScheme> {
+            self.current().supported_verify_schemes()
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        // EC P-256 self-signed CAs, valid until 2126. Regenerate with:
+        //   openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes \
+        //     -keyout /dev/null -out ca.pem -days 36500 -subj "/CN=test-ca-N"
+        const CA1: &str = "-----BEGIN CERTIFICATE-----
+MIIBgDCCASWgAwIBAgIUVrQf5d//S01a0fbXxYRIx9wc0VQwCgYIKoZIzj0EAwIw
+FDESMBAGA1UEAwwJdGVzdC1jYS0xMCAXDTI2MDMwNDEzMDk1MFoYDzIxMjYwMjA4
+MTMwOTUwWjAUMRIwEAYDVQQDDAl0ZXN0LWNhLTEwWTATBgcqhkjOPQIBBggqhkjO
+PQMBBwNCAARg57mWJPDsAIEQAgXqMOOfjMQP+PE9HqcZobycO8z94r/uRuV0wKx/
+0SvMsKFtnreut0bjgFtmZaWY+6d87Is9o1MwUTAdBgNVHQ4EFgQUjtGuhkM7LtHB
+gMPCJIxMwbY69OQwHwYDVR0jBBgwFoAUjtGuhkM7LtHBgMPCJIxMwbY69OQwDwYD
+VR0TAQH/BAUwAwEB/zAKBggqhkjOPQQDAgNJADBGAiEAj/WzNVJDg/cBtLqQVM77
+tkB+QyIXLG3Vi9Xj1YfW9QECIQDDFW8yFtgLeCg2Zhr4xQNq3/24r/01kI2rjFPO
+xBkDMw==
+-----END CERTIFICATE-----
+";
+        const CA2: &str = "-----BEGIN CERTIFICATE-----
+MIIBfjCCASWgAwIBAgIUZ7Qsiwan2joRz01p25/cy1XNNiwwCgYIKoZIzj0EAwIw
+FDESMBAGA1UEAwwJdGVzdC1jYS0yMCAXDTI2MDMwNDEzMDk1MFoYDzIxMjYwMjA4
+MTMwOTUwWjAUMRIwEAYDVQQDDAl0ZXN0LWNhLTIwWTATBgcqhkjOPQIBBggqhkjO
+PQMBBwNCAARJle2/yiOD5zp0UkjZg9Yy6ZHBItTLrqv/uzB2YMQg03frnqEUMzSV
+mFinosBcGpX/dPGfHNPhBMOpHmlocZu9o1MwUTAdBgNVHQ4EFgQUsqG0hSGDYsz2
+eGIsLIwJnCR5SFIwHwYDVR0jBBgwFoAUsqG0hSGDYsz2eGIsLIwJnCR5SFIwDwYD
+VR0TAQH/BAUwAwEB/zAKBggqhkjOPQQDAgNHADBEAiApvLu9DIC3/K/+G9ooOm75
+a72Cjw62aM8NfPe7ILs8SgIgL0VHe6ksTyB176RECCm3MJVnlhOop6b1tNvxjrru
+FRU=
+-----END CERTIFICATE-----
+";
+
+        fn expire(v: &ReloadingVerifier) {
+            // Can't move Instant backwards; instead, reach past the guard.
+            // The test pokes private state the same way auth::tests::token_file does.
+            v.inner.write().unwrap().1 =
+                Instant::now().checked_sub(Duration::from_secs(120)).unwrap();
+        }
+
+        #[test]
+        fn reloading_verifier() {
+            #[cfg(feature = "aws-lc-rs")]
+            let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+
+            let file = tempfile::NamedTempFile::new().unwrap();
+            std::fs::write(file.path(), CA1).unwrap();
+
+            let verifier = ReloadingVerifier::new(file.path().to_path_buf()).unwrap();
+            let first = verifier.current();
+
+            // File changed but we're still within the reload interval: no reload.
+            std::fs::write(file.path(), CA2).unwrap();
+            assert!(Arc::ptr_eq(&verifier.current(), &first));
+
+            // Force expiry: reload picks up CA2.
+            expire(&verifier);
+            let second = verifier.current();
+            assert!(!Arc::ptr_eq(&second, &first));
+
+            // File gone, expired again: keep stale verifier.
+            drop(file);
+            expire(&verifier);
+            assert!(Arc::ptr_eq(&verifier.current(), &second));
+        }
     }
 
     fn client_auth(data: &[u8]) -> Result<(Vec<CertificateDer<'static>>, PrivateKeyDer<'static>), Error> {
