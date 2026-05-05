@@ -681,7 +681,7 @@ mod test {
               name: gcp
         "#
         );
-        let config: Kubeconfig = serde_yaml::from_str(&test_file).unwrap();
+        let config: Kubeconfig = serde_saphyr::from_str(&test_file).unwrap();
         config.auth_infos[0].auth_info.clone().unwrap()
     }
 

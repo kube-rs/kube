@@ -63,11 +63,7 @@ pub enum KubeconfigError {
 
     /// Failed to parse kubeconfig YAML
     #[error("failed to parse kubeconfig YAML: {0}")]
-    Parse(#[source] serde_yaml::Error),
-
-    /// The structure of the parsed kubeconfig is invalid
-    #[error("the structure of the parsed kubeconfig is invalid: {0}")]
-    InvalidStructure(#[source] serde_yaml::Error),
+    Parse(Box<serde_saphyr::Error>),
 
     /// Cluster url is missing on selected cluster
     #[error("cluster url is missing on selected cluster")]
@@ -128,6 +124,7 @@ pub enum LoadDataError {
 /// If you are looking to parse the kubeconfig found in a user's home directory see [`Kubeconfig`].
 #[cfg_attr(docsrs, doc(cfg(feature = "config")))]
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct Config {
     /// The configured cluster url
     pub cluster_url: http::Uri,
@@ -135,6 +132,15 @@ pub struct Config {
     pub default_namespace: String,
     /// The configured root certificate
     pub root_cert: Option<Vec<Vec<u8>>>,
+    /// Path to the root certificate bundle file.
+    ///
+    /// When set and the `rustls-tls` feature is enabled, the file is re-read
+    /// periodically (~60 s) to pick up CA rotation, mirroring how
+    /// `token_file` is reloaded. This takes precedence over `root_cert` for
+    /// server certificate verification.
+    ///
+    /// Set automatically by [`Config::incluster`].
+    pub root_cert_file: Option<PathBuf>,
     /// Set the timeout for connecting to the Kubernetes API.
     ///
     /// A value of `None` means no timeout
@@ -188,6 +194,7 @@ impl Config {
             cluster_url,
             default_namespace: String::from("default"),
             root_cert: None,
+            root_cert_file: None,
             connect_timeout: Some(DEFAULT_CONNECT_TIMEOUT),
             read_timeout: None,
             write_timeout: Some(DEFAULT_WRITE_TIMEOUT),
@@ -269,6 +276,7 @@ impl Config {
             cluster_url,
             default_namespace,
             root_cert: Some(root_cert),
+            root_cert_file: Some(PathBuf::from(incluster_config::cert_file())),
             connect_timeout: Some(DEFAULT_CONNECT_TIMEOUT),
             read_timeout: None,
             write_timeout: Some(DEFAULT_WRITE_TIMEOUT),
@@ -334,6 +342,7 @@ impl Config {
             cluster_url,
             default_namespace,
             root_cert,
+            root_cert_file: None,
             connect_timeout: Some(DEFAULT_CONNECT_TIMEOUT),
             read_timeout: None,
             write_timeout: Some(DEFAULT_WRITE_TIMEOUT),
@@ -386,12 +395,12 @@ impl Config {
     }
 
     /// Client certificate and private key in PEM.
-    pub(crate) fn identity_pem(&self) -> Option<Vec<u8>> {
-        self.auth_info.identity_pem().ok()
+    pub(crate) fn identity_pem(&self) -> Result<Option<Vec<u8>>, KubeconfigError> {
+        self.auth_info.identity_pem()
     }
 }
 
-fn certs(data: &[u8]) -> Result<Vec<Vec<u8>>, pem::PemError> {
+pub(crate) fn certs(data: &[u8]) -> Result<Vec<Vec<u8>>, pem::PemError> {
     Ok(pem::parse_many(data)?
         .into_iter()
         .filter_map(|p| {

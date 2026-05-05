@@ -486,7 +486,7 @@ impl Kubeconfig {
 
     /// Read a Config from an arbitrary YAML string
     ///
-    /// This is preferable to using serde_yaml::from_str() because it will correctly
+    /// This is preferable to using serde_saphyr::from_str() because it will correctly
     /// parse multi-document YAML text and merge them into a single `Kubeconfig`
     pub fn from_yaml(text: &str) -> Result<Kubeconfig, KubeconfigError> {
         kubeconfig_from_yaml(text)?
@@ -565,13 +565,7 @@ impl Kubeconfig {
 }
 
 fn kubeconfig_from_yaml(text: &str) -> Result<Vec<Kubeconfig>, KubeconfigError> {
-    let mut documents = vec![];
-    for doc in serde_yaml::Deserializer::from_str(text) {
-        let value = serde_yaml::Value::deserialize(doc).map_err(KubeconfigError::Parse)?;
-        let kubeconfig = serde_yaml::from_value(value).map_err(KubeconfigError::InvalidStructure)?;
-        documents.push(kubeconfig);
-    }
-    Ok(documents)
+    serde_saphyr::from_multiple(text).map_err(|e| KubeconfigError::Parse(Box::new(e)))
 }
 
 fn append_new_named<T, F>(base: &mut Vec<T>, next: Vec<T>, f: F)
@@ -634,27 +628,41 @@ impl Cluster {
             &self.certificate_authority,
         )
         .map_err(KubeconfigError::LoadCertificateAuthority)?;
-        Ok(Some(ca))
+        Ok(ca)
     }
 }
 
 impl AuthInfo {
-    pub(crate) fn identity_pem(&self) -> Result<Vec<u8>, KubeconfigError> {
-        let client_cert = &self.load_client_certificate()?;
-        let client_key = &self.load_client_key()?;
-        let mut buffer = client_key.clone();
-        buffer.extend_from_slice(client_cert);
-        Ok(buffer)
+    pub(crate) fn identity_pem(&self) -> Result<Option<Vec<u8>>, KubeconfigError> {
+        let client_cert = self.load_client_certificate()?;
+        let client_key = self.load_client_key()?;
+
+        match (client_cert, client_key) {
+            (None, None) => Ok(None),
+
+            (Some(_), None) => Err(KubeconfigError::LoadClientKey(
+                LoadDataError::NoBase64DataOrFile,
+            )),
+
+            (None, Some(_)) => Err(KubeconfigError::LoadClientCertificate(
+                LoadDataError::NoBase64DataOrFile,
+            )),
+
+            (Some(cert), Some(mut key)) => {
+                key.extend_from_slice(&cert);
+                Ok(Some(key))
+            },
+        }
     }
 
-    pub(crate) fn load_client_certificate(&self) -> Result<Vec<u8>, KubeconfigError> {
+    pub(crate) fn load_client_certificate(&self) -> Result<Option<Vec<u8>>, KubeconfigError> {
         // TODO Shouldn't error when `self.client_certificate_data.is_none() && self.client_certificate.is_none()`
 
         load_from_base64_or_file(&self.client_certificate_data.as_deref(), &self.client_certificate)
             .map_err(KubeconfigError::LoadClientCertificate)
     }
 
-    pub(crate) fn load_client_key(&self) -> Result<Vec<u8>, KubeconfigError> {
+    pub(crate) fn load_client_key(&self) -> Result<Option<Vec<u8>>, KubeconfigError> {
         // TODO Shouldn't error when `self.client_key_data.is_none() && self.client_key.is_none()`
 
         load_from_base64_or_file(
@@ -720,12 +728,14 @@ impl TryFrom<&Cluster> for ExecAuthCluster {
 fn load_from_base64_or_file<P: AsRef<Path>>(
     value: &Option<&str>,
     file: &Option<P>,
-) -> Result<Vec<u8>, LoadDataError> {
+) -> Result<Option<Vec<u8>>, LoadDataError> {
     let data = value
         .map(load_from_base64)
-        .or_else(|| file.as_ref().map(load_from_file))
-        .unwrap_or_else(|| Err(LoadDataError::NoBase64DataOrFile))?;
-    Ok(ensure_trailing_newline(data))
+        .or_else(|| file.as_ref().map(load_from_file));
+    match data {
+        Some(data) => Ok(Some(ensure_trailing_newline(data?))),
+        None => Ok(None),
+    }
 }
 
 fn load_from_base64(value: &str) -> Result<Vec<u8>, LoadDataError> {
@@ -942,10 +952,10 @@ users:
             Some(["group1".to_string(), "group2".to_string()].as_slice())
         );
         let extra = auth_info.impersonate_user_extra.as_ref().unwrap();
-        assert_eq!(extra.get("scopes").unwrap(), &vec![
-            "read".to_string(),
-            "write".to_string()
-        ]);
+        assert_eq!(
+            extra.get("scopes").unwrap(),
+            &vec!["read".to_string(), "write".to_string()]
+        );
         let auth_ext = auth_info.extensions.as_ref().unwrap();
         assert_eq!(auth_ext[0].name, "authinfo_ext");
 
@@ -1058,7 +1068,7 @@ users:
 username: user
 password: 
 "#;
-        let authinfo: AuthInfo = serde_yaml::from_str(authinfo_yaml).unwrap();
+        let authinfo: AuthInfo = serde_saphyr::from_str(authinfo_yaml).unwrap();
         assert_eq!(authinfo.username, Some("user".to_string()));
         assert!(authinfo.password.is_none());
     }
@@ -1069,7 +1079,7 @@ password:
 username: user
 password: kube_rs
 "#;
-        let authinfo: AuthInfo = serde_yaml::from_str(authinfo_yaml).unwrap();
+        let authinfo: AuthInfo = serde_saphyr::from_str(authinfo_yaml).unwrap();
         let authinfo_debug_output = format!("{authinfo:?}");
         let expected_output = "AuthInfo { \
         username: Some(\"user\"), \
@@ -1200,7 +1210,7 @@ users:
         );
 
         // Round-trip: serialize back to YAML
-        let serialized = serde_yaml::to_string(&config).unwrap();
+        let serialized = serde_saphyr::to_string(&config).unwrap();
 
         // Verify unknown fields are preserved
         assert!(
