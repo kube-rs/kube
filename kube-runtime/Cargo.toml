@@ -27,7 +27,7 @@ workspace = true
 
 [dependencies]
 futures = { workspace = true, features = ["async-await"] }
-kube-client = { path = "../kube-client", version = "=3.0.1", default-features = false, features = ["jsonpatch", "client"] }
+kube-client = { path = "../kube-client", version = "=3.1.0", default-features = false, features = ["jsonpatch", "client"] }
 educe = { workspace = true, features = ["Clone", "Debug", "Hash", "PartialEq"] }
 serde.workspace = true
 ahash.workspace = true
@@ -49,7 +49,7 @@ hostname.workspace = true
 [dev-dependencies]
 kube = { path = "../kube", features = ["derive", "client", "runtime"], version = ">=2" }
 serde_json.workspace = true
-serde_yaml.workspace = true
+serde-saphyr.workspace = true
 tokio = { workspace = true, features = ["full", "test-util"] }
 rand.workspace = true
 schemars.workspace = true

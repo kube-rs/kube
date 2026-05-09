@@ -475,6 +475,35 @@ where
     }
 }
 
+/// Client-side idle timeout margin added on top of the server-side watch timeout.
+///
+/// The server closes the watch stream after the configured timeout (default 290s).
+/// We add a small margin so the client detects dead connections where the
+/// server's close never arrives (e.g. network failure).
+const WATCH_IDLE_TIMEOUT_MARGIN: Duration = Duration::from_secs(5);
+
+/// Poll the next item from a watch stream with an idle timeout.
+///
+/// Returns `None` when the stream ends **or** when no item arrives within
+/// `timeout + WATCH_IDLE_TIMEOUT_MARGIN`, causing the watcher to
+/// treat the connection as dead and reconnect.
+async fn next_with_idle_timeout<S, T>(stream: &mut S, timeout: Option<u32>) -> Option<T>
+where
+    S: Stream<Item = T> + Unpin,
+{
+    let idle_timeout = Duration::from_secs(u64::from(timeout.unwrap_or(290))) + WATCH_IDLE_TIMEOUT_MARGIN;
+    match tokio::time::timeout(idle_timeout, stream.next()).await {
+        Ok(item) => item,
+        Err(_elapsed) => {
+            debug!(
+                timeout_secs = idle_timeout.as_secs(),
+                "watch stream idle timeout, reconnecting"
+            );
+            None
+        }
+    }
+}
+
 /// Progresses the watcher a single step, returning (event, state)
 ///
 /// This function should be trampolined: if event == `None`
@@ -557,7 +586,7 @@ where
             }
         }
         State::InitialWatch { mut stream } => {
-            match stream.next().await {
+            match next_with_idle_timeout(&mut stream, wc.timeout).await {
                 Some(Ok(WatchEvent::Added(obj) | WatchEvent::Modified(obj))) => {
                     (Some(Ok(Event::InitApply(obj))), State::InitialWatch { stream })
                 }
@@ -627,7 +656,7 @@ where
         State::Watching {
             resource_version,
             mut stream,
-        } => match stream.next().await {
+        } => match next_with_idle_timeout(&mut stream, wc.timeout).await {
             Some(Ok(WatchEvent::Added(obj) | WatchEvent::Modified(obj))) => {
                 let resource_version = obj.resource_version().unwrap_or_default();
                 if resource_version.is_empty() {
@@ -1038,5 +1067,27 @@ mod tests {
             !all_exact,
             "With jitter enabled, delays should not all match exact exponential values"
         );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn idle_timeout_returns_item_when_stream_has_data() {
+        let mut stream = futures::stream::iter(vec![1, 2, 3]);
+        let result = next_with_idle_timeout(&mut stream, Some(290)).await;
+        assert_eq!(result, Some(1));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn idle_timeout_returns_none_on_dead_connection() {
+        let mut stream = futures::stream::pending::<i32>();
+        // NB tokio auto-advances virtual time when the runtime is idle so next_with_idle_timeout resolves immediately
+        let result = next_with_idle_timeout(&mut stream, Some(290)).await;
+        assert_eq!(result, None);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn idle_timeout_returns_none_when_stream_ends() {
+        let mut stream = futures::stream::empty::<i32>();
+        let result = next_with_idle_timeout(&mut stream, Some(290)).await;
+        assert_eq!(result, None);
     }
 }
