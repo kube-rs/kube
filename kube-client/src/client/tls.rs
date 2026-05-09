@@ -153,7 +153,7 @@ pub mod rustls_tls {
                     return guard.0.clone();
                 }
             }
-            let mut guard = self.inner.write().unwrap();
+            let mut guard = self.inner.write().unwrap_or_else(|e| e.into_inner());
             if guard.1.elapsed() < Self::RELOAD_INTERVAL {
                 return guard.0.clone();
             }
