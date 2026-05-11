@@ -112,7 +112,15 @@ pub struct AttachedProcess {
     stderr_reader: Option<DuplexStream>,
     status_rx: Option<StatusReceiver>,
     terminal_resize_tx: Option<TerminalSizeSender>,
-    task: tokio::task::JoinHandle<Result<(), Error>>,
+    task: Option<tokio::task::JoinHandle<Result<(), Error>>>,
+}
+
+impl Drop for AttachedProcess {
+    fn drop(&mut self) {
+        if let Some(task) = &self.task {
+            task.abort();
+        }
+    }
 }
 
 impl AttachedProcess {
@@ -153,7 +161,7 @@ impl AttachedProcess {
             has_stdin: ap.stdin,
             has_stdout: ap.stdout,
             has_stderr: ap.stderr,
-            task,
+            task: Some(task),
             stdin_writer: Some(stdin_writer),
             stdout_reader,
             stderr_reader,
@@ -224,12 +232,26 @@ impl AttachedProcess {
     /// Abort the background task, causing remote command to fail.
     #[inline]
     pub fn abort(&self) {
-        self.task.abort();
+        if let Some(task) = &self.task {
+            task.abort();
+        }
     }
 
     /// Waits for the remote command task to complete.
-    pub async fn join(self) -> Result<(), Error> {
-        self.task.await.unwrap_or_else(|e| Err(Error::Spawn(e)))
+    pub async fn join(mut self) -> Result<(), Error> {
+        // Drop all streams before awaiting the task to prevent deadlocks.
+        // If stdout/stderr readers have not been drained, the background task
+        // blocks writing to the full DuplexStream buffer while join() blocks
+        // waiting for the task.
+        self.stdin_writer = None;
+        self.stdout_reader = None;
+        self.stderr_reader = None;
+        self.status_rx = None;
+        self.terminal_resize_tx = None;
+        match self.task.take() {
+            Some(task) => task.await.unwrap_or_else(|e| Err(Error::Spawn(e))),
+            None => Ok(()),
+        }
     }
 
     /// Take a future that resolves with any status object or when the sender is dropped.
