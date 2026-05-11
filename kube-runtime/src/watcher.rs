@@ -433,7 +433,7 @@ enum WatchPhase {
 
 impl<K> ApiMode for FullObject<'_, K>
 where
-    K: Resource + Clone + Debug + DeserializeOwned + Send + 'static,
+    K: Clone + Debug + DeserializeOwned + Send + 'static,
 {
     type Value = K;
 
@@ -458,7 +458,7 @@ struct MetaOnly<'a, K> {
 
 impl<K> ApiMode for MetaOnly<'_, K>
 where
-    K: Resource + Clone + Debug + DeserializeOwned + Send + 'static,
+    K: Clone + Debug + DeserializeOwned + Send + 'static,
 {
     type Value = PartialObjectMeta<K>;
 

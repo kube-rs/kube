@@ -54,6 +54,10 @@ pub struct Api<K> {
     /// The client to use (from this library)
     pub(crate) client: Client,
     namespace: Option<String>,
+    /// Whether requests should use metadata-only Accept headers
+    /// (cached from `K::metadata_api()` at construction so that `impl<K> Api<K>`
+    /// method blocks don't have to tighten to `K: Resource`).
+    pub(crate) metadata_api: bool,
     /// Note: Using `iter::Empty` over `PhantomData`, because we never actually keep any
     /// `K` objects, so `Empty` better models our constraints (in particular, `Empty<K>`
     /// is `Send`, even if `K` may not be).
@@ -83,6 +87,7 @@ impl<K: Resource> Api<K> {
             client,
             request: Request::new(url),
             namespace: None,
+            metadata_api: K::metadata_api(),
             _phantom: std::iter::empty(),
         }
     }
@@ -100,6 +105,7 @@ impl<K: Resource> Api<K> {
             client,
             request: Request::new(url),
             namespace: Some(ns.to_string()),
+            metadata_api: K::metadata_api(),
             _phantom: std::iter::empty(),
         }
     }
@@ -194,6 +200,7 @@ where
             client,
             request: Request::new(url),
             namespace: Some(ns.to_string()),
+            metadata_api: K::metadata_api(),
             _phantom: std::iter::empty(),
         }
     }
@@ -241,6 +248,7 @@ impl<K> Debug for Api<K> {
             request,
             client: _,
             namespace,
+            metadata_api: _,
             _phantom,
         } = self;
         f.debug_struct("Api")
