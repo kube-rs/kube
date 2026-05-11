@@ -185,7 +185,7 @@ kind: Example
 metadata:
   name: doc1
 "#;
-        let tm: TypeMeta = serde_yaml::from_str(input).unwrap();
+        let tm: TypeMeta = serde_saphyr::from_str(input).unwrap();
         let gvk = GroupVersionKind::try_from(&tm).unwrap(); // takes ref
         let gvk2: GroupVersionKind = tm.try_into().unwrap(); // takes value
         assert_eq!(gvk.kind, "Example");
