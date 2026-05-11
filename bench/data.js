@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778507118054,
+  "lastUpdate": 1778507179716,
   "repoUrl": "https://github.com/kube-rs/kube",
   "entries": {
     "Benchmark": [
@@ -1904,6 +1904,105 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/kube-rs/kube/commit/89284aade8c96f8c228fbecf437c457d3b6d87a5"
         },
         "date": 1778507116938,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "init_listwatch - peak_bytes",
+            "value": 55194619,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - total_allocated",
+            "value": 76715088,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - alloc_count",
+            "value": 578023,
+            "unit": "allocations"
+          },
+          {
+            "name": "steady_state - peak_bytes",
+            "value": 71381202,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - total_allocated",
+            "value": 109519220,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - alloc_count",
+            "value": 799021,
+            "unit": "allocations"
+          },
+          {
+            "name": "relist - peak_bytes",
+            "value": 99797302,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - total_allocated",
+            "value": 174518628,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - alloc_count",
+            "value": 1189035,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_without_modify - peak_bytes",
+            "value": 141298836,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - total_allocated",
+            "value": 205865000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - alloc_count",
+            "value": 1298020,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_with_modify - peak_bytes",
+            "value": 134853452,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - total_allocated",
+            "value": 162895000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - alloc_count",
+            "value": 1058021,
+            "unit": "allocations"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "SebTardif@ncf.ca",
+            "name": "Sebastien Tardif",
+            "username": "SebTardif"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "360c3db6fdf30368dcd2fd3df84d1d019f6acc9f",
+          "message": "Handle RwLock write poisoning in ReloadingVerifier (#1977)\n\nPR #1976 fixed the read lock in ReloadingVerifier::current() to\ngracefully handle poisoning via unwrap_or_else, but the write lock\non line 156 was left as a bare .unwrap(). If any thread panics while\nholding the lock, subsequent CA bundle reload attempts cascade-panic\ninstead of recovering.\n\nApply the same unwrap_or_else(|e| e.into_inner()) pattern already\nused by the read lock five lines above.\n\nSigned-off-by: Sebastien Tardif <sebtardif@ncf.ca>",
+          "timestamp": "2026-05-11T14:44:57+01:00",
+          "tree_id": "61ac7304bb2808b77bdb812aae1b7165bd010e84",
+          "url": "https://github.com/kube-rs/kube/commit/360c3db6fdf30368dcd2fd3df84d1d019f6acc9f"
+        },
+        "date": 1778507178295,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
