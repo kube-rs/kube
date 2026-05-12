@@ -371,7 +371,7 @@ mod test {
         Ok(())
     }
 
-    // #[tokio::test] // TODO: bring back, fails in gha now for some reason
+    // #[tokio::test] // TODO: bring back, fails in gha now for some reason; https://github.com/kube-rs/kube/issues/1980
     #[ignore = "needs cluster (will create and attach to a pod)"]
     #[cfg(feature = "ws")]
     async fn pod_can_exec_and_write_to_stdin() -> Result<(), Box<dyn std::error::Error>> {
