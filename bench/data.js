@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778580361554,
+  "lastUpdate": 1778580953338,
   "repoUrl": "https://github.com/kube-rs/kube",
   "entries": {
     "Benchmark": [
@@ -2102,6 +2102,105 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/kube-rs/kube/commit/2299d763fede95fd814bb39a133232f83fa887df"
         },
         "date": 1778580360454,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "init_listwatch - peak_bytes",
+            "value": 55194619,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - total_allocated",
+            "value": 76715088,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - alloc_count",
+            "value": 578023,
+            "unit": "allocations"
+          },
+          {
+            "name": "steady_state - peak_bytes",
+            "value": 71381202,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - total_allocated",
+            "value": 109519220,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - alloc_count",
+            "value": 799021,
+            "unit": "allocations"
+          },
+          {
+            "name": "relist - peak_bytes",
+            "value": 99797302,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - total_allocated",
+            "value": 174518628,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - alloc_count",
+            "value": 1189035,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_without_modify - peak_bytes",
+            "value": 141298836,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - total_allocated",
+            "value": 205865000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - alloc_count",
+            "value": 1298020,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_with_modify - peak_bytes",
+            "value": 134853452,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - total_allocated",
+            "value": 162895000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - alloc_count",
+            "value": 1058021,
+            "unit": "allocations"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "doxxx93@gmail.com",
+            "name": "doxxx",
+            "username": "doxxx93"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "67e46715b4bf2697c83ffdac9ece022f7e45259b",
+          "message": "Add CEL validation via kube-cel re-export (#1954)\n\n* feat(kube-core): add CEL validation via kube-cel re-export\n\nRe-export the kube-cel crate through kube-core::cel behind the `cel`\nfeature flag (Option D from #1670). This gives users access to CEL\ncompilation, validation, and all Kubernetes CEL extension functions\nvia `kube::core::cel::*`.\n\n- Convert `cel.rs` → `cel/mod.rs` with `pub use kube_cel::*` re-export\n- Add `kube-cel = \"0.4\"` optional dependency with `validation` feature\n- Propagate `cel` feature through kube umbrella crate\n- Add RUSTSEC-2024-0436 ignore in deny.toml (paste via cel, pending cel 0.13)\n\nSigned-off-by: doxxx93 <doxxx93@gmail.com>\n\n* feat(cargo): update kube-cel to version 0.5 and clean up deny.toml\n\nSigned-off-by: doxxx93 <doxxx93@gmail.com>\n\n---------\n\nSigned-off-by: doxxx93 <doxxx93@gmail.com>\nCo-authored-by: Eirik A <sszynrae@gmail.com>",
+          "timestamp": "2026-05-12T11:14:30+01:00",
+          "tree_id": "e5289ccd6382d12f432c5e3aa4739e03b2311620",
+          "url": "https://github.com/kube-rs/kube/commit/67e46715b4bf2697c83ffdac9ece022f7e45259b"
+        },
+        "date": 1778580952330,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
