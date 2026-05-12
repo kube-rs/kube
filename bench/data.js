@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778580953338,
+  "lastUpdate": 1778594562428,
   "repoUrl": "https://github.com/kube-rs/kube",
   "entries": {
     "Benchmark": [
@@ -2201,6 +2201,105 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/kube-rs/kube/commit/67e46715b4bf2697c83ffdac9ece022f7e45259b"
         },
         "date": 1778580952330,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "init_listwatch - peak_bytes",
+            "value": 55194619,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - total_allocated",
+            "value": 76715088,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - alloc_count",
+            "value": 578023,
+            "unit": "allocations"
+          },
+          {
+            "name": "steady_state - peak_bytes",
+            "value": 71381202,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - total_allocated",
+            "value": 109519220,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - alloc_count",
+            "value": 799021,
+            "unit": "allocations"
+          },
+          {
+            "name": "relist - peak_bytes",
+            "value": 99797302,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - total_allocated",
+            "value": 174518628,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - alloc_count",
+            "value": 1189035,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_without_modify - peak_bytes",
+            "value": 141298836,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - total_allocated",
+            "value": 205865000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - alloc_count",
+            "value": 1298020,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_with_modify - peak_bytes",
+            "value": 134853452,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - total_allocated",
+            "value": 162895000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - alloc_count",
+            "value": 1058021,
+            "unit": "allocations"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "doxxx93@gmail.com",
+            "name": "doxxx",
+            "username": "doxxx93"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0f0cb937884ad88fd13c139d86ef12cb473327a2",
+          "message": "Api<PartialObjectMeta<K>> should opportunistically degrade to metadata requests (#1952)\n\n* feat(kube-core): add metadata_api() to Resource trait\n\nAdd `fn metadata_api() -> bool` to the `Resource` trait (default false),\noverridden to return true for `PartialObjectMeta<K>`. This allows\ndownstream code to detect metadata-only types at compile time and\nautomatically switch to efficient metadata-optimized API requests.\n\nRef: #1614\nSigned-off-by: doxxx93 <doxxx93@gmail.com>\n\n* feat(kube-client): auto-use metadata headers for PartialObjectMeta\n\nApi methods get, list, watch, and patch now branch on\nResource::metadata_api() to automatically use metadata-optimized\nAccept headers when K = PartialObjectMeta<_>, so the API server\nreturns only metadata instead of the full object.\n\nRef: #1614\nSigned-off-by: doxxx93 <doxxx93@gmail.com>\n\n* refactor(kube-runtime): deprecate metadata_watcher\n\nWith Api<PartialObjectMeta<K>> now automatically using metadata-only\nrequests, metadata_watcher is no longer needed. Users can use\nwatcher(Api::<PartialObjectMeta<K>>::all(client), config) instead.\n\nSimplify the dynamic_watcher example to remove the runtime branching\nand focus on dynamic resource watching.\n\nRef: #1614\nSigned-off-by: doxxx93 <doxxx93@gmail.com>\n\n* test(kube-client): verify PartialObjectMeta uses metadata headers\n\nAdd mock-based tests verifying that Api<PartialObjectMeta<Pod>>\nsends the correct metadata-only Accept headers for get, list, watch,\nand patch operations.\n\nRef: #1614\nSigned-off-by: doxxx93 <doxxx93@gmail.com>\n\n* refactor: cache metadata_api on Api to avoid tightening method bounds\n\nPR review feedback (clux): the original PR added `K: Resource` to\n`impl<K> Api<K>` in core_methods.rs (so it could call `K::metadata_api()`\nper request), which forced the same bound onto `ApiMode for FullObject<K>`\nand `ApiMode for MetaOnly<K>` in watcher.rs. This goes against the spirit\nof #1393 by tightening method-level bounds beyond what the corresponding\nApi/watcher constructors already require.\n\nCache the flag on `Api<K>` itself in the existing `impl<K: Resource> Api<K>`\nconstructors, then read `self.metadata_api` from the per-method code paths.\nThe Resource bound stays exactly where it was before this PR (Api\nconstructors and the public `watcher`/`metadata_watcher` signatures),\nno user-visible API change.\n\nSee https://github.com/kube-rs/kube/pull/1952#discussion_r3174134422\n\nSigned-off-by: doxxx93 <doxxx93@gmail.com>\n\n---------\n\nSigned-off-by: doxxx93 <doxxx93@gmail.com>\nCo-authored-by: Eirik A <sszynrae@gmail.com>",
+          "timestamp": "2026-05-12T15:01:41+01:00",
+          "tree_id": "65c3fdf7641d0bb6e504b8ef20f766df24dd1d55",
+          "url": "https://github.com/kube-rs/kube/commit/0f0cb937884ad88fd13c139d86ef12cb473327a2"
+        },
+        "date": 1778594561389,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
