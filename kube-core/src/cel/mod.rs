@@ -1,6 +1,16 @@
 //! CEL validation for CRDs
+//!
+//! When the `cel` feature is enabled, this module also provides client-side CEL evaluation
+//! via Kubernetes CEL extension functions, schema compilation, and validation.
 
 use std::{collections::BTreeMap, str::FromStr};
+
+// --- Client-side CEL evaluation (feature = "cel") ---
+// Re-exported from the kube-cel crate when the `cel` feature is enabled.
+
+#[cfg(feature = "cel")]
+#[cfg_attr(docsrs, doc(cfg(feature = "cel")))]
+pub use kube_cel::*;
 
 use derive_more::From;
 #[cfg(feature = "schema")] use schemars::Schema;
