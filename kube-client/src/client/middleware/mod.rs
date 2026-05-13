@@ -10,6 +10,7 @@ pub use extra_headers::{ExtraHeaders, ExtraHeadersLayer};
 
 use super::auth::RefreshableToken;
 /// Layer to set up `Authorization` header depending on the config.
+#[derive(Clone)]
 pub struct AuthLayer(pub(crate) Either<AddAuthorizationLayer, AsyncFilterLayer<RefreshableToken>>);
 
 impl<S> Layer<S> for AuthLayer {
