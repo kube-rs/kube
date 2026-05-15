@@ -1,4 +1,6 @@
-use std::{fmt::Debug, sync::Mutex, task::Poll};
+use std::{fmt::Debug, task::Poll};
+
+use parking_lot::Mutex;
 
 use futures::{FutureExt, channel};
 use thiserror::Error;
@@ -72,7 +74,7 @@ where
         self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Self::Output> {
-        let mut state = self.0.state.lock().unwrap();
+        let mut state = self.0.state.lock();
         trace!("got lock lock");
         match &mut *state {
             ReceiverState::Waiting(rx) => {

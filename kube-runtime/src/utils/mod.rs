@@ -31,9 +31,11 @@ use pin_project::pin_project;
 use std::{
     fmt::Debug,
     pin::{Pin, pin},
-    sync::{Arc, Mutex},
+    sync::Arc,
     task::Poll,
 };
+
+use parking_lot::Mutex;
 use stream::IntoStream;
 use tokio::{runtime::Handle, task::JoinHandle};
 
@@ -72,7 +74,7 @@ where
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Option<Self::Item>> {
         let this = self.project();
-        let inner = this.inner.lock().unwrap();
+        let inner = this.inner.lock();
         let mut inner = Pin::new(inner);
         let inner_peek = pin!(inner.as_mut().peek());
         match inner_peek.poll(cx) {
