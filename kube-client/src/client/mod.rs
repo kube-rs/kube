@@ -258,7 +258,9 @@ impl Client {
         upgrade::StreamProtocol::add_to_headers(&mut parts.headers)?;
 
         let res = self.send(Request::from_parts(parts, Body::from(body))).await?;
-        let protocol = upgrade::verify_response(&res, &key).map_err(Error::UpgradeConnection)?;
+        let (protocol, res) = upgrade::verify_response(res, &key)
+            .await
+            .map_err(Error::UpgradeConnection)?;
         match hyper::upgrade::on(res).await {
             Ok(upgraded) => Ok(Connection {
                 stream: WebSocketStream::from_raw_socket(

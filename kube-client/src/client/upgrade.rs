@@ -90,8 +90,14 @@ pub enum UpgradeConnectionError {
     /// connection.
     ///
     /// [`SWITCHING_PROTOCOLS`]: http::status::StatusCode::SWITCHING_PROTOCOLS
-    #[error("failed to switch protocol: {0}")]
-    ProtocolSwitch(http::status::StatusCode),
+    #[error("failed to switch protocol: {status}: {body}")]
+    ProtocolSwitch {
+        /// HTTP status code returned by the API server.
+        status: http::status::StatusCode,
+        /// Response body, typically a JSON-encoded `metav1.Status` with
+        /// message, reason, and details explaining the failure.
+        body: String,
+    },
 
     /// `Upgrade` header was not set to `websocket` (case insensitive)
     #[error("upgrade header was not set to websocket")]
@@ -116,9 +122,19 @@ pub enum UpgradeConnectionError {
 
 // Verify upgrade response according to RFC6455.
 // Based on `tungstenite` and added subprotocol verification.
-pub fn verify_response(res: &Response<Body>, key: &str) -> Result<StreamProtocol, UpgradeConnectionError> {
+pub async fn verify_response(
+    res: Response<Body>,
+    key: &str,
+) -> Result<(StreamProtocol, Response<Body>), UpgradeConnectionError> {
     if res.status() != StatusCode::SWITCHING_PROTOCOLS {
-        return Err(UpgradeConnectionError::ProtocolSwitch(res.status()));
+        let status = res.status();
+        let body = res
+            .into_body()
+            .collect_bytes()
+            .await
+            .map(|b| String::from_utf8_lossy(&b).into_owned())
+            .unwrap_or_default();
+        return Err(UpgradeConnectionError::ProtocolSwitch { status, body });
     }
 
     let headers = res.headers();
@@ -150,10 +166,10 @@ pub fn verify_response(res: &Response<Body>, key: &str) -> Result<StreamProtocol
     }
 
     // Make sure that the server returned an expected subprotocol.
-    let protocol = match StreamProtocol::get_from_response(res) {
+    let protocol = match StreamProtocol::get_from_response(&res) {
         Some(p) => p,
         None => return Err(UpgradeConnectionError::SecWebSocketProtocolMismatch),
     };
 
-    Ok(protocol)
+    Ok((protocol, res))
 }
