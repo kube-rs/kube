@@ -371,7 +371,7 @@ mod test {
         Ok(())
     }
 
-    // #[tokio::test] // TODO: bring back, fails in gha now for some reason; https://github.com/kube-rs/kube/issues/1980
+    #[tokio::test]
     #[ignore = "needs cluster (will create and attach to a pod)"]
     #[cfg(feature = "ws")]
     async fn pod_can_exec_and_write_to_stdin() -> Result<(), Box<dyn std::error::Error>> {
@@ -386,7 +386,7 @@ mod test {
             "apiVersion": "v1",
             "kind": "Pod",
             "metadata": {
-                "name": "busybox-kube2",
+                "name": "busybox-kube5",
                 "labels": { "app": "kube-rs-test" },
             },
             "spec": {
@@ -409,7 +409,7 @@ mod test {
         // Manual watch-api for it to become ready
         // NB: don't do this; using conditions (see pod_api example) is easier and less error prone
         let wp = WatchParams::default()
-            .fields(&format!("metadata.name={}", "busybox-kube2"))
+            .fields(&format!("metadata.name={}", "busybox-kube5"))
             .timeout(15);
         let mut stream = pods.watch(&wp, "0").await?.boxed();
         while let Some(ev) = stream.try_next().await? {
@@ -417,7 +417,13 @@ mod test {
                 WatchEvent::Modified(o) => {
                     let s = o.status.as_ref().expect("status exists on pod");
                     let phase = s.phase.clone().unwrap_or_default();
-                    if phase == "Running" {
+                    if phase != "Running" {
+                        continue;
+                    }
+                    let Some(statuses) = s.container_statuses.as_ref() else {
+                        continue;
+                    };
+                    if statuses.iter().all(|s| s.ready) {
                         break;
                     }
                 }
@@ -430,7 +436,7 @@ mod test {
         {
             let mut attached = pods
                 .exec(
-                    "busybox-kube2",
+                    "busybox-kube5",
                     vec!["sh", "-c", "for i in $(seq 1 3); do echo $i; done"],
                     &AttachParams::default().stderr(false),
                 )
@@ -448,7 +454,7 @@ mod test {
 
         // Verify we read from stdout after stdin is closed.
         {
-            let name = "busybox-kube2";
+            let name = "busybox-kube5";
             let command = vec!["sh", "-c", "sleep 2; echo test string 2"];
             let ap = AttachParams::default().stdin(true).stderr(false);
 
@@ -467,16 +473,16 @@ mod test {
                 stdin_writer.write_all(b"this will be ignored\n").await?;
                 _ = stdin_writer.shutdown().await;
 
-                let next_stdout = stdout_stream.next();
-                let stdout = String::from_utf8(next_stdout.await.unwrap().unwrap().to_vec()).unwrap();
-                assert_eq!(stdout, "test string 2\n");
-
                 // AttachedProcess resolves with status object.
                 let status = attached.take_status().unwrap();
                 if let Some(status) = status.await {
-                    assert_eq!(status.status, Some("Success".to_owned()));
                     assert_eq!(status.reason, None);
+                    assert_eq!(status.status, Some("Success".to_owned()));
                 }
+
+                let next_stdout = stdout_stream.next();
+                let stdout = String::from_utf8(next_stdout.await.unwrap().unwrap().to_vec()).unwrap();
+                assert_eq!(stdout, "test string 2\n");
             }
         }
 
@@ -484,7 +490,7 @@ mod test {
         {
             let mut attached = pods
                 .exec(
-                    "busybox-kube2",
+                    "busybox-kube5",
                     vec!["sh"],
                     &AttachParams::default().stdin(true).stderr(false),
                 )
@@ -510,8 +516,8 @@ mod test {
 
         // Delete it
         let dp = DeleteParams::default();
-        pods.delete("busybox-kube2", &dp).await?.map_left(|pdel| {
-            assert_eq!(pdel.name_unchecked(), "busybox-kube2");
+        pods.delete("busybox-kube5", &dp).await?.map_left(|pdel| {
+            assert_eq!(pdel.name_unchecked(), "busybox-kube5");
         });
 
         Ok(())
