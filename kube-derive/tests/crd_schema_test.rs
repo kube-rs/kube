@@ -483,7 +483,7 @@ fn test_crd_schema_matches_expected() {
                                 "x-kubernetes-validations": [{
                                     "rule": "self.metadata.name == 'singleton'",
                                 }],
-                                "title": "FooValidated",
+                                "title": "Foo",
                                 "type": "object"
                             }
                         },
