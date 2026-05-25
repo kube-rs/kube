@@ -442,20 +442,24 @@ fn token_from_gcp_provider(provider: &AuthProviderConfig) -> Result<ProviderToke
         // NB: This property does currently not exist upstream in client-go
         // See https://github.com/kube-rs/kube/issues/1060
         let drop_env = provider.config.get("cmd-drop-env").cloned().unwrap_or_default();
-        // TODO splitting args by space is not safe
+        let drop_env = shell_words::split(&drop_env)
+            .map_err(|e| Error::AuthExec(format!("invalid cmd-drop-env: {e}")))?;
+        let params = shell_words::split(&params)
+            .map_err(|e| Error::AuthExec(format!("invalid cmd-args: {e}")))?;
+        let command_line = params.join(" ");
         let mut command = Command::new(cmd);
         // Do not pass the following env vars to the command
-        for env in drop_env.trim().split(' ') {
+        for env in drop_env {
             command.env_remove(env);
         }
         let output = command
-            .args(params.trim().split(' '))
+            .args(params)
             .output()
             .map_err(|e| Error::AuthExec(format!("Executing {cmd:} failed: {e:?}")))?;
 
         if !output.status.success() {
             return Err(Error::AuthExecRun {
-                cmd: format!("{cmd} {params}"),
+                cmd: format!("{cmd} {command_line}"),
                 status: output.status,
                 out: output,
             });
@@ -646,43 +650,25 @@ fn auth_exec(auth: &ExecConfig) -> Result<ExecCredential, Error> {
 
 #[cfg(test)]
 mod test {
-    use crate::config::Kubeconfig;
     use std::time::{Duration, Instant};
 
     use super::*;
 
     /// Build an `AuthInfo` whose gcp auth-provider runs `cmd_path cmd_args` to emit credential JSON.
     fn gcp_auth_info(cmd_path: &str, cmd_args: &str) -> AuthInfo {
-        let test_file = format!(
-            r#"
-        apiVersion: v1
-        clusters:
-        - cluster:
-            certificate-authority-data: XXXXXXX
-            server: https://36.XXX.XXX.XX
-          name: generic-name
-        contexts:
-        - context:
-            cluster: generic-name
-            user: generic-name
-          name: generic-name
-        current-context: generic-name
-        kind: Config
-        preferences: {{}}
-        users:
-        - name: generic-name
-          user:
-            auth-provider:
-              config:
-                cmd-args: {cmd_args}
-                cmd-path: {cmd_path}
-                expiry-key: '{{.credential.token_expiry}}'
-                token-key: '{{.credential.access_token}}'
-              name: gcp
-        "#
-        );
-        let config: Kubeconfig = serde_saphyr::from_str(&test_file).unwrap();
-        config.auth_infos[0].auth_info.clone().unwrap()
+        AuthInfo {
+            auth_provider: Some(AuthProviderConfig {
+                name: "gcp".into(),
+                config: std::collections::HashMap::from([
+                    ("cmd-args".into(), cmd_args.into()),
+                    ("cmd-path".into(), cmd_path.into()),
+                    ("expiry-key".into(), "{.credential.token_expiry}".into()),
+                    ("token-key".into(), "{.credential.access_token}".into()),
+                ]),
+                ..Default::default()
+            }),
+            ..Default::default()
+        }
     }
 
     fn cred_json(token: &str, expiry: &str) -> String {
@@ -695,7 +681,7 @@ mod test {
     #[ignore = "fails on windows mysteriously"]
     async fn exec_auth_command() -> Result<(), Error> {
         let expiry = (Timestamp::now() + SIXTY_SEC).to_string();
-        let auth_info = gcp_auth_info("echo", &format!("'{}'", cred_json("my_token", &expiry)));
+        let auth_info = gcp_auth_info("printf", &format!("%s '{}'", cred_json("my_token", &expiry)));
         match Auth::try_from(&auth_info).unwrap() {
             Auth::RefreshableToken(RefreshableToken::Exec(refreshable)) => {
                 let (token, _expire, info) = Arc::try_unwrap(refreshable).unwrap().into_inner();
@@ -712,7 +698,7 @@ mod test {
     #[ignore = "shells out to echo/sh; skipped on windows"]
     async fn exec_token_refresh_via_to_header() -> Result<(), Error> {
         let fresh_expiry = (Timestamp::now() + SignedDuration::from_secs(3600)).to_string();
-        let auth_info = gcp_auth_info("echo", &format!("'{}'", cred_json("my_token", &fresh_expiry)));
+        let auth_info = gcp_auth_info("printf", &format!("%s '{}'", cred_json("my_token", &fresh_expiry)));
         // Seed with a stale token + past expiry to force the refresh branch.
         let stale_expiry = Timestamp::now() - SIXTY_SEC;
         let refreshable = RefreshableToken::Exec(Arc::new(Mutex::new((
@@ -770,6 +756,28 @@ mod test {
             "timer took {timer_elapsed:?}; to_header likely blocked the runtime"
         );
         assert_eq!(header?, HeaderValue::from_static("Bearer my_token"));
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[ignore = "shells out to sh; skipped on windows"]
+    async fn exec_auth_command_parses_quoted_cmd_args() -> Result<(), Error> {
+        let auth_info = AuthInfo {
+            auth_provider: Some(AuthProviderConfig {
+                name: "gcp".into(),
+                config: std::collections::HashMap::from([
+                    ("cmd-path".into(), "sh".into()),
+                    ("cmd-args".into(), "-c 'printf %s \"my token\"'".into()),
+                ]),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
+        match Auth::try_from(&auth_info).unwrap() {
+            Auth::Bearer(token) => assert_eq!(token.expose_secret(), "my token"),
+            _ => unreachable!(),
+        }
         Ok(())
     }
 
