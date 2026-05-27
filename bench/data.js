@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1779605641476,
+  "lastUpdate": 1779893620945,
   "repoUrl": "https://github.com/kube-rs/kube",
   "entries": {
     "Benchmark": [
@@ -2399,6 +2399,105 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/kube-rs/kube/commit/1f5a46b48cd69288ee3fa1423e8662237f7e60e9"
         },
         "date": 1779605640217,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "init_listwatch - peak_bytes",
+            "value": 55194619,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - total_allocated",
+            "value": 76715088,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - alloc_count",
+            "value": 578023,
+            "unit": "allocations"
+          },
+          {
+            "name": "steady_state - peak_bytes",
+            "value": 71381202,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - total_allocated",
+            "value": 109519220,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - alloc_count",
+            "value": 799021,
+            "unit": "allocations"
+          },
+          {
+            "name": "relist - peak_bytes",
+            "value": 99797302,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - total_allocated",
+            "value": 174518628,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - alloc_count",
+            "value": 1189035,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_without_modify - peak_bytes",
+            "value": 141298836,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - total_allocated",
+            "value": 205865000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - alloc_count",
+            "value": 1298020,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_with_modify - peak_bytes",
+            "value": 134853452,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - total_allocated",
+            "value": 162895000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - alloc_count",
+            "value": 1058021,
+            "unit": "allocations"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "doxxx93@gmail.com",
+            "name": "doxxx",
+            "username": "doxxx93"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d291bd5f9d74ad3c151a5eef80485bb719560e53",
+          "message": "feat(core): add AdmissionRequest::to_cel_request() for VAP CEL bridging (#1991)\n\n* feat(core): add AdmissionRequest::to_cel_request() for VAP CEL bridging\n\nBridges kube_core::admission::AdmissionRequest<T> to\nkube_cel::vap::AdmissionRequest behind the `cel` feature, so webhook\nhandlers can feed admission requests into client-side VAP evaluation.\n\nRefs kube-rs/kube-cel#4\n\nSigned-off-by: doxxx93 <doxxx93@gmail.com>\n\n* fix(core): require kube-cel 0.5.1 for vap module\n\nThe vap module that to_cel_request() projects into was added in\nkube-cel 0.5.1; the prior \"0.5\" requirement allowed 0.5.0 and broke\nthe minimal-versions check.\n\nRefs kube-rs/kube-cel#4\n\nSigned-off-by: doxxx93 <doxxx93@gmail.com>\n\n---------\n\nSigned-off-by: doxxx93 <doxxx93@gmail.com>",
+          "timestamp": "2026-05-27T15:51:15+01:00",
+          "tree_id": "5655f2f3feddfeae9f47950c5310e32c70064e67",
+          "url": "https://github.com/kube-rs/kube/commit/d291bd5f9d74ad3c151a5eef80485bb719560e53"
+        },
+        "date": 1779893619854,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
