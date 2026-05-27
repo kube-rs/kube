@@ -200,6 +200,47 @@ pub enum Operation {
     Connect,
 }
 
+#[cfg(feature = "cel")]
+#[cfg_attr(docsrs, doc(cfg(feature = "cel")))]
+impl<T: Resource> AdmissionRequest<T> {
+    /// Project this request into the [`kube_cel::vap::AdmissionRequest`] used to
+    /// bind the `request` variable for ValidatingAdmissionPolicy CEL evaluation.
+    ///
+    /// This is a lossy view: only the fields exposed to VAP's `request` variable
+    /// are carried over (`operation`, `name`, `namespace`, `dryRun`, `kind`,
+    /// `resource`, and `userInfo`'s `username`/`uid`/`groups`). Webhook-only fields
+    /// such as `object`, `oldObject`, `requestKind`, `subResource`, and `options`
+    /// are dropped. The carried `uid` is the *user* uid (`userInfo.uid`), matching
+    /// the VAP `request.userInfo.uid` variable, not the request round-trip uid.
+    pub fn to_cel_request(&self) -> kube_cel::vap::AdmissionRequest {
+        kube_cel::vap::AdmissionRequest {
+            operation: match self.operation {
+                Operation::Create => "CREATE",
+                Operation::Update => "UPDATE",
+                Operation::Delete => "DELETE",
+                Operation::Connect => "CONNECT",
+            }
+            .to_owned(),
+            username: self.user_info.username.clone().unwrap_or_default(),
+            uid: self.user_info.uid.clone().unwrap_or_default(),
+            groups: self.user_info.groups.clone().unwrap_or_default(),
+            name: self.name.clone(),
+            namespace: self.namespace.clone().unwrap_or_default(),
+            dry_run: self.dry_run,
+            kind: kube_cel::vap::GroupVersionKind {
+                group: self.kind.group.clone(),
+                version: self.kind.version.clone(),
+                kind: self.kind.kind.clone(),
+            },
+            resource: kube_cel::vap::GroupVersionResource {
+                group: self.resource.group.clone(),
+                version: self.resource.version.clone(),
+                resource: self.resource.resource.clone(),
+            },
+        }
+    }
+}
+
 /// An outgoing [`AdmissionReview`] response. Constructed from the corresponding
 /// [`AdmissionRequest`].
 /// ```no_run
@@ -372,5 +413,46 @@ mod test {
         // request.
         assert_eq!(&rev_typ, &res.types);
         Ok(())
+    }
+
+    #[cfg(feature = "cel")]
+    #[test]
+    fn to_cel_request_projects_fields() {
+        use crate::admission::{AdmissionRequest, Operation};
+        let rev = serde_json::from_str::<AdmissionReview<DynamicObject>>(WEBHOOK_BODY).unwrap();
+        let mut req: AdmissionRequest<DynamicObject> = rev.try_into().unwrap();
+
+        let cel = req.to_cel_request();
+        assert_eq!(cel.operation, "CREATE");
+        assert_eq!(cel.name, "echo-pod");
+        assert_eq!(cel.namespace, "colin-coder");
+        assert_eq!(cel.username, "colin@coder.com");
+        assert_eq!(cel.groups, vec!["system:authenticated".to_string()]);
+        assert_eq!(cel.kind.group, "");
+        assert_eq!(cel.kind.version, "v1");
+        assert_eq!(cel.kind.kind, "Pod");
+        assert_eq!(cel.resource.resource, "pods");
+        assert!(!cel.dry_run);
+
+        // `uid` is the *user* uid (`userInfo.uid`), never the round-trip request uid.
+        assert_ne!(req.uid, ""); // sanity: round-trip uid is populated in the payload
+        assert_eq!(cel.uid, ""); // userInfo.uid is absent -> empty, NOT req.uid
+        req.user_info.uid = Some("user-123".to_owned());
+        assert_eq!(req.to_cel_request().uid, "user-123");
+
+        // every Operation variant maps to its SCREAMING_SNAKE form
+        for (op, expected) in [
+            (Operation::Create, "CREATE"),
+            (Operation::Update, "UPDATE"),
+            (Operation::Delete, "DELETE"),
+            (Operation::Connect, "CONNECT"),
+        ] {
+            req.operation = op;
+            assert_eq!(req.to_cel_request().operation, expected);
+        }
+
+        // dry_run passes through
+        req.dry_run = true;
+        assert!(req.to_cel_request().dry_run);
     }
 }
