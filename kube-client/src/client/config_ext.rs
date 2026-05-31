@@ -70,6 +70,26 @@ pub trait ConfigExt: private::Sealed {
         connector: H,
     ) -> Result<hyper_rustls::HttpsConnector<H>>;
 
+    /// Create an HTTP/1.1-only HTTPS connector based on config and `connector`.
+    ///
+    /// Like [`rustls_https_connector_with_connector`](Self::rustls_https_connector_with_connector)
+    /// but advertises only `http/1.1` in ALPN. This is the connector used by
+    /// the upgrade transport that backs exec, attach, and port-forward, which
+    /// require an HTTP/1.1 connection because HTTP/1.1 upgrades are
+    /// unrepresentable on an HTTP/2 connection.
+    ///
+    /// Note: the return type is a kube-rs-internal connector rather than
+    /// `hyper_rustls::HttpsConnector` because hyper-rustls' builder cannot
+    /// produce an `http/1.1`-only ALPN advertisement (see
+    /// [`tls::rustls_tls::H1OnlyHttpsConnector`](crate::client::tls::rustls_tls)
+    /// for why).
+    #[cfg_attr(docsrs, doc(cfg(feature = "rustls-tls")))]
+    #[cfg(feature = "rustls-tls")]
+    fn rustls_https_connector_http1_only_with_connector<H>(
+        &self,
+        connector: H,
+    ) -> Result<crate::client::tls::rustls_tls::H1OnlyHttpsConnector<H>>;
+
     /// Create [`rustls::ClientConfig`] based on config.
     /// # Example
     ///
@@ -247,23 +267,27 @@ impl ConfigExt for Config {
         &self,
         connector: H,
     ) -> Result<hyper_rustls::HttpsConnector<H>> {
-        use hyper_rustls::FixedServerNameResolver;
+        let builder = self.rustls_https_connector_builder()?;
+        Ok(builder.enable_http1().enable_http2().wrap_connector(connector))
+    }
 
-        use crate::client::tls::rustls_tls;
-
+    #[cfg(feature = "rustls-tls")]
+    fn rustls_https_connector_http1_only_with_connector<H>(
+        &self,
+        connector: H,
+    ) -> Result<crate::client::tls::rustls_tls::H1OnlyHttpsConnector<H>> {
+        use crate::client::tls::rustls_tls::{Error as RustlsError, H1OnlyHttpsConnector};
         let rustls_config = self.rustls_client_config()?;
-        let mut builder = hyper_rustls::HttpsConnectorBuilder::new()
-            .with_tls_config(rustls_config)
-            .https_or_http();
-        if let Some(tsn) = self.tls_server_name.as_ref() {
-            builder = builder.with_server_name_resolver(FixedServerNameResolver::new(
-                tsn.clone()
-                    .try_into()
-                    .map_err(rustls_tls::Error::InvalidServerName)
-                    .map_err(Error::RustlsTls)?,
-            ));
-        }
-        Ok(builder.enable_http1().wrap_connector(connector))
+        let server_name = self
+            .tls_server_name
+            .as_ref()
+            .map(|n| {
+                rustls::pki_types::ServerName::try_from(n.clone())
+                    .map_err(RustlsError::InvalidServerName)
+                    .map_err(Error::RustlsTls)
+            })
+            .transpose()?;
+        Ok(H1OnlyHttpsConnector::new(connector, rustls_config, server_name))
     }
 
     #[cfg(feature = "openssl-tls")]
@@ -310,6 +334,31 @@ impl ConfigExt for Config {
             });
         }
         Ok(https)
+    }
+}
+
+impl Config {
+    #[cfg(feature = "rustls-tls")]
+    fn rustls_https_connector_builder(
+        &self,
+    ) -> Result<hyper_rustls::HttpsConnectorBuilder<hyper_rustls::builderstates::WantsProtocols1>> {
+        use hyper_rustls::FixedServerNameResolver;
+
+        use crate::client::tls::rustls_tls;
+
+        let rustls_config = self.rustls_client_config()?;
+        let mut builder = hyper_rustls::HttpsConnectorBuilder::new()
+            .with_tls_config(rustls_config)
+            .https_or_http();
+        if let Some(tsn) = self.tls_server_name.as_ref() {
+            builder = builder.with_server_name_resolver(FixedServerNameResolver::new(
+                tsn.clone()
+                    .try_into()
+                    .map_err(rustls_tls::Error::InvalidServerName)
+                    .map_err(Error::RustlsTls)?,
+            ));
+        }
+        Ok(builder)
     }
 }
 

@@ -163,6 +163,16 @@ pub struct Config {
     pub auth_info: AuthInfo,
     /// Whether to disable compression (would only have an effect when the `gzip` feature is enabled)
     pub disable_compression: bool,
+    /// Whether to disable HTTP/2.
+    ///
+    /// HTTP/2 is enabled by default and negotiated via ALPN where the TLS
+    /// backend supports it (currently `rustls-tls`). Set this to `true` to
+    /// force the client to negotiate HTTP/1.1 only, e.g. when working around
+    /// an intermediary that mishandles HTTP/2.
+    ///
+    /// Has no effect on the upgrade transport used by exec, attach, and
+    /// port-forward, which is always HTTP/1.1.
+    pub disable_http2: bool,
     /// Optional proxy URL. Proxy support requires the `socks5` feature.
     pub proxy_url: Option<http::Uri>,
     /// If set, apiserver certificate will be validated to contain this string
@@ -191,6 +201,7 @@ impl Config {
             accept_invalid_certs: false,
             auth_info: AuthInfo::default(),
             disable_compression: false,
+            disable_http2: false,
             proxy_url: None,
             tls_server_name: None,
             headers: Vec::new(),
@@ -275,6 +286,7 @@ impl Config {
                 ..Default::default()
             },
             disable_compression: false,
+            disable_http2: false,
             proxy_url: None,
             tls_server_name: None,
             headers: Vec::new(),
@@ -336,6 +348,7 @@ impl Config {
             write_timeout: Some(DEFAULT_WRITE_TIMEOUT),
             accept_invalid_certs,
             disable_compression,
+            disable_http2: false,
             proxy_url: loader.proxy_url()?,
             auth_info: loader.user,
             tls_server_name: loader.cluster.tls_server_name,

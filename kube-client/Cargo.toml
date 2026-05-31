@@ -13,7 +13,7 @@ categories = ["web-programming::http-client", "network-programming", "api-bindin
 
 [features]
 default = ["client", "ring"]
-rustls-tls = ["rustls", "hyper-rustls"]
+rustls-tls = ["rustls", "hyper-rustls", "tokio-rustls"]
 webpki-roots = ["hyper-rustls/webpki-roots"]
 aws-lc-rs = ["hyper-rustls?/aws-lc-rs"]
 ring = ["hyper-rustls?/ring"]
@@ -58,14 +58,15 @@ jiff = { workspace = true, optional = true, features = ["std", "serde"] }
 pem = { workspace = true, optional = true }
 openssl = { workspace = true, optional = true }
 rustls = { workspace = true, optional = true }
+tokio-rustls = { version = "0.26", default-features = false, optional = true }
 bytes = { workspace = true, optional = true }
 tokio = { workspace = true, features = ["time", "signal", "sync", "rt"], optional = true }
 kube-core = { path = "../kube-core", version = "=3.1.0" }
 jsonpath-rust = { workspace = true, optional = true }
 tokio-util = { workspace = true, features = ["io", "codec"], optional = true }
-hyper = { workspace = true, features = ["client", "http1"], optional = true }
-hyper-util = { workspace = true, features = ["client", "client-legacy", "http1", "tokio"], optional = true }
-hyper-rustls = { workspace = true, features = ["http1", "logging", "native-tokio", "tls12"], optional = true }
+hyper = { workspace = true, features = ["client", "http1", "http2"], optional = true }
+hyper-util = { workspace = true, features = ["client", "client-legacy", "http1", "http2", "tokio"], optional = true }
+hyper-rustls = { workspace = true, features = ["http1", "http2", "logging", "native-tokio", "tls12"], optional = true }
 tokio-tungstenite = { workspace = true, optional = true }
 tower = { workspace = true, features = ["buffer", "filter", "util", "retry"], optional = true }
 tower-http = { workspace = true, features = ["auth", "map-response-body", "trace", "util"], optional = true }
