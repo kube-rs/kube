@@ -177,13 +177,21 @@ mod openssl_tls_server_name_tests {
 
     use super::*;
 
-    // Self-signed cert whose only SAN is `dns`, so it does not match the 127.0.0.1 we connect to.
-    // Verification then only passes if the verify-host comes from tls_server_name.
-    fn self_signed_cert(dns: &str) -> (X509, PKey<Private>) {
+    enum San<'a> {
+        Dns(&'a str),
+        Ip(&'a str),
+    }
+
+    // Self-signed cert with a single SAN. A DNS SAN won't match the 127.0.0.1 we connect to, so
+    // verification only passes if the verify-host comes from tls_server_name.
+    fn self_signed_cert(san: San) -> (X509, PKey<Private>) {
+        let cn = match san {
+            San::Dns(s) | San::Ip(s) => s,
+        };
         let pkey = PKey::from_rsa(Rsa::generate(2048).unwrap()).unwrap();
 
         let mut name = X509NameBuilder::new().unwrap();
-        name.append_entry_by_text("CN", dns).unwrap();
+        name.append_entry_by_text("CN", cn).unwrap();
         let name = name.build();
 
         let mut builder = X509::builder().unwrap();
@@ -196,11 +204,13 @@ mod openssl_tls_server_name_tests {
         builder
             .append_extension(BasicConstraints::new().critical().ca().build().unwrap())
             .unwrap();
-        let san = SubjectAlternativeName::new()
-            .dns(dns)
-            .build(&builder.x509v3_context(None, None))
-            .unwrap();
-        builder.append_extension(san).unwrap();
+        let mut san_ext = SubjectAlternativeName::new();
+        match san {
+            San::Dns(s) => san_ext.dns(s),
+            San::Ip(s) => san_ext.ip(s),
+        };
+        let san_ext = san_ext.build(&builder.x509v3_context(None, None)).unwrap();
+        builder.append_extension(san_ext).unwrap();
         builder.sign(&pkey, MessageDigest::sha256()).unwrap();
 
         (builder.build(), pkey)
@@ -250,7 +260,7 @@ mod openssl_tls_server_name_tests {
     #[tokio::test]
     async fn tls_server_name_drives_sni_and_verification() {
         let server_name = "kubernetes.example.com";
-        let (cert, key) = self_signed_cert(server_name);
+        let (cert, key) = self_signed_cert(San::Dns(server_name));
         let (port, captured_sni) = spawn_tls_server(cert.clone(), key);
 
         let config = config_for(port, &cert, Some(server_name));
@@ -274,7 +284,7 @@ mod openssl_tls_server_name_tests {
     #[tokio::test]
     async fn without_tls_server_name_verification_uses_connection_host() {
         let server_name = "kubernetes.example.com";
-        let (cert, key) = self_signed_cert(server_name);
+        let (cert, key) = self_signed_cert(San::Dns(server_name));
         let (port, _captured_sni) = spawn_tls_server(cert.clone(), key);
 
         let config = config_for(port, &cert, None);
@@ -285,6 +295,43 @@ mod openssl_tls_server_name_tests {
             result.is_err(),
             "handshake must fail when the cert does not match the connection host"
         );
+    }
+
+    // An IP tls_server_name verifies via set_ip and, per RFC 6066, sends no SNI.
+    #[tokio::test]
+    async fn tls_server_name_as_ip_verifies_without_sni() {
+        let (cert, key) = self_signed_cert(San::Ip("127.0.0.1"));
+        let (port, captured_sni) = spawn_tls_server(cert.clone(), key);
+
+        let config = config_for(port, &cert, Some("127.0.0.1"));
+        let uri: http::Uri = config.cluster_url.clone();
+
+        connector_for(&config)
+            .oneshot(uri)
+            .await
+            .expect("handshake should succeed when the IP tls_server_name matches the cert");
+
+        assert_eq!(
+            *captured_sni.lock().unwrap(),
+            None,
+            "SNI must not be sent for an IP tls_server_name"
+        );
+    }
+
+    // accept_invalid_certs disables verification, so the mismatched cert is accepted.
+    #[tokio::test]
+    async fn accept_invalid_certs_skips_verification() {
+        let (cert, key) = self_signed_cert(San::Dns("kubernetes.example.com"));
+        let (port, _captured_sni) = spawn_tls_server(cert.clone(), key);
+
+        let mut config = config_for(port, &cert, None);
+        config.accept_invalid_certs = true;
+        let uri: http::Uri = config.cluster_url.clone();
+
+        connector_for(&config)
+            .oneshot(uri)
+            .await
+            .expect("handshake should succeed when accept_invalid_certs disables verification");
     }
 }
 
