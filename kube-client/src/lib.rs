@@ -322,7 +322,7 @@ mod test {
         match pods.create(&pp, &p).await {
             Ok(o) => assert_eq!(p.name_unchecked(), o.name_unchecked()),
             Err(crate::Error::Api { source: ae, uri: _ }) => assert_eq!(ae.code, 409), // if we failed to clean-up
-            Err(e) => return Err(e.into()),                         // any other case if a failure
+            Err(e) => return Err(e.into()), // any other case if a failure
         }
 
         // Manual watch-api for it to become ready
@@ -403,7 +403,7 @@ mod test {
         match pods.create(&Default::default(), &p).await {
             Ok(o) => assert_eq!(p.name_unchecked(), o.name_unchecked()),
             Err(crate::Error::Api { source: ae, uri: _ }) => assert_eq!(ae.code, 409), // if we failed to clean-up
-            Err(e) => return Err(e.into()),                         // any other case if a failure
+            Err(e) => return Err(e.into()), // any other case if a failure
         }
 
         // Manual watch-api for it to become ready
@@ -556,7 +556,7 @@ mod test {
         match pods.create(&Default::default(), &p).await {
             Ok(o) => assert_eq!(p.name_unchecked(), o.name_unchecked()),
             Err(crate::Error::Api { source: ae, uri: _ }) => assert_eq!(ae.code, 409), // if we failed to clean-up
-            Err(e) => return Err(e.into()),                         // any other case if a failure
+            Err(e) => return Err(e.into()), // any other case if a failure
         }
 
         // Manual watch-api for it to become ready
@@ -642,7 +642,7 @@ mod test {
         match pods.create(&Default::default(), &p).await {
             Ok(o) => assert_eq!(p.name_unchecked(), o.name_unchecked()),
             Err(crate::Error::Api { source: ae, uri: _ }) => assert_eq!(ae.code, 409), // if we failed to clean-up
-            Err(e) => return Err(e.into()),                         // any other case if a failure
+            Err(e) => return Err(e.into()), // any other case if a failure
         }
 
         // Test we can get a pod as a PartialObjectMeta and convert to
@@ -933,8 +933,8 @@ mod test {
 
         match pods.create(&Default::default(), &p).await {
             Ok(o) => assert_eq!(p.name_unchecked(), o.name_unchecked()),
-            Err(crate::Error::Api(ae)) => assert_eq!(ae.code, 409), // if we failed to clean-up
-            Err(e) => return Err(e.into()),                         // any other case if a failure
+            Err(crate::Error::Api { source: ae, uri: _ }) => assert_eq!(ae.code, 409), // if we failed to clean-up
+            Err(e) => return Err(e.into()), // any other case if a failure
         }
 
         // Manual watch-api for it to become ready
