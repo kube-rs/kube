@@ -277,6 +277,16 @@ where
     }
 
     /// Return a filtered snapshot of the current values, retaining only objects whose labels match `selector`
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use k8s_openapi::api::core::v1::ConfigMap;
+    /// # use kube_client::core::{Expression, Selector};
+    /// # let (reader, _writer) = kube_runtime::reflector::store::<ConfigMap>();
+    /// let selector: Selector = Expression::Equal("app".into(), "nginx".into()).into();
+    /// let result = reader.state_filtered(&selector);
+    /// ```
     #[must_use]
     pub fn state_filtered(&self, selector: &Selector) -> Vec<Arc<K>>
     where
