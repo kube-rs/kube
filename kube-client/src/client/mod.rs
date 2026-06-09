@@ -215,8 +215,9 @@ impl Client {
     /// This method can be used to get raw access to the API which may be used to, for example,
     /// create a proxy server or application-level gateway between localhost and the API server.
     pub async fn send(&self, request: Request<Body>) -> Result<Response<Body>> {
+        let req_uri = request.uri().clone();
         let mut svc = self.inner.clone();
-        let res = svc
+        let mut res = svc
             .ready()
             .await
             .map_err(Error::Service)?
@@ -231,6 +232,7 @@ impl Client {
                     // Error from another middleware
                     .unwrap_or_else(Error::Service)
             })?;
+        res.extensions_mut().insert(req_uri);
         Ok(res)
     }
 
@@ -344,6 +346,7 @@ impl Client {
     where
         T: Clone + DeserializeOwned,
     {
+        let req_uri = request.uri().clone();
         let res = self.send(request.map(Body::from)).await?;
         // trace!("Streaming from {} -> {}", res.url(), res.status().as_str());
         tracing::trace!("headers: {:?}", res.headers());
@@ -360,44 +363,50 @@ impl Client {
             LinesCodec::new(),
         );
 
-        Ok(frames.filter_map(|res| async {
-            match res {
-                Ok(line) => match serde_json::from_str::<WatchEvent<T>>(&line) {
-                    Ok(event) => Some(Ok(event)),
-                    Err(e) => {
-                        // Ignore EOF error that can happen for incomplete line from `decode_eof`.
-                        if e.is_eof() {
-                            return None;
+        Ok(frames.filter_map(move |res| {
+            let req_uri = req_uri.clone();
+            async move {
+                match res {
+                    Ok(line) => match serde_json::from_str::<WatchEvent<T>>(&line) {
+                        Ok(event) => Some(Ok(event)),
+                        Err(e) => {
+                            // Ignore EOF error that can happen for incomplete line from `decode_eof`.
+                            if e.is_eof() {
+                                return None;
+                            }
+
+                            // Got general error response
+                            if let Ok(status) = serde_json::from_str::<Status>(&line) {
+                                return Some(Err(Error::Api {
+                                    source: status.boxed(),
+                                    uri: req_uri
+                                }));
+                            }
+                            // Parsing error
+                            Some(Err(Error::SerdeError(e)))
                         }
+                    },
 
-                        // Got general error response
-                        if let Ok(status) = serde_json::from_str::<Status>(&line) {
-                            return Some(Err(Error::Api(status.boxed())));
+                    Err(LinesCodecError::Io(e)) => match e.kind() {
+                        // Client timeout
+                        std::io::ErrorKind::TimedOut => {
+                            tracing::warn!("timeout in poll: {}", e); // our client timeout
+                            None
                         }
-                        // Parsing error
-                        Some(Err(Error::SerdeError(e)))
-                    }
-                },
+                        // Unexpected EOF from chunked decoder.
+                        // Tends to happen after 300+s of watching.
+                        std::io::ErrorKind::UnexpectedEof => {
+                            tracing::warn!("eof in poll: {}", e);
+                            None
+                        }
+                        _ => Some(Err(Error::ReadEvents(e))),
+                    },
 
-                Err(LinesCodecError::Io(e)) => match e.kind() {
-                    // Client timeout
-                    std::io::ErrorKind::TimedOut => {
-                        tracing::warn!("timeout in poll: {}", e); // our client timeout
-                        None
+                    // Reached the maximum line length without finding a newline.
+                    // This should never happen because we're using the default `usize::MAX`.
+                    Err(LinesCodecError::MaxLineLengthExceeded) => {
+                        Some(Err(Error::LinesCodecMaxLineLengthExceeded))
                     }
-                    // Unexpected EOF from chunked decoder.
-                    // Tends to happen after 300+s of watching.
-                    std::io::ErrorKind::UnexpectedEof => {
-                        tracing::warn!("eof in poll: {}", e);
-                        None
-                    }
-                    _ => Some(Err(Error::ReadEvents(e))),
-                },
-
-                // Reached the maximum line length without finding a newline.
-                // This should never happen because we're using the default `usize::MAX`.
-                Err(LinesCodecError::MaxLineLengthExceeded) => {
-                    Some(Err(Error::LinesCodecMaxLineLengthExceeded))
                 }
             }
         }))
@@ -543,6 +552,7 @@ impl Client {
 async fn handle_api_errors(res: Response<Body>) -> Result<Response<Body>> {
     let status = res.status();
     if status.is_client_error() || status.is_server_error() {
+        let req_uri = res.extensions().get::<http::Uri>().cloned().unwrap_or_default();
         // trace!("Status = {:?} for {}", status, res.url());
         let body_bytes = res.into_body().collect().await?.to_bytes();
         let text = String::from_utf8(body_bytes.to_vec()).map_err(Error::FromUtf8)?;
@@ -550,12 +560,18 @@ async fn handle_api_errors(res: Response<Body>) -> Result<Response<Body>> {
         // trace!("Parsing error: {}", text);
         if let Ok(status) = serde_json::from_str::<Status>(&text) {
             tracing::debug!("Unsuccessful: {status:?}");
-            Err(Error::Api(status.boxed()))
+            Err(Error::Api {
+                source: status.boxed(),
+                uri: req_uri
+            })
         } else {
             tracing::warn!("Unsuccessful data error parse: {text}");
             let status = Status::failure(&text, "Failed to parse error data").with_code(status.as_u16());
             tracing::debug!("Unsuccessful: {status:?} (reconstruct)");
-            Err(Error::Api(status.boxed()))
+            Err(Error::Api {
+                source: status.boxed(),
+                uri: req_uri
+            })
         }
     } else {
         Ok(res)

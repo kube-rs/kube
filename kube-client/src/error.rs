@@ -15,8 +15,14 @@ pub enum Error {
     /// It's also used in `WatchEvent` from watch calls.
     ///
     /// It's quite common to get a `410 Gone` when the `resourceVersion` is too old.
-    #[error("ApiError: {0} ({0:?})")]
-    Api(#[source] Box<Status>),
+    #[error("ApiError: {source} ({source:?}) at {uri}")]
+    Api {
+        /// The underlying Kubernetes status object
+        #[source]
+        source: Box<Status>,
+        /// The request URI that triggered this error
+        uri: http::Uri,
+    },
 
     /// Hyper error
     #[cfg(feature = "client")]

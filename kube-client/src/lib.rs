@@ -321,7 +321,7 @@ mod test {
         let pp = PostParams::default();
         match pods.create(&pp, &p).await {
             Ok(o) => assert_eq!(p.name_unchecked(), o.name_unchecked()),
-            Err(crate::Error::Api(ae)) => assert_eq!(ae.code, 409), // if we failed to clean-up
+            Err(crate::Error::Api { source: ae, uri: _ }) => assert_eq!(ae.code, 409), // if we failed to clean-up
             Err(e) => return Err(e.into()),                         // any other case if a failure
         }
 
@@ -402,7 +402,7 @@ mod test {
 
         match pods.create(&Default::default(), &p).await {
             Ok(o) => assert_eq!(p.name_unchecked(), o.name_unchecked()),
-            Err(crate::Error::Api(ae)) => assert_eq!(ae.code, 409), // if we failed to clean-up
+            Err(crate::Error::Api { source: ae, uri: _ }) => assert_eq!(ae.code, 409), // if we failed to clean-up
             Err(e) => return Err(e.into()),                         // any other case if a failure
         }
 
@@ -555,7 +555,7 @@ mod test {
 
         match pods.create(&Default::default(), &p).await {
             Ok(o) => assert_eq!(p.name_unchecked(), o.name_unchecked()),
-            Err(crate::Error::Api(ae)) => assert_eq!(ae.code, 409), // if we failed to clean-up
+            Err(crate::Error::Api { source: ae, uri: _ }) => assert_eq!(ae.code, 409), // if we failed to clean-up
             Err(e) => return Err(e.into()),                         // any other case if a failure
         }
 
@@ -641,7 +641,7 @@ mod test {
 
         match pods.create(&Default::default(), &p).await {
             Ok(o) => assert_eq!(p.name_unchecked(), o.name_unchecked()),
-            Err(crate::Error::Api(ae)) => assert_eq!(ae.code, 409), // if we failed to clean-up
+            Err(crate::Error::Api { source: ae, uri: _ }) => assert_eq!(ae.code, 409), // if we failed to clean-up
             Err(e) => return Err(e.into()),                         // any other case if a failure
         }
 
