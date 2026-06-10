@@ -3,7 +3,7 @@ use darling::{
     util::{IdentString, parse_expr},
 };
 use proc_macro2::TokenStream;
-use syn::{Attribute, DeriveInput, Expr, Ident, Path, parse_quote};
+use syn::{Attribute, DeriveInput, Expr, Ident, Meta, Path, Token, parse_quote, punctuated::Punctuated};
 
 #[derive(FromField)]
 #[darling(attributes(x_kube))]
@@ -97,6 +97,13 @@ pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
     let attribute_whitelist = ["serde", "schemars", "doc", "validate"];
     ast.attrs = remove_attributes(&ast.attrs, &attribute_whitelist);
 
+    // A bare container-level `#[serde(default)]` makes the schemars derive call
+    // `<Self as Default>::default()` on the generated mirror structs, which have no `Default`
+    // impl of their own. Emit delegating impls alongside the mirrors in that case.
+    // (The `default = "path"` form needs none of this: schemars calls the function directly.)
+    let original_default = has_container_serde_default(&ast.attrs)
+        .then(|| quote! { <#ident as #std::default::Default>::default() });
+
     let struct_data = match ast.data {
         syn::Data::Struct(ref mut struct_data) => struct_data,
         _ => return quote! {},
@@ -105,7 +112,21 @@ pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
     // Preserve all serde attributes, to allow #[serde(rename_all = "camelCase")] or similar
     let struct_attrs: Vec<TokenStream> = ast.attrs.iter().map(|attr| quote! {#attr}).collect();
     let mut property_modifications = vec![];
+    let mut validated_default_impl = quote! {};
     if let syn::Fields::Named(fields) = &mut struct_data.fields {
+        if let Some(original) = &original_default {
+            let field_idents: Vec<Ident> = fields.named.iter().filter_map(|f| f.ident.clone()).collect();
+            let generated = struct_name.as_ident();
+            validated_default_impl = quote! {
+                #[automatically_derived]
+                impl #std::default::Default for #generated {
+                    fn default() -> Self {
+                        let original = #original;
+                        Self { #(#field_idents: original.#field_idents),* }
+                    }
+                }
+            };
+        }
         for field in &mut fields.named {
             let XKube {
                 validations,
@@ -131,6 +152,19 @@ pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
             let merge_strategy = merge_strategy
                 .map(|strategy| quote! {#kube_core::merge_strategy_property(merge, 0, #strategy).unwrap();});
 
+            let field_default_impl = original_default.as_ref().map(|original| {
+                let field_ident = &field.ident;
+                quote! {
+                    #[automatically_derived]
+                    impl #std::default::Default for Validated {
+                        fn default() -> Self {
+                            let original = #original;
+                            Self { #field_ident: original.#field_ident }
+                        }
+                    }
+                }
+            });
+
             // We need to prepend derive macros, as they were consumed by this macro processing, being a derive by itself.
             property_modifications.push(quote! {
                 {
@@ -141,6 +175,8 @@ pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
                     struct Validated {
                         #field
                     }
+
+                    #field_default_impl
 
                     let merge = &mut Validated::json_schema(generate);
                     #(#rules)*
@@ -170,6 +206,8 @@ pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
                 #[allow(missing_docs)]
                 #ast
 
+                #validated_default_impl
+
                 use #kube_core::{Rule, Message, Reason, ListMerge, MapMerge, StructMerge};
                 let s = &mut #generated_struct_name::json_schema(generate);
                 #(#struct_rules)*
@@ -178,6 +216,21 @@ pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
             }
         }
     }
+}
+
+// Detect a bare container-level `#[serde(default)]`.
+// A bare `default` parses as `Meta::Path`; `default = "path"` is a `Meta::NameValue`
+// and intentionally does not match (schemars resolves that function directly).
+fn has_container_serde_default(attrs: &[Attribute]) -> bool {
+    attrs
+        .iter()
+        .filter(|attr| attr.path().is_ident("serde"))
+        .filter_map(|attr| {
+            attr.parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)
+                .ok()
+        })
+        .flatten()
+        .any(|meta| matches!(meta, Meta::Path(ref path) if path.is_ident("default")))
 }
 
 // Remove all unknown attributes from the list
