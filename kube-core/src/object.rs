@@ -114,6 +114,8 @@ impl<T: Clone> IntoIterator for ObjectList<T> {
     }
 }
 
+impl<T> ExactSizeIterator for ObjectList<T> {}
+
 impl<'a, T: Clone> IntoIterator for &'a ObjectList<T> {
     type IntoIter = ::std::slice::Iter<'a, T>;
     type Item = &'a T;
@@ -123,6 +125,8 @@ impl<'a, T: Clone> IntoIterator for &'a ObjectList<T> {
     }
 }
 
+impl<'a, T> ExactSizeIterator for &'a ObjectList<T> {}
+
 impl<'a, T: Clone> IntoIterator for &'a mut ObjectList<T> {
     type IntoIter = ::std::slice::IterMut<'a, T>;
     type Item = &'a mut T;
@@ -131,6 +135,8 @@ impl<'a, T: Clone> IntoIterator for &'a mut ObjectList<T> {
         self.items.iter_mut()
     }
 }
+
+impl<'a, T> ExactSizeIterator for &'a mut ObjectList<T> {}
 
 /// A trait to access the `spec` of a Kubernetes resource.
 ///
