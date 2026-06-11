@@ -190,6 +190,14 @@ pub mod conditions {
         }
     }
 
+    /// An await condition that returns `true` once the object has been created.
+    ///
+    /// This is the counterpart to [`is_deleted`](super::conditions::is_deleted).
+    #[must_use]
+    pub fn is_created<K: Resource>() -> impl Condition<K> {
+        |obj: Option<&K>| obj.is_some()
+    }
+
     /// An await condition for `CustomResourceDefinition` that returns `true` once it has been accepted and established
     ///
     /// Note that this condition only guarantees you that you can use `Api<CustomResourceDefinition>` when it is ready.
