@@ -451,8 +451,7 @@ mod tests {
                 .labels
                 .as_ref()
                 .and_then(|l| l.get("app"))
-                .map(|v| v == "nginx")
-                .unwrap_or(false)
+                .is_some_and(|v| v == "nginx")
         });
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].as_ref(), &cm1);
