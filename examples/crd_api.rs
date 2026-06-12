@@ -77,8 +77,8 @@ async fn main() -> Result<()> {
             info!("Created {} ({:?})", o.name_any(), o.status.unwrap());
             debug!("Created CRD: {:?}", o.spec);
         }
-        Err(kube::Error::Api(ae)) => assert_eq!(ae.code, 409), // if you skipped delete, for instance
-        Err(e) => return Err(e.into()),                        // any other case is probably bad
+        Err(kube::Error::Api { source: ae, uri: _ }) => assert_eq!(ae.code, 409), // if you skipped delete, for instance
+        Err(e) => return Err(e.into()), // any other case is probably bad
     }
     // Wait for the api to catch up
     sleep(Duration::from_secs(1)).await;
@@ -205,7 +205,7 @@ async fn main() -> Result<()> {
     assert!(fx.spec.validate().is_err());
     // check rejection from apiserver (validation rules embedded in JsonSchema)
     match foos.create(&pp, &fx).await {
-        Err(kube::Error::Api(ae)) => {
+        Err(kube::Error::Api { source: ae, uri: _ }) => {
             assert_eq!(ae.code, 422);
             assert!(
                 ae.message

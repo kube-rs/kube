@@ -235,7 +235,7 @@ async fn main() -> Result<()> {
     let res = dynapi.create(&PostParams::default(), &data).await;
     assert!(res.is_err());
     match res.err() {
-        Some(kube::Error::Api(err)) => {
+        Some(kube::Error::Api { source: err, uri: _ }) => {
             assert_eq!(err.code, 422);
             assert_eq!(err.reason, "Invalid");
             assert!(err.is_failure());
@@ -276,7 +276,7 @@ async fn main() -> Result<()> {
     let cel_res = foos.patch("baz", &ssapply, &Patch::Apply(cel_patch)).await;
     assert!(cel_res.is_err());
     match cel_res.err() {
-        Some(kube::Error::Api(err)) => {
+        Some(kube::Error::Api { source: err, uri: _ }) => {
             assert_eq!(err.code, 422);
             assert_eq!(err.reason, "Invalid");
             assert!(err.is_failure());
@@ -298,7 +298,7 @@ async fn main() -> Result<()> {
     let cel_res = foos.patch("baz", &ssapply, &Patch::Apply(cel_patch)).await;
     assert!(cel_res.is_err());
     match cel_res.err() {
-        Some(kube::Error::Api(err)) => {
+        Some(kube::Error::Api { source: err, uri: _ }) => {
             assert_eq!(err.code, 422);
             assert_eq!(err.reason, "Invalid");
             assert!(err.is_failure());
@@ -321,7 +321,7 @@ async fn main() -> Result<()> {
     let cel_res = foos.patch("baz", &ssapply, &Patch::Apply(cel_patch)).await;
     assert!(cel_res.is_err());
     match cel_res.err() {
-        Some(kube::Error::Api(err)) => {
+        Some(kube::Error::Api { source: err, uri: _ }) => {
             assert_eq!(err.code, 422);
             assert_eq!(err.reason, "Invalid");
             assert!(err.is_failure());
@@ -344,7 +344,7 @@ async fn main() -> Result<()> {
     let cel_res = foos.patch("baz", &ssapply, &Patch::Apply(cel_patch)).await;
     assert!(cel_res.is_err());
     match cel_res.err() {
-        Some(kube::Error::Api(err)) => {
+        Some(kube::Error::Api { source: err, uri: _ }) => {
             assert_eq!(err.code, 422);
             assert_eq!(err.reason, "Invalid");
             assert!(err.is_failure());
@@ -380,7 +380,7 @@ async fn main() -> Result<()> {
     let cel_res = foos.patch("baz", &ssapply, &Patch::Apply(cel_patch)).await;
     assert!(cel_res.is_err());
     match cel_res.err() {
-        Some(kube::Error::Api(err)) => {
+        Some(kube::Error::Api { source: err, uri: _ }) => {
             assert_eq!(err.code, 422);
             assert_eq!(err.reason, "Invalid");
             assert!(err.is_failure());
