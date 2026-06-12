@@ -943,6 +943,73 @@ mod test {
         let labels = wp.label_selector.unwrap();
         assert_eq!(labels, "env in (development,sandbox)");
     }
+
+    #[test]
+    fn list_params_empty_selectors_are_serialized() {
+        let lp = ListParams::default().labels("").fields("");
+        let mut qp = form_urlencoded::Serializer::new(String::from("some/resource?"));
+        lp.populate_qp(&mut qp);
+        let urlstr = qp.finish();
+        assert!(urlstr.contains("labelSelector="), "empty label selector should be serialized: {urlstr}");
+        assert!(urlstr.contains("fieldSelector="), "empty field selector should be serialized: {urlstr}");
+    }
+
+    #[test]
+    fn list_params_resource_version_zero_preserved_without_limit() {
+        let lp = ListParams::default().at("0");
+        let mut qp = form_urlencoded::Serializer::new(String::from("some/resource?"));
+        lp.populate_qp(&mut qp);
+        let urlstr = qp.finish();
+        assert!(urlstr.contains("resourceVersion=0"), "resource_version='0' should be preserved when limit is unset: {urlstr}");
+    }
+
+    #[test]
+    fn list_params_resource_version_zero_dropped_with_limit() {
+        let lp = ListParams::default().at("0").limit(10);
+        let mut qp = form_urlencoded::Serializer::new(String::from("some/resource?"));
+        lp.populate_qp(&mut qp);
+        let urlstr = qp.finish();
+        assert!(!urlstr.contains("resourceVersion"), "resource_version='0' should be dropped when limit is set: {urlstr}");
+    }
+
+    #[test]
+    fn watch_params_empty_selectors_are_serialized() {
+        let wp = WatchParams::default().labels("").fields("");
+        let mut qp = form_urlencoded::Serializer::new(String::from("some/resource?"));
+        wp.populate_qp(&mut qp);
+        let urlstr = qp.finish();
+        assert!(urlstr.contains("labelSelector="), "empty label selector should be serialized: {urlstr}");
+        assert!(urlstr.contains("fieldSelector="), "empty field selector should be serialized: {urlstr}");
+    }
+
+    #[test]
+    fn watch_params_timeout_and_bookmarks_combined() {
+        let wp = WatchParams::default().timeout(120).disable_bookmarks();
+        let mut qp = form_urlencoded::Serializer::new(String::from("some/resource?"));
+        wp.populate_qp(&mut qp);
+        let urlstr = qp.finish();
+        assert!(urlstr.contains("timeoutSeconds=120"), "timeout should be serialized: {urlstr}");
+        assert!(!urlstr.contains("allowWatchBookmarks"), "bookmarks should not appear when disabled: {urlstr}");
+
+        let wp = WatchParams::default().timeout(120);
+        let mut qp = form_urlencoded::Serializer::new(String::from("some/resource?"));
+        wp.populate_qp(&mut qp);
+        let urlstr = qp.finish();
+        assert!(urlstr.contains("timeoutSeconds=120"), "timeout should be serialized: {urlstr}");
+        assert!(urlstr.contains("allowWatchBookmarks=true"), "bookmarks should be serialized: {urlstr}");
+    }
+
+    #[test]
+    fn patch_params_empty_field_manager_is_serialized() {
+        let pp = PatchParams {
+            field_manager: Some("".to_string()),
+            ..PatchParams::default()
+        };
+        let mut qp = form_urlencoded::Serializer::new(String::from("some/resource?"));
+        pp.populate_qp(&mut qp);
+        let urlstr = qp.finish();
+        assert!(urlstr.contains("fieldManager="), "empty field_manager should be serialized: {urlstr}");
+    }
 }
 
 /// Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.
