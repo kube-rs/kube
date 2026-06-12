@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1781217257790,
+  "lastUpdate": 1781304766776,
   "repoUrl": "https://github.com/kube-rs/kube",
   "entries": {
     "Benchmark": [
@@ -2894,6 +2894,105 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/kube-rs/kube/commit/ec8190f3960e0130bad03bf6312fc44edcc532a2"
         },
         "date": 1781217255920,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "init_listwatch - peak_bytes",
+            "value": 55194619,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - total_allocated",
+            "value": 76715088,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - alloc_count",
+            "value": 578023,
+            "unit": "allocations"
+          },
+          {
+            "name": "steady_state - peak_bytes",
+            "value": 71381202,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - total_allocated",
+            "value": 109519220,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - alloc_count",
+            "value": 799021,
+            "unit": "allocations"
+          },
+          {
+            "name": "relist - peak_bytes",
+            "value": 99797302,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - total_allocated",
+            "value": 174518628,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - alloc_count",
+            "value": 1189035,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_without_modify - peak_bytes",
+            "value": 141298836,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - total_allocated",
+            "value": 205865000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - alloc_count",
+            "value": 1298020,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_with_modify - peak_bytes",
+            "value": 134853452,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - total_allocated",
+            "value": 162895000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - alloc_count",
+            "value": 1058021,
+            "unit": "allocations"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "84204691+dgunzy@users.noreply.github.com",
+            "name": "dgunzy",
+            "username": "dgunzy"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b64ad83edbd7ef3c1f2148495d1b5431d1db88f4",
+          "message": "fix(client): apply tls-server-name on the openssl-tls path (#1993)\n\n* fix(client): apply tls-server-name on the openssl-tls path\n\nSigned-off-by: Daniel Guns <danbguns@gmail.com>\n\n* test(client): cover IP tls-server-name and accept_invalid_certs paths\n\nSigned-off-by: Daniel Guns <danbguns@gmail.com>\n\n---------\n\nSigned-off-by: Daniel Guns <danbguns@gmail.com>",
+          "timestamp": "2026-06-12T23:51:03+01:00",
+          "tree_id": "a144976b94dbee6daa27c58463f0544991bfd250",
+          "url": "https://github.com/kube-rs/kube/commit/b64ad83edbd7ef3c1f2148495d1b5431d1db88f4"
+        },
+        "date": 1781304765071,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
