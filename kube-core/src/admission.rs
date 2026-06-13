@@ -203,7 +203,7 @@ pub enum Operation {
 #[cfg(feature = "cel")]
 #[cfg_attr(docsrs, doc(cfg(feature = "cel")))]
 impl<T: Resource> AdmissionRequest<T> {
-    /// Project this request into the [`kube_cel::vap::AdmissionRequest`] used to
+    /// Project this request into the [`kube_cel::AdmissionRequest`] used to
     /// bind the `request` variable for ValidatingAdmissionPolicy CEL evaluation.
     ///
     /// This is a lossy view: only the fields exposed to VAP's `request` variable
@@ -212,8 +212,8 @@ impl<T: Resource> AdmissionRequest<T> {
     /// such as `object`, `oldObject`, `requestKind`, `subResource`, and `options`
     /// are dropped. The carried `uid` is the *user* uid (`userInfo.uid`), matching
     /// the VAP `request.userInfo.uid` variable, not the request round-trip uid.
-    pub fn to_cel_request(&self) -> kube_cel::vap::AdmissionRequest {
-        kube_cel::vap::AdmissionRequest {
+    pub fn to_cel_request(&self) -> kube_cel::AdmissionRequest {
+        kube_cel::AdmissionRequest {
             operation: match self.operation {
                 Operation::Create => "CREATE",
                 Operation::Update => "UPDATE",
@@ -227,12 +227,12 @@ impl<T: Resource> AdmissionRequest<T> {
             name: self.name.clone(),
             namespace: self.namespace.clone().unwrap_or_default(),
             dry_run: self.dry_run,
-            kind: kube_cel::vap::GroupVersionKind {
+            kind: kube_cel::GroupVersionKind {
                 group: self.kind.group.clone(),
                 version: self.kind.version.clone(),
                 kind: self.kind.kind.clone(),
             },
-            resource: kube_cel::vap::GroupVersionResource {
+            resource: kube_cel::GroupVersionResource {
                 group: self.resource.group.clone(),
                 version: self.resource.version.clone(),
                 resource: self.resource.resource.clone(),
