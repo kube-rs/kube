@@ -64,7 +64,7 @@ pub enum Error {
 
     /// Failed to parse auth exec output
     #[error("failed to parse auth exec output: {0}")]
-    AuthExecParse(#[source] serde_json::Error),
+    AuthExecParse(#[source] serde_saphyr::Error),
 
     /// Fail to serialize input
     #[error("failed to serialize input: {0}")]
@@ -639,9 +639,14 @@ fn auth_exec(auth: &ExecConfig) -> Result<ExecCredential, Error> {
             out,
         });
     }
-    let creds = serde_json::from_slice(&out.stdout).map_err(Error::AuthExecParse)?;
+    parse_exec_credentials(&out.stdout)
+}
 
-    Ok(creds)
+/// Exec plugins are expected to emit JSON, but client-go decodes their output with a
+/// YAML-tolerant codec, so some plugins emit YAML. `serde_saphyr` handles both because
+/// YAML 1.2 is a superset of JSON.
+fn parse_exec_credentials(stdout: &[u8]) -> Result<ExecCredential, Error> {
+    serde_saphyr::from_slice(stdout).map_err(Error::AuthExecParse)
 }
 
 #[cfg(test)]
@@ -771,6 +776,31 @@ mod test {
         );
         assert_eq!(header?, HeaderValue::from_static("Bearer my_token"));
         Ok(())
+    }
+
+    #[test]
+    fn exec_credentials_json_and_yaml_parse() {
+        let json = br#"{"kind": "ExecCredential", "apiVersion": "client.authentication.k8s.io/v1", "status": {"token": "json_token"}}"#;
+        let creds = parse_exec_credentials(json).unwrap();
+        assert_eq!(creds.status.unwrap().token.unwrap(), "json_token");
+
+        let yaml = br#"
+kind: ExecCredential
+apiVersion: client.authentication.k8s.io/v1
+status:
+  token: yaml_token
+  expirationTimestamp: "2030-01-01T00:00:00Z"
+"#;
+        let creds = parse_exec_credentials(yaml).unwrap();
+        let status = creds.status.unwrap();
+        assert_eq!(status.token.unwrap(), "yaml_token");
+        assert_eq!(status.expiration_timestamp.unwrap(), "2030-01-01T00:00:00Z");
+
+        let invalid = b"not: [valid";
+        assert!(matches!(
+            parse_exec_credentials(invalid),
+            Err(Error::AuthExecParse(_))
+        ));
     }
 
     #[test]
