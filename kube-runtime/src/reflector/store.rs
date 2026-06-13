@@ -263,8 +263,11 @@ where
     }
 
     /// Return a filtered snapshot of the current values, retaining only objects matching `predicate`
+    ///
+    /// Note: the store read lock is held for the entire duration of predicate evaluation.
+    /// Avoid blocking or expensive operations inside the predicate.
     #[must_use]
-    pub fn state_with<P>(&self, predicate: P) -> Vec<Arc<K>>
+    pub fn state_filter<P>(&self, predicate: P) -> Vec<Arc<K>>
     where
         P: Fn(&K) -> bool,
     {
@@ -285,14 +288,14 @@ where
     /// # use kube_client::core::{Expression, Selector};
     /// # let (reader, _writer) = kube_runtime::reflector::store::<ConfigMap>();
     /// let selector: Selector = Expression::Equal("app".into(), "nginx".into()).into();
-    /// let result = reader.state_filtered(&selector);
+    /// let result = reader.state_filter_selector(&selector);
     /// ```
     #[must_use]
-    pub fn state_filtered(&self, selector: &Selector) -> Vec<Arc<K>>
+    pub fn state_filter_selector(&self, selector: &Selector) -> Vec<Arc<K>>
     where
         K: ResourceExt,
     {
-        self.state_with(|k| selector.matches(k.labels()))
+        self.state_filter(|k| selector.matches(k.labels()))
     }
 
     /// Return the number of elements in the store
@@ -418,7 +421,7 @@ mod tests {
     }
 
     #[test]
-    fn state_with_filters_by_predicate() {
+    fn state_filter_filters_by_predicate() {
         let (reader, mut writer) = store::<ConfigMap>();
 
         let cm1 = ConfigMap {
@@ -443,20 +446,19 @@ mod tests {
         writer.apply_watcher_event(&watcher::Event::Apply(cm1.clone()));
         writer.apply_watcher_event(&watcher::Event::Apply(cm2));
 
-        let result = reader.state_with(|k| {
+        let result = reader.state_filter(|k| {
             k.metadata
                 .labels
                 .as_ref()
                 .and_then(|l| l.get("app"))
-                .map(|v| v == "nginx")
-                .unwrap_or(false)
+                .is_some_and(|v| v == "nginx")
         });
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].as_ref(), &cm1);
     }
 
     #[test]
-    fn state_filtered_filters_by_label_selector() {
+    fn state_filter_selector_filters_by_label_selector() {
         use kube_client::core::{Expression, Selector};
 
         let (reader, mut writer) = store::<ConfigMap>();
@@ -484,7 +486,7 @@ mod tests {
         writer.apply_watcher_event(&watcher::Event::Apply(cm2));
 
         let selector: Selector = Expression::Equal("app".into(), "nginx".into()).into();
-        let result = reader.state_filtered(&selector);
+        let result = reader.state_filter_selector(&selector);
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].as_ref(), &cm1);
     }
