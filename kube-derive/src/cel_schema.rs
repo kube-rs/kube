@@ -151,7 +151,12 @@ pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
         }
     }
 
-    let schema_name = struct_name.as_str();
+    // The generated struct is renamed with a `Validated` suffix to avoid
+    // colliding with the user's type, but that internal name must not become
+    // the schema's public identity. These schemas are always inlined, so
+    // `schema_name` is never used as a `$ref`; its only effect is the title
+    // schemars emits at the schema root. Report the user's type name.
+    let schema_name = ident.to_string();
     let generated_struct_name = struct_name.as_ident();
 
     quote! {
@@ -229,7 +234,7 @@ mod tests {
                     true
                 }
                 fn schema_name() -> ::std::borrow::Cow<'static, str> {
-                    "FooSpecValidated".into()
+                    "FooSpec".into()
                 }
                 fn json_schema(
                     generate: &mut ::schemars::generate::SchemaGenerator,
