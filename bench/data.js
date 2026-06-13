@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1781352262746,
+  "lastUpdate": 1781360725121,
   "repoUrl": "https://github.com/kube-rs/kube",
   "entries": {
     "Benchmark": [
@@ -3092,6 +3092,105 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/kube-rs/kube/commit/6c266576bc847c75bc0de9edb713fe73d934f745"
         },
         "date": 1781352260852,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "init_listwatch - peak_bytes",
+            "value": 55194619,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - total_allocated",
+            "value": 76715088,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - alloc_count",
+            "value": 578023,
+            "unit": "allocations"
+          },
+          {
+            "name": "steady_state - peak_bytes",
+            "value": 71381202,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - total_allocated",
+            "value": 109519220,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - alloc_count",
+            "value": 799021,
+            "unit": "allocations"
+          },
+          {
+            "name": "relist - peak_bytes",
+            "value": 99797302,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - total_allocated",
+            "value": 174518628,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - alloc_count",
+            "value": 1189035,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_without_modify - peak_bytes",
+            "value": 141298836,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - total_allocated",
+            "value": 205865000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - alloc_count",
+            "value": 1298020,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_with_modify - peak_bytes",
+            "value": 134853452,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - total_allocated",
+            "value": 162895000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - alloc_count",
+            "value": 1058021,
+            "unit": "allocations"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "doxxx93@gmail.com",
+            "name": "doxxx",
+            "username": "doxxx93"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c261d787af68af60616bcde3ffac5d2ee51297f9",
+          "message": "deps: bump kube-cel to 0.6.1 (validation surface flattened) (#2005)\n\nkube-cel 0.6 flattened its validation surface: the `vap` module is now\nprivate and its types (`AdmissionRequest`, `GroupVersionKind`,\n`GroupVersionResource`) are re-exported flat at the crate root. Update\n`AdmissionRequest::to_cel_request` to use the new flat paths.\n\nBREAKING CHANGE (kube-core `cel` surface): `to_cel_request` now returns\n`kube_cel::AdmissionRequest` instead of `kube_cel::vap::AdmissionRequest`,\nand the module-qualified paths `kube::core::cel::vap::*` /\n`...::compilation::*` are gone in 0.6. The flat type names re-exported\nthrough `kube_core::cel` keep working.\n\nSigned-off-by: doxxx93 <doxxx93@gmail.com>",
+          "timestamp": "2026-06-13T15:23:45+01:00",
+          "tree_id": "35525502e77424a0ff167c8edbd7f48d93b695a4",
+          "url": "https://github.com/kube-rs/kube/commit/c261d787af68af60616bcde3ffac5d2ee51297f9"
+        },
+        "date": 1781360723444,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
