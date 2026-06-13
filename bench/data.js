@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1781304766776,
+  "lastUpdate": 1781352262746,
   "repoUrl": "https://github.com/kube-rs/kube",
   "entries": {
     "Benchmark": [
@@ -2993,6 +2993,105 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/kube-rs/kube/commit/b64ad83edbd7ef3c1f2148495d1b5431d1db88f4"
         },
         "date": 1781304765071,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "init_listwatch - peak_bytes",
+            "value": 55194619,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - total_allocated",
+            "value": 76715088,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - alloc_count",
+            "value": 578023,
+            "unit": "allocations"
+          },
+          {
+            "name": "steady_state - peak_bytes",
+            "value": 71381202,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - total_allocated",
+            "value": 109519220,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - alloc_count",
+            "value": 799021,
+            "unit": "allocations"
+          },
+          {
+            "name": "relist - peak_bytes",
+            "value": 99797302,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - total_allocated",
+            "value": 174518628,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - alloc_count",
+            "value": 1189035,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_without_modify - peak_bytes",
+            "value": 141298836,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - total_allocated",
+            "value": 205865000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - alloc_count",
+            "value": 1298020,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_with_modify - peak_bytes",
+            "value": 134853452,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - total_allocated",
+            "value": 162895000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - alloc_count",
+            "value": 1058021,
+            "unit": "allocations"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "alexander.lvov.git@gmail.com",
+            "name": "Alexander Lvov",
+            "username": "Alvov1"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "6c266576bc847c75bc0de9edb713fe73d934f745",
+          "message": "refactor(runtime): rename Store::state_with/state_filtered per review feedback (#2002)\n\n* refactor(runtime): rename Store::state_with/state_filtered per review feedback\n\n- state_with -> state_filter (mirrors Iterator::filter naming)\n- state_filtered -> state_filter_selector\n- add doc note that read lock is held during the predicate evaluation\n\nSigned-off-by: Alexander Lvov <alexander.lvov.git@gmail.com>\n\n* refactor(runtime): use is_some_and in store test predicate\n\nSigned-off-by: Alexander Lvov <alexander.lvov.git@gmail.com>\n\n---------\n\nSigned-off-by: Alexander Lvov <alexander.lvov.git@gmail.com>",
+          "timestamp": "2026-06-13T13:02:34+01:00",
+          "tree_id": "64b4c0189673bbb4b0967b1d91769df1a9db69e0",
+          "url": "https://github.com/kube-rs/kube/commit/6c266576bc847c75bc0de9edb713fe73d934f745"
+        },
+        "date": 1781352260852,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
