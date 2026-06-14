@@ -13,12 +13,12 @@ use hyper_util::{
 
 use jiff::Timestamp;
 use std::time::Duration;
-use tower::{BoxError, Layer, Service, ServiceBuilder, ServiceExt as _, util::BoxService};
+use tower::{BoxError, Layer, Service, ServiceBuilder, ServiceExt as _, retry::RetryLayer, util::BoxService};
 use tower_http::{ServiceExt as _, classify::ServerErrorsFailureClass, trace::TraceLayer};
 use tracing::Span;
 
 use super::body::Body;
-use crate::{Client, Config, Error, Result, client::ConfigExt};
+use crate::{Client, Config, Error, Result, client::{ConfigExt, retry::RetryPolicy}};
 
 /// HTTP body of a dynamic backing type.
 ///
@@ -210,6 +210,7 @@ where
 
     let service = ServiceBuilder::new()
         .layer(stack)
+        .option_layer(config.with_retry.then_some(RetryLayer::new(RetryPolicy::server_retry())))
         .option_layer(auth_layer)
         .layer(config.extra_headers_layer()?)
         .layer(
