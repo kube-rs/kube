@@ -1,3 +1,6 @@
+use std::time::Duration;
+
+use bytes::Bytes;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::Status;
 
 use futures::{
@@ -8,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::{
     io::{AsyncRead, AsyncWrite, AsyncWriteExt, DuplexStream},
-    select,
+    select, time,
 };
 use tokio_tungstenite::tungstenite as ws;
 
@@ -64,6 +67,10 @@ pub enum Error {
     #[error("failed to send a WebSocket close message: {0}")]
     SendClose(#[source] ws::Error),
 
+    /// Failed to send ping message.
+    #[error("failed to send a WebSocket ping message: {0}")]
+    SendPing(#[source] ws::Error),
+
     /// Failed to deserialize status object
     #[error("failed to deserialize status object: {0}")]
     DeserializeStatus(#[source] serde_json::Error),
@@ -105,7 +112,15 @@ pub struct AttachedProcess {
     stderr_reader: Option<DuplexStream>,
     status_rx: Option<StatusReceiver>,
     terminal_resize_tx: Option<TerminalSizeSender>,
-    task: tokio::task::JoinHandle<Result<(), Error>>,
+    task: Option<tokio::task::JoinHandle<Result<(), Error>>>,
+}
+
+impl Drop for AttachedProcess {
+    fn drop(&mut self) {
+        if let Some(task) = &self.task {
+            task.abort();
+        }
+    }
 }
 
 impl AttachedProcess {
@@ -146,7 +161,7 @@ impl AttachedProcess {
             has_stdin: ap.stdin,
             has_stdout: ap.stdout,
             has_stderr: ap.stderr,
-            task,
+            task: Some(task),
             stdin_writer: Some(stdin_writer),
             stdout_reader,
             stderr_reader,
@@ -217,12 +232,26 @@ impl AttachedProcess {
     /// Abort the background task, causing remote command to fail.
     #[inline]
     pub fn abort(&self) {
-        self.task.abort();
+        if let Some(task) = &self.task {
+            task.abort();
+        }
     }
 
     /// Waits for the remote command task to complete.
-    pub async fn join(self) -> Result<(), Error> {
-        self.task.await.unwrap_or_else(|e| Err(Error::Spawn(e)))
+    pub async fn join(mut self) -> Result<(), Error> {
+        // Drop all streams before awaiting the task to prevent deadlocks.
+        // If stdout/stderr readers have not been drained, the background task
+        // blocks writing to the full DuplexStream buffer while join() blocks
+        // waiting for the task.
+        self.stdin_writer = None;
+        self.stdout_reader = None;
+        self.stderr_reader = None;
+        self.status_rx = None;
+        self.terminal_resize_tx = None;
+        match self.task.take() {
+            Some(task) => task.await.unwrap_or_else(|e| Err(Error::Spawn(e))),
+            None => Ok(()),
+        }
     }
 
     /// Take a future that resolves with any status object or when the sender is dropped.
@@ -283,6 +312,10 @@ async fn start_message_loop(
     // True until we reach EOF for stdin.
     let mut stdin_is_open = true;
 
+    let mut ping_interval = time::interval(Duration::from_secs(60));
+    ping_interval.set_missed_tick_behavior(time::MissedTickBehavior::Delay);
+    ping_interval.reset();
+
     loop {
         let terminal_size_next = async {
             match terminal_size_rx.as_mut() {
@@ -290,7 +323,16 @@ async fn start_message_loop(
                 None => None,
             }
         };
+
         select! {
+            _ = ping_interval.tick() => {
+                // send a ping to keep an idle connection alive
+                server_send
+                    .send(ws::Message::Ping(Bytes::new()))
+                    .await
+                    .map_err(Error::SendPing)?;
+            },
+
             server_message = server_recv.next() => {
                 match server_message {
                     Some(Ok(Message::Stdout(bin))) => {

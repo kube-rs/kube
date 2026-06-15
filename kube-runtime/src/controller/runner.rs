@@ -78,7 +78,6 @@ where
     }
 }
 
-#[allow(clippy::match_wildcard_for_single_variants)]
 impl<T, R, F, MkF, Ready, ReadyErr> Stream for Runner<T, R, F, MkF, Ready>
 where
     T: Eq + Hash + Clone + Unpin,
@@ -120,7 +119,7 @@ where
                 match scheduler.as_mut().hold().poll_next_unpin(cx) {
                     Poll::Pending | Poll::Ready(None) => break Poll::Pending,
                     // The above future never returns Poll::Ready(Some(_)).
-                    _ => unreachable!(),
+                    Poll::Ready(_) => unreachable!(),
                 }
             }
 

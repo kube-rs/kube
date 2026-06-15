@@ -1,0 +1,63 @@
+name: memory-bench
+on:
+  push:
+    branches: [main]
+    paths:
+      - kube-runtime/**
+      - kube-client/**
+      - kube-core/**
+      - Cargo.toml
+      - Cargo.lock
+  pull_request:
+    paths:
+      - kube-runtime/**
+      - kube-client/**
+      - kube-core/**
+      - Cargo.toml
+      - Cargo.lock
+
+# Spend CI time only on latest ref: https://docs.github.com/en/actions/using-jobs/using-concurrency
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  memory-bench:
+    runs-on: ubuntu-latest
+    if: github.repository == 'kube-rs/kube'
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Run memory benchmark
+        run: cargo bench -p kube-runtime --bench memory > bench-result.json
+
+      - name: Compare benchmarks (PR)
+        if: github.event_name == 'pull_request'
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          tool: customSmallerIsBetter
+          output-file-path: bench-result.json
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          gh-pages-branch: gh-pages
+          benchmark-data-dir-path: bench
+          auto-push: false
+          comment-on-alert: true
+          alert-threshold: "110%"
+          fail-on-alert: true
+
+      - name: Store benchmark result (main)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          tool: customSmallerIsBetter
+          output-file-path: bench-result.json
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          auto-push: true
+          gh-pages-branch: gh-pages
+          benchmark-data-dir-path: bench

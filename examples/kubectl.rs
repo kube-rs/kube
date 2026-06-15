@@ -3,7 +3,11 @@
 //! with labels and namespace selectors supported.
 use anyhow::{Context, Result, bail};
 use futures::{StreamExt, TryStreamExt};
-use k8s_openapi::{apimachinery::pkg::apis::meta::v1::Time, chrono::Utc};
+use k8s_openapi::{
+    apimachinery::pkg::apis::meta::v1::Time,
+    jiff,
+    jiff::{SpanRound, Timestamp, Unit},
+};
 use kube::{
     Client,
     api::{Api, DynamicObject, ListParams, Patch, PatchParams, ResourceExt},
@@ -95,13 +99,17 @@ impl App {
         result.iter_mut().for_each(|x| x.managed_fields_mut().clear()); // hide managed fields
 
         match self.output {
-            OutputMode::Yaml => println!("{}", serde_yaml::to_string(&result)?),
+            OutputMode::Yaml => println!("{}", serde_saphyr::to_string(&result)?),
             OutputMode::Pretty => {
                 // Display style; size columns according to longest name
                 let max_name = result.iter().map(|x| x.name_any().len() + 2).max().unwrap_or(63);
                 println!("{0:<width$} {1:<20}", "NAME", "AGE", width = max_name);
                 for inst in result {
-                    let age = inst.creation_timestamp().map(format_creation).unwrap_or_default();
+                    let age = inst
+                        .creation_timestamp()
+                        .map(format_creation)
+                        .transpose()?
+                        .unwrap_or_default();
                     println!("{0:<width$} {1:<20}", inst.name_any(), age, width = max_name);
                 }
             }
@@ -129,7 +137,11 @@ impl App {
         let mut stream = watcher(api, wc).applied_objects().boxed();
         println!("{0:<width$} {1:<20}", "NAME", "AGE", width = 63);
         while let Some(inst) = stream.try_next().await? {
-            let age = inst.creation_timestamp().map(format_creation).unwrap_or_default();
+            let age = inst
+                .creation_timestamp()
+                .map(format_creation)
+                .transpose()?
+                .unwrap_or_default();
             println!("{0:<width$} {1:<20}", inst.name_any(), age, width = 63);
         }
         Ok(())
@@ -139,12 +151,12 @@ impl App {
         if let Some(n) = &self.name {
             let mut orig = api.get(n).await?;
             orig.managed_fields_mut().clear(); // hide managed fields
-            let input = serde_yaml::to_string(&orig)?;
+            let input = serde_saphyr::to_string(&orig)?;
             debug!("opening {} in {:?}", orig.name_any(), edit::get_editor());
             let edited = edit::edit(&input)?;
             if edited != input {
                 info!("updating changed object {}", orig.name_any());
-                let data: DynamicObject = serde_yaml::from_str(&edited)?;
+                let data: DynamicObject = serde_saphyr::from_str(&edited)?;
                 // NB: simplified kubectl constructs a merge-patch of differences
                 api.replace(n, &Default::default(), &data).await?;
             }
@@ -157,10 +169,13 @@ impl App {
     async fn apply(&self, client: Client, discovery: &Discovery) -> Result<()> {
         let ssapply = PatchParams::apply("kubectl-light").force();
         let pth = self.file.clone().expect("apply needs a -f file supplied");
-        let yaml =
-            std::fs::read_to_string(&pth).with_context(|| format!("Failed to read {}", pth.display()))?;
-        for doc in multidoc_deserialize(&yaml)? {
-            let obj: DynamicObject = serde_yaml::from_value(doc)?;
+        let yaml = std::fs::read(&pth).with_context(|| format!("Failed to read {}", pth.display()))?;
+        let docs = serde_json::Deserializer::from_slice(&yaml)
+            .into_iter::<DynamicObject>()
+            .flatten()
+            .collect::<Vec<_>>();
+
+        for obj in docs {
             let namespace = obj.metadata.namespace.as_deref().or(self.namespace.as_deref());
             let gvk = if let Some(tm) = &obj.types {
                 GroupVersionKind::try_from(tm)?
@@ -170,7 +185,7 @@ impl App {
             let name = obj.name_any();
             if let Some((ar, caps)) = discovery.resolve_gvk(&gvk) {
                 let api = dynamic_api(ar, caps, client.clone(), namespace, false);
-                trace!("Applying {}: \n{}", gvk.kind, serde_yaml::to_string(&obj)?);
+                trace!("Applying {}: \n{}", gvk.kind, serde_saphyr::to_string(&obj)?);
                 let data: serde_json::Value = serde_json::to_value(&obj)?;
                 let _r = api.patch(&name, &ssapply, &Patch::Apply(data)).await?;
                 info!("applied {} {}", gvk.kind, name);
@@ -240,20 +255,16 @@ fn dynamic_api(
     }
 }
 
-fn format_creation(time: Time) -> String {
-    let dur = Utc::now().signed_duration_since(time.0);
-    match (dur.num_days(), dur.num_hours(), dur.num_minutes()) {
+fn format_creation(time: Time) -> std::result::Result<String, jiff::Error> {
+    let dur = Timestamp::now().since(time.0)?.round(
+        SpanRound::new()
+            .largest(Unit::Day)
+            .days_are_24_hours()
+            .smallest(Unit::Minute),
+    )?;
+    Ok(match (dur.get_days(), dur.get_hours(), dur.get_minutes()) {
         (days, _, _) if days > 0 => format!("{days}d"),
         (_, hours, _) if hours > 0 => format!("{hours}h"),
         (_, _, mins) => format!("{mins}m"),
-    }
-}
-
-pub fn multidoc_deserialize(data: &str) -> Result<Vec<serde_yaml::Value>> {
-    use serde::Deserialize;
-    let mut docs = vec![];
-    for de in serde_yaml::Deserializer::from_str(data) {
-        docs.push(serde_yaml::Value::deserialize(de)?);
-    }
-    Ok(docs)
+    })
 }

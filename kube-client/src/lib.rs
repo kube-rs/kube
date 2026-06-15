@@ -115,7 +115,7 @@ cfg_config! {
 cfg_error! {
     pub mod error;
     #[doc(inline)] pub use error::Error;
-    /// Convient alias for `Result<T, Error>`
+    /// Convenient alias for `Result<T, Error>`
     pub type Result<T, E = Error> = std::result::Result<T, E>;
 }
 
@@ -135,7 +135,6 @@ mod test {
         client::ConfigExt,
     };
     use futures::{AsyncBufRead, AsyncBufReadExt, StreamExt, TryStreamExt};
-    use hyper::Uri;
     use k8s_openapi::api::core::v1::{EphemeralContainer, Pod, PodSpec};
     use kube_core::{
         params::{DeleteParams, Patch, PatchParams, PostParams, WatchParams},
@@ -313,7 +312,7 @@ mod test {
                 "restartPolicy": "Never",
                 "containers": [{
                   "name": "busybox",
-                  "image": "busybox:1.34.1",
+                  "image": "busybox:stable",
                   "command": ["sh", "-c", "sleep 30"],
                 }],
             }
@@ -387,7 +386,7 @@ mod test {
             "apiVersion": "v1",
             "kind": "Pod",
             "metadata": {
-                "name": "busybox-kube2",
+                "name": "busybox-kube5",
                 "labels": { "app": "kube-rs-test" },
             },
             "spec": {
@@ -395,7 +394,7 @@ mod test {
                 "restartPolicy": "Never",
                 "containers": [{
                   "name": "busybox",
-                  "image": "busybox:1.34.1",
+                  "image": "busybox:stable",
                   "command": ["sh", "-c", "sleep 30"],
                 }],
             }
@@ -410,7 +409,7 @@ mod test {
         // Manual watch-api for it to become ready
         // NB: don't do this; using conditions (see pod_api example) is easier and less error prone
         let wp = WatchParams::default()
-            .fields(&format!("metadata.name={}", "busybox-kube2"))
+            .fields(&format!("metadata.name={}", "busybox-kube5"))
             .timeout(15);
         let mut stream = pods.watch(&wp, "0").await?.boxed();
         while let Some(ev) = stream.try_next().await? {
@@ -418,7 +417,13 @@ mod test {
                 WatchEvent::Modified(o) => {
                     let s = o.status.as_ref().expect("status exists on pod");
                     let phase = s.phase.clone().unwrap_or_default();
-                    if phase == "Running" {
+                    if phase != "Running" {
+                        continue;
+                    }
+                    let Some(statuses) = s.container_statuses.as_ref() else {
+                        continue;
+                    };
+                    if statuses.iter().all(|s| s.ready) {
                         break;
                     }
                 }
@@ -431,7 +436,7 @@ mod test {
         {
             let mut attached = pods
                 .exec(
-                    "busybox-kube2",
+                    "busybox-kube5",
                     vec!["sh", "-c", "for i in $(seq 1 3); do echo $i; done"],
                     &AttachParams::default().stderr(false),
                 )
@@ -449,7 +454,7 @@ mod test {
 
         // Verify we read from stdout after stdin is closed.
         {
-            let name = "busybox-kube2";
+            let name = "busybox-kube5";
             let command = vec!["sh", "-c", "sleep 2; echo test string 2"];
             let ap = AttachParams::default().stdin(true).stderr(false);
 
@@ -468,16 +473,16 @@ mod test {
                 stdin_writer.write_all(b"this will be ignored\n").await?;
                 _ = stdin_writer.shutdown().await;
 
-                let next_stdout = stdout_stream.next();
-                let stdout = String::from_utf8(next_stdout.await.unwrap().unwrap().to_vec()).unwrap();
-                assert_eq!(stdout, "test string 2\n");
-
                 // AttachedProcess resolves with status object.
                 let status = attached.take_status().unwrap();
                 if let Some(status) = status.await {
-                    assert_eq!(status.status, Some("Success".to_owned()));
                     assert_eq!(status.reason, None);
+                    assert_eq!(status.status, Some("Success".to_owned()));
                 }
+
+                let next_stdout = stdout_stream.next();
+                let stdout = String::from_utf8(next_stdout.await.unwrap().unwrap().to_vec()).unwrap();
+                assert_eq!(stdout, "test string 2\n");
             }
         }
 
@@ -485,7 +490,7 @@ mod test {
         {
             let mut attached = pods
                 .exec(
-                    "busybox-kube2",
+                    "busybox-kube5",
                     vec!["sh"],
                     &AttachParams::default().stdin(true).stderr(false),
                 )
@@ -511,8 +516,8 @@ mod test {
 
         // Delete it
         let dp = DeleteParams::default();
-        pods.delete("busybox-kube2", &dp).await?.map_left(|pdel| {
-            assert_eq!(pdel.name_unchecked(), "busybox-kube2");
+        pods.delete("busybox-kube5", &dp).await?.map_left(|pdel| {
+            assert_eq!(pdel.name_unchecked(), "busybox-kube5");
         });
 
         Ok(())
@@ -542,7 +547,7 @@ mod test {
                 "restartPolicy": "Never",
                 "containers": [{
                   "name": "busybox",
-                  "image": "busybox:1.34.1",
+                  "image": "busybox:stable",
                   "command": ["sh", "-c", "for i in $(seq 1 5); do echo kube $i; sleep 0.1; done"],
                 }],
             }
@@ -628,7 +633,7 @@ mod test {
                 "restartPolicy": "Never",
                 "containers": [{
                   "name": "busybox",
-                  "image": "busybox:1.34.1",
+                  "image": "busybox:stable",
                   "command": ["sh", "-c", "sleep 30s"],
                 }],
             }
@@ -769,7 +774,7 @@ mod test {
                 "restartPolicy": "Never",
                 "containers": [{
                   "name": "busybox",
-                  "image": "busybox:1.34.1",
+                  "image": "busybox:stable",
                   "command": ["sh", "-c", "sleep 2"],
                 }],
             }
@@ -787,7 +792,7 @@ mod test {
             .await
             .map(|v| v.map_left(|pdel| assert_eq!(pdel.name_any(), pod.name_any())));
 
-        // Ephemeral containes can only be applied to a running pod, so one must
+        // Ephemeral containers can only be applied to a running pod, so one must
         // be created before any operations are tested.
         match pods.create(&Default::default(), &pod).await {
             Ok(o) => assert_eq!(pod.name_unchecked(), o.name_unchecked()),
@@ -808,7 +813,7 @@ mod test {
         let mut busybox_eph: EphemeralContainer = serde_json::from_value(json!(
             {
                 "name": "myephemeralcontainer1",
-                "image": "busybox:1.34.1",
+                "image": "busybox:stable",
                 "command": ["sh", "-c", "sleep 2"],
             }
         ))?;
@@ -842,7 +847,7 @@ mod test {
         busybox_eph = serde_json::from_value(json!(
             {
                 "name": "myephemeralcontainer2",
-                "image": "busybox:1.35.0",
+                "image": "busybox:stable",
                 "command": ["sh", "-c", "sleep 1"],
             }
         ))?;
@@ -920,7 +925,7 @@ mod test {
                 "restartPolicy": "Never",
                 "containers": [{
                   "name": "busybox",
-                  "image": "busybox:1.34.1",
+                  "image": "busybox:stable",
                   "command": ["sh", "-c", "sleep 30"],
                 }],
             }
@@ -954,7 +959,7 @@ mod test {
 
         let mut config = Config::infer().await?;
         config.accept_invalid_certs = true;
-        config.cluster_url = "https://localhost:10250".to_string().parse::<Uri>().unwrap();
+        config.cluster_url = "https://localhost:10250".parse().unwrap();
         let kubelet_client: Client = config.try_into()?;
 
         // Verify exec works and we can get the output

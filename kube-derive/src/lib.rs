@@ -35,7 +35,7 @@ mod resource;
 ///     info: "informative info".into(),
 /// });
 /// println!("foo: {:?}", f); // debug print on root type
-/// println!("crd: {}", serde_yaml::to_string(&Foo::crd()).unwrap()); // crd yaml
+/// println!("crd: {}", serde_saphyr::to_string(&Foo::crd()).unwrap()); // crd yaml
 /// ```
 ///
 /// This example generates a `struct Foo` containing metadata, the spec,
@@ -164,8 +164,26 @@ mod resource;
 /// The deprecated way of customizing the scale subresource using a raw JSON string is still
 /// support for backwards-compatibility.
 ///
-/// ## `#[kube(printcolumn = r#"json"#)]`
-/// Allows adding straight json to [printcolumns](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#additional-printer-columns).
+/// ## `#[kube(printcolumn(...))]`
+///
+/// Allows adding a custom column to the [printcolumns](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#additional-printer-columns).
+///
+/// ```ignore
+/// #[kube(printcolumn(
+///     name = "CustomColumn",
+///     type_ = "integer",
+///     json_path = ".spec.someField",
+///     description = "a custom column", // optional
+///     format = "int32",                // optional
+///     priority = "1",                  // optional
+/// ))]
+/// ```
+///
+/// The older method of supplying raw json is still supported:
+///
+/// ```ignore
+/// printcolumn = r#"{"name":"Spec", "type":"string", "description":"name of foo", "jsonPath":".spec.name"}"#,
+/// ```
 ///
 /// ## `#[kube(shortname = "sn")]`
 /// Add a single shortname to the generated crd.
@@ -200,7 +218,7 @@ mod resource;
 /// #[kube(deprecated)]
 /// ```
 ///
-/// Aditionally, you can provide a `deprecationWarning` using the following example.
+/// Additionally, you can provide a `deprecationWarning` using the following example.
 ///
 /// ```ignore
 /// #[kube(deprecated = "Replaced by other CRD")]
@@ -231,7 +249,12 @@ mod resource;
 ///     plural = "feetz",
 ///     shortname = "f",
 ///     scale = r#"{"specReplicasPath":".spec.replicas", "statusReplicasPath":".status.replicas"}"#,
-///     printcolumn = r#"{"name":"Spec", "type":"string", "description":"name of foo", "jsonPath":".spec.name"}"#,
+///     printcolumn(
+///         name = "Spec",
+///         type_ = "string",
+///         description = "name of foo",
+///         json_path = ".spec.name"
+///     ),
 ///     selectable = "spec.replicasCount"
 /// )]
 /// #[serde(rename_all = "camelCase")]
@@ -314,7 +337,7 @@ mod resource;
 /// - similarly; [nested / must_match / credit_card were unhandled by schemars at time of writing](https://github.com/GREsau/schemars/pull/78)
 /// - encoding validations specified through garde (i.e. #[garde(ascii)]), are currently not supported by schemars
 /// - to validate required attributes client-side, garde requires a custom validation function (`#[garde(custom(my_required_check))]`)
-/// - when using garde, fields that should not be validated need to be explictly skipped through the `#[garde(skip)]` attr
+/// - when using garde, fields that should not be validated need to be explicitly skipped through the `#[garde(skip)]` attr
 ///
 /// For sanity, you should review the generated schema before sending it to kubernetes.
 ///
@@ -391,7 +414,7 @@ pub fn derive_custom_resource(input: proc_macro::TokenStream) -> proc_macro::Tok
 ///     group = "kube.rs",
 ///     version = "v1",
 ///     kind = "Struct",
-///     validation = "self.matadata.name == 'singleton'",
+///     validation = "self.metadata.name == 'singleton'",
 /// )]
 /// #[x_kube(validation = "self == oldSelf")]
 /// struct MyStruct {
@@ -409,7 +432,7 @@ pub fn derive_custom_resource(input: proc_macro::TokenStream) -> proc_macro::Tok
 /// assert!(serde_json::to_string(&Struct::crd()).unwrap().contains(r#""rule":"self != ''""#));
 /// assert!(serde_json::to_string(&Struct::crd()).unwrap().contains(r#""message":"failure message""#));
 /// assert!(serde_json::to_string(&Struct::crd()).unwrap().contains(r#""default":"value""#));
-/// assert!(serde_json::to_string(&Struct::crd()).unwrap().contains(r#""rule":"self.matadata.name == 'singleton'""#));
+/// assert!(serde_json::to_string(&Struct::crd()).unwrap().contains(r#""rule":"self.metadata.name == 'singleton'""#));
 /// ```
 #[proc_macro_derive(KubeSchema, attributes(x_kube, schemars, validate))]
 pub fn derive_schema_validation(input: proc_macro::TokenStream) -> proc_macro::TokenStream {

@@ -1,5 +1,6 @@
 use std::time::{Duration, Instant};
 
+/// A mostly internal trait to allow resetting backoff based on a reset duration
 pub trait Backoff: Iterator<Item = Duration> + Send + Sync + Unpin {
     /// Resets the internal state to the initial value.
     fn reset(&mut self);
@@ -20,6 +21,7 @@ pub struct ResetTimerBackoff<B: Backoff> {
 }
 
 impl<B: Backoff> ResetTimerBackoff<B> {
+    /// Create a reset backoff wrapper for a given `Backoff` implementing object and a reset duration.
     pub fn new(backoff: B, reset_duration: Duration) -> Self {
         Self {
             backoff,

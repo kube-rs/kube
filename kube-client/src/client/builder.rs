@@ -13,10 +13,8 @@ use hyper_util::{
 
 use jiff::Timestamp;
 use std::time::Duration;
-use tower::{BoxError, Layer, Service, ServiceBuilder, util::BoxService};
-use tower_http::{
-    classify::ServerErrorsFailureClass, map_response_body::MapResponseBodyLayer, trace::TraceLayer,
-};
+use tower::{BoxError, Layer, Service, ServiceBuilder, ServiceExt as _, util::BoxService};
+use tower_http::{ServiceExt as _, classify::ServerErrorsFailureClass, trace::TraceLayer};
 use tracing::Span;
 
 use super::body::Body;
@@ -126,8 +124,20 @@ impl TryFrom<Config> for ClientBuilder<GenericService> {
             Some(proxy_url) if proxy_url.scheme_str() == Some("http") => {
                 #[cfg(feature = "http-proxy")]
                 {
-                    let connector =
+                    let mut connector =
                         hyper_util::client::legacy::connect::proxy::Tunnel::new(proxy_url.clone(), connector);
+
+                    if let Some(authority) = proxy_url.authority() {
+                        if let Some((userinfo, _)) = authority.as_str().split_once('@') {
+                            use base64::Engine;
+                            use http::HeaderValue;
+
+                            let value = format!("Basic {}", base64::engine::general_purpose::STANDARD.encode(userinfo));
+                            let header = HeaderValue::from_str(&value).unwrap();
+                            connector = connector.with_auth(header);
+                        } 
+                    }
+
                     make_generic_builder(connector, config)
                 }
 
@@ -256,12 +266,11 @@ where
     let (_, expiration) = config.exec_identity_pem();
 
     let client = ClientBuilder::new(
-        BoxService::new(
-            MapResponseBodyLayer::new(|body| {
+        service
+            .map_response_body(|body| {
                 Box::new(http_body_util::BodyExt::map_err(body, BoxError::from)) as Box<DynBody>
             })
-            .layer(service),
-        ),
+            .boxed(),
         default_ns,
     )
     .with_valid_until(expiration);

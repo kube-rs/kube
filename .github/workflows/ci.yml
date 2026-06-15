@@ -91,6 +91,18 @@ jobs:
         env:
           RUSTDOCFLAGS: --cfg docsrs
 
+  minimal-versions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install nightly toolchain
+        uses: dtolnay/rust-toolchain@nightly
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@cargo-hack
+      - uses: extractions/setup-just@v4
+      - name: Check minimal versions
+        run: just minimal-versions
+
   msrv:
     # Run `cargo check` on our minimum supported Rust version
     runs-on: ubuntu-latest
@@ -133,7 +145,7 @@ jobs:
       matrix:
         # Run these tests against older clusters as well
         k8s:
-        - "v1.30" # MK8SV
+        - "v1.32" # MK8SV
         - "latest"
     steps:
       - uses: actions/checkout@v6
@@ -154,6 +166,11 @@ jobs:
           # github-token: ${{ secrets.GITHUB_TOKEN }}
           k3d-args: "-p 10250:10250 --no-rollback --k3s-arg --disable=traefik,servicelb,metrics-server@server:*"
 
+      - name: Import test images into k3d
+        run: |
+          docker pull busybox:stable
+          k3d image import busybox:stable -c kube
+
       # Real CI work starts here
       - name: Build workspace
         run: cargo build
@@ -167,7 +184,7 @@ jobs:
         run: cargo run -p kube-examples --example crd_derive
 
   mk8sv:
-    # comile check e2e tests against mk8sv
+    # compile check e2e tests against mk8sv
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -196,7 +213,7 @@ jobs:
 
       - uses: nolar/setup-k3d-k3s@v1
         with:
-          version: "v1.30" # MK8SV
+          version: "v1.32" # MK8SV
           # k3d-kube
           k3d-name: kube
           # Used to avoid rate limits when fetching the releases from k3s repo.
@@ -230,7 +247,7 @@ jobs:
 
       - name: Setup Docker buildx
         id: setup-buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       # clux: i can never get the buildkit cache dance seems to work reliably so commenting it out
       # would like to get this to work long term, but at least the build is pretty fast
@@ -265,7 +282,7 @@ jobs:
 
       - name: Build and push Docker image
         id: build
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           cache-from: type=gha

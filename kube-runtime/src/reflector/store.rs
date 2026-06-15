@@ -1,3 +1,4 @@
+//! A reader/writer split store for reflectors
 use super::{Lookup, ObjectRef, dispatcher::Dispatcher};
 #[cfg(feature = "unstable-runtime-subscribe")]
 use crate::reflector::ReflectHandle;
@@ -7,6 +8,10 @@ use crate::{
 };
 use ahash::AHashMap;
 use educe::Educe;
+use kube_client::{
+    ResourceExt,
+    core::{Selector, SelectorExt},
+};
 use parking_lot::RwLock;
 use std::{fmt::Debug, hash::Hash, sync::Arc};
 use thiserror::Error;
@@ -191,6 +196,7 @@ where
     ready_rx: Arc<DelayedInit<()>>,
 }
 
+/// The error returned by `Store::wait_until_ready`
 #[derive(Debug, Error)]
 #[error("writer was dropped before store became ready")]
 pub struct WriterDropped(delayed_init::InitDropped);
@@ -256,6 +262,42 @@ where
             .cloned()
     }
 
+    /// Return a filtered snapshot of the current values, retaining only objects matching `predicate`
+    ///
+    /// Note: the store read lock is held for the entire duration of predicate evaluation.
+    /// Avoid blocking or expensive operations inside the predicate.
+    #[must_use]
+    pub fn state_filter<P>(&self, predicate: P) -> Vec<Arc<K>>
+    where
+        P: Fn(&K) -> bool,
+    {
+        self.store
+            .read()
+            .values()
+            .filter(|k| predicate(k.as_ref()))
+            .cloned()
+            .collect()
+    }
+
+    /// Return a filtered snapshot of the current values, retaining only objects whose labels match `selector`
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use k8s_openapi::api::core::v1::ConfigMap;
+    /// # use kube_client::core::{Expression, Selector};
+    /// # let (reader, _writer) = kube_runtime::reflector::store::<ConfigMap>();
+    /// let selector: Selector = Expression::Equal("app".into(), "nginx".into()).into();
+    /// let result = reader.state_filter_selector(&selector);
+    /// ```
+    #[must_use]
+    pub fn state_filter_selector(&self, selector: &Selector) -> Vec<Arc<K>>
+    where
+        K: ResourceExt,
+    {
+        self.state_filter(|k| selector.matches(k.labels()))
+    }
+
     /// Return the number of elements in the store
     #[must_use]
     pub fn len(&self) -> usize {
@@ -293,7 +335,6 @@ where
 /// A buffer size is used for the underlying message channel. When the buffer is
 /// full, backpressure will be applied by waiting for capacity.
 #[must_use]
-#[allow(clippy::module_name_repetitions)]
 #[cfg(feature = "unstable-runtime-subscribe")]
 pub fn store_shared<K>(buf_size: usize) -> (Store<K>, Writer<K>)
 where
@@ -371,13 +412,83 @@ mod tests {
             },
             ..ConfigMap::default()
         };
-        #[allow(clippy::redundant_clone)] // false positive
         let mut nsed_cm = cm.clone();
         nsed_cm.metadata.namespace = Some("ns".to_string());
         let mut store_w = Writer::default();
         store_w.apply_watcher_event(&watcher::Event::Apply(cm.clone()));
         let store = store_w.as_reader();
         assert_eq!(store.get(&ObjectRef::from_obj(&nsed_cm)).as_deref(), Some(&cm));
+    }
+
+    #[test]
+    fn state_filter_filters_by_predicate() {
+        let (reader, mut writer) = store::<ConfigMap>();
+
+        let cm1 = ConfigMap {
+            metadata: ObjectMeta {
+                name: Some("cm1".to_string()),
+                namespace: Some("ns".to_string()),
+                labels: Some([("app".to_string(), "nginx".to_string())].into()),
+                ..ObjectMeta::default()
+            },
+            ..ConfigMap::default()
+        };
+        let cm2 = ConfigMap {
+            metadata: ObjectMeta {
+                name: Some("cm2".to_string()),
+                namespace: Some("ns".to_string()),
+                labels: Some([("app".to_string(), "postgres".to_string())].into()),
+                ..ObjectMeta::default()
+            },
+            ..ConfigMap::default()
+        };
+
+        writer.apply_watcher_event(&watcher::Event::Apply(cm1.clone()));
+        writer.apply_watcher_event(&watcher::Event::Apply(cm2));
+
+        let result = reader.state_filter(|k| {
+            k.metadata
+                .labels
+                .as_ref()
+                .and_then(|l| l.get("app"))
+                .is_some_and(|v| v == "nginx")
+        });
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].as_ref(), &cm1);
+    }
+
+    #[test]
+    fn state_filter_selector_filters_by_label_selector() {
+        use kube_client::core::{Expression, Selector};
+
+        let (reader, mut writer) = store::<ConfigMap>();
+
+        let cm1 = ConfigMap {
+            metadata: ObjectMeta {
+                name: Some("cm1".to_string()),
+                namespace: Some("ns".to_string()),
+                labels: Some([("app".to_string(), "nginx".to_string())].into()),
+                ..ObjectMeta::default()
+            },
+            ..ConfigMap::default()
+        };
+        let cm2 = ConfigMap {
+            metadata: ObjectMeta {
+                name: Some("cm2".to_string()),
+                namespace: Some("ns".to_string()),
+                labels: Some([("app".to_string(), "postgres".to_string())].into()),
+                ..ObjectMeta::default()
+            },
+            ..ConfigMap::default()
+        };
+
+        writer.apply_watcher_event(&watcher::Event::Apply(cm1.clone()));
+        writer.apply_watcher_event(&watcher::Event::Apply(cm2));
+
+        let selector: Selector = Expression::Equal("app".into(), "nginx".into()).into();
+        let result = reader.state_filter_selector(&selector);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].as_ref(), &cm1);
     }
 
     #[test]

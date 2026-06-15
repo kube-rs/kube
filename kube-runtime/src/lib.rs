@@ -8,6 +8,7 @@
 //! opinionated starting point that should be appropriate for simple operators, but all
 //! components are designed to be usable á la carte if your operator doesn't quite fit that mold.
 
+#![cfg_attr(docsrs, feature(doc_cfg))]
 #![deny(clippy::all)]
 #![deny(clippy::pedantic)]
 // Triggered by many derive macros (kube-derive, educe)
@@ -35,7 +36,7 @@ pub use finalizer::finalizer;
 pub use reflector::reflector;
 pub use scheduler::scheduler;
 pub use utils::WatchStreamExt;
-pub use watcher::{metadata_watcher, watcher};
+#[allow(deprecated)] pub use watcher::{metadata_watcher, watcher};
 
 pub use utils::{Predicate, PredicateConfig, predicates};
 pub use wait::conditions;

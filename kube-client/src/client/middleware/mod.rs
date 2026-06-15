@@ -57,12 +57,12 @@ mod tests {
                 request.headers().get(AUTHORIZATION).unwrap(),
                 HeaderValue::try_from(format!("Bearer {TOKEN}")).unwrap()
             );
-            send.send_response(Response::builder().body(Body::empty()).unwrap());
+            send.send_response(Response::new(Body::empty()));
         });
 
         assert_ready_ok!(service.poll_ready());
         service
-            .call(Request::builder().uri("/").body(Body::empty()).unwrap())
+            .call(Request::get("/").body(Body::empty()).unwrap())
             .await
             .unwrap();
         spawned.await.unwrap();
@@ -75,7 +75,7 @@ mod tests {
         let (mut service, _handle) =
             mock::spawn_layer::<Request<Body>, Response<Body>, _>(AsyncFilterLayer::new(auth));
         let err = service
-            .call(Request::builder().uri("/").body(Body::empty()).unwrap())
+            .call(Request::get("/").body(Body::empty()).unwrap())
             .await
             .unwrap_err();
 

@@ -28,7 +28,12 @@ use serde::{Deserialize, Serialize};
         spec_replicas_path = ".spec.replicas",
         status_replicas_path = ".status.replicas"
     ),
-    printcolumn = r#"{"name":"Spec", "type":"string", "description":"name of foo", "jsonPath":".spec.name"}"#,
+    printcolumn(
+        name = "Spec",
+        type_ = "string",
+        description = "name of foo",
+        json_path = ".spec.name",
+    ),
     selectable = "spec.name"
 )]
 pub struct MyFoo {
@@ -201,7 +206,7 @@ fn verify_crd() {
       }
     });
     let crd = serde_json::to_value(FooCrd::crd()).unwrap();
-    println!("got crd: {}", serde_yaml::to_string(&FooCrd::crd()).unwrap());
+    println!("got crd: {}", serde_saphyr::to_string(&FooCrd::crd()).unwrap());
     use assert_json_diff::assert_json_include;
     assert_json_include!(actual: output, expected: crd);
 }
@@ -226,13 +231,13 @@ async fn verify_url_gen() {
 #[test]
 fn verify_default() {
     let fdef = FooCrd::default();
-    let ser = serde_yaml::to_string(&fdef).unwrap();
+    let ser = serde_saphyr::to_string(&fdef).unwrap();
     let exp = r#"
 apiVersion: clux.dev/v1
 kind: Foo
 metadata: {}
 spec:
-  name: ''
+  name: ""
 "#;
     assert_eq!(exp.trim(), ser.trim());
 }

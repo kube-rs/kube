@@ -9,8 +9,10 @@ use thiserror::Error;
 
 use crate::watcher::{self, watch_object};
 
+/// Errors from `await_condition`
 #[derive(Debug, Error)]
 pub enum Error {
+    /// The underlying watcher failed to probe the stream
     #[error("failed to probe for whether the condition is fulfilled yet: {0}")]
     ProbeFailed(#[source] watcher::Error),
 }
@@ -91,6 +93,7 @@ where
 /// }
 /// ```
 pub trait Condition<K> {
+    /// The main trait condition that must be implemented
     fn matches_object(&self, obj: Option<&K>) -> bool;
 
     /// Returns a `Condition` that holds if `self` does not
@@ -185,6 +188,14 @@ pub mod conditions {
                 |obj| obj.meta().uid.as_deref() != Some(uid),
             )
         }
+    }
+
+    /// An await condition that returns `true` once the object has been created.
+    ///
+    /// This is the counterpart to [`is_deleted`](super::conditions::is_deleted).
+    #[must_use]
+    pub fn is_created<K: Resource>() -> impl Condition<K> {
+        |obj: Option<&K>| obj.is_some()
     }
 
     /// An await condition for `CustomResourceDefinition` that returns `true` once it has been accepted and established
@@ -377,7 +388,7 @@ pub mod conditions {
                   - v1
             "#;
 
-            let c = serde_yaml::from_str(crd).unwrap();
+            let c = serde_saphyr::from_str(crd).unwrap();
             assert!(is_crd_established().matches_object(Some(&c)))
         }
 
@@ -430,7 +441,7 @@ pub mod conditions {
                   - v1
             "#;
 
-            let c = serde_yaml::from_str(crd).unwrap();
+            let c = serde_saphyr::from_str(crd).unwrap();
             assert!(!is_crd_established().matches_object(Some(&c)))
         }
 
@@ -497,7 +508,7 @@ pub mod conditions {
                   qosClass: Burstable
             "#;
 
-            let p = serde_yaml::from_str(pod).unwrap();
+            let p = serde_saphyr::from_str(pod).unwrap();
             assert!(is_pod_running().matches_object(Some(&p)))
         }
 
@@ -522,8 +533,7 @@ pub mod conditions {
                   conditions:
                     - lastProbeTime: null
                       lastTransitionTime: "2025-03-06T03:52:25Z"
-                      message: '0/1 nodes are available: 1 node(s) were unschedulable. preemption: 0/1
-                      nodes are available: 1 Preemption is not helpful for scheduling.'
+                      message: '0/1 nodes are available: 1 node(s) were unschedulable. preemption: 0/1 nodes are available: 1 Preemption is not helpful for scheduling.'
                       reason: Unschedulable
                       status: "False"
                       type: PodScheduled
@@ -531,7 +541,7 @@ pub mod conditions {
                   qosClass: Burstable
             "#;
 
-            let p = serde_yaml::from_str(pod).unwrap();
+            let p = serde_saphyr::from_str(pod).unwrap();
             assert!(!is_pod_running().matches_object(Some(&p)))
         }
 
@@ -588,7 +598,7 @@ pub mod conditions {
                   uncountedTerminatedPods: {}
             "#;
 
-            let j = serde_yaml::from_str(job).unwrap();
+            let j = serde_saphyr::from_str(job).unwrap();
             assert!(is_job_completed().matches_object(Some(&j)))
         }
 
@@ -628,7 +638,7 @@ pub mod conditions {
                   uncountedTerminatedPods: {}
             "#;
 
-            let j = serde_yaml::from_str(job).unwrap();
+            let j = serde_saphyr::from_str(job).unwrap();
             assert!(!is_job_completed().matches_object(Some(&j)))
         }
 
@@ -700,7 +710,7 @@ pub mod conditions {
                   updatedReplicas: 3
             "#;
 
-            let d = serde_yaml::from_str(depl).unwrap();
+            let d = serde_saphyr::from_str(depl).unwrap();
             assert!(is_deployment_completed().matches_object(Some(&d)))
         }
 
@@ -763,7 +773,7 @@ pub mod conditions {
                   updatedReplicas: 3
             "#;
 
-            let d = serde_yaml::from_str(depl).unwrap();
+            let d = serde_saphyr::from_str(depl).unwrap();
             assert!(!is_deployment_completed().matches_object(Some(&d)))
         }
 
@@ -776,7 +786,7 @@ pub mod conditions {
         }
 
         #[test]
-        /// pass if loadbalancer service has recieved a loadbalancer IP
+        /// pass if loadbalancer service has received a loadbalancer IP
         fn service_lb_provisioned_ok_ip() {
             use super::{Condition, is_service_loadbalancer_provisioned};
 
@@ -800,12 +810,12 @@ pub mod conditions {
                       - ip: 192.0.2.127
             ";
 
-            let s = serde_yaml::from_str(service).unwrap();
+            let s = serde_saphyr::from_str(service).unwrap();
             assert!(is_service_loadbalancer_provisioned().matches_object(Some(&s)))
         }
 
         #[test]
-        /// pass if loadbalancer service has recieved a loadbalancer hostname
+        /// pass if loadbalancer service has received a loadbalancer hostname
         fn service_lb_provisioned_ok_hostname() {
             use super::{Condition, is_service_loadbalancer_provisioned};
 
@@ -829,7 +839,7 @@ pub mod conditions {
                       - hostname: example.exposed.service
             ";
 
-            let s = serde_yaml::from_str(service).unwrap();
+            let s = serde_saphyr::from_str(service).unwrap();
             assert!(is_service_loadbalancer_provisioned().matches_object(Some(&s)))
         }
 
@@ -856,7 +866,7 @@ pub mod conditions {
                   loadBalancer: {}
             ";
 
-            let s = serde_yaml::from_str(service).unwrap();
+            let s = serde_saphyr::from_str(service).unwrap();
             assert!(!is_service_loadbalancer_provisioned().matches_object(Some(&s)))
         }
 
@@ -882,7 +892,7 @@ pub mod conditions {
                   loadBalancer: {}
             ";
 
-            let s = serde_yaml::from_str(service).unwrap();
+            let s = serde_saphyr::from_str(service).unwrap();
             assert!(is_service_loadbalancer_provisioned().matches_object(Some(&s)))
         }
 
@@ -895,7 +905,7 @@ pub mod conditions {
         }
 
         #[test]
-        /// pass when ingress has recieved a loadbalancer IP
+        /// pass when ingress has received a loadbalancer IP
         fn ingress_provisioned_ok_ip() {
             use super::{Condition, is_ingress_provisioned};
 
@@ -925,12 +935,12 @@ pub mod conditions {
                       - ip: 10.89.7.3
             "#;
 
-            let i = serde_yaml::from_str(ingress).unwrap();
+            let i = serde_saphyr::from_str(ingress).unwrap();
             assert!(is_ingress_provisioned().matches_object(Some(&i)))
         }
 
         #[test]
-        /// pass when ingress has recieved a loadbalancer hostname
+        /// pass when ingress has received a loadbalancer hostname
         fn ingress_provisioned_ok_hostname() {
             use super::{Condition, is_ingress_provisioned};
 
@@ -960,7 +970,7 @@ pub mod conditions {
                       - hostname: example.exposed.service
             "#;
 
-            let i = serde_yaml::from_str(ingress).unwrap();
+            let i = serde_saphyr::from_str(ingress).unwrap();
             assert!(is_ingress_provisioned().matches_object(Some(&i)))
         }
 
@@ -993,7 +1003,7 @@ pub mod conditions {
                   loadBalancer: {}
             "#;
 
-            let i = serde_yaml::from_str(ingress).unwrap();
+            let i = serde_saphyr::from_str(ingress).unwrap();
             assert!(!is_ingress_provisioned().matches_object(Some(&i)))
         }
 
@@ -1015,12 +1025,18 @@ pub mod delete {
     use std::fmt::Debug;
     use thiserror::Error;
 
+    /// Errors from `delete_and_finalize`
     #[derive(Debug, Error)]
     pub enum Error {
+        /// No uid found on metadata.uid on deleted object
         #[error("deleted object has no UID to wait for")]
         NoUid,
+
+        /// Apiserver returned an error to the delete call
         #[error("failed to delete object: {0}")]
         Delete(#[source] kube_client::Error),
+
+        /// A watcher failed to probe the object for the `is_deleted` condition
         #[error("failed to wait for object to be deleted: {0}")]
         Await(#[source] super::Error),
     }
@@ -1030,7 +1046,6 @@ pub mod delete {
     /// # Errors
     ///
     /// Returns an [`Error`](enum@super::Error) if the object was unable to be deleted, or if the wait was interrupted.
-    #[allow(clippy::module_name_repetitions)]
     pub async fn delete_and_finalize<K: Clone + Debug + Send + DeserializeOwned + Resource + 'static>(
         api: Api<K>,
         name: &str,

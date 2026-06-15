@@ -1,4 +1,4 @@
-//! Traits and tyes for CustomResources
+//! Traits and types for CustomResources
 
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions as apiexts;
 
@@ -222,9 +222,9 @@ pub mod v1 {
                 served: true
                 storage: false"#;
 
-            let c1: Crd = serde_yaml::from_str(crd1).unwrap();
-            let c2: Crd = serde_yaml::from_str(crd2).unwrap();
-            let ce: Crd = serde_yaml::from_str(expected).unwrap();
+            let c1: Crd = serde_saphyr::from_str(crd1).unwrap();
+            let c2: Crd = serde_saphyr::from_str(crd2).unwrap();
+            let ce: Crd = serde_saphyr::from_str(expected).unwrap();
             let combined = merge_crds(vec![c1, c2], "v2").unwrap();
 
             let combo_json = serde_json::to_value(&combined).unwrap();

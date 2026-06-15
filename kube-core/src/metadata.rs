@@ -150,6 +150,10 @@ impl<K: Resource> Resource for PartialObjectMeta<K> {
     type DynamicType = K::DynamicType;
     type Scope = K::Scope;
 
+    fn metadata_api() -> bool {
+        true
+    }
+
     fn kind(dt: &Self::DynamicType) -> Cow<'_, str> {
         K::kind(dt)
     }
@@ -206,5 +210,13 @@ mod test {
         // but the response_pom will use the type-erased kinds from the apiserver
         assert_eq!(response_pom.types.as_ref().unwrap().api_version, "meta.k8s.io/v1");
         assert_eq!(response_pom.types.as_ref().unwrap().kind, "PartialObjectMetadata");
+    }
+
+    #[test]
+    fn metadata_api_flag() {
+        // PartialObjectMeta should signal metadata-only API requests
+        assert!(PartialObjectMeta::<Pod>::metadata_api());
+        // Regular resources should not
+        assert!(!Pod::metadata_api());
     }
 }

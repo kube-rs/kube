@@ -64,7 +64,7 @@ pub enum Error {
 
     /// Failed to parse auth exec output
     #[error("failed to parse auth exec output: {0}")]
-    AuthExecParse(#[source] serde_json::Error),
+    AuthExecParse(#[source] serde_saphyr::Error),
 
     /// Fail to serialize input
     #[error("failed to serialize input: {0}")]
@@ -108,7 +108,6 @@ pub enum Error {
 }
 
 #[derive(Debug, Clone)]
-#[allow(clippy::large_enum_variant)]
 pub(crate) enum Auth {
     None,
     Basic(String, SecretString),
@@ -214,8 +213,14 @@ impl RefreshableToken {
                 // Add some wiggle room onto the current timestamp so we don't get any race
                 // conditions where the token expires while we are refreshing
                 if Timestamp::now() + SIXTY_SEC >= locked_data.1 {
+                    // Run blocking exec command on the blocking threadpool to avoid
+                    // stalling the tokio worker during token refresh.
                     // TODO Improve refreshing exec to avoid `Auth::try_from`
-                    match Auth::try_from(&locked_data.2)? {
+                    let auth_info = locked_data.2.clone();
+                    let auth = tokio::task::spawn_blocking(move || Auth::try_from(&auth_info))
+                        .await
+                        .map_err(|e| Error::AuthExec(format!("failed to spawn blocking auth task: {e}")))??;
+                    match auth {
                         Auth::None | Auth::Basic(_, _) | Auth::Bearer(_) | Auth::Certificate(_, _, _) => {
                             return Err(Error::UnrefreshableTokenResponse);
                         }
@@ -614,8 +619,16 @@ fn auth_exec(auth: &ExecConfig) -> Result<ExecCredential, Error> {
 
     #[cfg(target_os = "windows")]
     {
-        const CREATE_NO_WINDOW: u32 = 0x08000000;
-        cmd.creation_flags(CREATE_NO_WINDOW);
+        // Opt-in via env var; see https://github.com/kube-rs/kube/issues/1901 for why
+        // this is gated (CREATE_NO_WINDOW breaks stderr inheritance for interactive exec
+        // plugins like kubelogin.exe).
+        if std::env::var("KUBE_RS_UNSTABLE_CREATE_NO_WINDOW")
+            .map(|s| s == "1")
+            .unwrap_or(false)
+        {
+            const CREATE_NO_WINDOW: u32 = 0x08000000;
+            cmd.creation_flags(CREATE_NO_WINDOW);
+        }
     }
 
     let out = cmd.output().map_err(Error::AuthExecStart)?;
@@ -626,20 +639,25 @@ fn auth_exec(auth: &ExecConfig) -> Result<ExecCredential, Error> {
             out,
         });
     }
-    let creds = serde_json::from_slice(&out.stdout).map_err(Error::AuthExecParse)?;
+    parse_exec_credentials(&out.stdout)
+}
 
-    Ok(creds)
+/// Exec plugins are expected to emit JSON, but client-go decodes their output with a
+/// YAML-tolerant codec, so some plugins emit YAML. `serde_saphyr` handles both because
+/// YAML 1.2 is a superset of JSON.
+fn parse_exec_credentials(stdout: &[u8]) -> Result<ExecCredential, Error> {
+    serde_saphyr::from_slice(stdout).map_err(Error::AuthExecParse)
 }
 
 #[cfg(test)]
 mod test {
     use crate::config::Kubeconfig;
+    use std::time::{Duration, Instant};
 
     use super::*;
-    #[tokio::test]
-    #[ignore = "fails on windows mysteriously"]
-    async fn exec_auth_command() -> Result<(), Error> {
-        let expiry = (Timestamp::now() + SIXTY_SEC).to_string();
+
+    /// Build an `AuthInfo` whose gcp auth-provider runs `cmd_path cmd_args` to emit credential JSON.
+    fn gcp_auth_info(cmd_path: &str, cmd_args: &str) -> AuthInfo {
         let test_file = format!(
             r#"
         apiVersion: v1
@@ -661,17 +679,29 @@ mod test {
           user:
             auth-provider:
               config:
-                cmd-args: '{{"something": "else", "credential": {{"access_token": "my_token", "token_expiry": "{expiry}"}}}}'
-                cmd-path: echo
+                cmd-args: {cmd_args}
+                cmd-path: {cmd_path}
                 expiry-key: '{{.credential.token_expiry}}'
                 token-key: '{{.credential.access_token}}'
               name: gcp
         "#
         );
+        let config: Kubeconfig = serde_saphyr::from_str(&test_file).unwrap();
+        config.auth_infos[0].auth_info.clone().unwrap()
+    }
 
-        let config: Kubeconfig = serde_yaml::from_str(&test_file).unwrap();
-        let auth_info = config.auth_infos[0].auth_info.as_ref().unwrap();
-        match Auth::try_from(auth_info).unwrap() {
+    fn cred_json(token: &str, expiry: &str) -> String {
+        format!(
+            r#"{{"something": "else", "credential": {{"access_token": "{token}", "token_expiry": "{expiry}"}}}}"#
+        )
+    }
+
+    #[tokio::test]
+    #[ignore = "fails on windows mysteriously"]
+    async fn exec_auth_command() -> Result<(), Error> {
+        let expiry = (Timestamp::now() + SIXTY_SEC).to_string();
+        let auth_info = gcp_auth_info("echo", &format!("'{}'", cred_json("my_token", &expiry)));
+        match Auth::try_from(&auth_info).unwrap() {
             Auth::RefreshableToken(RefreshableToken::Exec(refreshable)) => {
                 let (token, _expire, info) = Arc::try_unwrap(refreshable).unwrap().into_inner();
                 assert_eq!(token.expose_secret(), &"my_token".to_owned());
@@ -681,6 +711,96 @@ mod test {
             _ => unreachable!(),
         }
         Ok(())
+    }
+
+    #[tokio::test]
+    #[ignore = "shells out to echo/sh; skipped on windows"]
+    async fn exec_token_refresh_via_to_header() -> Result<(), Error> {
+        let fresh_expiry = (Timestamp::now() + SignedDuration::from_secs(3600)).to_string();
+        let auth_info = gcp_auth_info("echo", &format!("'{}'", cred_json("my_token", &fresh_expiry)));
+        // Seed with a stale token + past expiry to force the refresh branch.
+        let stale_expiry = Timestamp::now() - SIXTY_SEC;
+        let refreshable = RefreshableToken::Exec(Arc::new(Mutex::new((
+            SecretString::from("stale"),
+            stale_expiry,
+            auth_info,
+        ))));
+
+        let header = refreshable.to_header().await?;
+        assert_eq!(header, HeaderValue::from_static("Bearer my_token"));
+
+        // Cached state should have been updated in place.
+        if let RefreshableToken::Exec(data) = &refreshable {
+            let locked = data.lock().await;
+            assert_eq!(locked.0.expose_secret(), "my_token");
+            assert!(locked.1 > Timestamp::now(), "expiry should be in the future");
+        } else {
+            unreachable!();
+        }
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    #[ignore = "shells out to echo/sh; skipped on windows"]
+    async fn exec_token_refresh_does_not_block_runtime() -> Result<(), Error> {
+        use std::io::Write;
+        let fresh_expiry = (Timestamp::now() + SignedDuration::from_secs(3600)).to_string();
+        // Write a script that sleeps ~300ms before emitting credentials; the gcp provider
+        // splits cmd-args on spaces so we can't inline this via `sh -c`.
+        let mut script = tempfile::NamedTempFile::new().unwrap();
+        writeln!(script, "#!/bin/sh").unwrap();
+        writeln!(script, "sleep 0.3").unwrap();
+        writeln!(script, "echo '{}'", cred_json("my_token", &fresh_expiry)).unwrap();
+        script.flush().unwrap();
+        let script_path = script.path().to_str().unwrap().to_owned();
+
+        let auth_info = gcp_auth_info("sh", &script_path);
+        let stale_expiry = Timestamp::now() - SIXTY_SEC;
+        let refreshable = RefreshableToken::Exec(Arc::new(Mutex::new((
+            SecretString::from("stale"),
+            stale_expiry,
+            auth_info,
+        ))));
+
+        // On a current_thread runtime, if to_header() blocked the worker the 50ms
+        // timer below could not fire until the 300ms exec completed.
+        let start = Instant::now();
+        let (header, timer_elapsed) = tokio::join!(refreshable.to_header(), async {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+            start.elapsed()
+        });
+
+        assert!(
+            timer_elapsed < Duration::from_millis(200),
+            "timer took {timer_elapsed:?}; to_header likely blocked the runtime"
+        );
+        assert_eq!(header?, HeaderValue::from_static("Bearer my_token"));
+        Ok(())
+    }
+
+    #[test]
+    fn exec_credentials_json_and_yaml_parse() {
+        let json = br#"{"kind": "ExecCredential", "apiVersion": "client.authentication.k8s.io/v1", "status": {"token": "json_token"}}"#;
+        let creds = parse_exec_credentials(json).unwrap();
+        assert_eq!(creds.status.unwrap().token.unwrap(), "json_token");
+
+        let yaml = br#"
+kind: ExecCredential
+apiVersion: client.authentication.k8s.io/v1
+status:
+  token: yaml_token
+  expirationTimestamp: "2030-01-01T00:00:00Z"
+"#;
+        let creds = parse_exec_credentials(yaml).unwrap();
+        let status = creds.status.unwrap();
+        assert_eq!(status.token.unwrap(), "yaml_token");
+        assert_eq!(status.expiration_timestamp.unwrap(), "2030-01-01T00:00:00Z");
+
+        let invalid = b"not: [valid";
+        assert!(matches!(
+            parse_exec_credentials(invalid),
+            Err(Error::AuthExecParse(_))
+        ));
     }
 
     #[test]

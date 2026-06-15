@@ -43,14 +43,10 @@ exceptions = [
 unknown-registry = "deny"
 unknown-git = "deny"
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
-
+allow-git = ["https://github.com/Arnavion/k8s-openapi"]
 
 [bans]
 multiple-versions = "deny"
-
-[[bans.skip]]
-# base64 did some annoying breaking changes
-name = "base64"
 
 [[bans.skip-tree]]
 name = "windows-sys"
@@ -61,10 +57,6 @@ name = "thiserror"
 [[bans.skip]]
 name = "thiserror-impl"
 
-# rand / ahash inconsistencies;
 [[bans.skip]]
+# ahash hasn't had a release in 12mo
 name = "getrandom"
-[[bans.skip]]
-name = "wasi"
-[[bans.skip]]
-name = "zerocopy"

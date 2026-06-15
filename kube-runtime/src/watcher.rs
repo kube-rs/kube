@@ -11,26 +11,43 @@ use kube_client::{
     Api, Error as ClientErr,
     api::{ListParams, Resource, ResourceExt, VersionMatch, WatchEvent, WatchParams},
     core::{ObjectList, Selector, metadata::PartialObjectMeta},
-    error::ErrorResponse,
+    error::Status,
 };
 use serde::de::DeserializeOwned;
 use std::{clone::Clone, collections::VecDeque, fmt::Debug, future, time::Duration};
 use thiserror::Error;
 use tracing::{debug, error, warn};
 
+/// Errors that a watcher can emit
+///
+/// These are all considered retryable from a watcher's point of view,
+/// even though they may require patching of rbac/netpols in the background to fix.
+///
+/// To avoid constantly looping errors, make sure backoff is applied.
 #[derive(Debug, Error)]
 pub enum Error {
+    /// Received a raw error while performing an api.list
     #[error("failed to perform initial object list: {0}")]
     InitialListFailed(#[source] kube_client::Error),
+
+    /// Received a raw error while starting an api.watch
     #[error("failed to start watching object: {0}")]
     WatchStartFailed(#[source] kube_client::Error),
+
+    /// Received a `WatchEvent::Error` from the apiserver
     #[error("error returned by apiserver during watch: {0}")]
-    WatchError(#[source] ErrorResponse),
+    WatchError(#[source] Box<Status>),
+
+    /// Received a raw error while watching
     #[error("watch stream failed: {0}")]
     WatchFailed(#[source] kube_client::Error),
+
+    /// Missing resource version field from api server
     #[error("no metadata.resourceVersion in watch result (does resource support watch?)")]
     NoResourceVersion,
 }
+
+/// Type alias for Result with a `watcher::Error` as default.
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 #[derive(Debug, Clone)]
@@ -177,7 +194,7 @@ pub enum ListSemantic {
 
 #[derive(Clone, Default, Debug, PartialEq)]
 pub enum InitialListStrategy {
-    /// List first, then watch from given resouce version
+    /// List first, then watch from given resource version
     ///
     /// This is the old and default way of watching. The watcher will do a paginated list call first before watching.
     /// When using this mode, you can configure the `page_size` on the watcher.
@@ -390,15 +407,28 @@ impl Config {
     }
 
     /// Converts generic `watcher::Config` structure to the instance of `WatchParams` used for watch requests.
-    fn to_watch_params(&self) -> WatchParams {
+    fn to_watch_params(&self, phase: WatchPhase) -> WatchParams {
         WatchParams {
             label_selector: self.label_selector.clone(),
             field_selector: self.field_selector.clone(),
             timeout: self.timeout,
             bookmarks: self.bookmarks,
-            send_initial_events: self.initial_list_strategy == InitialListStrategy::StreamingList,
+            send_initial_events: phase == WatchPhase::Initial
+                && self.initial_list_strategy == InitialListStrategy::StreamingList,
         }
     }
+}
+
+/// Distinguishes between initial watch and resumed watch for streaming lists.
+///
+/// This is used to determine whether to set `sendInitialEvents=true` in watch requests.
+/// Only initial watches should request initial events; reconnections should not.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum WatchPhase {
+    /// Initial watch from `State::Empty` - requests initial events for streaming lists
+    Initial,
+    /// Resumed watch from `State::InitListed` - does not request initial events
+    Resumed,
 }
 
 impl<K> ApiMode for FullObject<'_, K>
@@ -445,6 +475,35 @@ where
     }
 }
 
+/// Client-side idle timeout margin added on top of the server-side watch timeout.
+///
+/// The server closes the watch stream after the configured timeout (default 290s).
+/// We add a small margin so the client detects dead connections where the
+/// server's close never arrives (e.g. network failure).
+const WATCH_IDLE_TIMEOUT_MARGIN: Duration = Duration::from_secs(5);
+
+/// Poll the next item from a watch stream with an idle timeout.
+///
+/// Returns `None` when the stream ends **or** when no item arrives within
+/// `timeout + WATCH_IDLE_TIMEOUT_MARGIN`, causing the watcher to
+/// treat the connection as dead and reconnect.
+async fn next_with_idle_timeout<S, T>(stream: &mut S, timeout: Option<u32>) -> Option<T>
+where
+    S: Stream<Item = T> + Unpin,
+{
+    let idle_timeout = Duration::from_secs(u64::from(timeout.unwrap_or(290))) + WATCH_IDLE_TIMEOUT_MARGIN;
+    match tokio::time::timeout(idle_timeout, stream.next()).await {
+        Ok(item) => item,
+        Err(_elapsed) => {
+            debug!(
+                timeout_secs = idle_timeout.as_secs(),
+                "watch stream idle timeout, reconnecting"
+            );
+            None
+        }
+    }
+}
+
 /// Progresses the watcher a single step, returning (event, state)
 ///
 /// This function should be trampolined: if event == `None`
@@ -466,17 +525,19 @@ where
                 objects: VecDeque::default(),
                 last_bookmark: None,
             }),
-            InitialListStrategy::StreamingList => match api.watch(&wc.to_watch_params(), "0").await {
-                Ok(stream) => (None, State::InitialWatch { stream }),
-                Err(err) => {
-                    if std::matches!(err, ClientErr::Api(ErrorResponse { code: 403, .. })) {
-                        warn!("watch initlist error with 403: {err:?}");
-                    } else {
-                        debug!("watch initlist error: {err:?}");
+            InitialListStrategy::StreamingList => {
+                match api.watch(&wc.to_watch_params(WatchPhase::Initial), "0").await {
+                    Ok(stream) => (None, State::InitialWatch { stream }),
+                    Err(err) => {
+                        if std::matches!(err, ClientErr::Api(ref status) if status.is_forbidden()) {
+                            warn!("watch initlist error with 403: {err:?}");
+                        } else {
+                            debug!("watch initlist error: {err:?}");
+                        }
+                        (Some(Err(Error::WatchStartFailed(err))), State::default())
                     }
-                    (Some(Err(Error::WatchStartFailed(err))), State::default())
                 }
-            },
+            }
         },
         State::InitPage {
             continue_token,
@@ -515,7 +576,7 @@ where
                     })
                 }
                 Err(err) => {
-                    if std::matches!(err, ClientErr::Api(ErrorResponse { code: 403, .. })) {
+                    if std::matches!(err, ClientErr::Api(ref status) if status.is_forbidden()) {
                         warn!("watch list error with 403: {err:?}");
                     } else {
                         debug!("watch list error: {err:?}");
@@ -525,7 +586,7 @@ where
             }
         }
         State::InitialWatch { mut stream } => {
-            match stream.next().await {
+            match next_with_idle_timeout(&mut stream, wc.timeout).await {
                 Some(Ok(WatchEvent::Added(obj) | WatchEvent::Modified(obj))) => {
                     (Some(Ok(Event::InitApply(obj))), State::InitialWatch { stream })
                 }
@@ -558,10 +619,10 @@ where
                     } else {
                         debug!("error watchevent error: {err:?}");
                     }
-                    (Some(Err(Error::WatchError(err))), new_state)
+                    (Some(Err(Error::WatchError(err.boxed()))), new_state)
                 }
                 Some(Err(err)) => {
-                    if std::matches!(err, ClientErr::Api(ErrorResponse { code: 403, .. })) {
+                    if std::matches!(err, ClientErr::Api(ref status) if status.is_forbidden()) {
                         warn!("watcher error 403: {err:?}");
                     } else {
                         debug!("watcher error: {err:?}");
@@ -572,13 +633,16 @@ where
             }
         }
         State::InitListed { resource_version } => {
-            match api.watch(&wc.to_watch_params(), &resource_version).await {
+            match api
+                .watch(&wc.to_watch_params(WatchPhase::Resumed), &resource_version)
+                .await
+            {
                 Ok(stream) => (None, State::Watching {
                     resource_version,
                     stream,
                 }),
                 Err(err) => {
-                    if std::matches!(err, ClientErr::Api(ErrorResponse { code: 403, .. })) {
+                    if std::matches!(err, ClientErr::Api(ref status) if status.is_forbidden()) {
                         warn!("watch initlist error with 403: {err:?}");
                     } else {
                         debug!("watch initlist error: {err:?}");
@@ -592,7 +656,7 @@ where
         State::Watching {
             resource_version,
             mut stream,
-        } => match stream.next().await {
+        } => match next_with_idle_timeout(&mut stream, wc.timeout).await {
             Some(Ok(WatchEvent::Added(obj) | WatchEvent::Modified(obj))) => {
                 let resource_version = obj.resource_version().unwrap_or_default();
                 if resource_version.is_empty() {
@@ -634,10 +698,10 @@ where
                 } else {
                     debug!("error watchevent error: {err:?}");
                 }
-                (Some(Err(Error::WatchError(err))), new_state)
+                (Some(Err(Error::WatchError(err.boxed()))), new_state)
             }
             Some(Err(err)) => {
-                if std::matches!(err, ClientErr::Api(ErrorResponse { code: 403, .. })) {
+                if std::matches!(err, ClientErr::Api(ref status) if status.is_forbidden()) {
                     warn!("watcher error 403: {err:?}");
                 } else {
                     debug!("watcher error: {err:?}");
@@ -683,26 +747,26 @@ where
 /// The events are intended to provide a safe input interface for a state store like a [`reflector`].
 /// Direct users may want to use [`WatchStreamExt`] for higher-level constructs.
 ///
-/// ```no_run
+/// ```
 /// use kube::{
 ///   api::{Api, ResourceExt}, Client,
 ///   runtime::{watcher, WatchStreamExt}
 /// };
 /// use k8s_openapi::api::core::v1::Pod;
 /// use futures::TryStreamExt;
-/// #[tokio::main]
-/// async fn main() -> Result<(), watcher::Error> {
-///     let client = Client::try_default().await.unwrap();
-///     let pods: Api<Pod> = Api::namespaced(client, "apps");
 ///
-///     watcher(pods, watcher::Config::default()).applied_objects()
-///         .try_for_each(|p| async move {
-///          println!("Applied: {}", p.name_any());
-///             Ok(())
-///         })
-///         .await?;
-///     Ok(())
-/// }
+/// # async fn wrapper() -> Result<(), watcher::Error> {
+/// #   let client: Client = todo!();
+/// let pods: Api<Pod> = Api::namespaced(client, "apps");
+///
+/// watcher(pods, watcher::Config::default()).applied_objects()
+///     .try_for_each(|p| async move {
+///         println!("Applied: {}", p.name_any());
+///        Ok(())
+///     })
+///     .await?;
+/// # Ok(())
+/// # }
 /// ```
 /// [`WatchStreamExt`]: super::WatchStreamExt
 /// [`reflector`]: super::reflector::reflector
@@ -747,26 +811,26 @@ pub fn watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
 /// The events are intended to provide a safe input interface for a state store like a [`reflector`].
 /// Direct users may want to use [`WatchStreamExt`] for higher-level constructs.
 ///
-/// ```no_run
+/// ```
 /// use kube::{
 ///   api::{Api, ResourceExt}, Client,
 ///   runtime::{watcher, metadata_watcher, WatchStreamExt}
 /// };
 /// use k8s_openapi::api::core::v1::Pod;
 /// use futures::TryStreamExt;
-/// #[tokio::main]
-/// async fn main() -> Result<(), watcher::Error> {
-///     let client = Client::try_default().await.unwrap();
-///     let pods: Api<Pod> = Api::namespaced(client, "apps");
 ///
-///     metadata_watcher(pods, watcher::Config::default()).applied_objects()
+/// # async fn wrapper() -> Result<(), watcher::Error> {
+/// #   let client: Client = todo!();
+/// let pods: Api<Pod> = Api::namespaced(client, "apps");
+///
+/// metadata_watcher(pods, watcher::Config::default()).applied_objects()
 ///         .try_for_each(|p| async move {
 ///          println!("Applied: {}", p.name_any());
 ///             Ok(())
 ///         })
 ///         .await?;
-///     Ok(())
-/// }
+/// #   Ok(())
+/// # }
 /// ```
 /// [`WatchStreamExt`]: super::WatchStreamExt
 /// [`reflector`]: super::reflector::reflector
@@ -783,7 +847,11 @@ pub fn watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
 /// that we have seen on the stream. If this is successful then the stream is simply resumed from where it left off.
 /// If this fails because the resource version is no longer valid then we start over with a new stream, starting with
 /// an [`Event::Init`]. The internals mechanics of recovery should be considered an implementation detail.
-#[allow(clippy::module_name_repetitions)]
+#[deprecated(
+    since = "3.1.0",
+    note = "Use `watcher(Api::<PartialObjectMeta<K>>::all(client), config)` instead. \
+            `Api<PartialObjectMeta<K>>` now automatically uses metadata-only requests."
+)]
 pub fn metadata_watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
     api: Api<K>,
     watcher_config: Config,
@@ -847,6 +915,7 @@ pub fn watch_object<K: Resource + Clone + DeserializeOwned + Debug + Send + 'sta
         })
 }
 
+/// A struct with a manually configured exponential backoff
 pub struct ExponentialBackoff {
     inner: backon::ExponentialBackoff,
     builder: backon::ExponentialBuilder,
@@ -860,9 +929,11 @@ impl ExponentialBackoff {
             .with_factor(factor)
             .without_max_times();
 
-        if enable_jitter {
-            builder.with_jitter();
-        }
+        let builder = if enable_jitter {
+            builder.with_jitter()
+        } else {
+            builder
+        };
 
         Self {
             inner: builder.build(),
@@ -927,5 +998,101 @@ impl Iterator for DefaultBackoff {
 impl Backoff for DefaultBackoff {
     fn reset(&mut self) {
         self.0.reset();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn to_watch_params_initial_phase_with_streaming_list_sets_send_initial_events() {
+        let config = Config::default().streaming_lists();
+        let params = config.to_watch_params(WatchPhase::Initial);
+        assert!(params.send_initial_events);
+    }
+
+    #[test]
+    fn to_watch_params_resumed_phase_with_streaming_list_does_not_set_send_initial_events() {
+        let config = Config::default().streaming_lists();
+        let params = config.to_watch_params(WatchPhase::Resumed);
+        assert!(!params.send_initial_events);
+    }
+
+    #[test]
+    fn to_watch_params_listwatch_mode_does_not_set_send_initial_events() {
+        let config = Config::default(); // ListWatch mode
+        let params_initial = config.to_watch_params(WatchPhase::Initial);
+        let params_resumed = config.to_watch_params(WatchPhase::Resumed);
+        assert!(!params_initial.send_initial_events);
+        assert!(!params_resumed.send_initial_events);
+    }
+
+    fn approx_eq(a: Duration, b: Duration) -> bool {
+        a.abs_diff(b) < Duration::from_micros(100)
+    }
+
+    #[test]
+    fn exponential_backoff_without_jitter() {
+        let mut backoff =
+            ExponentialBackoff::new(Duration::from_millis(100), Duration::from_secs(1), 2.0, false);
+
+        assert!(approx_eq(backoff.next().unwrap(), Duration::from_millis(100)));
+        assert!(approx_eq(backoff.next().unwrap(), Duration::from_millis(200)));
+        assert!(approx_eq(backoff.next().unwrap(), Duration::from_millis(400)));
+    }
+
+    #[test]
+    fn exponential_backoff_with_jitter_applies_randomness() {
+        let mut backoff =
+            ExponentialBackoff::new(Duration::from_millis(100), Duration::from_secs(1), 2.0, true);
+
+        let delays: Vec<_> = (0..5).filter_map(|_| backoff.next()).collect();
+
+        // All delays should be positive
+        for d in &delays {
+            assert!(*d > Duration::ZERO);
+        }
+
+        // With jitter, at least one delay should differ from exact values
+        let exact_values = [
+            Duration::from_millis(100),
+            Duration::from_millis(200),
+            Duration::from_millis(400),
+            Duration::from_millis(800),
+            Duration::from_secs(1),
+        ];
+
+        let all_exact = delays
+            .iter()
+            .zip(exact_values.iter())
+            .all(|(d, e)| approx_eq(*d, *e));
+
+        assert!(
+            !all_exact,
+            "With jitter enabled, delays should not all match exact exponential values"
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn idle_timeout_returns_item_when_stream_has_data() {
+        let mut stream = futures::stream::iter(vec![1, 2, 3]);
+        let result = next_with_idle_timeout(&mut stream, Some(290)).await;
+        assert_eq!(result, Some(1));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn idle_timeout_returns_none_on_dead_connection() {
+        let mut stream = futures::stream::pending::<i32>();
+        // NB tokio auto-advances virtual time when the runtime is idle so next_with_idle_timeout resolves immediately
+        let result = next_with_idle_timeout(&mut stream, Some(290)).await;
+        assert_eq!(result, None);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn idle_timeout_returns_none_when_stream_ends() {
+        let mut stream = futures::stream::empty::<i32>();
+        let result = next_with_idle_timeout(&mut stream, Some(290)).await;
+        assert_eq!(result, None);
     }
 }

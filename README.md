@@ -2,7 +2,7 @@
 
 [![Crates.io](https://img.shields.io/crates/v/kube.svg)](https://crates.io/crates/kube)
 [![Rust 1.88](https://img.shields.io/badge/MSRV-1.88-dea584.svg)](https://github.com/rust-lang/rust/releases/tag/1.88.0)
-[![Tested against Kubernetes v1.30 and above](https://img.shields.io/badge/MK8SV-v1.30-326ce5.svg)](https://kube.rs/kubernetes-version)
+[![Tested against Kubernetes v1.32 and above](https://img.shields.io/badge/MK8SV-v1.32-326ce5.svg)](https://kube.rs/kubernetes-version)
 [![Best Practices](https://bestpractices.coreinfrastructure.org/projects/5413/badge)](https://bestpractices.coreinfrastructure.org/projects/5413)
 [![Discord chat](https://img.shields.io/discord/500028886025895936.svg?logo=discord&style=plastic)](https://discord.gg/tokio)
 
@@ -16,8 +16,8 @@ Select a version of `kube` along matching versions of [k8s-openapi](https://gith
 
 ```toml
 [dependencies]
-kube = { version = "2.0.1", features = ["runtime", "derive"] }
-k8s-openapi = { version = "0.26.0", features = ["latest", "schemars"] }
+kube = { version = "3.1.0", features = ["runtime", "derive"] }
+k8s-openapi = { version = "0.28.0", features = ["latest", "schemars"] }
 schemars = { version = "1" }
 ```
 
@@ -86,7 +86,7 @@ Then you can use the generated wrapper struct `Document` as a [`kube::Resource`]
 let docs: Api<Document> = Api::default_namespaced(client);
 let d = Document::new("guide", DocumentSpec::default());
 println!("doc: {:?}", d);
-println!("crd: {:?}", serde_yaml::to_string(&Document::crd()));
+println!("crd: {:?}", serde_saphyr::to_string(&Document::crd()));
 ```
 
 There are a ton of kubebuilder-like instructions that you can annotate with here. See the [documentation](https://docs.rs/kube/latest/kube/derive.CustomResource.html) or the `crd_` prefixed [examples](https://github.com/kube-rs/kube/blob/main/examples) for more.
@@ -158,13 +158,13 @@ Uses [rustls](https://github.com/rustls/rustls) with `ring` provider (default) o
 To switch [rustls providers](https://docs.rs/rustls/latest/rustls/crypto/struct.CryptoProvider.html), turn off `default-features` and enable the `aws-lc-rs` feature:
 
 ```toml
-kube = { version = "2.0.1", default-features = false, features = ["client", "rustls-tls", "aws-lc-rs"] }
+kube = { version = "3.1.0", default-features = false, features = ["client", "rustls-tls", "aws-lc-rs"] }
 ```
 
 To switch to `openssl`, turn off `default-features`, and enable the `openssl-tls` feature:
 
 ```toml
-kube = { version = "2.0.1", default-features = false, features = ["client", "openssl-tls"] }
+kube = { version = "3.1.0", default-features = false, features = ["client", "openssl-tls"] }
 ```
 
 This will pull in `openssl` and `hyper-openssl`. If `default-features` is left enabled, you will pull in two TLS stacks, and the default will remain as `rustls`.

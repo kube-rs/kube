@@ -121,6 +121,7 @@ impl<K: Resource> Lookup for K {
 /// ```
 #[non_exhaustive]
 pub struct ObjectRef<K: Lookup + ?Sized> {
+    /// Resource information for the object K
     pub dyntype: K::DynamicType,
     /// The name of the object
     pub name: String,
@@ -162,11 +163,15 @@ impl<K: Lookup> ObjectRef<K>
 where
     K::DynamicType: Default,
 {
+    /// Create a default object ref with a name
     #[must_use]
     pub fn new(name: &str) -> Self {
         Self::new_with(name, Default::default())
     }
 
+    /// Create an object ref from an object `K`
+    ///
+    /// This object is assumed to be valid and will expect a .metadata.name.
     #[must_use]
     pub fn from_obj(obj: &K) -> Self {
         obj.to_object_ref(Default::default())
@@ -183,6 +188,7 @@ where
 }
 
 impl<K: Lookup> ObjectRef<K> {
+    /// Create an object ref with a name and a dynamic resource type
     #[must_use]
     pub fn new_with(name: &str, dyntype: K::DynamicType) -> Self {
         Self {
@@ -193,6 +199,7 @@ impl<K: Lookup> ObjectRef<K> {
         }
     }
 
+    /// Set the namespace on an object ref
     #[must_use]
     pub fn within(mut self, namespace: &str) -> Self {
         self.namespace = Some(namespace.to_string());
@@ -246,6 +253,7 @@ impl<K: Lookup> ObjectRef<K> {
         }
     }
 
+    /// Create a object ref for a type erased dynamic object (using a static impl)
     pub fn erase(self) -> ObjectRef<DynamicObject> {
         ObjectRef {
             dyntype: kube_client::api::ApiResource {

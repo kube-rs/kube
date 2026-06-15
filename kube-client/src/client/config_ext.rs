@@ -155,6 +155,186 @@ pub trait ConfigExt: private::Sealed {
     fn openssl_ssl_connector_builder(&self) -> Result<openssl::ssl::SslConnectorBuilder>;
 }
 
+#[cfg(all(test, feature = "openssl-tls"))]
+mod openssl_tls_server_name_tests {
+    use std::{
+        net::TcpListener,
+        sync::{Arc, Mutex},
+    };
+
+    use openssl::{
+        asn1::Asn1Time,
+        hash::MessageDigest,
+        pkey::{PKey, Private},
+        rsa::Rsa,
+        ssl::{NameType, SslAcceptor, SslMethod},
+        x509::{
+            extension::{BasicConstraints, SubjectAlternativeName},
+            X509NameBuilder, X509,
+        },
+    };
+    use tower::ServiceExt as _;
+
+    use super::*;
+
+    enum San<'a> {
+        Dns(&'a str),
+        Ip(&'a str),
+    }
+
+    // Self-signed cert with a single SAN. A DNS SAN won't match the 127.0.0.1 we connect to, so
+    // verification only passes if the verify-host comes from tls_server_name.
+    fn self_signed_cert(san: San) -> (X509, PKey<Private>) {
+        let cn = match san {
+            San::Dns(s) | San::Ip(s) => s,
+        };
+        let pkey = PKey::from_rsa(Rsa::generate(2048).unwrap()).unwrap();
+
+        let mut name = X509NameBuilder::new().unwrap();
+        name.append_entry_by_text("CN", cn).unwrap();
+        let name = name.build();
+
+        let mut builder = X509::builder().unwrap();
+        builder.set_version(2).unwrap();
+        builder.set_subject_name(&name).unwrap();
+        builder.set_issuer_name(&name).unwrap();
+        builder.set_pubkey(&pkey).unwrap();
+        builder.set_not_before(&Asn1Time::days_from_now(0).unwrap()).unwrap();
+        builder.set_not_after(&Asn1Time::days_from_now(1).unwrap()).unwrap();
+        builder
+            .append_extension(BasicConstraints::new().critical().ca().build().unwrap())
+            .unwrap();
+        let mut san_ext = SubjectAlternativeName::new();
+        match san {
+            San::Dns(s) => san_ext.dns(s),
+            San::Ip(s) => san_ext.ip(s),
+        };
+        let san_ext = san_ext.build(&builder.x509v3_context(None, None)).unwrap();
+        builder.append_extension(san_ext).unwrap();
+        builder.sign(&pkey, MessageDigest::sha256()).unwrap();
+
+        (builder.build(), pkey)
+    }
+
+    // Localhost TLS server that records the SNI from the one connection it accepts.
+    fn spawn_tls_server(cert: X509, key: PKey<Private>) -> (u16, Arc<Mutex<Option<String>>>) {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let captured: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
+
+        let captured_in_cb = captured.clone();
+        let mut acceptor = SslAcceptor::mozilla_intermediate(SslMethod::tls()).unwrap();
+        acceptor.set_private_key(&key).unwrap();
+        acceptor.set_certificate(&cert).unwrap();
+        acceptor.set_servername_callback(move |ssl, _alert| {
+            *captured_in_cb.lock().unwrap() = ssl.servername(NameType::HOST_NAME).map(str::to_owned);
+            Ok(())
+        });
+        let acceptor = acceptor.build();
+
+        std::thread::spawn(move || {
+            if let Ok((stream, _)) = listener.accept() {
+                // SNI is captured during the handshake; we don't care whether it then completes.
+                let _ = acceptor.accept(stream);
+            }
+        });
+
+        (port, captured)
+    }
+
+    fn config_for(port: u16, ca: &X509, tls_server_name: Option<&str>) -> Config {
+        let mut config = Config::new(format!("https://127.0.0.1:{port}").parse().unwrap());
+        config.root_cert = Some(vec![ca.to_der().unwrap()]);
+        config.tls_server_name = tls_server_name.map(str::to_owned);
+        config
+    }
+
+    fn connector_for(config: &Config) -> hyper_openssl::client::legacy::HttpsConnector<HttpConnector> {
+        let mut http = HttpConnector::new();
+        http.enforce_http(false);
+        config.openssl_https_connector_with_connector(http).unwrap()
+    }
+
+    // tls_server_name set: SNI carries it (not the 127.0.0.1 host) and verification targets it,
+    // so the handshake against the SAN-only cert succeeds.
+    #[tokio::test]
+    async fn tls_server_name_drives_sni_and_verification() {
+        let server_name = "kubernetes.example.com";
+        let (cert, key) = self_signed_cert(San::Dns(server_name));
+        let (port, captured_sni) = spawn_tls_server(cert.clone(), key);
+
+        let config = config_for(port, &cert, Some(server_name));
+        let uri: http::Uri = config.cluster_url.clone();
+
+        connector_for(&config)
+            .oneshot(uri)
+            .await
+            .expect("handshake should succeed when verification targets tls_server_name");
+
+        assert_eq!(
+            captured_sni.lock().unwrap().as_deref(),
+            Some(server_name),
+            "ClientHello SNI must equal tls_server_name, not the connection host"
+        );
+    }
+
+    // Control: without tls_server_name, verification falls back to the 127.0.0.1 host, which the
+    // SAN-only cert doesn't match, so the handshake fails. Confirms the pass above isn't just lax
+    // verification.
+    #[tokio::test]
+    async fn without_tls_server_name_verification_uses_connection_host() {
+        let server_name = "kubernetes.example.com";
+        let (cert, key) = self_signed_cert(San::Dns(server_name));
+        let (port, _captured_sni) = spawn_tls_server(cert.clone(), key);
+
+        let config = config_for(port, &cert, None);
+        let uri: http::Uri = config.cluster_url.clone();
+
+        let result = connector_for(&config).oneshot(uri).await;
+        assert!(
+            result.is_err(),
+            "handshake must fail when the cert does not match the connection host"
+        );
+    }
+
+    // An IP tls_server_name verifies via set_ip and, per RFC 6066, sends no SNI.
+    #[tokio::test]
+    async fn tls_server_name_as_ip_verifies_without_sni() {
+        let (cert, key) = self_signed_cert(San::Ip("127.0.0.1"));
+        let (port, captured_sni) = spawn_tls_server(cert.clone(), key);
+
+        let config = config_for(port, &cert, Some("127.0.0.1"));
+        let uri: http::Uri = config.cluster_url.clone();
+
+        connector_for(&config)
+            .oneshot(uri)
+            .await
+            .expect("handshake should succeed when the IP tls_server_name matches the cert");
+
+        assert_eq!(
+            *captured_sni.lock().unwrap(),
+            None,
+            "SNI must not be sent for an IP tls_server_name"
+        );
+    }
+
+    // accept_invalid_certs disables verification, so the mismatched cert is accepted.
+    #[tokio::test]
+    async fn accept_invalid_certs_skips_verification() {
+        let (cert, key) = self_signed_cert(San::Dns("kubernetes.example.com"));
+        let (port, _captured_sni) = spawn_tls_server(cert.clone(), key);
+
+        let mut config = config_for(port, &cert, None);
+        config.accept_invalid_certs = true;
+        let uri: http::Uri = config.cluster_url.clone();
+
+        connector_for(&config)
+            .oneshot(uri)
+            .await
+            .expect("handshake should succeed when accept_invalid_certs disables verification");
+    }
+}
+
 mod private {
     pub trait Sealed {}
     impl Sealed for super::Config {}
@@ -208,13 +388,31 @@ impl ConfigExt for Config {
 
     #[cfg(feature = "rustls-tls")]
     fn rustls_client_config(&self) -> Result<rustls::ClientConfig> {
-        let identity = self.exec_identity_pem().0.or_else(|| self.identity_pem());
-        tls::rustls_tls::rustls_client_config(
+        let identity = match self.exec_identity_pem().0 {
+            Some(identity) => Some(identity),
+            None => self.identity_pem()?,
+        };
+        let mut config = tls::rustls_tls::rustls_client_config(
             identity.as_deref(),
             self.root_cert.as_deref(),
             self.accept_invalid_certs,
         )
-        .map_err(Error::RustlsTls)
+        .map_err(Error::RustlsTls)?;
+
+        // When a CA file path is available (in-cluster), install a verifier
+        // that re-reads it periodically to survive CA rotation. `root_cert`
+        // bytes are still passed above so the builder typestate is satisfied,
+        // but verification is handed over here.
+        if !self.accept_invalid_certs
+            && let Some(path) = &self.root_cert_file
+        {
+            let verifier =
+                tls::rustls_tls::ReloadingVerifier::new(path.clone()).map_err(Error::RustlsTls)?;
+            config
+                .dangerous()
+                .set_certificate_verifier(Arc::new(verifier));
+        }
+        Ok(config)
     }
 
     #[cfg(feature = "rustls-tls")]
@@ -250,8 +448,13 @@ impl ConfigExt for Config {
 
     #[cfg(feature = "openssl-tls")]
     fn openssl_ssl_connector_builder(&self) -> Result<openssl::ssl::SslConnectorBuilder> {
-        let identity = self.exec_identity_pem().0.or_else(|| self.identity_pem());
-        // TODO: pass self.tls_server_name for openssl
+        let identity = match self.exec_identity_pem().0 {
+            Some(identity) => Some(identity),
+            None => self.identity_pem()?,
+        };
+
+        // tls_server_name has no hook on the builder; it is applied per-connection in
+        // openssl_https_connector_with_connector instead.
         tls::openssl_tls::ssl_connector_builder(identity.as_ref(), self.root_cert.as_ref())
             .map_err(|e| Error::OpensslTls(tls::openssl_tls::Error::CreateSslConnector(e)))
     }
@@ -281,9 +484,34 @@ impl ConfigExt for Config {
             self.openssl_ssl_connector_builder()?,
         )
         .map_err(|e| Error::OpensslTls(tls::openssl_tls::Error::CreateHttpsConnector(e)))?;
-        if self.accept_invalid_certs {
-            https.set_callback(|ssl, _uri| {
-                ssl.set_verify(openssl::ssl::SslVerifyMode::NONE);
+        // OpenSSL has no server-name-resolver hook, so unlike rustls we apply tls_server_name in
+        // the per-connection callback (which already exists for accept_invalid_certs).
+        let accept_invalid_certs = self.accept_invalid_certs;
+        let tls_server_name = self.tls_server_name.clone();
+        if accept_invalid_certs || tls_server_name.is_some() {
+            https.set_callback(move |ssl, _uri| {
+                if accept_invalid_certs {
+                    ssl.set_verify(openssl::ssl::SslVerifyMode::NONE);
+                }
+                if let Some(name) = &tls_server_name {
+                    use std::net::IpAddr;
+
+                    use openssl::x509::verify::X509CheckFlags;
+                    // into_ssl(host) runs after this callback and would otherwise set SNI and the
+                    // verify host from the URI host. Disable both so it keeps our values.
+                    ssl.set_use_server_name_indication(false);
+                    ssl.set_verify_hostname(false);
+                    // SNI is not sent for IP literals.
+                    if name.parse::<IpAddr>().is_err() {
+                        ssl.set_hostname(name)?;
+                    }
+                    let param = ssl.param_mut();
+                    param.set_hostflags(X509CheckFlags::NO_PARTIAL_WILDCARDS);
+                    match name.parse::<IpAddr>() {
+                        Ok(ip) => param.set_ip(ip)?,
+                        Err(_) => param.set_host(name)?,
+                    }
+                }
                 Ok(())
             });
         }
