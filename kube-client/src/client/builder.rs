@@ -210,7 +210,7 @@ where
 
     let service = ServiceBuilder::new()
         .layer(stack)
-        .option_layer(config.with_retry.then_some(RetryLayer::new(RetryPolicy::server_retry())))
+        .option_layer(config.default_retry.then_some(RetryLayer::new(RetryPolicy::server_retry())))
         .option_layer(auth_layer)
         .layer(config.extra_headers_layer()?)
         .layer(

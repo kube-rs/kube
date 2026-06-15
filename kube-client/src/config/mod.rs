@@ -172,7 +172,7 @@ pub struct Config {
     /// Headers to pass with every request.
     pub headers: Vec<(HeaderName, HeaderValue)>,
     /// Whether to enable default retrying requests on transient failures (429, 503, 504).
-    pub with_retry: bool,
+    pub default_retry: bool,
 }
 
 impl Config {
@@ -196,7 +196,7 @@ impl Config {
             proxy_url: None,
             tls_server_name: None,
             headers: Vec::new(),
-            with_retry: true,
+            default_retry: true,
         }
     }
 
@@ -281,7 +281,7 @@ impl Config {
             proxy_url: None,
             tls_server_name: None,
             headers: Vec::new(),
-            with_retry: true,
+            default_retry: true,
         })
     }
 
@@ -344,7 +344,7 @@ impl Config {
             auth_info: loader.user,
             tls_server_name: loader.cluster.tls_server_name,
             headers: Vec::new(),
-            with_retry: true,
+            default_retry: true,
         })
     }
 
