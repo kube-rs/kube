@@ -58,6 +58,13 @@ struct KubeAttrs {
     #[darling(multiple, rename = "validation", with = parse_expr::preserve_str_literal)]
     validations: Vec<Expr>,
 
+    /// Generate client-side CEL validation methods (`validate_cel` / `validate_cel_update`).
+    ///
+    /// Requires the downstream crate to enable the `kube/cel` feature, since the generated
+    /// code references `kube::core::cel::*`.
+    #[darling(default)]
+    cel: bool,
+
     /// Sets the `storage` property to `true` or `false`.
     ///
     /// Defaults to `true`.
@@ -563,6 +570,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         selectable,
         scale,
         validations,
+        cel,
         storage,
         served,
         deprecated,
@@ -645,7 +653,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
     // these are validated by the API server implicitly. Also, we can't generate the
     // schema for `metadata` (`ObjectMeta`) because it doesn't implement `JsonSchema`.
     let schemars_skip = schema_mode.derive().then_some(quote! { #[schemars(skip)] });
-    if schema_mode.derive() && !validations.is_empty() {
+    if schema_mode.derive() && (!validations.is_empty() || cel) {
         derive_paths.push(syn::parse_quote! { #kube::KubeSchema });
     } else if schema_mode.derive() {
         derive_paths.push(syn::parse_quote! { #schemars::JsonSchema });
@@ -952,6 +960,43 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
 
     let impl_hasspec = generate_hasspec(&ident, &rootident, &kube_core);
 
+    // Client-side CEL validation methods, generated when `#[kube(cel)]` is set.
+    // Requires the downstream crate to enable `kube/cel` (the generated code references
+    // `#kube_core::cel`). The bodies just delegate to `kube_core::cel::validate_cel{,_update}`, which
+    // own the schema extraction + validation so they are compiled once in kube-core rather than
+    // re-expanded at every derive site. Gated on a derived schema: a manual schema is not forced
+    // through `KubeSchema`, so it would carry no `x-kubernetes-validations` and the methods would
+    // silently validate nothing — reject that combination at compile time instead.
+    let impl_validate_cel = if cel {
+        if schema_mode.derive() {
+            quote! {
+                impl #rootident {
+                    /// Validate this resource against its CEL creation rules (`x-kubernetes-validations`)
+                    /// client-side, without an apiserver. `Ok(())` if all rules pass, otherwise the
+                    /// aggregated failures.
+                    pub fn validate_cel(&self) -> ::core::result::Result<(), #kube_core::cel::ValidationErrors> {
+                        #kube_core::cel::validate_cel(self)
+                    }
+
+                    /// Validate this resource against its CEL transition rules (rules using `oldSelf`)
+                    /// client-side, comparing against the `old` state. `Ok(())` if all rules pass,
+                    /// otherwise the aggregated failures.
+                    pub fn validate_cel_update(&self, old: &Self) -> ::core::result::Result<(), #kube_core::cel::ValidationErrors> {
+                        #kube_core::cel::validate_cel_update(self, old)
+                    }
+                }
+            }
+        } else {
+            quote! {
+                ::core::compile_error!(
+                    "#[kube(cel)] requires a derived schema; it cannot be combined with `schema = \"manual\"`"
+                );
+            }
+        }
+    } else {
+        quote! {}
+    };
+
     // Concat output
     quote! {
         #compile_constraints
@@ -961,6 +1006,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         #impl_crd
         #impl_hasspec
         #impl_hasstatus
+        #impl_validate_cel
     }
 }
 

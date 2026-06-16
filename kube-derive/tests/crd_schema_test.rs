@@ -578,3 +578,81 @@ fn test_optional_int_or_string_nullable() {
     assert_eq!(optional.x_kubernetes_int_or_string, Some(true));
     assert_eq!(optional.nullable, Some(true));
 }
+
+// Client-side CEL validation (`#[kube(cel)]` / `#[x_kube(cel)]`), issue #1670.
+// One struct exercises both surfaces:
+// - root `#[kube(cel, validation = ...)]` → `CelTest::validate_cel` / `validate_cel_update`
+// - sub-struct `#[x_kube(cel)]` → static `CelTestSpec::validate_cel(value, old)`
+#[derive(CustomResource, Serialize, Deserialize, Clone, Debug, KubeSchema)]
+// The root `#[kube(validation)]` rule is attached at the CR root node, where `self` is the
+// whole object, so it must address `self.spec.*`. The `#[x_kube(validation)]` rule is scoped
+// to the spec object, where `self` is the spec itself.
+#[kube(
+    group = "clux.dev",
+    version = "v1",
+    kind = "CelTest",
+    namespaced,
+    cel,
+    validation = "self.spec.replicas <= self.spec.maxReplicas"
+)]
+#[x_kube(cel, validation = "self.replicas <= self.maxReplicas")]
+#[serde(rename_all = "camelCase")]
+struct CelTestSpec {
+    #[x_kube(validation = "self >= 0")]
+    replicas: i32,
+    max_replicas: i32,
+    #[x_kube(validation = "self == oldSelf")]
+    immutable: String,
+}
+
+#[test]
+fn cel_substruct_validate() {
+    // Valid: replicas <= maxReplicas and replicas >= 0.
+    let ok = serde_json::json!({"replicas": 1, "maxReplicas": 3, "immutable": "x"});
+    assert!(CelTestSpec::validate_cel(&ok, None).is_ok());
+
+    // Invalid on creation: replicas (-1) > maxReplicas (-3) AND replicas < 0.
+    // The transition rule (`self == oldSelf`) is skipped when `old` is None.
+    let bad = serde_json::json!({"replicas": -1, "maxReplicas": -3, "immutable": "x"});
+    let errs = CelTestSpec::validate_cel(&bad, None).unwrap_err();
+    assert!(errs.len() >= 2, "expected >=2 errors, got {errs:?}");
+}
+
+#[test]
+fn cel_root_validate() {
+    let valid = CelTest::new("ok", CelTestSpec {
+        replicas: 1,
+        max_replicas: 3,
+        immutable: "a".into(),
+    });
+    let res = valid.validate_cel();
+    assert!(res.is_ok(), "valid CR should pass, got {res:?}");
+
+    let invalid = CelTest::new("bad", CelTestSpec {
+        replicas: 5,
+        max_replicas: 3,
+        immutable: "a".into(),
+    });
+    assert!(invalid.validate_cel().is_err());
+}
+
+#[test]
+fn cel_root_validate_update() {
+    let old = CelTest::new("x", CelTestSpec {
+        replicas: 1,
+        max_replicas: 3,
+        immutable: "a".into(),
+    });
+
+    // Unchanged immutable field → transition rule passes.
+    let same = old.clone();
+    assert!(same.validate_cel_update(&old).is_ok());
+
+    // Changed immutable field → transition rule (`self == oldSelf`) fails.
+    let changed = CelTest::new("x", CelTestSpec {
+        replicas: 1,
+        max_replicas: 3,
+        immutable: "b".into(),
+    });
+    assert!(changed.validate_cel_update(&old).is_err());
+}
