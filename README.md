@@ -2,7 +2,7 @@
 
 [![Crates.io](https://img.shields.io/crates/v/kube.svg)](https://crates.io/crates/kube)
 [![Rust 1.88](https://img.shields.io/badge/MSRV-1.88-dea584.svg)](https://github.com/rust-lang/rust/releases/tag/1.88.0)
-[![Tested against Kubernetes v1.31 and above](https://img.shields.io/badge/MK8SV-v1.31-326ce5.svg)](https://kube.rs/kubernetes-version)
+[![Tested against Kubernetes v1.32 and above](https://img.shields.io/badge/MK8SV-v1.32-326ce5.svg)](https://kube.rs/kubernetes-version)
 [![Best Practices](https://bestpractices.coreinfrastructure.org/projects/5413/badge)](https://bestpractices.coreinfrastructure.org/projects/5413)
 [![Discord chat](https://img.shields.io/discord/500028886025895936.svg?logo=discord&style=plastic)](https://discord.gg/tokio)
 
@@ -17,7 +17,7 @@ Select a version of `kube` along matching versions of [k8s-openapi](https://gith
 ```toml
 [dependencies]
 kube = { version = "3.1.0", features = ["runtime", "derive"] }
-k8s-openapi = { version = "0.27.0", features = ["latest", "schemars"] }
+k8s-openapi = { version = "0.28.0", features = ["latest", "schemars"] }
 schemars = { version = "1" }
 ```
 
