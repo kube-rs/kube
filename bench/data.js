@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1781601860968,
+  "lastUpdate": 1781624711903,
   "repoUrl": "https://github.com/kube-rs/kube",
   "entries": {
     "Benchmark": [
@@ -3587,6 +3587,105 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/kube-rs/kube/commit/8d617848ef5095fe0798bdc94f6b6f1a2245ce65"
         },
         "date": 1781601859840,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "init_listwatch - peak_bytes",
+            "value": 55194619,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - total_allocated",
+            "value": 76715088,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - alloc_count",
+            "value": 578023,
+            "unit": "allocations"
+          },
+          {
+            "name": "steady_state - peak_bytes",
+            "value": 71381202,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - total_allocated",
+            "value": 109519220,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - alloc_count",
+            "value": 799021,
+            "unit": "allocations"
+          },
+          {
+            "name": "relist - peak_bytes",
+            "value": 99797302,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - total_allocated",
+            "value": 174518628,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - alloc_count",
+            "value": 1189035,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_without_modify - peak_bytes",
+            "value": 141298836,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - total_allocated",
+            "value": 205865000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - alloc_count",
+            "value": 1298020,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_with_modify - peak_bytes",
+            "value": 134853452,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - total_allocated",
+            "value": 162895000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - alloc_count",
+            "value": 1058021,
+            "unit": "allocations"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "doxxx93@gmail.com",
+            "name": "doxxx",
+            "username": "doxxx93"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "2310a068599f8d2d94336ebc491b14376dbd4dd9",
+          "message": "feat(derive): client-side CEL validation via #[kube(cel)] / #[x_kube(cel)] (#2011)\n\n* feat(derive): client-side CEL validation via #[kube(cel)] / #[x_kube(cel)]\n\nGenerate client-side CEL validation methods so users can evaluate the same\nx-kubernetes-validations rules locally, without an apiserver (issue #1670).\n\n- `#[kube(cel)]` on a CustomResource generates `Foo::validate_cel(&self)`\n  (creation rules) and `Foo::validate_cel_update(&self, old)` (transition rules).\n  Forces the KubeSchema derive; rejected at compile time with `schema = \"manual\"`\n  since a manual schema carries no validations.\n- `#[x_kube(cel)]` on any KubeSchema struct generates a static\n  `T::validate_cel(value, old)` usable on a serialized fragment in unit tests.\n\nThe sub-struct method regenerates the schema with the same openAPIV3 settings and\nstructural transforms the CRD path uses, so the schema kube-cel walks matches what\nan apiserver would validate (`schemars::schema_for!` alone is not walkable).\nValidation is per-call (Validator::new().validate); caching can follow.\n\nRequires the downstream crate to enable `kube/cel`, since the generated code\nreferences `kube::core::cel`.\n\nAdds runtime integration tests, a compile-fail test for `schema = \"manual\"` + cel,\na doctest, and the `crd_derive_cel` example.\n\nSigned-off-by: doxxx93 <doxxx93@gmail.com>\n\n* feat(derive): validate_cel returns Result<(), ValidationErrors>\n\nAddress review feedback (#2011): returning `Vec<ValidationError>` forced callers\nto check `is_empty()`, inverting the idiomatic `validate()?` flow.\n\nkube-cel 0.7.0 flipped its validation entry points to `Result<(), ValidationErrors>`,\nso the generated `validate_cel` / `validate_cel_update` (root) and the static\nsub-struct `validate_cel` now mirror that: `Ok(())` on success, the aggregated\nfailures otherwise. Bumps the kube-cel floor 0.6.1 -> 0.7.0 (kube-core).\n\nUpdates the doctest, the crd_derive_cel example, and the integration tests to\n`is_ok()` / `is_err()`.\n\nSigned-off-by: doxxx93 <doxxx93@gmail.com>\n\n* refactor(derive): delegate CEL validation bodies to kube-core helpers\n\nMove the client-side CEL validation logic out of the proc-macro output and\ninto kube-core free functions, so it is compiled once instead of being\nre-expanded (and re-parsed) at every derive site.\n\n- kube-core::cel::{validate_cel, validate_cel_update} (cfg(cel)): read the\n  schema from <T as CustomResourceExt>::crd(), so no schemars at runtime and\n  no schema feature needed.\n- kube-core::cel::validate_cel_schema (cfg(all(cel, schema))): runs the\n  schemars openapi3 settings + kube_core::schema transforms for the\n  #[x_kube(cel)] sub-struct path.\n\nThe derives still emit the same inherent methods, now one-line delegations,\nso the macro stays the opt-in gatekeeper and the schema = \"manual\"\ncompile_error guard is unchanged. Call-site feature requirements are\nidentical to the previous inline bodies.\n\nSigned-off-by: doxxx93 <doxxx93@gmail.com>\n\n---------\n\nSigned-off-by: doxxx93 <doxxx93@gmail.com>",
+          "timestamp": "2026-06-16T16:43:47+01:00",
+          "tree_id": "5353da7c055468204464605a6af09cd1aae056e4",
+          "url": "https://github.com/kube-rs/kube/commit/2310a068599f8d2d94336ebc491b14376dbd4dd9"
+        },
+        "date": 1781624710545,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
