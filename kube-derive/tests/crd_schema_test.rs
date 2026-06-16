@@ -578,3 +578,75 @@ fn test_optional_int_or_string_nullable() {
     assert_eq!(optional.x_kubernetes_int_or_string, Some(true));
     assert_eq!(optional.nullable, Some(true));
 }
+
+// Test for container-level serde(default) handling (issue #1805)
+#[derive(CustomResource, KubeSchema, Serialize, Deserialize, Debug, Clone)]
+#[kube(group = "clux.dev", version = "v1", kind = "ContainerDefault", namespaced)]
+#[serde(rename_all = "camelCase", default)]
+struct ContainerDefaultSpec {
+    #[x_kube(validation = "self % 2 == 1")]
+    replica_count: i32,
+}
+
+impl Default for ContainerDefaultSpec {
+    fn default() -> Self {
+        Self { replica_count: 3 }
+    }
+}
+
+#[test]
+fn test_container_level_serde_default() {
+    use kube::core::CustomResourceExt;
+    let crd = ContainerDefault::crd();
+    let spec_schema = &crd.spec.versions[0]
+        .schema
+        .as_ref()
+        .unwrap()
+        .open_api_v3_schema
+        .as_ref()
+        .unwrap()
+        .properties
+        .as_ref()
+        .unwrap()["spec"];
+
+    // Defaults from the container-level Default impl reach the schema
+    let replica_count = &spec_schema.properties.as_ref().unwrap()["replicaCount"];
+    assert_eq!(replica_count.default.as_ref().unwrap().0, serde_json::json!(3));
+
+    // The CEL rule on the defaulted field survives
+    let validations = replica_count.x_kubernetes_validations.as_ref().unwrap();
+    assert_eq!(validations[0].rule, "self % 2 == 1");
+}
+
+// The `#[serde(default = "path")]` container form resolves the function directly and needs
+// no generated Default impls; pin that it keeps working alongside the bare form.
+#[derive(CustomResource, KubeSchema, Serialize, Deserialize, Debug, Clone)]
+#[kube(group = "clux.dev", version = "v1", kind = "ContainerPathDefault", namespaced)]
+#[serde(default = "container_path_default")]
+struct ContainerPathDefaultSpec {
+    #[x_kube(validation = "self != ''")]
+    name: String,
+}
+
+fn container_path_default() -> ContainerPathDefaultSpec {
+    ContainerPathDefaultSpec { name: "x".into() }
+}
+
+#[test]
+fn test_container_level_serde_default_path() {
+    use kube::core::CustomResourceExt;
+    let crd = ContainerPathDefault::crd();
+    let spec_schema = &crd.spec.versions[0]
+        .schema
+        .as_ref()
+        .unwrap()
+        .open_api_v3_schema
+        .as_ref()
+        .unwrap()
+        .properties
+        .as_ref()
+        .unwrap()["spec"];
+
+    let name = &spec_schema.properties.as_ref().unwrap()["name"];
+    assert_eq!(name.default.as_ref().unwrap().0, serde_json::json!("x"));
+}
