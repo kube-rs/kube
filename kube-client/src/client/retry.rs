@@ -30,7 +30,7 @@
 //! # }
 //! ```
 
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use http::{Request, Response, StatusCode};
 use tower::{
@@ -61,6 +61,7 @@ pub struct RetryPolicy {
     backoff: ExponentialBackoff,
     current_attempt: u32,
     max_retries: u32,
+    server_aware: bool,
 }
 
 impl RetryPolicy {
@@ -71,11 +72,17 @@ impl RetryPolicy {
     /// * `min_delay` - Initial delay between retries
     /// * `max_delay` - Maximum delay between retries (cap for exponential growth)
     /// * `max_retries` - Maximum number of retry attempts
+    /// * `server_retry` - Whether to respect server-provided `Retry-After` header for retry timing
     ///
     /// # Errors
     ///
     /// Returns [`InvalidBackoff`] if the backoff parameters are invalid.
-    pub fn new(min_delay: Duration, max_delay: Duration, max_retries: u32) -> Result<Self, InvalidBackoff> {
+    pub fn new(
+        min_delay: Duration,
+        max_delay: Duration,
+        max_retries: u32,
+        server_retry: bool,
+    ) -> Result<Self, InvalidBackoff> {
         let backoff =
             ExponentialBackoffMaker::new(min_delay, max_delay, 2.0, HasherRng::new())?.make_backoff();
 
@@ -83,7 +90,24 @@ impl RetryPolicy {
             backoff,
             current_attempt: 0,
             max_retries,
+            server_aware: server_retry,
         })
+    }
+
+    /// Create a new server-aware retry policy with parameters optimized for typical controller API usage.
+    ///
+    /// Default parameters:
+    /// - `min_delay`: 5ms
+    /// - `max_delay`: 1000s
+    /// - `max_retries`: 15
+    /// - `server_retry`: true (respects server-provided `Retry-After` header for retry timing)
+    ///
+    /// # Errors
+    ///
+    /// Returns [`InvalidBackoff`] if the backoff parameters are invalid.
+    pub fn server_retry() -> Self {
+        Self::new(Duration::from_millis(5), Duration::from_secs(1000), 15, true)
+            .expect("default server RetryPolicy parameters are valid")
     }
 
     /// Check if the status code is retryable.
@@ -103,7 +127,7 @@ impl Default for RetryPolicy {
     /// - `max_delay`: 5s
     /// - `max_retries`: 3
     fn default() -> Self {
-        Self::new(Duration::from_millis(500), Duration::from_secs(5), 3)
+        Self::new(Duration::from_millis(500), Duration::from_secs(5), 3, false)
             .expect("default RetryPolicy parameters are valid")
     }
 }
@@ -122,7 +146,20 @@ impl<Res> Policy<Request<Body>, Response<Res>, BoxError> for RetryPolicy {
                     && self.current_attempt < self.max_retries =>
             {
                 self.current_attempt += 1;
-                Some(self.backoff.next_backoff())
+                // Tick the backoff retry anyways
+                let backoff = self.backoff.next_backoff();
+                if self.server_aware
+                    && let Some(retry_after) = response.headers().get("Retry-After")
+                    && let Some(retry_after) = retry_after.to_str().ok()
+                    && let Some(retry_after) = retry_after.parse::<u64>().ok()
+                {
+                    let server_delay = Duration::from_secs(retry_after);
+                    let retry_after = Instant::now() + server_delay;
+                    if backoff.deadline().le(&retry_after.into()) {
+                        return Some(tokio::time::sleep(server_delay));
+                    }
+                }
+                Some(backoff)
             }
             _ => None,
         }
@@ -176,7 +213,14 @@ mod tests {
 
     #[test]
     fn test_invalid_backoff() {
-        let result = RetryPolicy::new(Duration::from_secs(10), Duration::from_secs(1), 3);
+        let result = RetryPolicy::new(Duration::from_secs(10), Duration::from_secs(1), 3, false);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_compile_server_retry() {
+        let policy = RetryPolicy::server_retry();
+        assert!(policy.server_aware);
+        assert_eq!(policy.max_retries, 15);
     }
 }
