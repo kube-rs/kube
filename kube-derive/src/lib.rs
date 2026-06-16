@@ -331,6 +331,20 @@ mod resource;
 ///
 /// When using `garde` directly, you must add it to your dependencies (with the `derive` feature).
 ///
+/// ### CEL validation (client-side)
+/// CEL rules declared with `#[kube(validation = ...)]` / `#[x_kube(validation = ...)]` are normally
+/// enforced server-side by the apiserver. With `#[kube(cel)]` the derive also generates client-side
+/// methods so you can run the same rules locally without a cluster:
+/// - `Foo::validate_cel(&self) -> Vec<ValidationError>` evaluates creation rules.
+/// - `Foo::validate_cel_update(&self, old: &Self) -> Vec<ValidationError>` also evaluates transition
+///   rules (rules using `oldSelf`), comparing against `old`.
+///
+/// Likewise, `#[x_kube(cel)]` on any `KubeSchema` struct generates a static
+/// `T::validate_cel(value, old)` usable on a fragment in unit tests (see [`KubeSchema`]).
+/// Both require the downstream crate to enable the **`kube/cel`** feature, since the generated code
+/// references `kube::core::cel`. `#[kube(cel)]` requires a derived schema (it cannot be combined with
+/// `schema = "manual"`). See the [`crd_derive_cel`](https://github.com/kube-rs/kube/blob/main/examples/crd_derive_cel.rs) example.
+///
 /// ### Validation Caveats
 /// Make sure your validation rules are static and handled by `schemars`:
 /// - validations from `#[garde(custom(my_func))]` will not show up in the schema.
@@ -433,6 +447,33 @@ pub fn derive_custom_resource(input: proc_macro::TokenStream) -> proc_macro::Tok
 /// assert!(serde_json::to_string(&Struct::crd()).unwrap().contains(r#""message":"failure message""#));
 /// assert!(serde_json::to_string(&Struct::crd()).unwrap().contains(r#""default":"value""#));
 /// assert!(serde_json::to_string(&Struct::crd()).unwrap().contains(r#""rule":"self.metadata.name == 'singleton'""#));
+/// ```
+///
+/// ## Client-side CEL validation with `#[x_kube(cel)]`
+///
+/// Adding `cel` to `#[x_kube(...)]` generates a static `T::validate_cel(value, old)` method that
+/// evaluates this type's CEL rules locally, without an apiserver — handy in unit tests on a struct
+/// fragment. `value` is the serialized form (`serde_json::to_value(&instance)`); `old` supplies the
+/// previous state for transition rules (rules using `oldSelf`), or `None` on creation.
+///
+/// This requires the downstream crate to enable the **`kube/cel`** feature, since the generated code
+/// references `kube::core::cel`.
+///
+/// ```rust
+/// # use kube::KubeSchema;
+/// # use serde::{Deserialize, Serialize};
+/// #[derive(KubeSchema, Serialize, Deserialize, Clone, Debug)]
+/// #[x_kube(cel, validation = "self.max >= self.min")]
+/// struct Range {
+///     min: i32,
+///     max: i32,
+/// }
+///
+/// let ok = serde_json::json!({"min": 1, "max": 5});
+/// assert!(Range::validate_cel(&ok, None).is_empty());
+///
+/// let bad = serde_json::json!({"min": 5, "max": 1});
+/// assert!(!Range::validate_cel(&bad, None).is_empty());
 /// ```
 #[proc_macro_derive(KubeSchema, attributes(x_kube, schemars, validate))]
 pub fn derive_schema_validation(input: proc_macro::TokenStream) -> proc_macro::TokenStream {

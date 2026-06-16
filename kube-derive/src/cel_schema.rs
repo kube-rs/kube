@@ -21,6 +21,12 @@ struct KubeSchema {
     ident: Ident,
     #[darling(multiple, rename = "validation", with = parse_expr::preserve_str_literal)]
     validations: Vec<Expr>,
+    /// Generate a static client-side CEL validation method `validate_cel(value, old)`.
+    ///
+    /// Requires the downstream crate to enable the `kube/cel` feature, since the generated
+    /// code references `kube::core::cel::*`.
+    #[darling(default)]
+    cel: bool,
 }
 
 #[derive(Debug, FromMeta)]
@@ -31,6 +37,8 @@ struct Crates {
     schemars: Path,
     #[darling(default = "Self::default_serde")]
     serde: Path,
+    #[darling(default = "Self::default_serde_json")]
+    serde_json: Path,
     #[darling(default = "Self::default_std")]
     std: Path,
 }
@@ -56,6 +64,10 @@ impl Crates {
         parse_quote! { ::serde }
     }
 
+    fn default_serde_json() -> Path {
+        parse_quote! { ::serde_json }
+    }
+
     fn default_std() -> Path {
         parse_quote! { ::std }
     }
@@ -73,10 +85,12 @@ pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
                 kube_core,
                 schemars,
                 serde,
+                serde_json,
                 std,
             },
         ident,
         validations,
+        cel,
     } = match KubeSchema::from_derive_input(&ast) {
         Err(err) => return err.write_errors(),
         Ok(attrs) => attrs,
@@ -159,6 +173,46 @@ pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
     let schema_name = ident.to_string();
     let generated_struct_name = struct_name.as_ident();
 
+    // Client-side CEL validation method, generated when `#[x_kube(cel)]` is set.
+    // Requires the downstream crate to enable `kube/cel` (the generated code references
+    // `#kube_core::cel`). The schema is generated with the same openAPIV3 settings and
+    // structural transforms the CRD path uses (see `custom_resource.rs` schemagen), so the
+    // `x-kubernetes-validations` rules and structure match what an apiserver would validate;
+    // `schemars::schema_for!` (plain JSON-Schema 2020-12, non-inlined `$ref`s) would not be
+    // walkable by kube-cel.
+    let impl_validate_cel = if cel {
+        quote! {
+            impl #ident {
+                /// Validate a serialized value of this type against its CEL validation rules
+                /// (`x-kubernetes-validations`) client-side, without an apiserver.
+                ///
+                /// `value` is the serialized form of an instance (`serde_json::to_value(&instance)`);
+                /// `old` supplies the previous state for transition rules (rules using `oldSelf`),
+                /// or `None` on creation. Returns the list of validation failures.
+                pub fn validate_cel(
+                    value: &#serde_json::Value,
+                    old: ::core::option::Option<&#serde_json::Value>,
+                ) -> Vec<#kube_core::cel::ValidationError> {
+                    let generate = #schemars::generate::SchemaSettings::openapi3()
+                        .with(|s| {
+                            s.inline_subschemas = true;
+                            s.meta_schema = None;
+                        })
+                        .with_transform(#schemars::transform::AddNullable::default())
+                        .with_transform(#kube_core::schema::StructuralSchemaRewriter)
+                        .with_transform(#kube_core::schema::OptionalEnum)
+                        .with_transform(#kube_core::schema::OptionalIntOrString)
+                        .into_generator();
+                    let schema = generate.into_root_schema_for::<Self>();
+                    let schema = #serde_json::to_value(&schema).expect("schema serializes to JSON");
+                    #kube_core::cel::Validator::new().validate(&schema, value, old)
+                }
+            }
+        }
+    } else {
+        quote! {}
+    };
+
     quote! {
         impl #schemars::JsonSchema for #ident {
             fn inline_schema() -> bool {
@@ -182,6 +236,8 @@ pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
                 s.clone()
             }
         }
+
+        #impl_validate_cel
     }
 }
 

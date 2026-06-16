@@ -34,6 +34,7 @@ refresh = ["kube/oauth", "kube/oidc"]
 kubelet-debug = ["kube/kubelet-debug"]
 ws = ["kube/ws"]
 latest = ["k8s-openapi/latest"]
+cel = ["kube/cel"]
 
 [dev-dependencies]
 tokio-util.workspace = true
@@ -102,6 +103,11 @@ path = "crd_apply.rs"
 [[example]]
 name = "crd_derive"
 path = "crd_derive.rs"
+
+[[example]]
+name = "crd_derive_cel"
+path = "crd_derive_cel.rs"
+required-features = ["cel"]
 
 [[example]]
 name = "crd_derive_schema"
