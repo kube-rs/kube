@@ -17,6 +17,85 @@ use derive_more::From;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+// --- Client-side CEL validation helpers (feature = "cel") ---
+//
+// These back the `validate_cel` / `validate_cel_update` methods that kube-derive generates for
+// `#[kube(cel)]` / `#[x_kube(cel)]`. The derive emits thin inherent wrappers that delegate here,
+// so the validation logic is compiled once in this crate instead of being re-expanded (and the
+// proc-macro re-parsed) at every derive site. The wrappers keep the public method surface, so the
+// derive stays the opt-in gatekeeper (only `#[kube(cel)]` types get the methods) and the
+// `schema = "manual"` compile-time rejection still lives in the macro.
+
+/// Validate a derived custom resource against its CEL creation rules (`x-kubernetes-validations`)
+/// client-side, without an apiserver. Backs the generated `Foo::validate_cel(&self)`.
+#[cfg(feature = "cel")]
+#[cfg_attr(docsrs, doc(cfg(feature = "cel")))]
+pub fn validate_cel<T>(obj: &T) -> Result<(), ValidationErrors>
+where
+    T: crate::CustomResourceExt + Serialize,
+{
+    validate_cel_with_old(obj, None)
+}
+
+/// Validate a derived custom resource against its CEL transition rules (rules using `oldSelf`)
+/// client-side, comparing against `old`. Backs the generated `Foo::validate_cel_update(&self, old)`.
+#[cfg(feature = "cel")]
+#[cfg_attr(docsrs, doc(cfg(feature = "cel")))]
+pub fn validate_cel_update<T>(obj: &T, old: &T) -> Result<(), ValidationErrors>
+where
+    T: crate::CustomResourceExt + Serialize,
+{
+    let old = serde_json::to_value(old).expect("resource serializes to JSON");
+    validate_cel_with_old(obj, Some(old))
+}
+
+#[cfg(feature = "cel")]
+fn validate_cel_with_old<T>(obj: &T, old: Option<Value>) -> Result<(), ValidationErrors>
+where
+    T: crate::CustomResourceExt + Serialize,
+{
+    let crd = T::crd();
+    let schema = serde_json::to_value(
+        crd.spec.versions[0]
+            .schema
+            .as_ref()
+            .and_then(|s| s.open_api_v3_schema.as_ref())
+            .expect("derived CRD has an openAPIV3Schema"),
+    )
+    .expect("CRD schema serializes to JSON");
+    let object = serde_json::to_value(obj).expect("resource serializes to JSON");
+    Validator::new().validate(&schema, &object, old.as_ref())
+}
+
+/// Validate a serialized value of a `KubeSchema` type against its CEL validation rules
+/// (`x-kubernetes-validations`) client-side, without an apiserver. Backs the generated static
+/// `T::validate_cel(value, old)`.
+///
+/// The schema is generated with the same openAPIV3 settings and structural transforms the CRD path
+/// uses, so the `x-kubernetes-validations` rules and structure match what an apiserver would
+/// validate; `schemars::schema_for!` (plain JSON-Schema 2020-12, non-inlined `$ref`s) would not be
+/// walkable by kube-cel.
+#[cfg(all(feature = "cel", feature = "schema"))]
+#[cfg_attr(docsrs, doc(cfg(all(feature = "cel", feature = "schema"))))]
+pub fn validate_cel_schema<T>(value: &Value, old: Option<&Value>) -> Result<(), ValidationErrors>
+where
+    T: schemars::JsonSchema,
+{
+    let generate = schemars::generate::SchemaSettings::openapi3()
+        .with(|s| {
+            s.inline_subschemas = true;
+            s.meta_schema = None;
+        })
+        .with_transform(schemars::transform::AddNullable::default())
+        .with_transform(crate::schema::StructuralSchemaRewriter)
+        .with_transform(crate::schema::OptionalEnum)
+        .with_transform(crate::schema::OptionalIntOrString)
+        .into_generator();
+    let schema = generate.into_root_schema_for::<T>();
+    let schema = serde_json::to_value(&schema).expect("schema serializes to JSON");
+    Validator::new().validate(&schema, value, old)
+}
+
 /// Rule is a CEL validation rule for the CRD field
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]

@@ -175,11 +175,9 @@ pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
 
     // Client-side CEL validation method, generated when `#[x_kube(cel)]` is set.
     // Requires the downstream crate to enable `kube/cel` (the generated code references
-    // `#kube_core::cel`). The schema is generated with the same openAPIV3 settings and
-    // structural transforms the CRD path uses (see `custom_resource.rs` schemagen), so the
-    // `x-kubernetes-validations` rules and structure match what an apiserver would validate;
-    // `schemars::schema_for!` (plain JSON-Schema 2020-12, non-inlined `$ref`s) would not be
-    // walkable by kube-cel.
+    // `#kube_core::cel`). The body just delegates to `kube_core::cel::validate_cel_schema`, which
+    // owns the schemagen (same openAPIV3 settings + structural transforms the CRD path uses) so it
+    // is compiled once in kube-core rather than re-expanded at every derive site.
     let impl_validate_cel = if cel {
         quote! {
             impl #ident {
@@ -193,19 +191,7 @@ pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
                     value: &#serde_json::Value,
                     old: ::core::option::Option<&#serde_json::Value>,
                 ) -> ::core::result::Result<(), #kube_core::cel::ValidationErrors> {
-                    let generate = #schemars::generate::SchemaSettings::openapi3()
-                        .with(|s| {
-                            s.inline_subschemas = true;
-                            s.meta_schema = None;
-                        })
-                        .with_transform(#schemars::transform::AddNullable::default())
-                        .with_transform(#kube_core::schema::StructuralSchemaRewriter)
-                        .with_transform(#kube_core::schema::OptionalEnum)
-                        .with_transform(#kube_core::schema::OptionalIntOrString)
-                        .into_generator();
-                    let schema = generate.into_root_schema_for::<Self>();
-                    let schema = #serde_json::to_value(&schema).expect("schema serializes to JSON");
-                    #kube_core::cel::Validator::new().validate(&schema, value, old)
+                    #kube_core::cel::validate_cel_schema::<Self>(value, old)
                 }
             }
         }

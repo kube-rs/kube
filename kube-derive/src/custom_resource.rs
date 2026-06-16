@@ -962,8 +962,10 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
 
     // Client-side CEL validation methods, generated when `#[kube(cel)]` is set.
     // Requires the downstream crate to enable `kube/cel` (the generated code references
-    // `#kube_core::cel`). Gated on a derived schema: a manual schema is not forced through
-    // `KubeSchema`, so it would carry no `x-kubernetes-validations` and the methods would
+    // `#kube_core::cel`). The bodies just delegate to `kube_core::cel::validate_cel{,_update}`, which
+    // own the schema extraction + validation so they are compiled once in kube-core rather than
+    // re-expanded at every derive site. Gated on a derived schema: a manual schema is not forced
+    // through `KubeSchema`, so it would carry no `x-kubernetes-validations` and the methods would
     // silently validate nothing — reject that combination at compile time instead.
     let impl_validate_cel = if cel {
         if schema_mode.derive() {
@@ -973,35 +975,14 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
                     /// client-side, without an apiserver. `Ok(())` if all rules pass, otherwise the
                     /// aggregated failures.
                     pub fn validate_cel(&self) -> ::core::result::Result<(), #kube_core::cel::ValidationErrors> {
-                        let crd = <Self as #extver::CustomResourceExt>::crd();
-                        let schema = #serde_json::to_value(
-                            crd.spec.versions[0]
-                                .schema
-                                .as_ref()
-                                .and_then(|s| s.open_api_v3_schema.as_ref())
-                                .expect("derived CRD has an openAPIV3Schema"),
-                        )
-                        .expect("CRD schema serializes to JSON");
-                        let object = #serde_json::to_value(self).expect("resource serializes to JSON");
-                        #kube_core::cel::Validator::new().validate(&schema, &object, None)
+                        #kube_core::cel::validate_cel(self)
                     }
 
                     /// Validate this resource against its CEL transition rules (rules using `oldSelf`)
                     /// client-side, comparing against the `old` state. `Ok(())` if all rules pass,
                     /// otherwise the aggregated failures.
                     pub fn validate_cel_update(&self, old: &Self) -> ::core::result::Result<(), #kube_core::cel::ValidationErrors> {
-                        let crd = <Self as #extver::CustomResourceExt>::crd();
-                        let schema = #serde_json::to_value(
-                            crd.spec.versions[0]
-                                .schema
-                                .as_ref()
-                                .and_then(|s| s.open_api_v3_schema.as_ref())
-                                .expect("derived CRD has an openAPIV3Schema"),
-                        )
-                        .expect("CRD schema serializes to JSON");
-                        let object = #serde_json::to_value(self).expect("resource serializes to JSON");
-                        let old = #serde_json::to_value(old).expect("resource serializes to JSON");
-                        #kube_core::cel::Validator::new().validate(&schema, &object, Some(&old))
+                        #kube_core::cel::validate_cel_update(self, old)
                     }
                 }
             }
