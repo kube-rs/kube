@@ -970,8 +970,9 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
             quote! {
                 impl #rootident {
                     /// Validate this resource against its CEL creation rules (`x-kubernetes-validations`)
-                    /// client-side, without an apiserver. Returns the list of validation failures.
-                    pub fn validate_cel(&self) -> Vec<#kube_core::cel::ValidationError> {
+                    /// client-side, without an apiserver. `Ok(())` if all rules pass, otherwise the
+                    /// aggregated failures.
+                    pub fn validate_cel(&self) -> ::core::result::Result<(), #kube_core::cel::ValidationErrors> {
                         let crd = <Self as #extver::CustomResourceExt>::crd();
                         let schema = #serde_json::to_value(
                             crd.spec.versions[0]
@@ -986,8 +987,9 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
                     }
 
                     /// Validate this resource against its CEL transition rules (rules using `oldSelf`)
-                    /// client-side, comparing against the `old` state. Returns validation failures.
-                    pub fn validate_cel_update(&self, old: &Self) -> Vec<#kube_core::cel::ValidationError> {
+                    /// client-side, comparing against the `old` state. `Ok(())` if all rules pass,
+                    /// otherwise the aggregated failures.
+                    pub fn validate_cel_update(&self, old: &Self) -> ::core::result::Result<(), #kube_core::cel::ValidationErrors> {
                         let crd = <Self as #extver::CustomResourceExt>::crd();
                         let schema = #serde_json::to_value(
                             crd.spec.versions[0]

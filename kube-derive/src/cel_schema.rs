@@ -188,11 +188,11 @@ pub(crate) fn derive_validated_schema(input: TokenStream) -> TokenStream {
                 ///
                 /// `value` is the serialized form of an instance (`serde_json::to_value(&instance)`);
                 /// `old` supplies the previous state for transition rules (rules using `oldSelf`),
-                /// or `None` on creation. Returns the list of validation failures.
+                /// or `None` on creation. `Ok(())` if all rules pass, otherwise the aggregated failures.
                 pub fn validate_cel(
                     value: &#serde_json::Value,
                     old: ::core::option::Option<&#serde_json::Value>,
-                ) -> Vec<#kube_core::cel::ValidationError> {
+                ) -> ::core::result::Result<(), #kube_core::cel::ValidationErrors> {
                     let generate = #schemars::generate::SchemaSettings::openapi3()
                         .with(|s| {
                             s.inline_subschemas = true;

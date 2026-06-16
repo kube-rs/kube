@@ -41,7 +41,7 @@ fn main() {
         tier: "standard".into(),
     });
     println!("valid.validate_cel() -> {:?}", valid.validate_cel());
-    assert!(valid.validate_cel().is_empty());
+    assert!(valid.validate_cel().is_ok());
 
     // Root: min > max violates the creation rule.
     let invalid = Autoscaler::new("web", AutoscalerSpec {
@@ -50,7 +50,7 @@ fn main() {
         tier: "standard".into(),
     });
     println!("invalid.validate_cel() -> {:?}", invalid.validate_cel());
-    assert!(!invalid.validate_cel().is_empty());
+    assert!(invalid.validate_cel().is_err());
 
     // Root update: changing the immutable `tier` violates the transition rule.
     let changed = Autoscaler::new("web", AutoscalerSpec {
@@ -62,13 +62,13 @@ fn main() {
         "changed.validate_cel_update(&valid) -> {:?}",
         changed.validate_cel_update(&valid)
     );
-    assert!(!changed.validate_cel_update(&valid).is_empty());
+    assert!(changed.validate_cel_update(&valid).is_err());
 
     // Sub-struct: validate a serialized spec fragment directly, no resource needed.
     let fragment = serde_json::json!({"minReplicas": 3, "maxReplicas": 1, "tier": "standard"});
-    let errors = AutoscalerSpec::validate_cel(&fragment, None);
-    println!("AutoscalerSpec::validate_cel(fragment) -> {errors:?}");
-    assert!(!errors.is_empty());
+    let result = AutoscalerSpec::validate_cel(&fragment, None);
+    println!("AutoscalerSpec::validate_cel(fragment) -> {result:?}");
+    assert!(result.is_err());
 
     println!("all CEL validations behaved as expected");
 }

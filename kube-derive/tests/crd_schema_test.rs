@@ -609,12 +609,12 @@ struct CelTestSpec {
 fn cel_substruct_validate() {
     // Valid: replicas <= maxReplicas and replicas >= 0.
     let ok = serde_json::json!({"replicas": 1, "maxReplicas": 3, "immutable": "x"});
-    assert!(CelTestSpec::validate_cel(&ok, None).is_empty());
+    assert!(CelTestSpec::validate_cel(&ok, None).is_ok());
 
     // Invalid on creation: replicas (-1) > maxReplicas (-3) AND replicas < 0.
     // The transition rule (`self == oldSelf`) is skipped when `old` is None.
     let bad = serde_json::json!({"replicas": -1, "maxReplicas": -3, "immutable": "x"});
-    let errs = CelTestSpec::validate_cel(&bad, None);
+    let errs = CelTestSpec::validate_cel(&bad, None).unwrap_err();
     assert!(errs.len() >= 2, "expected >=2 errors, got {errs:?}");
 }
 
@@ -625,15 +625,15 @@ fn cel_root_validate() {
         max_replicas: 3,
         immutable: "a".into(),
     });
-    let errs = valid.validate_cel();
-    assert!(errs.is_empty(), "valid CR should pass, got {errs:?}");
+    let res = valid.validate_cel();
+    assert!(res.is_ok(), "valid CR should pass, got {res:?}");
 
     let invalid = CelTest::new("bad", CelTestSpec {
         replicas: 5,
         max_replicas: 3,
         immutable: "a".into(),
     });
-    assert!(!invalid.validate_cel().is_empty());
+    assert!(invalid.validate_cel().is_err());
 }
 
 #[test]
@@ -646,7 +646,7 @@ fn cel_root_validate_update() {
 
     // Unchanged immutable field → transition rule passes.
     let same = old.clone();
-    assert!(same.validate_cel_update(&old).is_empty());
+    assert!(same.validate_cel_update(&old).is_ok());
 
     // Changed immutable field → transition rule (`self == oldSelf`) fails.
     let changed = CelTest::new("x", CelTestSpec {
@@ -654,5 +654,5 @@ fn cel_root_validate_update() {
         max_replicas: 3,
         immutable: "b".into(),
     });
-    assert!(!changed.validate_cel_update(&old).is_empty());
+    assert!(changed.validate_cel_update(&old).is_err());
 }

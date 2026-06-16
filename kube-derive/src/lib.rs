@@ -335,9 +335,9 @@ mod resource;
 /// CEL rules declared with `#[kube(validation = ...)]` / `#[x_kube(validation = ...)]` are normally
 /// enforced server-side by the apiserver. With `#[kube(cel)]` the derive also generates client-side
 /// methods so you can run the same rules locally without a cluster:
-/// - `Foo::validate_cel(&self) -> Vec<ValidationError>` evaluates creation rules.
-/// - `Foo::validate_cel_update(&self, old: &Self) -> Vec<ValidationError>` also evaluates transition
-///   rules (rules using `oldSelf`), comparing against `old`.
+/// - `Foo::validate_cel(&self) -> Result<(), ValidationErrors>` evaluates creation rules.
+/// - `Foo::validate_cel_update(&self, old: &Self) -> Result<(), ValidationErrors>` also evaluates
+///   transition rules (rules using `oldSelf`), comparing against `old`.
 ///
 /// Likewise, `#[x_kube(cel)]` on any `KubeSchema` struct generates a static
 /// `T::validate_cel(value, old)` usable on a fragment in unit tests (see [`KubeSchema`]).
@@ -470,10 +470,10 @@ pub fn derive_custom_resource(input: proc_macro::TokenStream) -> proc_macro::Tok
 /// }
 ///
 /// let ok = serde_json::json!({"min": 1, "max": 5});
-/// assert!(Range::validate_cel(&ok, None).is_empty());
+/// assert!(Range::validate_cel(&ok, None).is_ok());
 ///
 /// let bad = serde_json::json!({"min": 5, "max": 1});
-/// assert!(!Range::validate_cel(&bad, None).is_empty());
+/// assert!(Range::validate_cel(&bad, None).is_err());
 /// ```
 #[proc_macro_derive(KubeSchema, attributes(x_kube, schemars, validate))]
 pub fn derive_schema_validation(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
