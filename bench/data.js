@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1781541476057,
+  "lastUpdate": 1781601860968,
   "repoUrl": "https://github.com/kube-rs/kube",
   "entries": {
     "Benchmark": [
@@ -3488,6 +3488,105 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/kube-rs/kube/commit/a5b4f3fb9729d7317a3f4521a37481193772a19c"
         },
         "date": 1781541474166,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "init_listwatch - peak_bytes",
+            "value": 55194619,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - total_allocated",
+            "value": 76715088,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - alloc_count",
+            "value": 578023,
+            "unit": "allocations"
+          },
+          {
+            "name": "steady_state - peak_bytes",
+            "value": 71381202,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - total_allocated",
+            "value": 109519220,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - alloc_count",
+            "value": 799021,
+            "unit": "allocations"
+          },
+          {
+            "name": "relist - peak_bytes",
+            "value": 99797302,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - total_allocated",
+            "value": 174518628,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - alloc_count",
+            "value": 1189035,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_without_modify - peak_bytes",
+            "value": 141298836,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - total_allocated",
+            "value": 205865000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - alloc_count",
+            "value": 1298020,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_with_modify - peak_bytes",
+            "value": 134853452,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - total_allocated",
+            "value": 162895000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - alloc_count",
+            "value": 1058021,
+            "unit": "allocations"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "daniil.grigorev.dev@gmail.com",
+            "name": "Danil Grigorev",
+            "username": "Danil-Grigorev"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8d617848ef5095fe0798bdc94f6b6f1a2245ce65",
+          "message": "Enable `RetryPolicy::server_retry` by default for `Client` (#2007)\n\n* Enable RetryPolicy::server_retry by default for Client\n\nSigned-off-by: Danil-Grigorev <daniil.grigorev.dev@gmail.com>\n\n* switch form with_retry to default_retry\n\nSigned-off-by: Danil-Grigorev <daniil.grigorev.dev@gmail.com>\n\n---------\n\nSigned-off-by: Danil-Grigorev <daniil.grigorev.dev@gmail.com>\nCo-authored-by: Eirik A <sszynrae@gmail.com>",
+          "timestamp": "2026-06-16T09:23:12Z",
+          "tree_id": "eb74174ada856b9f57bc8d1871c9fec78c2c622a",
+          "url": "https://github.com/kube-rs/kube/commit/8d617848ef5095fe0798bdc94f6b6f1a2245ce65"
+        },
+        "date": 1781601859840,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
