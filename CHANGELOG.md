@@ -7,9 +7,119 @@ UNRELEASED
 ===================
  * see https://github.com/kube-rs/kube/compare/4.0.0...main
 
+[4.0.0](https://github.com/kube-rs/kube/releases/tag/4.0.0) / 2026-06-16
+===================
+<!-- Release notes generated using configuration in .github/release.yml at 4.0.0 -->
+## New Major
+As per the release schedule to match up with the [latest Kubernetes ハル release](https://kubernetes.io/blog/2026/04/22/kubernetes-v1-36-release/).
+Lots of fixes and improvements. Thanks to everyone who contributed!
+
+## Kubernetes `v1_36` support via k8s-openapi [0.28](https://github.com/Arnavion/k8s-openapi/releases/tag/v0.28.0)
+
+Please [upgrade k8s-openapi along with kube](https://kube.rs/upgrading/) to avoid conflicts.
+
+## CEL Validation
+A new optional crate [kube-cel](https://docs.rs/kube-cel/latest/kube_cel/) is being re-exported through `kube::core::cel` via https://github.com/kube-rs/kube/pull/1954
+
+Kubernetes CRDs support [CEL validation rules](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#validation-rules) via `x-kubernetes-validations`, and were supported from 3.0 via [`KubeSchema`](https://docs.rs/kube/latest/kube/derive.KubeSchema.html), but these rules could only be evaluated server-side by the API server.
+
+The new crate allows evaluating these rules locally using rules matching the [upstream Kubernetes CEL libraries](https://docs.rs/kube/latest/kube/core/cel/trait.KubeCelExt.html#upstream-sources).
+
+While low-level, a higher-level CEL validator integrates with [`CustomResource`](https://docs.rs/kube/latest/kube/derive.CustomResource.html) via [`#[kube(cel)]`](https://docs.rs/kube/latest/kube/derive.CustomResource.html#cel-validation-client-side) from https://github.com/kube-rs/kube/pull/2011 and can be used as;
+
+```rust
+#[derive(CustomResource, Serialize, Deserialize, Clone, KubeSchema)]
+#[kube(group = "example.com", version = "v1", kind = "Foo", namespaced)]
+#[kube(cel, validation = "self.spec.replicas >= 0")] // cel trigger + validation rule
+struct FooSpec { replicas: i32 }
+
+let foo = Foo::new("test", FooSpec { replicas: -1 });
+foo.validate_cel()?;                     // new impl; checks creation rules
+new_foo.validate_cel_update(&old_foo)?;  // new impl; checks transition rules
+```
+
+See [examples/crd_derive_cel.rs](https://github.com/kube-rs/kube/blob/main/examples/crd_derive_cel.rs) for more details.
+
+This is available under the `kube/cel` feature, courtesy of @doxxx93.
+
+## Config
+A lot of improvements to config handling;
+
+- better error handling of malformed client certs in https://github.com/kube-rs/kube/pull/1966
+- add missing `Kubeconfig` fields in https://github.com/kube-rs/kube/pull/1965
+- `Kubeconfig` future key compatibility for new fields by adding catch-all `other` key via https://github.com/kube-rs/kube/pull/1964
+- deserialization changed from `serde-yaml` to [`serde-saphyr`](https://github.com/bourumir-wyngs/serde-saphyr) to get rid of the long-deprecated dependency. https://github.com/kube-rs/kube/pull/1975
+
+### Retry and Timeouts
+Better timeout and retry handling to better deal with flaky network conditions, and busy or initializing apiservers.
+
+- default global read timeouts has been unset in favor of `watcher` level timeouts in https://github.com/kube-rs/kube/pull/1945 (see https://github.com/kube-rs/kube/issues/1798 for context)
+- regular (non-watch) queries now respect the [`RetryPolicy`](https://docs.rs/kube/latest/kube/client/retry/struct.RetryPolicy.html) - now enabled by default in https://github.com/kube-rs/kube/pull/2007.
+
+### Client
+
+- properly handling rotating ca certs in cluster via https://github.com/kube-rs/kube/pull/1962
+- handle `tls-server-name` with `openssl-tls` via https://github.com/kube-rs/kube/pull/1993
+- auth exec: accept `yaml` output from `exec` plugins via https://github.com/kube-rs/kube/pull/2003
+- fix `ws` task leak and `drop`, and a deadlock on `join()` via https://github.com/kube-rs/kube/pull/1978
+- **change**: client tracing now opt-in due to issues. see https://github.com/kube-rs/kube/pull/1972
+
+### Runtime
+
+- [`watcher`](https://docs.rs/kube/latest/kube/runtime/watcher/index.html) automatically uses the `metadata_` api methods when called with [`PartialObjectMeta<K>`](https://docs.rs/kube/latest/kube/core/metadata/struct.PartialObjectMeta.html) via https://github.com/kube-rs/kube/pull/1952
+  * (this deprecates [`metadata_watcher`](https://docs.rs/kube/latest/kube/runtime/watcher/fn.metadata_watcher.html) in favor of an explicit change from `Api::<K>` to `Api::<PartialObjectMeta<K>>`)
+- added [`wait::conditions::is_created`](https://docs.rs/kube/latest/kube/runtime/wait/conditions/fn.is_deleted.html) as a counter to `is_deleted` https://github.com/kube-rs/kube/pull/2000
+- added [`Store::state_filtered`](https://docs.rs/kube/latest/kube/runtime/reflector/struct.Store.html#method.state_filter) and [`Store::state_filter_selector`](https://docs.rs/kube/latest/kube/runtime/reflector/struct.Store.html#method.state_filter_selector) to allow more efficient slicing of the locked cache via https://github.com/kube-rs/kube/pull/2002 + https://github.com/kube-rs/kube/pull/1998
+
+
+
+
+## What's Changed
+### Added
+* feat: add typed kubeconfig fields for client-go parity by @alex-lapuka in https://github.com/kube-rs/kube/pull/1965
+* Add CEL validation via kube-cel re-export by @doxxx93 in https://github.com/kube-rs/kube/pull/1954
+* Add `AdmissionRequest::to_cel_request()` for VAP CEL bridging by @doxxx93 in https://github.com/kube-rs/kube/pull/1991
+* runtime: implement `Store::state_with` and `Store::state_filtered` by @Alvov1 in https://github.com/kube-rs/kube/pull/1998
+* runtime: add `wait::conditions::is_created` helper by @orangecms in https://github.com/kube-rs/kube/pull/2000
+* refactor(runtime): rename Store::state_with/state_filtered per review feedback by @Alvov1 in https://github.com/kube-rs/kube/pull/2002
+* deps: bump kube-cel to 0.6.1 (validation surface flattened) by @doxxx93 in https://github.com/kube-rs/kube/pull/2005
+* Enable `RetryPolicy::server_retry` by default for `Client` by @Danil-Grigorev in https://github.com/kube-rs/kube/pull/2007
+* feat(derive): client-side CEL validation via #[kube(cel)] / #[x_kube(cel)] by @doxxx93 in https://github.com/kube-rs/kube/pull/2011
+### Changed
+* preserve unknown kubeconfig fields via serde(flatten) by @alex-lapuka in https://github.com/kube-rs/kube/pull/1964
+* Remove global read_timeout default, add watcher-level idle timeout by @doxxx93 in https://github.com/kube-rs/kube/pull/1945
+* Update tokio-tungstenite requirement from 0.28.0 to 0.29.0 by @dependabot[bot] in https://github.com/kube-rs/kube/pull/1963
+* convert from serde-yaml to serde-saphyr by @clux in https://github.com/kube-rs/kube/pull/1975
+* features: making client tracing opt-in by @mattklein123 in https://github.com/kube-rs/kube/pull/1972
+* client: reload in-cluster CA bundle on rotation (rustls-tls) by @chrnorm in https://github.com/kube-rs/kube/pull/1962
+* Api<PartialObjectMeta<K>> should opportunistically degrade to metadata requests by @doxxx93 in https://github.com/kube-rs/kube/pull/1952
+* Chore(deps): Update garde requirement from 0.22.0 to 0.23.0 by @dependabot[bot] in https://github.com/kube-rs/kube/pull/1989
+* bump k8s-openapi to 0.28 by @clux in https://github.com/kube-rs/kube/pull/2009
+* Box a large runtime error in ReconcilerErr by @clux in https://github.com/kube-rs/kube/pull/1880
+### Fixed
+* fix: feature-flag CREATE_NO_WINDOW to not break stderr inheritance by @cristeigabriela in https://github.com/kube-rs/kube/pull/1971
+* Remove silent error when client-key/client-certificate is malformed by @goenning in https://github.com/kube-rs/kube/pull/1966
+* Fix AttachedProcess task leak on drop and join() deadlock by @SebTardif in https://github.com/kube-rs/kube/pull/1978
+* support auth exec yaml output by @aviramha in https://github.com/kube-rs/kube/pull/2003
+* fix(client): apply tls-server-name on the openssl-tls path by @dgunzy in https://github.com/kube-rs/kube/pull/1993
+* Use the resource's own name for the schema title by @cehoffman in https://github.com/kube-rs/kube/pull/1985
+
+
+* @alex-lapuka made their first contribution in https://github.com/kube-rs/kube/pull/1965
+* @cristeigabriela made their first contribution in https://github.com/kube-rs/kube/pull/1971
+* @mattklein123 made their first contribution in https://github.com/kube-rs/kube/pull/1972
+* @chrnorm made their first contribution in https://github.com/kube-rs/kube/pull/1962
+* @SebTardif made their first contribution in https://github.com/kube-rs/kube/pull/1978
+* @Alvov1 made their first contribution in https://github.com/kube-rs/kube/pull/1998
+* @orangecms made their first contribution in https://github.com/kube-rs/kube/pull/2000
+* @dgunzy made their first contribution in https://github.com/kube-rs/kube/pull/1993
+* @cehoffman made their first contribution in https://github.com/kube-rs/kube/pull/1985
+
+**Full Changelog**: https://github.com/kube-rs/kube/compare/3.1.0...4.0.0
+
 4.0.0 / 2026-06-16
 ===================
- * see https://github.com/kube-rs/kube/compare/3.1.0...main
+ * see https://github.com/kube-rs/kube/compare/4.0.0...main
 
 [3.1.0](https://github.com/kube-rs/kube/releases/tag/3.1.0) / 2026-03-17
 ===================
@@ -41,7 +151,7 @@ Maintenance release with fixes for schemas/validation, client exec blocking and 
 
 3.1.0 / 2026-03-17
 ===================
- * see https://github.com/kube-rs/kube/compare/3.1.0...main
+ * see https://github.com/kube-rs/kube/compare/4.0.0...main
 
 [3.0.1](https://github.com/kube-rs/kube/releases/tag/3.0.1) / 2026-01-30
 ===================
