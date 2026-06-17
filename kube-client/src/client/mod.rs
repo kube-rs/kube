@@ -11,8 +11,7 @@ use either::{Either, Left, Right};
 use futures::{AsyncBufRead, StreamExt, TryStream, TryStreamExt, future::BoxFuture};
 use http::{self, Request, Response};
 use http_body_util::BodyExt;
-#[cfg(feature = "ws")]
-use hyper_util::rt::TokioIo;
+#[cfg(feature = "ws")] use hyper_util::rt::TokioIo;
 use jiff::Timestamp;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1 as k8s_meta_v1;
 use kube_core::{discovery::v2::ACCEPT_AGGREGATED_DISCOVERY_V2, response::Status};
@@ -49,15 +48,12 @@ pub use config_ext::ConfigExt;
 pub mod middleware;
 pub mod retry;
 
-#[cfg(any(feature = "rustls-tls", feature = "openssl-tls"))]
-mod tls;
+#[cfg(any(feature = "rustls-tls", feature = "openssl-tls"))] mod tls;
 
 #[cfg(feature = "openssl-tls")]
 pub use tls::openssl_tls::Error as OpensslTlsError;
-#[cfg(feature = "rustls-tls")]
-pub use tls::rustls_tls::Error as RustlsTlsError;
-#[cfg(feature = "ws")]
-mod upgrade;
+#[cfg(feature = "rustls-tls")] pub use tls::rustls_tls::Error as RustlsTlsError;
+#[cfg(feature = "ws")] mod upgrade;
 
 #[cfg(feature = "oauth")]
 #[cfg_attr(docsrs, doc(cfg(feature = "oauth")))]
@@ -67,8 +63,7 @@ pub use auth::OAuthError;
 #[cfg_attr(docsrs, doc(cfg(feature = "oidc")))]
 pub use auth::oidc_errors;
 
-#[cfg(feature = "ws")]
-pub use upgrade::UpgradeConnectionError;
+#[cfg(feature = "ws")] pub use upgrade::UpgradeConnectionError;
 
 #[cfg(feature = "kubelet-debug")]
 #[cfg_attr(docsrs, doc(cfg(feature = "kubelet-debug")))]
@@ -88,6 +83,10 @@ pub struct Client {
     // - `Buffer` for cheap clone
     // - `BoxFuture` for dynamic response future type
     inner: Buffer<Request<Body>, BoxFuture<'static, Result<Response<Body>, BoxError>>>,
+    // HTTP/1.1-only transport for the upgrade path used by exec, attach,
+    // and port-forward. Defaults to a clone of `inner` when not separately
+    // configured; see [`Client::new_with_upgrade`].
+    upgrade_inner: Buffer<Request<Body>, BoxFuture<'static, Result<Response<Body>, BoxError>>>,
     default_ns: String,
     valid_until: Option<Timestamp>,
 }
@@ -113,6 +112,29 @@ impl Connection {
     pub fn into_stream(self) -> WebSocketStream<TokioIo<hyper::upgrade::Upgraded>> {
         self.stream
     }
+}
+
+async fn send_via(
+    svc: &Buffer<Request<Body>, BoxFuture<'static, Result<Response<Body>, BoxError>>>,
+    request: Request<Body>,
+) -> Result<Response<Body>> {
+    let mut svc = svc.clone();
+    let res = svc
+        .ready()
+        .await
+        .map_err(Error::Service)?
+        .call(request)
+        .await
+        .map_err(|err| {
+            // Error decorating request
+            err.downcast::<Error>()
+                .map(|e| *e)
+                // Error requesting
+                .or_else(|err| err.downcast::<hyper::Error>().map(|err| Error::HyperError(*err)))
+                // Error from another middleware
+                .unwrap_or_else(Error::Service)
+        })?;
+    Ok(res)
 }
 
 /// Constructors and low-level api interfaces.
@@ -164,8 +186,51 @@ impl Client {
             .map_response_body(Body::wrap_body)
             .map_err(Into::into)
             .boxed();
+        let inner = Buffer::new(service, 1024);
+        let upgrade_inner = inner.clone();
+        Self {
+            inner,
+            upgrade_inner,
+            default_ns: default_namespace.into(),
+            valid_until: None,
+        }
+    }
+
+    /// Create a [`Client`] with separate primary and upgrade [`Service`] stacks.
+    ///
+    /// The `service` is used for normal traffic; `upgrade_service` is used by
+    /// [`Client::connect`] for exec, attach, and port-forward, which require
+    /// HTTP/1.1.
+    ///
+    /// Most users do not need this; [`Client::new`] (or [`Client::try_from`])
+    /// is sufficient. Use this constructor when supplying a custom `Service`
+    /// stack that may negotiate HTTP/2 *and* the application also uses
+    /// upgrade subresources.
+    pub fn new_with_upgrade<S, U, B1, B2, T>(service: S, upgrade_service: U, default_namespace: T) -> Self
+    where
+        S: Service<Request<Body>, Response = Response<B1>> + Send + 'static,
+        S::Future: Send + 'static,
+        S::Error: Into<BoxError>,
+        B1: http_body::Body<Data = bytes::Bytes> + Send + 'static,
+        B1::Error: Into<BoxError>,
+        U: Service<Request<Body>, Response = Response<B2>> + Send + 'static,
+        U::Future: Send + 'static,
+        U::Error: Into<BoxError>,
+        B2: http_body::Body<Data = bytes::Bytes> + Send + 'static,
+        B2::Error: Into<BoxError>,
+        T: Into<String>,
+    {
+        let service = service
+            .map_response_body(Body::wrap_body)
+            .map_err(Into::into)
+            .boxed();
+        let upgrade_service = upgrade_service
+            .map_response_body(Body::wrap_body)
+            .map_err(Into::into)
+            .boxed();
         Self {
             inner: Buffer::new(service, 1024),
+            upgrade_inner: Buffer::new(upgrade_service, 1024),
             default_ns: default_namespace.into(),
             valid_until: None,
         }
@@ -215,23 +280,12 @@ impl Client {
     /// This method can be used to get raw access to the API which may be used to, for example,
     /// create a proxy server or application-level gateway between localhost and the API server.
     pub async fn send(&self, request: Request<Body>) -> Result<Response<Body>> {
-        let mut svc = self.inner.clone();
-        let res = svc
-            .ready()
-            .await
-            .map_err(Error::Service)?
-            .call(request)
-            .await
-            .map_err(|err| {
-                // Error decorating request
-                err.downcast::<Error>()
-                    .map(|e| *e)
-                    // Error requesting
-                    .or_else(|err| err.downcast::<hyper::Error>().map(|err| Error::HyperError(*err)))
-                    // Error from another middleware
-                    .unwrap_or_else(Error::Service)
-            })?;
-        Ok(res)
+        send_via(&self.inner, request).await
+    }
+
+    #[cfg(feature = "ws")]
+    async fn send_upgrade(&self, request: Request<Body>) -> Result<Response<Body>> {
+        send_via(&self.upgrade_inner, request).await
     }
 
     /// Make WebSocket connection.
@@ -257,7 +311,9 @@ impl Client {
         );
         upgrade::StreamProtocol::add_to_headers(&mut parts.headers)?;
 
-        let res = self.send(Request::from_parts(parts, Body::from(body))).await?;
+        let res = self
+            .send_upgrade(Request::from_parts(parts, Body::from(body)))
+            .await?;
         let protocol = upgrade::verify_response(&res, &key).map_err(Error::UpgradeConnection)?;
         match hyper::upgrade::on(res).await {
             Ok(upgraded) => Ok(Connection {
