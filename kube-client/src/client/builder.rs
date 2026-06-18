@@ -162,14 +162,12 @@ impl TryFrom<Config> for ClientBuilder<GenericService> {
             }
 
             Some(proxy_url) if proxy_url.scheme_str() == Some("https") => {
-                #[cfg(feature = "http-proxy")]
+                #[cfg(all(feature = "http-proxy", any(feature = "rustls-tls", feature = "openssl-tls")))]
                 {
                     #[cfg(feature = "rustls-tls")]
                     let proxy_connector = config.rustls_https_connector_with_connector(connector)?;
                     #[cfg(all(not(feature = "rustls-tls"), feature = "openssl-tls"))]
                     let proxy_connector = config.openssl_https_connector_with_connector(connector)?;
-                    #[cfg(all(not(feature = "rustls-tls"), not(feature = "openssl-tls")))]
-                    return Err(Error::TlsRequired);
 
                     let connector =
                         hyper_util::client::legacy::connect::proxy::Tunnel::new(proxy_url.clone(), proxy_connector);
@@ -177,6 +175,9 @@ impl TryFrom<Config> for ClientBuilder<GenericService> {
 
                     make_generic_builder(connector, config)
                 }
+
+                #[cfg(all(feature = "http-proxy", not(any(feature = "rustls-tls", feature = "openssl-tls"))))]
+                return Err(Error::TlsRequired);
 
                 #[cfg(not(feature = "http-proxy"))]
                 Err(Error::ProxyProtocolDisabled {
