@@ -86,6 +86,29 @@ impl<Svc> ClientBuilder<Svc> {
 
 pub type GenericService = BoxService<Request<Body>, Response<Box<DynBody>>, BoxError>;
 
+#[cfg(feature = "http-proxy")]
+fn with_proxy_basic_auth<C>(
+    proxy_url: &http::Uri,
+    mut connector: hyper_util::client::legacy::connect::proxy::Tunnel<C>,
+) -> hyper_util::client::legacy::connect::proxy::Tunnel<C> {
+    if let Some(authority) = proxy_url.authority()
+        && let Some((userinfo, _)) = authority.as_str().split_once('@')
+    {
+        use base64::Engine;
+        use http::HeaderValue;
+
+        let value = format!(
+            "Basic {}",
+            base64::engine::general_purpose::STANDARD.encode(userinfo)
+        );
+        if let Ok(header) = HeaderValue::from_str(&value) {
+            connector = connector.with_auth(header);
+        }
+    }
+
+    connector
+}
+
 impl TryFrom<Config> for ClientBuilder<GenericService> {
     type Error = Error;
 
@@ -124,19 +147,33 @@ impl TryFrom<Config> for ClientBuilder<GenericService> {
             Some(proxy_url) if proxy_url.scheme_str() == Some("http") => {
                 #[cfg(feature = "http-proxy")]
                 {
-                    let mut connector =
+                    let connector =
                         hyper_util::client::legacy::connect::proxy::Tunnel::new(proxy_url.clone(), connector);
+                    let connector = with_proxy_basic_auth(proxy_url, connector);
 
-                    if let Some(authority) = proxy_url.authority() {
-                        if let Some((userinfo, _)) = authority.as_str().split_once('@') {
-                            use base64::Engine;
-                            use http::HeaderValue;
+                    make_generic_builder(connector, config)
+                }
 
-                            let value = format!("Basic {}", base64::engine::general_purpose::STANDARD.encode(userinfo));
-                            let header = HeaderValue::from_str(&value).unwrap();
-                            connector = connector.with_auth(header);
-                        } 
-                    }
+                #[cfg(not(feature = "http-proxy"))]
+                Err(Error::ProxyProtocolDisabled {
+                    proxy_url: proxy_url.clone(),
+                    protocol_feature: "kube/http-proxy",
+                })
+            }
+
+            Some(proxy_url) if proxy_url.scheme_str() == Some("https") => {
+                #[cfg(feature = "http-proxy")]
+                {
+                    #[cfg(feature = "rustls-tls")]
+                    let proxy_connector = config.rustls_https_connector_with_connector(connector)?;
+                    #[cfg(all(not(feature = "rustls-tls"), feature = "openssl-tls"))]
+                    let proxy_connector = config.openssl_https_connector_with_connector(connector)?;
+                    #[cfg(all(not(feature = "rustls-tls"), not(feature = "openssl-tls")))]
+                    return Err(Error::TlsRequired);
+
+                    let connector =
+                        hyper_util::client::legacy::connect::proxy::Tunnel::new(proxy_url.clone(), proxy_connector);
+                    let connector = with_proxy_basic_auth(proxy_url, connector);
 
                     make_generic_builder(connector, config)
                 }
