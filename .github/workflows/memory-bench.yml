@@ -30,7 +30,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.repository == 'kube-rs/kube'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
