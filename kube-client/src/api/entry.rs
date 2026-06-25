@@ -249,10 +249,10 @@ impl<K> OccupiedEntry<'_, K> {
 /// Commit errors
 pub enum CommitError {
     /// Pre-commit validation failed
-    #[error("failed to validate object for saving")]
+    #[error("failed to validate object for saving: {0}")]
     Validate(#[from] CommitValidationError),
     /// Failed to submit the new object to the Kubernetes API
-    #[error("failed to save object")]
+    #[error("failed to save object: {0}")]
     Save(#[source] Error),
 }
 
