@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1782113052527,
+  "lastUpdate": 1782470534347,
   "repoUrl": "https://github.com/kube-rs/kube",
   "entries": {
     "Benchmark": [
@@ -4082,6 +4082,105 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/kube-rs/kube/commit/a795e7e925eca034d43ad519b446548bad44db64"
         },
         "date": 1782113050743,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "init_listwatch - peak_bytes",
+            "value": 55194619,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - total_allocated",
+            "value": 76715088,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - alloc_count",
+            "value": 578023,
+            "unit": "allocations"
+          },
+          {
+            "name": "steady_state - peak_bytes",
+            "value": 71381202,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - total_allocated",
+            "value": 109519220,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - alloc_count",
+            "value": 799021,
+            "unit": "allocations"
+          },
+          {
+            "name": "relist - peak_bytes",
+            "value": 99797302,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - total_allocated",
+            "value": 174518628,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - alloc_count",
+            "value": 1189035,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_without_modify - peak_bytes",
+            "value": 141298836,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - total_allocated",
+            "value": 205865000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - alloc_count",
+            "value": 1298020,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_with_modify - peak_bytes",
+            "value": 134853452,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - total_allocated",
+            "value": 162895000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - alloc_count",
+            "value": 1058021,
+            "unit": "allocations"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "git@vini.cat",
+            "name": "Vinicius Deolindo",
+            "username": "iniw"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c983e5b6c5574572a0af1c6e22d2a9031d29607e",
+          "message": "client: include sources in `CommitError`'s error message (#2020)\n\n# Context\n\nA user report left us with logs that essentially boiled down to a `CommitError` message:\n\n> failed to save object\n\nThat made the failure look generic and sent me down a couple-hour long debug session.\n\nThe actual cause was pretty simple, and once I eventually managed to reproduce it I saw that the inner `kube::Error` contained a pretty clear message for the actual problem and I thought \"Damn, having that information would've made this so much easier\" - so this change is to help future me :)\n\n# Summary\n\nThis PR just appends the existing error messages with `: {0}`, which is a pattern already present in other places such as the top-level `kube::Error` type.\n\nSigned-off-by: Vinicius Deolindo <git@vini.cat>",
+          "timestamp": "2026-06-26T11:40:16+01:00",
+          "tree_id": "67eadaffddba260583256f95a28448b08dce295d",
+          "url": "https://github.com/kube-rs/kube/commit/c983e5b6c5574572a0af1c6e22d2a9031d29607e"
+        },
+        "date": 1782470533325,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
