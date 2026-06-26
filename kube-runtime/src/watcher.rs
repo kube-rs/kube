@@ -6,7 +6,7 @@ use crate::utils::{Backoff, ResetTimerBackoff};
 
 use backon::BackoffBuilder;
 use educe::Educe;
-use futures::{FutureExt, Stream, StreamExt, stream::BoxStream, task::AtomicWaker};
+use futures::{FutureExt, Stream, StreamExt, stream::BoxStream};
 use kube_client::{
     Api, Error as ClientErr,
     api::{ListParams, Resource, ResourceExt, VersionMatch, WatchEvent, WatchParams},
@@ -14,16 +14,7 @@ use kube_client::{
     error::Status,
 };
 use serde::de::DeserializeOwned;
-use std::{
-    cell::{Ref, RefCell},
-    clone::Clone,
-    collections::{HashMap, VecDeque},
-    fmt::Debug,
-    future,
-    marker::PhantomData,
-    pin::Pin,
-    time::Duration,
-};
+use std::{cell::RefCell, clone::Clone, collections::VecDeque, fmt::Debug, future, pin::Pin, time::Duration};
 use thiserror::Error;
 use tracing::{debug, error, warn};
 
