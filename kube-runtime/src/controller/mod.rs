@@ -70,15 +70,15 @@ pub enum Error<ReconcilerErr: 'static, QueueErr: 'static> {
     ObjectNotFound(Box<ObjectRef<DynamicObject>>),
 
     /// User's reconcile fn failed for the object
-    #[error("reconciler for object {1} failed")]
+    #[error("reconciler for object {1} failed: {0}")]
     ReconcilerFailed(#[source] ReconcilerErr, Box<ObjectRef<DynamicObject>>),
 
     /// The queue stream contained an error
-    #[error("event queue error")]
+    #[error("event queue error: {0}")]
     QueueError(#[source] QueueErr),
 
     /// The internal runner returned an error
-    #[error("runner error")]
+    #[error("runner error: {0}")]
     RunnerError(#[source] RunnerError),
 }
 

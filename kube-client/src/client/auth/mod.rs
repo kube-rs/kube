@@ -79,7 +79,7 @@ pub enum Error {
     ReadTokenFile(#[source] std::io::Error, PathBuf),
 
     /// Failed to parse token-key
-    #[error("failed to parse token-key")]
+    #[error("failed to parse token-key: {0}")]
     ParseTokenKey(#[source] serde_json::Error),
 
     /// command was missing from exec config
@@ -103,7 +103,7 @@ pub enum Error {
     ExecMissingClusterInfo,
 
     /// No valid native root CA certificates found
-    #[error("No valid native root CA certificates found")]
+    #[error("No valid native root CA certificates found: {0}")]
     NoValidNativeRootCA(#[source] std::io::Error),
 }
 

@@ -78,15 +78,15 @@ pub enum KubeconfigError {
     ParseProxyUrl(#[source] http::uri::InvalidUri),
 
     /// Failed to load certificate authority
-    #[error("failed to load certificate authority")]
+    #[error("failed to load certificate authority: {0}")]
     LoadCertificateAuthority(#[source] LoadDataError),
 
     /// Failed to load client certificate
-    #[error("failed to load client certificate")]
+    #[error("failed to load client certificate: {0}")]
     LoadClientCertificate(#[source] LoadDataError),
 
     /// Failed to load client key
-    #[error("failed to load client key")]
+    #[error("failed to load client key: {0}")]
     LoadClientKey(#[source] LoadDataError),
 
     /// Failed to parse PEM-encoded certificates

@@ -46,7 +46,7 @@ pub mod rustls_tls {
         AddRootCertificate(#[source] Box<dyn std::error::Error + Send + Sync>),
 
         /// No valid native root CA certificates found
-        #[error("no valid native root CA certificates found")]
+        #[error("no valid native root CA certificates found: {0}")]
         NoValidNativeRootCA(#[source] std::io::Error),
 
         /// Invalid server name
