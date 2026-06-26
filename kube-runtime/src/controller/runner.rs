@@ -13,7 +13,7 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum Error<ReadyErr> {
-    #[error("readiness gate failed to become ready")]
+    #[error("readiness gate failed to become ready: {0}")]
     Readiness(#[source] ReadyErr),
 }
 

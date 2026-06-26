@@ -84,7 +84,7 @@ pub enum Error {
     SerializeTerminalSize(#[source] serde_json::Error),
 
     /// Fail to send terminal size message
-    #[error("failed to send terminal size message")]
+    #[error("failed to send terminal size message: {0}")]
     SendTerminalSize(#[source] ws::Error),
 
     /// Failed to set terminal size, tty need to be true to resize the terminal

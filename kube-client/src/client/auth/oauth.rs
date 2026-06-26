@@ -56,7 +56,7 @@ pub enum Error {
     BuildRequest(#[source] http::Error),
 
     /// No valid native root CA certificates found
-    #[error("No valid native root CA certificates found")]
+    #[error("No valid native root CA certificates found: {0}")]
     NoValidNativeRootCA(#[source] std::io::Error),
 
     /// OAuth failed with unknown reason

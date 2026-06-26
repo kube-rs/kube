@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
-#[error("failed to serialize patch")]
+#[error("failed to serialize patch: {0}")]
 /// Failed to serialize patch.
 pub struct SerializePatchError(#[source] serde_json::Error);
 
