@@ -53,7 +53,8 @@
         src = lib.cleanSourceWith {
           src = ./.;
           name = "kube-source";
-          filter = path: type:
+          filter =
+            path: type:
             (craneLib.filterCargoSources path type)
             || lib.hasSuffix ".json" path
             || lib.hasSuffix ".md" path
@@ -72,7 +73,10 @@
           pkgs.pkg-config
         ];
 
-        buildInputs = [ pkgs.openssl ] ++ lib.optionals pkgs.stdenv.isDarwin [
+        buildInputs = [
+          pkgs.openssl
+        ]
+        ++ lib.optionals pkgs.stdenv.isDarwin [
           pkgs.darwin.apple_sdk.frameworks.Security
           pkgs.darwin.apple_sdk.frameworks.SystemConfiguration
         ];
@@ -90,7 +94,8 @@
           cargoExtraArgs = "--locked";
           NIX_SSL_CERT_FILE = certFile;
           SSL_CERT_FILE = certFile;
-        } // cargoLockArgs;
+        }
+        // cargoLockArgs;
 
         cargoArtifacts = craneLib.buildDepsOnly (
           commonArgs
@@ -185,6 +190,19 @@
             done
           '';
         };
+
+        cargo-fmt = nightlyCraneLib.cargoFmt {
+          inherit src version;
+          pname = "kube-workspace";
+          doCheck = false;
+        };
+        cargo-fmt-apply = pkgs.writeShellApplication {
+          name = "nightly-cargo-fmt";
+          runtimeInputs = [ nightlyToolchain ];
+          text = ''
+            exec cargo fmt --all
+          '';
+        };
       in
       {
         apps = {
@@ -202,6 +220,11 @@
             type = "app";
             program = "${installGitHooksApp}/bin/install-git-hooks";
             meta.description = "Install local hooks that keep Cargo.lock out of commits";
+          };
+          fmt = {
+            type = "app";
+            program = "${cargo-fmt-apply}/bin/nightly-cargo-fmt";
+            meta.description = "Run cargo fmt and apply the changes";
           };
           default = self.apps.${system}.ci;
         };
@@ -223,11 +246,7 @@
             kube-derive
             kube-runtime
             ;
-
-          cargo-fmt = nightlyCraneLib.cargoFmt {
-            inherit src version;
-            pname = "kube-workspace";
-          };
+          inherit cargo-fmt;
 
           cargo-clippy = nightlyCraneLib.cargoClippy (
             commonArgs
