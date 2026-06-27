@@ -14,5 +14,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@nightly
         with:
           components: clippy
-      - uses: extractions/setup-just@v4
-      - run: just clippy # keep CI clippy identical to local
+      # same two passes as `just clippy` (justfile documents the e2e/feature reasons)
+      - uses: clechasseur/rs-clippy-check@v5
+        with:
+          args: --workspace --all-features --all-targets --exclude e2e
+      - uses: clechasseur/rs-clippy-check@v5
+        with:
+          args: --workspace --all-targets
