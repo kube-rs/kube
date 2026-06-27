@@ -222,7 +222,7 @@ pub(crate) mod test {
         // the cache. Same with a Restarted(vec![delete_item])
         let foo = testpod("foo");
         let bar = testpod("bar");
-        let st = stream::iter([
+        let st = stream::iter(vec![
             Ok(Event::Delete(foo.clone())),
             Ok(Event::Apply(foo.clone())),
             Err(Error::NoResourceVersion),

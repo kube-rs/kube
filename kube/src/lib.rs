@@ -399,6 +399,7 @@ mod test {
     // #[ignore = "needs cluster (fetches api resources, and lists all)"]
     // TODO: fixup. gets rate limited in default k3s on CI now.
     #[cfg(feature = "derive")]
+    #[allow(dead_code)] // disabled test (needs cluster); kept for future re-enable
     async fn derived_resources_discoverable() -> Result<(), Box<dyn std::error::Error>> {
         use crate::{
             core::{DynamicObject, GroupVersion, GroupVersionKind},

@@ -14,6 +14,5 @@ jobs:
       - uses: dtolnay/rust-toolchain@nightly
         with:
           components: clippy
-      - uses: clechasseur/rs-clippy-check@v5
-        with:
-          args: --workspace
+      - uses: extractions/setup-just@v4
+      - run: just clippy # keep CI clippy identical to local

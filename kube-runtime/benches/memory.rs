@@ -207,12 +207,12 @@ fn collect_stats(scenario: &str, results: &mut Vec<BenchMetric>) {
     results.push(BenchMetric {
         name: format!("{scenario} - total_allocated"),
         unit: "bytes",
-        value: stats.total_bytes as u64,
+        value: stats.total_bytes,
     });
     results.push(BenchMetric {
         name: format!("{scenario} - alloc_count"),
         unit: "allocations",
-        value: stats.total_blocks as u64,
+        value: stats.total_blocks,
     });
 }
 
