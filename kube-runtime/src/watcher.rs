@@ -507,7 +507,7 @@ impl<K> TestMode<K>
 where
     K: Clone + Debug + DeserializeOwned + Send + 'static,
 {
-    /// Arguments are mut because we reverse the order internally because we pop() off the end
+    /// Arguments are mut because we reverse the order internally because we `pop()` off the end
     /// which means the first element to be returned would the last which would be unexpected.
     pub fn new(
         mut fixture: Vec<kube_client::Result<ObjectList<K>>>,
@@ -532,7 +532,7 @@ where
     ObjectList {
         types: kube_client::api::TypeMeta::default(), // TODO(juf): This is probably bad
         metadata: kube_client::api::ListMeta::default(), // TODO(juf): This is probably also bad
-        items: Vec::with_capacity(0),
+        items: Vec::new(),
     }
 }
 
@@ -566,11 +566,10 @@ impl<K: Unpin> Stream for TestStream<K> {
     ) -> std::task::Poll<Option<Self::Item>> {
         let this = self.get_mut();
         if let Some(inner_fut) = this.waiting.as_mut() {
-            if !matches!(inner_fut.poll_unpin(cx), std::task::Poll::Ready(_)) {
+            if !matches!(inner_fut.poll_unpin(cx), std::task::Poll::Ready(())) {
                 return std::task::Poll::Pending;
-            } else {
-                this.waiting = None;
             }
+            this.waiting = None;
         }
         let mut inner = this.seq.borrow_mut();
         match inner.pop() {
@@ -578,7 +577,7 @@ impl<K: Unpin> Stream for TestStream<K> {
                 Sequence::Empty => std::task::Poll::Ready(None),
                 Sequence::List(mut watch_events) => std::task::Poll::Ready(watch_events.pop()),
                 Sequence::Wait(duration) => {
-                    if matches!(this.waiting, Some(_)) {
+                    if this.waiting.is_some() {
                         unreachable!("TestStream::waiting should be None when accessing inner, this is a bug")
                     }
                     this.waiting = Some(Box::pin(tokio::time::sleep(duration)));
