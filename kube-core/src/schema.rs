@@ -537,7 +537,7 @@ fn hoist_subschema_properties(
                             panic!(
                                 "Property {:?} has the schema {:?} but was already defined as {:?} in another subschema. The schemas for a property used in multiple subschemas must be identical",
                                 entry.key(),
-                                &property,
+                                property,
                                 entry.get()
                             );
                         }

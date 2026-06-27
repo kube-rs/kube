@@ -14,6 +14,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@nightly
         with:
           components: clippy
+      # same two passes as `just clippy` (justfile documents the e2e/feature reasons)
       - uses: clechasseur/rs-clippy-check@v5
         with:
-          args: --workspace
+          args: --workspace --all-features --all-targets --exclude e2e
+      - uses: clechasseur/rs-clippy-check@v5
+        with:
+          args: --workspace --all-targets

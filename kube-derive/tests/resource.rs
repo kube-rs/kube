@@ -1,4 +1,5 @@
 #![allow(missing_docs)]
+#![allow(dead_code)] // test fixtures: fields exist to exercise the derive, not to be read
 
 use k8s_openapi::{
     ByteString,

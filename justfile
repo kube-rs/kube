@@ -7,8 +7,10 @@ default:
 
 clippy:
   #rustup component add clippy --toolchain nightly
-  cargo +nightly clippy --workspace
-  cargo +nightly clippy --all-features
+  # all features + all targets, minus e2e (its latest+mk8sv = two k8s-openapi versions -> build panic)
+  cargo +nightly clippy --workspace --all-features --all-targets --exclude e2e
+  # default features too, for the #[cfg(not(feature = ...))] paths the first pass can't reach
+  cargo +nightly clippy --workspace --all-targets
 
 fmt:
   #rustup component add rustfmt --toolchain nightly
