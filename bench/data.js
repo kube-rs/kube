@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1782513767802,
+  "lastUpdate": 1782567574978,
   "repoUrl": "https://github.com/kube-rs/kube",
   "entries": {
     "Benchmark": [
@@ -4280,6 +4280,105 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/kube-rs/kube/commit/fb5f04d65a088e71b713a4f60071be1b2aac807a"
         },
         "date": 1782513766721,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "init_listwatch - peak_bytes",
+            "value": 55194619,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - total_allocated",
+            "value": 76715088,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - alloc_count",
+            "value": 578023,
+            "unit": "allocations"
+          },
+          {
+            "name": "steady_state - peak_bytes",
+            "value": 71381202,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - total_allocated",
+            "value": 109519220,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - alloc_count",
+            "value": 799021,
+            "unit": "allocations"
+          },
+          {
+            "name": "relist - peak_bytes",
+            "value": 99797302,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - total_allocated",
+            "value": 174518628,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - alloc_count",
+            "value": 1189035,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_without_modify - peak_bytes",
+            "value": 141298836,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - total_allocated",
+            "value": 205865000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - alloc_count",
+            "value": 1298020,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_with_modify - peak_bytes",
+            "value": 134853452,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - total_allocated",
+            "value": 162895000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - alloc_count",
+            "value": 1058021,
+            "unit": "allocations"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "doxxx93@gmail.com",
+            "name": "doxxx",
+            "username": "doxxx93"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f0937801d56def7938d2e8a6814b573475a463cd",
+          "message": "chore(ci): widen clippy to all targets, fix surfaced lints (#2023)\n\n* chore(ci): widen clippy to all targets, fix surfaced lints\n\n`just clippy` (and the CI job that now calls it) skipped test/example/bench\ncode (no --all-targets) and only ran --all-features on the kube facade.\nWiden to two passes, with no hardcoded feature list so features added later\nare linted automatically:\n\n    cargo clippy --workspace --all-features --all-targets --exclude e2e\n    cargo clippy --workspace --all-targets\n\ne2e is excluded from the --all-features pass because it enables both\nk8s-openapi `latest` and `mk8sv`, panicking the build script; the default\npass lints it and the `#[cfg(not(feature))]` paths instead.\n\nFixes the lints this surfaced in previously-unlinted code:\n- kube-client: box ProviderToken::Oidc (large_enum_variant); the enum is\n  private, so this is not a public API change\n- kube-core: drop a redundant `&` in a panic! arg\n- kube-runtime: drop redundant `as u64` casts; vec! for a >16KB test array\n- allow(dead_code) on intentional test/example fixtures\n\nSigned-off-by: doxxx93 <doxxx93@gmail.com>\n\n* chore(ci): lint via rs-clippy-check action, not `run: just clippy`\n\nKeep the clippy action so it still annotates the diff (it's good at getting\ncontributors to fix lints unprompted), running both `just clippy` passes\nthrough it. Gating is unchanged: a non-zero clippy exit (deny-level lint)\nfails the job, warnings stay advisory.\n\nSigned-off-by: doxxx93 <doxxx93@gmail.com>\n\n---------\n\nSigned-off-by: doxxx93 <doxxx93@gmail.com>",
+          "timestamp": "2026-06-27T14:38:38+01:00",
+          "tree_id": "504d2016ebd934bee60b9d645ffdb6618dc78e5b",
+          "url": "https://github.com/kube-rs/kube/commit/f0937801d56def7938d2e8a6814b573475a463cd"
+        },
+        "date": 1782567573625,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
