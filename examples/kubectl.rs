@@ -170,10 +170,7 @@ impl App {
         let ssapply = PatchParams::apply("kubectl-light").force();
         let pth = self.file.clone().expect("apply needs a -f file supplied");
         let yaml = std::fs::read(&pth).with_context(|| format!("Failed to read {}", pth.display()))?;
-        let docs = serde_json::Deserializer::from_slice(&yaml)
-            .into_iter::<DynamicObject>()
-            .flatten()
-            .collect::<Vec<_>>();
+        let docs: Vec<DynamicObject> = serde_saphyr::from_slice_multiple(&yaml)?;
 
         for obj in docs {
             let namespace = obj.metadata.namespace.as_deref().or(self.namespace.as_deref());
