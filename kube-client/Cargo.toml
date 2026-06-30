@@ -15,6 +15,7 @@ categories = ["web-programming::http-client", "network-programming", "api-bindin
 default = ["client", "ring"]
 rustls-tls = ["rustls", "hyper-rustls"]
 webpki-roots = ["hyper-rustls/webpki-roots"]
+rustls-platform-verifier = ["rustls-tls", "dep:rustls-platform-verifier"]
 aws-lc-rs = ["hyper-rustls?/aws-lc-rs"]
 ring = ["hyper-rustls?/ring"]
 openssl-tls = ["openssl", "hyper-openssl"]
@@ -36,7 +37,7 @@ unstable-client = []
 __non_core = ["tracing", "serde-saphyr", "base64"]
 
 [package.metadata.docs.rs]
-features = ["client", "rustls-tls", "openssl-tls", "ws", "oauth", "oidc", "jsonpatch", "admission", "k8s-openapi/latest", "socks5", "unstable-client", "http-proxy"]
+features = ["client", "rustls-tls", "rustls-platform-verifier", "openssl-tls", "ws", "oauth", "oidc", "jsonpatch", "admission", "k8s-openapi/latest", "socks5", "unstable-client", "http-proxy"]
 # Define the configuration attribute `docsrs`. Used to enable `doc_cfg` feature.
 rustdoc-args = ["--cfg", "docsrs"]
 
@@ -58,6 +59,7 @@ jiff = { workspace = true, optional = true, features = ["std", "serde"] }
 pem = { workspace = true, optional = true }
 openssl = { workspace = true, optional = true }
 rustls = { workspace = true, optional = true }
+rustls-platform-verifier = { workspace = true, optional = true }
 bytes = { workspace = true, optional = true }
 tokio = { workspace = true, features = ["time", "signal", "sync", "rt"], optional = true }
 kube-core = { path = "../kube-core", version = "=4.0.0" }

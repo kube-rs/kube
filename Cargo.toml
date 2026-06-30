@@ -67,7 +67,8 @@ proc-macro2 = "1.0.93"
 quote = "1.0.38"
 rand = "0.10.0"
 runtime-macros = "1.1.1"
-rustls = { version = "0.23.16", default-features = false }
+rustls = { version = "0.23.27", default-features = false }
+rustls-platform-verifier = "0.7.0"
 schemars = "1.0.0"
 secrecy = "0.10.2"
 serde = "1.0.221"
