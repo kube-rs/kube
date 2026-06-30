@@ -47,9 +47,9 @@ pub mod rustls_tls {
         #[error("failed to add a root certificate: {0}")]
         AddRootCertificate(#[source] Box<dyn std::error::Error + Send + Sync>),
 
-        /// Failed to initialise the platform certificate verifier
-        #[error("failed to initialise the platform certificate verifier: {0}")]
-        PlatformVerifier(#[source] rustls::Error),
+        /// No valid native root CA certificates found
+        #[error("no valid native root CA certificates found: {0}")]
+        NoValidNativeRootCA(#[source] std::io::Error),
 
         /// Invalid server name
         #[error("invalid server name: {0}")]
@@ -81,7 +81,9 @@ pub mod rustls_tls {
                 use rustls_platform_verifier::BuilderVerifierExt;
                 ClientConfig::builder()
                     .with_platform_verifier()
-                    .map_err(Error::PlatformVerifier)?
+                    // Reuse the type-erased trust-setup error variant to keep the
+                    // public `Error` enum stable.
+                    .map_err(|e| Error::AddRootCertificate(Box::new(e)))?
             }
         };
 
