@@ -30,10 +30,8 @@ hyper-util-tracing = ["kube-client/hyper-util-tracing", "client"]
 aws-lc-rs = ["kube-client?/aws-lc-rs"]
 ## ring rustls provider
 ring = ["kube-client?/ring"]
-## enable webpki roots in rustls
+## enable webpki roots in rustls (otherwise the OS-native trust store is used when no CA is configured)
 webpki-roots = ["kube-client/webpki-roots", "client"]
-## verify server certs against the OS-native trust store via rustls-platform-verifier (used when no CA is configured)
-rustls-platform-verifier = ["kube-client/rustls-platform-verifier", "rustls-tls"]
 
 ## enable kube-derive and proc macros
 derive = ["kube-derive", "kube-core/schema"]

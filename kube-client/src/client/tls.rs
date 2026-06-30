@@ -6,8 +6,8 @@ pub mod rustls_tls {
         time::{Duration, Instant},
     };
 
-    // Only the webpki/native-root fallbacks use this; the platform-verifier path does not.
-    #[cfg(not(feature = "rustls-platform-verifier"))]
+    // Only the webpki-roots fallback uses this; the default platform-verifier path does not.
+    #[cfg(feature = "webpki-roots")]
     use hyper_rustls::ConfigBuilderExt;
     use rustls::{
         self, ClientConfig, DigitallySignedStruct, RootCertStore,
@@ -47,12 +47,7 @@ pub mod rustls_tls {
         #[error("failed to add a root certificate: {0}")]
         AddRootCertificate(#[source] Box<dyn std::error::Error + Send + Sync>),
 
-        /// No valid native root CA certificates found
-        #[error("no valid native root CA certificates found: {0}")]
-        NoValidNativeRootCA(#[source] std::io::Error),
-
         /// Failed to initialise the platform certificate verifier
-        #[cfg(feature = "rustls-platform-verifier")]
         #[error("failed to initialise the platform certificate verifier: {0}")]
         PlatformVerifier(#[source] rustls::Error),
 
@@ -71,30 +66,22 @@ pub mod rustls_tls {
             ClientConfig::builder().with_root_certificates(root_store(certs)?)
         } else {
             // No CA was configured (e.g. the kubeconfig has no `certificate-authority`),
-            // so fall back to the platform/system trust store, mirroring how client-go
-            // leaves `RootCAs` nil to defer to the OS roots.
-            #[cfg(feature = "rustls-platform-verifier")]
+            // so defer to the trust store, mirroring how client-go leaves `RootCAs`
+            // nil to use the OS roots.
+            #[cfg(feature = "webpki-roots")]
             {
-                // Delegate to the OS-native verifier (macOS Security framework,
-                // Windows CryptoAPI, native roots on Linux). Takes precedence over
-                // `webpki-roots`/`with_native_roots` because it honours OS trust
-                // policies such as per-certificate trust settings.
+                // Opt-in override: use the bundled WebPKI (Mozilla) roots.
+                ClientConfig::builder().with_webpki_roots()
+            }
+            #[cfg(not(feature = "webpki-roots"))]
+            {
+                // Default: delegate to the OS-native verifier (macOS Security
+                // framework, Windows CryptoAPI, native roots on Linux/Android/iOS),
+                // honouring OS trust policies such as per-certificate trust settings.
                 use rustls_platform_verifier::BuilderVerifierExt;
                 ClientConfig::builder()
                     .with_platform_verifier()
                     .map_err(Error::PlatformVerifier)?
-            }
-            #[cfg(all(not(feature = "rustls-platform-verifier"), feature = "webpki-roots"))]
-            {
-                // Use WebPKI roots.
-                ClientConfig::builder().with_webpki_roots()
-            }
-            #[cfg(all(not(feature = "rustls-platform-verifier"), not(feature = "webpki-roots")))]
-            {
-                // Use native roots. This will panic on Android and iOS.
-                ClientConfig::builder()
-                    .with_native_roots()
-                    .map_err(Error::NoValidNativeRootCA)?
             }
         };
 
@@ -289,7 +276,7 @@ FRU=
         }
     }
 
-    #[cfg(all(test, feature = "rustls-platform-verifier"))]
+    #[cfg(all(test, not(feature = "webpki-roots")))]
     mod platform_verifier_tests {
         use super::*;
 
