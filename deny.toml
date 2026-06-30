@@ -37,6 +37,9 @@ exceptions = [
     # Pulled in via hyper-rustls when using the webpki-roots feature,
     # which is off by default.
     { allow = ["CDLA-Permissive-2.0", "MPL-2.0"], crate = "webpki-roots" },
+    # Bundled CA roots pulled in via rustls-platform-verifier (used as the
+    # default no-CA trust source on the rustls-tls stack).
+    { allow = ["CDLA-Permissive-2.0"], crate = "webpki-root-certs" },
 ]
 
 [sources]
