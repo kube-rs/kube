@@ -65,7 +65,10 @@ async fn cleanup(cm: Arc<ConfigMap>, secrets: &kube::Api<Secret>) -> Result<Acti
         .map(|_| ())
         .or_else(|err| match err {
             // Object is already deleted
-            kube::Error::Api(status) if status.is_not_found() => Ok(()),
+            kube::Error::Api {
+                source: ref status,
+                uri: _,
+            } if status.is_not_found() => Ok(()),
             err => Err(err),
         })
         .map_err(Error::DeleteSecret)?;
