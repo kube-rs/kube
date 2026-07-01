@@ -55,8 +55,11 @@ where
     }
 }
 
-// Join base URI and Path+Query, preserving any path in the base.
-fn set_base_uri(base_uri: &http::Uri, req_pandq: Option<&uri::PathAndQuery>) -> http::Uri {
+/// Join base URI and Path+Query, preserving any path in the base.
+pub(in crate::client) fn set_base_uri(
+    base_uri: &http::Uri,
+    req_pandq: Option<&uri::PathAndQuery>,
+) -> http::Uri {
     let mut builder = uri::Builder::new();
     if let Some(scheme) = base_uri.scheme() {
         builder = builder.scheme(scheme.as_str());
