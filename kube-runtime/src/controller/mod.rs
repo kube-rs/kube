@@ -1501,7 +1501,7 @@ where
     ///
     /// If a [`Stream`] is terminated (by emitting [`None`]) then the [`Controller`] keeps running, but the [`Stream`] stops being polled.
     #[must_use]
-    pub fn reconcile_all_on(mut self, trigger: impl Stream<Item = ()> + Send + Sync + 'static) -> Self {
+    pub fn reconcile_all_on(mut self, trigger: impl Stream<Item = ()> + Send + 'static) -> Self {
         let store = self.store();
         let dyntype = self.dyntype.clone();
         self.trigger_selector.push(
