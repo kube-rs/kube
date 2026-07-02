@@ -6,6 +6,8 @@ pub mod rustls_tls {
         time::{Duration, Instant},
     };
 
+    // Only the webpki-roots fallback uses this; the default platform-verifier path does not.
+    #[cfg(feature = "webpki-roots")]
     use hyper_rustls::ConfigBuilderExt;
     use rustls::{
         self, ClientConfig, DigitallySignedStruct, RootCertStore,
@@ -63,17 +65,25 @@ pub mod rustls_tls {
         let config_builder = if let Some(certs) = root_certs {
             ClientConfig::builder().with_root_certificates(root_store(certs)?)
         } else {
+            // No CA was configured (e.g. the kubeconfig has no `certificate-authority`),
+            // so defer to the trust store, mirroring how client-go leaves `RootCAs`
+            // nil to use the OS roots.
             #[cfg(feature = "webpki-roots")]
             {
-                // Use WebPKI roots.
+                // Opt-in override: use the bundled WebPKI (Mozilla) roots.
                 ClientConfig::builder().with_webpki_roots()
             }
             #[cfg(not(feature = "webpki-roots"))]
             {
-                // Use native roots. This will panic on Android and iOS.
+                // Default: delegate to the OS-native verifier (macOS Security
+                // framework, Windows CryptoAPI, native roots on Linux/Android/iOS),
+                // honouring OS trust policies such as per-certificate trust settings.
+                use rustls_platform_verifier::BuilderVerifierExt;
                 ClientConfig::builder()
-                    .with_native_roots()
-                    .map_err(Error::NoValidNativeRootCA)?
+                    .with_platform_verifier()
+                    // Reuse the type-erased trust-setup error variant to keep the
+                    // public `Error` enum stable.
+                    .map_err(|e| Error::AddRootCertificate(Box::new(e)))?
             }
         };
 
@@ -265,6 +275,21 @@ FRU=
             drop(file);
             expire(&verifier);
             assert!(Arc::ptr_eq(&verifier.current(), &second));
+        }
+    }
+
+    #[cfg(all(test, not(feature = "webpki-roots")))]
+    mod platform_verifier_tests {
+        use super::*;
+
+        // With no kubeconfig CA, the client config must fall back to the OS-native
+        // verifier instead of producing an empty (reject-everything) trust store.
+        #[test]
+        fn no_ca_falls_back_to_platform_verifier() {
+            #[cfg(feature = "aws-lc-rs")]
+            let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+
+            rustls_client_config(None, None, false).expect("platform verifier config should build");
         }
     }
 
