@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1782898758064,
+  "lastUpdate": 1783003251378,
   "repoUrl": "https://github.com/kube-rs/kube",
   "entries": {
     "Benchmark": [
@@ -4478,6 +4478,105 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/kube-rs/kube/commit/8e2c23ea2083dab5f2a6889796711bb0b47e921a"
         },
         "date": 1782898756792,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "init_listwatch - peak_bytes",
+            "value": 55194619,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - total_allocated",
+            "value": 76715088,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - alloc_count",
+            "value": 578023,
+            "unit": "allocations"
+          },
+          {
+            "name": "steady_state - peak_bytes",
+            "value": 71381202,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - total_allocated",
+            "value": 109519220,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - alloc_count",
+            "value": 799021,
+            "unit": "allocations"
+          },
+          {
+            "name": "relist - peak_bytes",
+            "value": 99797302,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - total_allocated",
+            "value": 174518628,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - alloc_count",
+            "value": 1189035,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_without_modify - peak_bytes",
+            "value": 141298836,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - total_allocated",
+            "value": 205865000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - alloc_count",
+            "value": 1298020,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_with_modify - peak_bytes",
+            "value": 134853452,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - total_allocated",
+            "value": 162895000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - alloc_count",
+            "value": 1058021,
+            "unit": "allocations"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "aviram@metalbear.com",
+            "name": "Aviram Hassan",
+            "username": "aviramha"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ae49cce192b85db3d734d290a6031aa2d9ac60e0",
+          "message": "client: fall back to OS-native cert store via rustls-platform-verifier (#2030)\n\n* client: fall back to OS-native cert store via rustls-platform-verifier\n\nWhen no certificate-authority is configured in the kubeconfig, client-go\ndefers TLS verification to the platform trust store. Add an opt-in\nrustls-platform-verifier feature that does the same for the rustls\nbackend, using the OS-native verifier (macOS Security framework, Windows\nCryptoAPI, native roots on Linux) instead of the webpki/native-roots\nfallback. Behaviour is unchanged by default and when a CA is configured.\n\nCloses #2028\n\nSigned-off-by: Aviram Hassan <aviram@metalbear.com>\n\n* make platform verifier the default rustls no-CA path\n\nFold rustls-platform-verifier into the rustls-tls feature and use it by\ndefault when no CA is configured, replacing the with_native_roots()\nfallback (which it supersedes, including removing the Android/iOS panic).\nwebpki-roots remains an explicit opt-in override for the bundled Mozilla\nroots.\n\nSigned-off-by: Aviram Hassan <aviram@metalbear.com>\n\n* reuse AddRootCertificate variant for platform verifier errors\n\nKeep the public rustls_tls::Error enum unchanged by mapping the\nrustls::Error from with_platform_verifier() into the existing\ntype-erased AddRootCertificate variant, and restore NoValidNativeRootCA\nrather than removing it.\n\nSigned-off-by: Aviram Hassan <aviram@metalbear.com>\n\n* cargo-deny: allow CDLA-Permissive-2.0 for webpki-root-certs\n\nPulled in transitively via rustls-platform-verifier, now the default\nno-CA trust source on the rustls-tls stack.\n\nSigned-off-by: Aviram Hassan <aviram@metalbear.com>\n\n---------\n\nSigned-off-by: Aviram Hassan <aviram@metalbear.com>\nCo-authored-by: Eirik A <sszynrae@gmail.com>",
+          "timestamp": "2026-07-02T15:39:48+01:00",
+          "tree_id": "3ee94e5ffd6fa76dc544e651b8fea56651f6f45c",
+          "url": "https://github.com/kube-rs/kube/commit/ae49cce192b85db3d734d290a6031aa2d9ac60e0"
+        },
+        "date": 1783003249606,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
