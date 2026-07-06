@@ -46,7 +46,7 @@ exceptions = [
 unknown-registry = "deny"
 unknown-git = "deny"
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
-allow-git = ["https://github.com/Arnavion/k8s-openapi"]
+# allow-git = ["https://github.com/Arnavion/k8s-openapi"]
 
 [bans]
 multiple-versions = "deny"
@@ -63,3 +63,10 @@ name = "thiserror-impl"
 [[bans.skip]]
 # ahash hasn't had a release in 12mo
 name = "getrandom"
+[[bans.skip]]
+# ahash hasn't had a release in 12mo
+name = "r-efi"
+
+[[bans.skip]]
+# tungstenite needs to bump rand
+name = "rand_core"
