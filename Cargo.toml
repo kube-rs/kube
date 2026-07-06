@@ -41,7 +41,7 @@ base64 = "0.22.1"
 bytes = "1.9.0"
 darling = "0.23.0"
 derive_more = "2.0.1"
-educe = { version = "0.6.0", default-features = false }
+educe = { version = "0.7.3", default-features = false }
 either = "1.6.1"
 form_urlencoded = "1.2.0"
 futures = { version = "0.3.17", default-features = false }
