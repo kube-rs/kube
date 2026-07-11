@@ -1182,9 +1182,14 @@ users:
         // Regression for kdash-rs/kdash#541.
         let dir = tempfile::TempDir::new().unwrap();
         let path = dir.path().join("config");
+        // Build the relative command with the platform separator so it contains
+        // `MAIN_SEPARATOR` on every OS (the guard uses `MAIN_SEPARATOR`, which is
+        // `\` on Windows), keeping the test separator-agnostic.
+        let rel_cmd = format!("auth{}token.sh", std::path::MAIN_SEPARATOR);
         std::fs::write(
             &path,
-            r#"
+            format!(
+                r#"
 apiVersion: v1
 kind: Config
 current-context: ctx
@@ -1202,20 +1207,21 @@ users:
   user:
     exec:
       apiVersion: client.authentication.k8s.io/v1beta1
-      command: auth/token.sh
+      command: {rel_cmd}
 - name: path-user
   user:
     exec:
       apiVersion: client.authentication.k8s.io/v1beta1
       command: aws
-"#,
+"#
+            ),
         )
         .unwrap();
 
         let cfg = Kubeconfig::read_from(&path).unwrap();
 
         // Relative command containing a separator is made absolute.
-        let expected = to_absolute(dir.path(), "auth/token.sh");
+        let expected = to_absolute(dir.path(), &rel_cmd);
         assert_eq!(
             cfg.auth_infos[0]
                 .auth_info
