@@ -252,8 +252,10 @@ where
     KOwner: Resource,
     KOwner::DynamicType: Clone,
 {
-    let mapper = move |obj: S::Ok| {
-        let meta = obj.meta().clone();
+    let mapper = move |mut obj: S::Ok| {
+        // `obj` is owned here, so take the metadata instead of deep-cloning the whole
+        // ObjectMeta (labels/annotations/managedFields) just to read two fields.
+        let meta = std::mem::take(obj.meta_mut());
         let ns = meta.namespace;
         let owner_type = owner_type.clone();
         meta.owner_references
