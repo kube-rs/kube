@@ -112,7 +112,6 @@ fn verify_crd() {
           "plural": "fooz",
           "shortNames": ["f"],
           "singular": "foo",
-          "categories": []
         },
         "scope": "Namespaced",
         "versions": [
