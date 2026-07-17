@@ -25,9 +25,10 @@
         lib = pkgs.lib;
 
         version = "4.0.0";
+        stableToolchainVersion = "1.88.0";
         certFile = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
 
-        stableToolchain = pkgs.rust-bin.stable."1.88.0".default.override {
+        stableToolchain = pkgs.rust-bin.stable.${stableToolchainVersion}.default.override {
           extensions = [
             "clippy"
             "rust-analyzer"
@@ -203,6 +204,30 @@
             exec cargo fmt --all
           '';
         };
+
+        # The justfile uses rustup-style cargo selectors; dispatch them to Nix toolchains.
+        cargoToolchainShim = pkgs.writeShellApplication {
+          name = "cargo";
+          text = ''
+            if [ "$#" -gt 0 ]; then
+              case "$1" in
+                +nightly)
+                  shift
+                  export PATH="${nightlyToolchain}/bin:$PATH"
+                  exec "${nightlyToolchain}/bin/cargo" "$@"
+                  ;;
+                +stable|+${stableToolchainVersion})
+                  shift
+                  export PATH="${stableToolchain}/bin:$PATH"
+                  exec "${stableToolchain}/bin/cargo" "$@"
+                  ;;
+              esac
+            fi
+
+            export PATH="${stableToolchain}/bin:$PATH"
+            exec "${stableToolchain}/bin/cargo" "$@"
+          '';
+        };
       in
       {
         apps = {
@@ -300,6 +325,7 @@
           NIX_SSL_CERT_FILE = certFile;
           SSL_CERT_FILE = certFile;
           shellHook = ''
+            export PATH="${cargoToolchainShim}/bin:$PATH"
             export RUST_SRC_PATH="${stableToolchain}/lib/rustlib/src/rust/library"
           '';
         };
