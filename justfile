@@ -23,16 +23,6 @@ deny:
   # might require rm Cargo.lock first to match CI
   cargo deny --workspace --all-features check bans licenses sources
 
-lockfile:
-  #!/usr/bin/env bash
-  set -euo pipefail
-  if [[ -f .gitignore ]]; then
-    tmp="$(mktemp)"
-    awk '$0 != "Cargo.lock" { print }' .gitignore > "$tmp"
-    mv "$tmp" .gitignore
-  fi
-  cargo generate-lockfile
-
 # Unit tests
 test:
   #!/usr/bin/env bash
