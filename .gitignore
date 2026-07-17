@@ -1,5 +1,6 @@
 .vscode/
 .idea/
+.direnv/
 /target
 **/*.rs.bk
 Cargo.lock

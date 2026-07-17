@@ -133,65 +133,6 @@
           '';
         };
 
-        generateLockfileApp = pkgs.writeShellApplication {
-          name = "generate-lockfile";
-          runtimeInputs = [
-            stableToolchain
-            pkgs.coreutils
-            pkgs.gawk
-            pkgs.git
-          ];
-          text = ''
-            set -euo pipefail
-
-            repo="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
-            cd "$repo"
-
-            if [ -f .gitignore ]; then
-              tmp="$(mktemp)"
-              awk '$0 != "Cargo.lock" { print }' .gitignore > "$tmp"
-              mv "$tmp" .gitignore
-            fi
-
-            cargo generate-lockfile
-          '';
-        };
-
-        installGitHooksApp = pkgs.writeShellApplication {
-          name = "install-git-hooks";
-          runtimeInputs = [
-            pkgs.coreutils
-            pkgs.git
-          ];
-          text = ''
-            set -euo pipefail
-
-            repo="$(git rev-parse --show-toplevel)"
-            hooks_dir="$(git rev-parse --git-path hooks)"
-            mkdir -p "$hooks_dir"
-
-            for hook in pre-commit prepare-commit-msg post-commit; do
-              src="$repo/scripts/git-hooks/$hook"
-              dest="$hooks_dir/$hook"
-
-              if [ ! -f "$src" ]; then
-                printf 'missing hook script: %s\n' "$src" >&2
-                exit 1
-              fi
-
-              current="$(readlink "$dest" 2>/dev/null || true)"
-              if [ -e "$dest" ] && [ "$current" != "$src" ]; then
-                backup="$dest.bak.$(date +%s)"
-                mv "$dest" "$backup"
-                printf 'backed up existing %s to %s\n' "$dest" "$backup"
-              fi
-
-              ln -sfn "$src" "$dest"
-              printf 'installed %s -> %s\n' "$dest" "$src"
-            done
-          '';
-        };
-
         cargo-fmt = nightlyCraneLib.cargoFmt {
           inherit src version;
           pname = "kube-workspace";
@@ -205,7 +146,6 @@
           '';
         };
 
-        # The justfile uses rustup-style cargo selectors; dispatch them to Nix toolchains.
         cargoToolchainShim = pkgs.writeShellApplication {
           name = "cargo";
           text = ''
@@ -235,16 +175,6 @@
             type = "app";
             program = "${ciApp}/bin/ci";
             meta.description = "Run the canonical Nix CI checks locally";
-          };
-          generate-lockfile = {
-            type = "app";
-            program = "${generateLockfileApp}/bin/generate-lockfile";
-            meta.description = "Generate Cargo.lock and keep it unignored locally";
-          };
-          install-git-hooks = {
-            type = "app";
-            program = "${installGitHooksApp}/bin/install-git-hooks";
-            meta.description = "Install local hooks that keep Cargo.lock out of commits";
           };
           fmt = {
             type = "app";
@@ -307,9 +237,7 @@
           );
         };
 
-        devShells.default = pkgs.mkShell {
-          inputsFrom = [ self.packages.${system}.kube ];
-
+        devShells.default = craneLib.devShell {
           packages = [
             stableToolchain
             nightlyToolchain
