@@ -7,7 +7,10 @@ use futures::Stream;
 use kube_client::{Resource, api::ObjectMeta};
 use pin_project::pin_project;
 use std::{
-    collections::{HashMap, hash_map::DefaultHasher},
+    collections::{
+        HashMap,
+        hash_map::{DefaultHasher, Entry},
+    },
     hash::{Hash, Hasher},
     marker::PhantomData,
     time::{Duration, Instant},
@@ -162,6 +165,7 @@ pub struct PredicateFilter<St, K: Resource, P: Predicate<K>> {
     predicate: P,
     cache: HashMap<PredicateCacheKey, CacheEntry>,
     config: Config,
+    last_evicted: Instant,
     // K: Resource necessary to get .meta() of an object during polling
     _phantom: PhantomData<K>,
 }
@@ -177,6 +181,7 @@ where
             predicate,
             cache: HashMap::new(),
             config,
+            last_evicted: Instant::now(),
             _phantom: PhantomData,
         }
     }
@@ -193,27 +198,44 @@ where
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut me = self.project();
 
-        // Evict expired entries before processing new events
         let now = Instant::now();
         let ttl = me.config.ttl;
-        me.cache
-            .retain(|_, entry| now.duration_since(entry.last_seen) < ttl);
+        // Reclaim expired entries periodically instead of on every poll. Per-entry
+        // freshness is enforced below, so this scan is only memory hygiene and does
+        // not affect which events are emitted.
+        if now.duration_since(*me.last_evicted) >= ttl {
+            me.cache
+                .retain(|_, entry| now.duration_since(entry.last_seen) < ttl);
+            *me.last_evicted = now;
+        }
 
         Poll::Ready(loop {
             break match ready!(me.stream.as_mut().poll_next(cx)) {
                 Some(Ok(obj)) => {
                     if let Some(val) = me.predicate.hash_property(&obj) {
                         let key = PredicateCacheKey::from(obj.meta());
-                        let now = Instant::now();
 
-                        // Check if the predicate value changed or entry doesn't exist
-                        let changed = me.cache.get(&key).map(|entry| entry.hash) != Some(val);
-
-                        // Upsert the cache entry with new hash and timestamp
-                        me.cache.insert(key, CacheEntry {
-                            hash: val,
-                            last_seen: now,
-                        });
+                        // Upsert in a single lookup. An entry older than the TTL is
+                        // treated as absent, matching the evict-before-every-poll
+                        // semantics now that eviction is amortized.
+                        let changed = match me.cache.entry(key) {
+                            Entry::Occupied(mut e) => {
+                                let stale = now.duration_since(e.get().last_seen) >= ttl;
+                                let changed = stale || e.get().hash != val;
+                                e.insert(CacheEntry {
+                                    hash: val,
+                                    last_seen: now,
+                                });
+                                changed
+                            }
+                            Entry::Vacant(e) => {
+                                e.insert(CacheEntry {
+                                    hash: val,
+                                    last_seen: now,
+                                });
+                                true
+                            }
+                        };
 
                         if changed {
                             Some(Ok(obj))
