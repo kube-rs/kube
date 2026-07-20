@@ -471,6 +471,17 @@ impl Kubeconfig {
                         {
                             auth_info.token_file = Some(abs_path);
                         }
+                        // Exec plugin commands can also be relative paths. Match
+                        // client-go (`GetAuthInfoFileReferences`) and only resolve
+                        // them when they contain a path separator, so bare `PATH`
+                        // lookups like `aws` are left untouched.
+                        if let Some(exec) = &mut auth_info.exec
+                            && let Some(command) = &exec.command
+                            && command.contains(std::path::MAIN_SEPARATOR)
+                            && let Some(abs_path) = to_absolute(dir, command)
+                        {
+                            exec.command = Some(abs_path);
+                        }
                     }
                 }
             }
@@ -1162,6 +1173,73 @@ users:
             assert_eq!(cfg.contexts[0].name, "k3d-promstack");
             assert_eq!(cfg.auth_infos[0].name, "admin@k3d-k3s-default");
         }
+    }
+
+    #[test]
+    fn read_from_resolves_relative_exec_command() {
+        // Relative exec plugin commands are resolved against the kubeconfig
+        // directory (like client-go), while bare PATH commands are left as-is.
+        // Regression for kdash-rs/kdash#541.
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("config");
+        // Build the relative command with the platform separator so it contains
+        // `MAIN_SEPARATOR` on every OS (the guard uses `MAIN_SEPARATOR`, which is
+        // `\` on Windows), keeping the test separator-agnostic.
+        let rel_cmd = format!("auth{}token.sh", std::path::MAIN_SEPARATOR);
+        std::fs::write(
+            &path,
+            format!(
+                r#"
+apiVersion: v1
+kind: Config
+current-context: ctx
+clusters:
+- name: cluster
+  cluster:
+    server: https://localhost:6443
+contexts:
+- name: ctx
+  context:
+    cluster: cluster
+    user: relative-user
+users:
+- name: relative-user
+  user:
+    exec:
+      apiVersion: client.authentication.k8s.io/v1beta1
+      command: {rel_cmd}
+- name: path-user
+  user:
+    exec:
+      apiVersion: client.authentication.k8s.io/v1beta1
+      command: aws
+"#
+            ),
+        )
+        .unwrap();
+
+        let cfg = Kubeconfig::read_from(&path).unwrap();
+
+        // Relative command containing a separator is made absolute.
+        let expected = to_absolute(dir.path(), &rel_cmd);
+        assert_eq!(
+            cfg.auth_infos[0]
+                .auth_info
+                .as_ref()
+                .and_then(|a| a.exec.as_ref())
+                .and_then(|e| e.command.clone()),
+            expected
+        );
+
+        // Bare PATH command is untouched.
+        assert_eq!(
+            cfg.auth_infos[1]
+                .auth_info
+                .as_ref()
+                .and_then(|a| a.exec.as_ref())
+                .and_then(|e| e.command.as_deref()),
+            Some("aws")
+        );
     }
 
     #[test]
