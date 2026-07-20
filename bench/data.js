@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1784196890417,
+  "lastUpdate": 1784578500976,
   "repoUrl": "https://github.com/kube-rs/kube",
   "entries": {
     "Benchmark": [
@@ -4973,6 +4973,105 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/kube-rs/kube/commit/fe44fa25f7368fe6d771d43e2141cd282e9921bf"
         },
         "date": 1784196888863,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "init_listwatch - peak_bytes",
+            "value": 55194619,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - total_allocated",
+            "value": 76715088,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - alloc_count",
+            "value": 578023,
+            "unit": "allocations"
+          },
+          {
+            "name": "steady_state - peak_bytes",
+            "value": 71381202,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - total_allocated",
+            "value": 109519220,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - alloc_count",
+            "value": 799021,
+            "unit": "allocations"
+          },
+          {
+            "name": "relist - peak_bytes",
+            "value": 99797302,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - total_allocated",
+            "value": 174518628,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - alloc_count",
+            "value": 1189035,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_without_modify - peak_bytes",
+            "value": 141298836,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - total_allocated",
+            "value": 205865000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - alloc_count",
+            "value": 1298020,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_with_modify - peak_bytes",
+            "value": 134853452,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - total_allocated",
+            "value": 162895000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - alloc_count",
+            "value": 1058021,
+            "unit": "allocations"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "d4udts@gmail.com",
+            "name": "Deepu K Sasidharan",
+            "username": "deepu105"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d0328f7d9915c90db4479aa694344d5b9fc1423f",
+          "message": "config: resolve relative exec plugin command paths (#2037)\n\n* config: resolve relative exec plugin command paths\n\nkube-rs remaps relative certificate, key, and token-file paths to absolute\nagainst the kubeconfig directory, but leaves exec plugin commands untouched.\nclient-go resolves a relative exec command (one containing a path separator)\nagainst the kubeconfig directory too, so a config that works with kubectl\nfails here when the process is launched from another directory.\n\nResolve relative exec commands the same way, guarding on a path separator so\nbare PATH lookups like `aws` stay untouched.\n\nFixes: https://github.com/kdash-rs/kdash/issues/541\nSigned-off-by: Deepu K Sasidharan <d4udts@gmail.com>\n\n* config: use MAIN_SEPARATOR in relative exec command test\n\nBuild the test's relative command from MAIN_SEPARATOR so it contains the\nplatform separator on every OS (the resolution guard checks MAIN_SEPARATOR,\nwhich is a backslash on Windows). Keeps the test passing cross-platform.\n\nSigned-off-by: Deepu K Sasidharan <d4udts@gmail.com>\n\n---------\n\nSigned-off-by: Deepu K Sasidharan <d4udts@gmail.com>\nCo-authored-by: Eirik A <sszynrae@gmail.com>",
+          "timestamp": "2026-07-20T20:12:50Z",
+          "tree_id": "5da108f3f38710b2b2d8ff67ade7f4f74ea25e47",
+          "url": "https://github.com/kube-rs/kube/commit/d0328f7d9915c90db4479aa694344d5b9fc1423f"
+        },
+        "date": 1784578499342,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
