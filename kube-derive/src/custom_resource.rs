@@ -794,11 +794,6 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         let printers: Vec<_> = printcolumns.iter().map(|p| p.to_tokens(&k8s_openapi)).collect();
         quote! { vec![ #(#printers),* ] }
     };
-    let fields: Vec<String> = selectable
-        .iter()
-        .map(|s| format!(r#"{{ "jsonPath": "{s}" }}"#))
-        .collect();
-    let fields = format!("[ {} ]", fields.join(","));
     let scale = scale.map_or_else(
         || quote! { None },
         |s| {
@@ -823,20 +818,33 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         quote! { &[#names] }
     };
 
-    let categories_json = serde_json::to_string(&categories).unwrap();
-    let short_json = serde_json::to_string(&shortnames).unwrap();
+    // Unset attributes must be absent from the CRD, not explicit empty collections (#1680)
+    let opt = |unset: bool, value: TokenStream| {
+        if unset {
+            quote! { None }
+        } else {
+            quote! { Some(#value) }
+        }
+    };
+    let categories = opt(categories.is_empty(), quote! { vec![#(#categories.into()),*] });
+    let short_names = opt(shortnames.is_empty(), quote! { vec![#(#shortnames.into()),*] });
+    let printer_columns = opt(printcolumns.is_empty(), printers);
+    let fields = selectable
+        .iter()
+        .map(|path| quote! { #apiext::SelectableField { json_path: #path.into() } });
+    let selectable_fields = opt(selectable.is_empty(), quote! { vec![#(#fields),*] });
+    let subresources = opt(!has_status, quote! {
+        #apiext::CustomResourceSubresources {
+            scale: #scale,
+            status: Some(#apiext::CustomResourceSubresourceStatus(#serde_json::json!({}))),
+        }
+    });
+    let (deprecated, deprecation_warning) = match deprecated {
+        None => (quote! { None }, quote! { None }),
+        Some(Override::Inherit) => (quote! { Some(true) }, quote! { None }),
+        Some(Override::Explicit(warning)) => (quote! { Some(true) }, quote! { Some(#warning.into()) }),
+    };
     let crd_meta_name = format!("{plural}.{group}");
-
-    let mut crd_meta = TokenStream::new();
-    crd_meta.extend(quote! { "name": #crd_meta_name });
-
-    if !annotations.is_empty() {
-        crd_meta.extend(quote! { , "annotations": #meta_annotations });
-    }
-
-    if !labels.is_empty() {
-        crd_meta.extend(quote! { , "labels": #meta_labels });
-    }
 
     let schemagen = if schema_mode.use_in_crd() {
         quote! {
@@ -851,7 +859,10 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
                 .with_transform(#kube_core::schema::OptionalEnum)
                 .with_transform(#kube_core::schema::OptionalIntOrString)
                 .into_generator();
-            let schema = generate.into_root_schema_for::<Self>();
+            let schema = #serde_json::to_value(generate.into_root_schema_for::<Self>())
+                .and_then(#serde_json::from_value)
+                .map(Some)
+                .expect("valid JSONSchemaProps from schemars schema");
         }
     } else {
         // we could issue a compile time warning for this, but it would hit EVERY compile, which would be noisy
@@ -862,86 +873,51 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         }
     };
 
-    let selectable = if !selectable.is_empty() {
-        quote! { "selectableFields": fields, }
-    } else {
-        quote! {}
-    };
-
-    let deprecation = if let Some(deprecation) = deprecated {
-        match deprecation {
-            Override::Inherit => quote! { "deprecated": true, },
-            Override::Explicit(warning) => quote! {
-                "deprecated": true,
-                "deprecationWarning": #warning,
-            },
-        }
-    } else {
-        quote! {}
-    };
-
     // Known constraints that are hard to enforce elsewhere
     let compile_constraints = quote! {}; // all modern features rolled out atm.
-
-    let jsondata = quote! {
-        #schemagen
-
-        let jsondata = #serde_json::json!({
-            "metadata": {
-                #crd_meta
-            },
-            "spec": {
-                "group": #group,
-                "scope": #scope,
-                "names": {
-                    "categories": categories,
-                    "plural": #plural,
-                    "singular": #name,
-                    "kind": #kind,
-                    "shortNames": shorts
-                },
-                "versions": [{
-                    "name": #version,
-                    "served": #served,
-                    "storage": #storage,
-                    #deprecation
-                    "schema": {
-                        "openAPIV3Schema": schema,
-                    },
-                    "additionalPrinterColumns": columns,
-                    #selectable
-                    "subresources": subres,
-                }],
-            }
-        });
-    };
 
     // Implement the CustomResourceExt trait to allow users writing generic logic on top of them
     let impl_crd = quote! {
         impl #extver::CustomResourceExt for #rootident {
 
             fn crd() -> #apiext::CustomResourceDefinition {
-                let columns : Vec<#apiext::CustomResourceColumnDefinition> = #printers;
-                let fields : Vec<#apiext::SelectableField> = #serde_json::from_str(#fields).expect("valid selectableField column json");
-                let scale: Option<#apiext::CustomResourceSubresourceScale> = #scale;
-                let categories: Vec<String> = #serde_json::from_str(#categories_json).expect("valid categories");
-                let shorts : Vec<String> = #serde_json::from_str(#short_json).expect("valid shortnames");
-                let subres = if #has_status {
-                    if let Some(s) = &scale {
-                        #serde_json::json!({
-                            "status": {},
-                            "scale": scale
-                        })
-                    } else {
-                        #serde_json::json!({"status": {} })
-                    }
-                } else {
-                    #serde_json::json!({})
-                };
+                #schemagen
 
-                #jsondata
-                #serde_json::from_value(jsondata)
-                    .expect("valid custom resource from #[kube(attrs..)]")
+                #apiext::CustomResourceDefinition {
+                    metadata: #k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta {
+                        annotations: #meta_annotations,
+                        labels: #meta_labels,
+                        name: Some(#crd_meta_name.into()),
+                        ..Default::default()
+                    },
+                    spec: #apiext::CustomResourceDefinitionSpec {
+                        group: #group.into(),
+                        names: #apiext::CustomResourceDefinitionNames {
+                            categories: #categories,
+                            kind: #kind.into(),
+                            plural: #plural.into(),
+                            short_names: #short_names,
+                            singular: Some(#name.into()),
+                            ..Default::default()
+                        },
+                        scope: #scope.into(),
+                        versions: vec![#apiext::CustomResourceDefinitionVersion {
+                            additional_printer_columns: #printer_columns,
+                            deprecated: #deprecated,
+                            deprecation_warning: #deprecation_warning,
+                            name: #version.into(),
+                            schema: Some(#apiext::CustomResourceValidation {
+                                open_api_v3_schema: schema,
+                            }),
+                            selectable_fields: #selectable_fields,
+                            served: #served,
+                            storage: #storage,
+                            subresources: #subresources,
+                        }],
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                }
             }
 
             fn crd_name() -> &'static str {

@@ -70,16 +70,13 @@ fn test_crd_schema_matches_expected() {
           "spec": {
             "group": "clux.dev",
             "names": {
-              "categories": [],
               "kind": "FooEnum",
               "plural": "fooenums",
-              "shortNames": [],
               "singular": "fooenum"
             },
             "scope": "Cluster",
             "versions": [
               {
-                "additionalPrinterColumns": [],
                 "name": "v1",
                 "schema": {
                   "openAPIV3Schema": {
@@ -146,7 +143,6 @@ fn test_crd_schema_matches_expected() {
                 },
                 "served": true,
                 "storage": true,
-                "subresources": {}
               }
             ]
           }
