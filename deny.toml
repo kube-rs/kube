@@ -70,3 +70,7 @@ name = "r-efi"
 [[bans.skip]]
 # tungstenite needs to bump rand
 name = "rand_core"
+
+[[bans.skip]]
+# need some time to get the whole ecosystem to syn 3
+name = "syn"
