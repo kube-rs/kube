@@ -6,7 +6,6 @@ use crate::utils::{Backoff, ResetTimerBackoff};
 
 use backon::BackoffBuilder;
 use educe::Educe;
-#[cfg(test)] use futures::FutureExt;
 use futures::{Stream, StreamExt, stream::BoxStream};
 use kube_client::{
     Api, Error as ClientErr,
@@ -15,8 +14,17 @@ use kube_client::{
     error::Status,
 };
 use serde::de::DeserializeOwned;
-#[cfg(test)] use std::{cell::RefCell, pin::Pin};
-use std::{clone::Clone, collections::VecDeque, fmt::Debug, future, time::Duration};
+#[cfg(test)]
+#[path = "stub_watcher.rs"]
+mod stub_watcher;
+
+use std::{
+    clone::Clone,
+    collections::VecDeque,
+    fmt::{Debug, Display},
+    future,
+    time::Duration,
+};
 use thiserror::Error;
 use tracing::{debug, error, warn};
 
@@ -83,6 +91,22 @@ pub enum Event<K> {
     /// Any objects that were previously [`Applied`](Event::Applied) but are not listed in any of
     /// the `InitApply` events should be assumed to have been [`Deleted`](Event::Deleted).
     InitDone,
+}
+
+impl<K> Display for Event<K>
+where
+    K: ResourceExt,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let desc = match self {
+            Event::Init => "Init".into(),
+            Event::InitApply(obj) => format!("InitApply({})", obj.name_any()),
+            Event::InitDone => "InitDone".into(),
+            Event::Apply(obj) => format!("Apply({})", obj.name_any()),
+            Event::Delete(obj) => format!("Delete({})", obj.name_any()),
+        };
+        write!(f, "{desc}")
+    }
 }
 
 impl<K> Event<K> {
@@ -474,150 +498,6 @@ where
         version: &str,
     ) -> kube_client::Result<BoxStream<'static, kube_client::Result<WatchEvent<Self::Value>>>> {
         self.api.watch_metadata(wp, version).await.map(StreamExt::boxed)
-    }
-}
-
-#[cfg(test)]
-enum Recording {
-    List(ListParams),
-    Watch(WatchParams, String),
-}
-
-#[cfg(test)]
-/// `TestMode` is the test-only "mock" implementation for [`ApiMode`].
-///
-/// [`TestMode::fixture`] is the fixed list of values `TestMode` returns, removing
-/// one element per call and returning it once none are left.
-/// This enables us to simulate different list scenarios.
-///
-/// [`TestMode::watch_sequence`] is the fixed list of [`Sequence`]s `TestMode` returns. The
-/// behaviour, is similar to [`TestMode::fixture`] but it allows for simulating "waiting" periods,
-/// empty intermediary result and for returning a [`futures::stream::BoxStream`] implemented via [`TestStream`].
-struct TestMode<K>
-where
-    K: Clone + Debug + DeserializeOwned + Send + 'static,
-{
-    fixture: RefCell<Vec<kube_client::Result<ObjectList<K>>>>,
-    watch_sequence: RefCell<Vec<Sequence<K>>>,
-    recorder: RefCell<Vec<Recording>>,
-}
-
-#[cfg(test)]
-impl<K> TestMode<K>
-where
-    K: Clone + Debug + DeserializeOwned + Send + 'static,
-{
-    /// Arguments are mut because we reverse the order internally because we pop off the end
-    /// which means the first element to be returned would the last which would be unexpected.
-    pub fn new(
-        mut fixture: Vec<kube_client::Result<ObjectList<K>>>,
-        mut watch_sequence: Vec<Sequence<K>>,
-    ) -> Self {
-        fixture.reverse();
-        watch_sequence.reverse();
-        Self {
-            fixture: RefCell::new(fixture),
-            watch_sequence: RefCell::new(watch_sequence),
-            recorder: RefCell::new(vec![]),
-        }
-    }
-}
-
-#[cfg(test)]
-fn empty_list<K>() -> ObjectList<K>
-where
-    K: Clone,
-{
-    ObjectList {
-        types: kube_client::api::TypeMeta::default(), // TODO(juf): This is probably bad
-        metadata: kube_client::api::ListMeta::default(), // TODO(juf): This is probably also bad
-        items: Vec::new(),
-    }
-}
-
-#[cfg(test)]
-/// Utility enum to represent different "Segments" of a continuum over repeated calls on a running watch(er).
-pub enum Sequence<K> {
-    /// Represents returning nothing, i.e., [`std::task::Poll::Ready`] with [`None`]
-    Empty,
-    /// Represents returning from a list of results until the inner list is empty, i.e., [`std::task::Poll::Ready`] with one [`kube_client::Result<WatchEvent<_>>`]
-    /// for each call.
-    List(Vec<kube_client::Result<WatchEvent<K>>>),
-    /// Represents a "sleep"/wait behaviour to simulate a watch(er) not returning elements for a
-    /// certain duration.
-    Wait(std::time::Duration),
-}
-
-#[cfg(test)]
-/// Implements [`futures::stream::BoxStream`] via [`futures::Stream`] for internal use via [`TestMode::watch`]
-pub struct TestStream<K> {
-    seq: RefCell<Vec<Sequence<K>>>,
-    waiting: Option<Pin<Box<tokio::time::Sleep>>>,
-}
-
-#[cfg(test)]
-impl<K: Unpin> Stream for TestStream<K> {
-    type Item = kube_client::Result<WatchEvent<K>>;
-
-    fn poll_next(
-        self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Option<Self::Item>> {
-        let this = self.get_mut();
-        if let Some(inner_fut) = this.waiting.as_mut() {
-            if !matches!(inner_fut.poll_unpin(cx), std::task::Poll::Ready(())) {
-                return std::task::Poll::Pending;
-            }
-            this.waiting = None;
-        }
-        let mut inner = this.seq.borrow_mut();
-        match inner.pop() {
-            Some(seq) => match seq {
-                Sequence::Empty => std::task::Poll::Ready(None),
-                Sequence::List(mut watch_events) => std::task::Poll::Ready(watch_events.pop()),
-                Sequence::Wait(duration) => {
-                    if this.waiting.is_some() {
-                        unreachable!("TestStream::waiting should be None when accessing inner, this is a bug")
-                    }
-                    this.waiting = Some(Box::pin(tokio::time::sleep(duration)));
-                    std::task::Poll::Pending
-                }
-            },
-            None => std::task::Poll::Ready(None),
-        }
-    }
-}
-
-#[cfg(test)]
-#[allow(clippy::unused_async_trait_impl)]
-impl<K> ApiMode for TestMode<K>
-where
-    K: Clone + Debug + DeserializeOwned + Send + Unpin + 'static,
-{
-    type Value = K;
-
-    async fn list(&self, lp: &ListParams) -> kube_client::Result<ObjectList<Self::Value>> {
-        self.recorder.borrow_mut().push(Recording::List(lp.clone()));
-        match self.fixture.borrow_mut().pop() {
-            Some(next) => next,
-            None => Ok(empty_list()),
-        }
-    }
-
-    async fn watch(
-        &self,
-        wp: &WatchParams,
-        version: &str,
-    ) -> kube_client::Result<BoxStream<'static, kube_client::Result<WatchEvent<Self::Value>>>> {
-        self.recorder
-            .borrow_mut()
-            .push(Recording::Watch(wp.clone(), version.into()));
-        let seq = self.watch_sequence.borrow_mut().pop().into_iter().collect();
-        Ok(TestStream {
-            seq: RefCell::new(seq),
-            waiting: None,
-        }
-        .boxed())
     }
 }
 
@@ -1149,13 +1029,19 @@ impl Backoff for DefaultBackoff {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use k8s_openapi::{
-        api::core::v1::ConfigMap,
-        apimachinery::pkg::apis::meta::v1::{ListMeta, ObjectMeta},
+    use std::time::Duration;
+
+    use k8s_openapi::{api::core::v1::ConfigMap, apimachinery::pkg::apis::meta::v1::ObjectMeta};
+    use kube_client::api::WatchEvent;
+
+    use crate::watcher::{
+        Config, ExponentialBackoff, State, WatchPhase, next_with_idle_timeout, step,
+        stub_watcher::{Recording, Sequence, TestMode},
     };
 
-    fn cm(name: &str, resource_version: &str) -> ConfigMap {
+    use super::stub_watcher::ResultPage;
+
+    fn config_map(name: &str, resource_version: &str) -> ConfigMap {
         ConfigMap {
             metadata: ObjectMeta {
                 name: Some(name.to_string()),
@@ -1166,41 +1052,25 @@ mod tests {
         }
     }
 
-    fn list(
-        items: Vec<ConfigMap>,
-        resource_version: Option<&str>,
-        continue_token: Option<&str>,
-    ) -> ObjectList<ConfigMap> {
-        ObjectList {
-            types: kube_client::api::TypeMeta::default(),
-            metadata: ListMeta {
-                resource_version: resource_version.map(str::to_string),
-                continue_: continue_token.map(str::to_string),
-                ..ListMeta::default()
-            },
-            items,
-        }
-    }
-
-    fn event_name(event: Result<Event<ConfigMap>>) -> String {
-        match event.unwrap() {
-            Event::Init => "Init".into(),
-            Event::InitApply(obj) => format!("InitApply({})", obj.name_any()),
-            Event::InitDone => "InitDone".into(),
-            Event::Apply(obj) => format!("Apply({})", obj.name_any()),
-            Event::Delete(obj) => format!("Delete({})", obj.name_any()),
-        }
-    }
-
     #[tokio::test]
     async fn listwatch_paginates_initial_list_before_starting_watch() {
         let api = TestMode::new(
             vec![
-                Ok(list(vec![cm("a", "1")], None, Some("first"))),
-                Ok(list(vec![cm("b", "2")], Some("2"), Some("second"))),
-                Ok(list(vec![cm("c", "3")], Some("3"), None)),
+                Ok(ResultPage::empty()
+                    .items(vec![config_map("a", "1")])
+                    .continue_token("first".into())
+                    .into()),
+                Ok(ResultPage::empty()
+                    .items(vec![config_map("b", "2")])
+                    .resource_version("2".into())
+                    .continue_token("second".into())
+                    .into()),
+                Ok(ResultPage::empty()
+                    .items(vec![config_map("c", "3")])
+                    .resource_version("3".into())
+                    .into()),
             ],
-            vec![Sequence::List(vec![Ok(WatchEvent::Added(cm("d", "4")))])],
+            vec![Sequence::List(vec![Ok(WatchEvent::Added(config_map("d", "4")))])],
         );
 
         let config = Config::default()
@@ -1211,28 +1081,28 @@ mod tests {
 
         let (event, next) = step(&api, &config, state).await;
         state = next;
-        assert_eq!(event_name(event), "Init");
+        assert_eq!(event.unwrap().to_string(), "Init");
 
         let (event, next) = step(&api, &config, state).await;
         state = next;
-        assert_eq!(event_name(event), "InitApply(a)");
+        assert_eq!(event.unwrap().to_string(), "InitApply(a)");
 
         let (event, next) = step(&api, &config, state).await;
         state = next;
-        assert_eq!(event_name(event), "InitApply(b)");
+        assert_eq!(event.unwrap().to_string(), "InitApply(b)");
 
         let (event, next) = step(&api, &config, state).await;
         state = next;
-        assert_eq!(event_name(event), "InitApply(c)");
+        assert_eq!(event.unwrap().to_string(), "InitApply(c)");
 
         let (event, next) = step(&api, &config, state).await;
         state = next;
-        assert_eq!(event_name(event), "InitDone");
+        assert_eq!(event.unwrap().to_string(), "InitDone");
 
         let (event, _) = step(&api, &config, state).await;
-        assert_eq!(event_name(event), "Apply(d)");
+        assert_eq!(event.unwrap().to_string(), "Apply(d)");
 
-        let records = api.recorder.borrow();
+        let records = api.get_recordings();
         match &records[..] {
             [
                 Recording::List(first),
