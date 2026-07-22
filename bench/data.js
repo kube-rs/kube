@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1784578500976,
+  "lastUpdate": 1784709906357,
   "repoUrl": "https://github.com/kube-rs/kube",
   "entries": {
     "Benchmark": [
@@ -5072,6 +5072,105 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/kube-rs/kube/commit/d0328f7d9915c90db4479aa694344d5b9fc1423f"
         },
         "date": 1784578499342,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "init_listwatch - peak_bytes",
+            "value": 55194619,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - total_allocated",
+            "value": 76715088,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - alloc_count",
+            "value": 578023,
+            "unit": "allocations"
+          },
+          {
+            "name": "steady_state - peak_bytes",
+            "value": 71381202,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - total_allocated",
+            "value": 109519220,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - alloc_count",
+            "value": 799021,
+            "unit": "allocations"
+          },
+          {
+            "name": "relist - peak_bytes",
+            "value": 99797302,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - total_allocated",
+            "value": 174518628,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - alloc_count",
+            "value": 1189035,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_without_modify - peak_bytes",
+            "value": 141298836,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - total_allocated",
+            "value": 205865000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - alloc_count",
+            "value": 1298020,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_with_modify - peak_bytes",
+            "value": 134853452,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - total_allocated",
+            "value": 162895000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - alloc_count",
+            "value": 1058021,
+            "unit": "allocations"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "sszynrae@gmail.com",
+            "name": "clux",
+            "username": "clux"
+          },
+          "committer": {
+            "email": "sszynrae@gmail.com",
+            "name": "clux",
+            "username": "clux"
+          },
+          "distinct": true,
+          "id": "526f1f2cfa996ed0e92510feabb2d2327df5e49f",
+          "message": "release 4.2.0",
+          "timestamp": "2026-07-22T09:40:53+01:00",
+          "tree_id": "e55d621fc6e8c54cdc146f94a60bc89aeb7b62f1",
+          "url": "https://github.com/kube-rs/kube/commit/526f1f2cfa996ed0e92510feabb2d2327df5e49f"
+        },
+        "date": 1784709904562,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
