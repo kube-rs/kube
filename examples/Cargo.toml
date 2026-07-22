@@ -89,6 +89,10 @@ name = "configmapgen_controller"
 path = "configmapgen_controller.rs"
 
 [[example]]
+name = "owner_finalizer_demo"
+path = "owner_finalizer_demo.rs"
+
+[[example]]
 name = "shared_stream_controllers"
 path = "shared_stream_controllers.rs"
 
