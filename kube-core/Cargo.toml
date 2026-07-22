@@ -43,5 +43,5 @@ kube-cel = { version = "0.8.0", optional = true, features = ["validation"] }
 [dev-dependencies]
 k8s-openapi = { workspace = true, features = ["latest"] }
 assert-json-diff.workspace = true
-kube = { path = "../kube", version = ">=4" }
+kube = { path = "../kube" }
 serde-saphyr.workspace = true

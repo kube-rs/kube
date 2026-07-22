@@ -28,7 +28,7 @@ proc-macro = true
 [dev-dependencies]
 serde = { workspace = true, features = ["derive"] }
 serde-saphyr.workspace = true
-kube = { path = "../kube", version = ">=4", features = ["derive", "client", "cel"] }
+kube = { path = "../kube", features = ["derive", "client", "cel"] }
 schemars = { workspace = true, features = ["jiff02"] }
 k8s-openapi = { workspace = true, features = ["latest", "schemars"] }
 jiff.workspace = true
