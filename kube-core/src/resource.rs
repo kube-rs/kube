@@ -282,6 +282,16 @@ pub trait ResourceExt: Resource {
     fn finalizers(&self) -> &[String];
     /// Provides mutable access to the finalizers
     fn finalizers_mut(&mut self) -> &mut Vec<String>;
+    /// Returns whether the given finalizer is present
+    fn has_finalizer(&self, name: &str) -> bool;
+    /// Adds a finalizer if it is not already present
+    ///
+    /// Returns `true` if the finalizer was added, `false` if it was already present.
+    fn add_finalizer(&mut self, name: &str) -> bool;
+    /// Removes a finalizer if present
+    ///
+    /// Returns `true` if the finalizer was removed, `false` if it was not present.
+    fn remove_finalizer(&mut self, name: &str) -> bool;
     /// Returns managed fields
     fn managed_fields(&self) -> &[ManagedFieldsEntry];
     /// Provides mutable access to managed fields
@@ -351,11 +361,57 @@ impl<K: Resource> ResourceExt for K {
         self.meta_mut().finalizers.get_or_insert_with(Vec::new)
     }
 
+    fn has_finalizer(&self, name: &str) -> bool {
+        self.finalizers().iter().any(|f| f == name)
+    }
+
+    fn add_finalizer(&mut self, name: &str) -> bool {
+        if self.has_finalizer(name) {
+            return false;
+        }
+        self.finalizers_mut().push(name.to_string());
+        true
+    }
+
+    fn remove_finalizer(&mut self, name: &str) -> bool {
+        let finalizers = self.finalizers_mut();
+        let len_before = finalizers.len();
+        finalizers.retain(|f| f != name);
+        finalizers.len() != len_before
+    }
+
     fn managed_fields(&self) -> &[ManagedFieldsEntry] {
         self.meta().managed_fields.as_deref().unwrap_or_default()
     }
 
     fn managed_fields_mut(&mut self) -> &mut Vec<ManagedFieldsEntry> {
         self.meta_mut().managed_fields.get_or_insert_with(Vec::new)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ResourceExt;
+    use k8s_openapi::api::core::v1::Pod;
+
+    #[test]
+    fn finalizer_add_is_idempotent() {
+        let mut pod = Pod::default();
+        assert!(!pod.has_finalizer("my.finalizer"));
+        assert!(pod.add_finalizer("my.finalizer"));
+        assert!(pod.has_finalizer("my.finalizer"));
+        // Adding again is a no-op
+        assert!(!pod.add_finalizer("my.finalizer"));
+        assert_eq!(pod.finalizers(), &["my.finalizer".to_string()]);
+    }
+
+    #[test]
+    fn finalizer_remove_reports_whether_anything_changed() {
+        let mut pod = Pod::default();
+        pod.add_finalizer("my.finalizer");
+        assert!(pod.remove_finalizer("my.finalizer"));
+        assert!(!pod.has_finalizer("my.finalizer"));
+        // Removing again is a no-op
+        assert!(!pod.remove_finalizer("my.finalizer"));
     }
 }
