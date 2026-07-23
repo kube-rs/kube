@@ -194,6 +194,7 @@ where
             seq: RefCell::new(seq),
             waiting: None,
         }
+        .fuse()
         .boxed())
     }
 }
