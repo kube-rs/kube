@@ -386,15 +386,12 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         .iter()
         .map(|path| quote! { #apiext::SelectableField { json_path: #path.into() } });
     let selectable_fields = opt(selectable.is_empty(), quote! { vec![#(#fields),*] });
-    let subresources = opt(
-        !has_status,
-        quote! {
-            #apiext::CustomResourceSubresources {
-                scale: #scale,
-                status: Some(#apiext::CustomResourceSubresourceStatus(#serde_json::json!({}))),
-            }
-        },
-    );
+    let subresources = opt(!has_status, quote! {
+        #apiext::CustomResourceSubresources {
+            scale: #scale,
+            status: Some(#apiext::CustomResourceSubresourceStatus(#serde_json::json!({}))),
+        }
+    });
     let (deprecated, deprecation_warning) = match deprecated {
         None => (quote! { None }, quote! { None }),
         Some(Override::Inherit) => (quote! { Some(true) }, quote! { None }),
