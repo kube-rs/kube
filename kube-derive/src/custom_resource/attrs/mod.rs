@@ -154,7 +154,7 @@ impl Crates {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, FromMeta)]
 pub enum SchemaMode {
     Disabled,
     Manual,
@@ -175,17 +175,6 @@ impl SchemaMode {
             SchemaMode::Disabled => false,
             SchemaMode::Manual => true,
             SchemaMode::Derived => true,
-        }
-    }
-}
-
-impl FromMeta for SchemaMode {
-    fn from_string(value: &str) -> darling::Result<Self> {
-        match value {
-            "disabled" => Ok(SchemaMode::Disabled),
-            "manual" => Ok(SchemaMode::Manual),
-            "derived" => Ok(SchemaMode::Derived),
-            x => Err(darling::Error::unknown_value(x)),
         }
     }
 }
