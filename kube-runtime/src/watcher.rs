@@ -1036,7 +1036,7 @@ mod tests {
 
     use crate::watcher::{
         Config, ExponentialBackoff, State, WatchPhase, next_with_idle_timeout, step,
-        stub_watcher::{Recording, Sequence, TestMode},
+        stub_watcher::{Recording, Sequence, SequenceStep, TestMode},
     };
 
     use super::stub_watcher::ResultPage;
@@ -1070,7 +1070,9 @@ mod tests {
                     .resource_version("3".into())
                     .into()),
             ],
-            vec![Sequence::List(vec![Ok(WatchEvent::Added(config_map("d", "4")))])],
+            vec![Sequence::new(vec![SequenceStep::List(vec![Ok(
+                WatchEvent::Added(config_map("d", "4")),
+            )])])],
         );
 
         let config = Config::default()

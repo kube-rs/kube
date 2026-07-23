@@ -7,6 +7,7 @@ use serde::de::DeserializeOwned;
 use std::{
     cell::{Ref, RefCell},
     fmt::Debug,
+    ops::DerefMut,
     pin::Pin,
 };
 
@@ -31,7 +32,7 @@ where
     K: Clone + Debug + DeserializeOwned + Send + 'static,
 {
     list_sequence: RefCell<Vec<kube_client::Result<ObjectList<K>>>>,
-    watch_sequence: RefCell<Vec<Sequence<K>>>,
+    watch_sequences: RefCell<Vec<Sequence<K>>>,
     recorder: RefCell<Vec<Recording>>,
 }
 
@@ -58,7 +59,7 @@ where
         watch_sequence.reverse();
         Self {
             list_sequence: RefCell::new(fixture),
-            watch_sequence: RefCell::new(watch_sequence),
+            watch_sequences: RefCell::new(watch_sequence),
             recorder: RefCell::new(vec![]),
         }
     }
@@ -116,9 +117,7 @@ where
 }
 
 /// Utility enum to represent different "Segments" of a continuum over repeated calls on a running watch(er).
-pub enum Sequence<K> {
-    /// Represents end of stream, i.e., [`std::task::Poll::Ready`] with [`None`]
-    Terminate,
+pub enum SequenceStep<K> {
     /// Represents returning from a list of results until the inner list is empty, i.e., [`std::task::Poll::Ready`] with one [`kube_client::Result<WatchEvent<_>>`]
     /// for each call.
     List(Vec<kube_client::Result<WatchEvent<K>>>),
@@ -127,9 +126,25 @@ pub enum Sequence<K> {
     Wait(std::time::Duration),
 }
 
+pub struct Sequence<K> {
+    inner: Vec<SequenceStep<K>>,
+}
+
+impl<K> Sequence<K> {
+    pub fn new(steps: Vec<SequenceStep<K>>) -> Self {
+        Self { inner: steps }
+    }
+}
+
+impl<K> Default for Sequence<K> {
+    fn default() -> Self {
+        Sequence { inner: vec![] }
+    }
+}
+
 /// Implements [`futures::stream::BoxStream`] via [`futures::Stream`] for internal use via [`TestMode::watch`]
 pub struct TestStream<K> {
-    seq: RefCell<Vec<Sequence<K>>>,
+    seq: RefCell<Sequence<K>>,
     waiting: Option<Pin<Box<tokio::time::Sleep>>>,
 }
 
@@ -147,12 +162,11 @@ impl<K: Unpin> futures::Stream for TestStream<K> {
             }
             this.waiting = None;
         }
-        let mut inner = this.seq.borrow_mut();
-        match inner.pop() {
-            Some(seq) => match seq {
-                Sequence::Terminate => std::task::Poll::Ready(None),
-                Sequence::List(mut watch_events) => std::task::Poll::Ready(watch_events.pop()),
-                Sequence::Wait(duration) => {
+        let mut seq = this.seq.borrow_mut();
+        match seq.inner.pop() {
+            Some(step) => match step {
+                SequenceStep::List(mut watch_events) => std::task::Poll::Ready(watch_events.pop()),
+                SequenceStep::Wait(duration) => {
                     if this.waiting.is_some() {
                         unreachable!("TestStream::waiting should be None when accessing inner, this is a bug")
                     }
@@ -189,7 +203,9 @@ where
         self.recorder
             .borrow_mut()
             .push(Recording::Watch(wp.clone(), version.into()));
-        let seq = self.watch_sequence.borrow_mut().pop().into_iter().collect();
+        let seq = self.watch_sequences.borrow_mut().pop().unwrap_or_default();
+        // NOTE(juf): Currently we assume no sequences == empty
+        // stream.
         Ok(TestStream {
             seq: RefCell::new(seq),
             waiting: None,
