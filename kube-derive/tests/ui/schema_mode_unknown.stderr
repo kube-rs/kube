@@ -1,0 +1,5 @@
+error: Unknown value: `unknown`. Available values: `derived`, `disabled`, `manual`
+ --> tests/ui/schema_mode_unknown.rs:7:70
+  |
+7 | #[kube(group = "example.org", version = "v1", kind = "Foo", schema = "unknown")]
+  |                                                                      ^^^^^^^^^
