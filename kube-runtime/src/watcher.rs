@@ -14,7 +14,17 @@ use kube_client::{
     error::Status,
 };
 use serde::de::DeserializeOwned;
-use std::{clone::Clone, collections::VecDeque, fmt::Debug, future, time::Duration};
+#[cfg(test)]
+#[path = "stub_watcher.rs"]
+mod stub_watcher;
+
+use std::{
+    clone::Clone,
+    collections::VecDeque,
+    fmt::{Debug, Display},
+    future,
+    time::Duration,
+};
 use thiserror::Error;
 use tracing::{debug, error, warn};
 
@@ -81,6 +91,22 @@ pub enum Event<K> {
     /// Any objects that were previously [`Applied`](Event::Applied) but are not listed in any of
     /// the `InitApply` events should be assumed to have been [`Deleted`](Event::Deleted).
     InitDone,
+}
+
+impl<K> Display for Event<K>
+where
+    K: ResourceExt,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let desc = match self {
+            Event::Init => "Init".into(),
+            Event::InitApply(obj) => format!("InitApply({})", obj.name_any()),
+            Event::InitDone => "InitDone".into(),
+            Event::Apply(obj) => format!("Apply({})", obj.name_any()),
+            Event::Delete(obj) => format!("Delete({})", obj.name_any()),
+        };
+        write!(f, "{desc}")
+    }
 }
 
 impl<K> Event<K> {
@@ -1003,7 +1029,108 @@ impl Backoff for DefaultBackoff {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::time::Duration;
+
+    use k8s_openapi::{api::core::v1::ConfigMap, apimachinery::pkg::apis::meta::v1::ObjectMeta};
+    use kube_client::api::WatchEvent;
+
+    use crate::watcher::{
+        Config, ExponentialBackoff, State, WatchPhase, next_with_idle_timeout, step,
+        stub_watcher::{Recording, Sequence, SequenceStep, TestMode},
+    };
+
+    use super::stub_watcher::ResultPage;
+
+    fn config_map(name: &str, resource_version: &str) -> ConfigMap {
+        ConfigMap {
+            metadata: ObjectMeta {
+                name: Some(name.to_string()),
+                resource_version: Some(resource_version.to_string()),
+                ..ObjectMeta::default()
+            },
+            ..ConfigMap::default()
+        }
+    }
+
+    #[tokio::test]
+    async fn listwatch_paginates_initial_list_before_starting_watch() {
+        let api = TestMode::new(
+            vec![
+                Ok(ResultPage::empty()
+                    .items(vec![config_map("a", "1")])
+                    .continue_token("first".into())
+                    .into()),
+                Ok(ResultPage::empty()
+                    .items(vec![config_map("b", "2")])
+                    .resource_version("2".into())
+                    .continue_token("second".into())
+                    .into()),
+                Ok(ResultPage::empty()
+                    .items(vec![config_map("c", "3")])
+                    .resource_version("3".into())
+                    .into()),
+            ],
+            vec![Sequence::new(vec![SequenceStep::List(vec![Ok(
+                WatchEvent::Added(config_map("d", "4")),
+            )])])],
+        );
+
+        let config = Config::default()
+            .page_size(1)
+            .labels("app=test")
+            .fields("metadata.name!=ignored");
+        let mut state = State::default();
+
+        let (event, next) = step(&api, &config, state).await;
+        state = next;
+        assert_eq!(event.unwrap().to_string(), "Init");
+
+        let (event, next) = step(&api, &config, state).await;
+        state = next;
+        assert_eq!(event.unwrap().to_string(), "InitApply(a)");
+
+        let (event, next) = step(&api, &config, state).await;
+        state = next;
+        assert_eq!(event.unwrap().to_string(), "InitApply(b)");
+
+        let (event, next) = step(&api, &config, state).await;
+        state = next;
+        assert_eq!(event.unwrap().to_string(), "InitApply(c)");
+
+        let (event, next) = step(&api, &config, state).await;
+        state = next;
+        assert_eq!(event.unwrap().to_string(), "InitDone");
+
+        let (event, _) = step(&api, &config, state).await;
+        assert_eq!(event.unwrap().to_string(), "Apply(d)");
+
+        let records = api.get_recordings();
+        match &records[..] {
+            [
+                Recording::List(first),
+                Recording::List(second),
+                Recording::List(third),
+                Recording::Watch(watch_params, watch_version),
+            ] => {
+                assert_eq!(first.continue_token.as_deref(), None);
+                assert_eq!(second.continue_token.as_deref(), Some("first"));
+                assert_eq!(third.continue_token.as_deref(), Some("second"));
+
+                assert_eq!(first.limit, Some(1));
+                assert_eq!(first.label_selector.as_deref(), Some("app=test"));
+                assert_eq!(first.field_selector.as_deref(), Some("metadata.name!=ignored"));
+
+                assert_eq!(watch_version, "3");
+                assert_eq!(watch_params.label_selector.as_deref(), Some("app=test"));
+                assert_eq!(
+                    watch_params.field_selector.as_deref(),
+                    Some("metadata.name!=ignored")
+                );
+                assert!(!watch_params.send_initial_events);
+            }
+            _ => panic!("unexpected API call sequence"),
+        }
+    }
 
     #[test]
     fn to_watch_params_initial_phase_with_streaming_list_sets_send_initial_events() {
