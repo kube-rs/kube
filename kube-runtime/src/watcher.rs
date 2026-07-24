@@ -529,7 +529,8 @@ where
                 match api.watch(&wc.to_watch_params(WatchPhase::Initial), "0").await {
                     Ok(stream) => (None, State::InitialWatch { stream }),
                     Err(err) => {
-                        if std::matches!(err, ClientErr::Api(ref status) if status.is_forbidden()) {
+                        if std::matches!(err, ClientErr::Api { source: ref status, uri: _ } if status.is_forbidden())
+                        {
                             warn!("watch initlist error with 403: {err:?}");
                         } else {
                             debug!("watch initlist error: {err:?}");
@@ -576,7 +577,8 @@ where
                     })
                 }
                 Err(err) => {
-                    if std::matches!(err, ClientErr::Api(ref status) if status.is_forbidden()) {
+                    if std::matches!(err, ClientErr::Api { source: ref status, uri: _ } if status.is_forbidden())
+                    {
                         warn!("watch list error with 403: {err:?}");
                     } else {
                         debug!("watch list error: {err:?}");
@@ -622,7 +624,8 @@ where
                     (Some(Err(Error::WatchError(err.boxed()))), new_state)
                 }
                 Some(Err(err)) => {
-                    if std::matches!(err, ClientErr::Api(ref status) if status.is_forbidden()) {
+                    if std::matches!(err, ClientErr::Api { source: ref status, uri: _ } if status.is_forbidden())
+                    {
                         warn!("watcher error 403: {err:?}");
                     } else {
                         debug!("watcher error: {err:?}");
@@ -642,7 +645,8 @@ where
                     stream,
                 }),
                 Err(err) => {
-                    if std::matches!(err, ClientErr::Api(ref status) if status.is_forbidden()) {
+                    if std::matches!(err, ClientErr::Api { source: ref status, uri: _ } if status.is_forbidden())
+                    {
                         warn!("watch initlist error with 403: {err:?}");
                     } else {
                         debug!("watch initlist error: {err:?}");
@@ -701,7 +705,8 @@ where
                 (Some(Err(Error::WatchError(err.boxed()))), new_state)
             }
             Some(Err(err)) => {
-                if std::matches!(err, ClientErr::Api(ref status) if status.is_forbidden()) {
+                if std::matches!(err, ClientErr::Api { source: ref status, uri: _ } if status.is_forbidden())
+                {
                     warn!("watcher error 403: {err:?}");
                 } else {
                     debug!("watcher error: {err:?}");

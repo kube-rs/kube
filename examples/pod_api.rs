@@ -37,8 +37,8 @@ async fn main() -> anyhow::Result<()> {
             assert_eq!(p.name_any(), name);
             info!("Created {}", name);
         }
-        Err(kube::Error::Api(ae)) => assert_eq!(ae.code, 409), // if you skipped delete, for instance
-        Err(e) => return Err(e.into()),                        // any other case is probably bad
+        Err(kube::Error::Api { source: ae, uri: _ }) => assert_eq!(ae.code, 409), // if you skipped delete, for instance
+        Err(e) => return Err(e.into()), // any other case is probably bad
     }
 
     // Watch it phase for a few seconds
