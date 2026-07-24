@@ -1,5 +1,5 @@
 error: Unknown value: `Disabled`. Did you mean `disabled`?
- --> tests/ui/invalid_schema_mode.rs:7:70
+ --> tests/ui/schema_mode_invalid.rs:7:70
   |
 7 | #[kube(group = "example.org", version = "v1", kind = "Foo", schema = "Disabled")]
   |                                                                      ^^^^^^^^^^
