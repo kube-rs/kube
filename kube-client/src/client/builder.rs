@@ -328,11 +328,7 @@ mod tests {
         use http::Uri;
         use std::net::SocketAddr;
         use tokio::net::{TcpListener, TcpStream};
-
-        rustls::crypto::aws_lc_rs::default_provider()
-            .install_default()
-            .expect("to install the aws_lc_rs crypto provider");
-
+        
         // setup a server that echoes back any encoding header value
         let addr: SocketAddr = ([127, 0, 0, 1], 0).into();
         let listener = TcpListener::bind(addr).await?;
