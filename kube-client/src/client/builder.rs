@@ -321,14 +321,14 @@ where
 mod tests {
     #[cfg(feature = "gzip")] use super::*;
 
-    #[cfg(feature = "gzip")]
+    #[cfg(all(feature = "gzip", feature = "rustls-tls"))]
     #[tokio::test]
     async fn test_no_accept_encoding_header_sent_when_compression_disabled()
     -> Result<(), Box<dyn std::error::Error>> {
         use http::Uri;
         use std::net::SocketAddr;
         use tokio::net::{TcpListener, TcpStream};
-
+        
         // setup a server that echoes back any encoding header value
         let addr: SocketAddr = ([127, 0, 0, 1], 0).into();
         let listener = TcpListener::bind(addr).await?;
