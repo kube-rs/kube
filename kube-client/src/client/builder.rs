@@ -321,7 +321,7 @@ where
 mod tests {
     #[cfg(feature = "gzip")] use super::*;
 
-    #[cfg(feature = "gzip")]
+    #[cfg(all(feature = "gzip", feature = "rustls-tls"))]
     #[tokio::test]
     async fn test_no_accept_encoding_header_sent_when_compression_disabled()
     -> Result<(), Box<dyn std::error::Error>> {
