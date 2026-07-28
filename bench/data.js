@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1784894460627,
+  "lastUpdate": 1785254378310,
   "repoUrl": "https://github.com/kube-rs/kube",
   "entries": {
     "Benchmark": [
@@ -5270,6 +5270,105 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/kube-rs/kube/commit/f8a8d474784a40716a5198aa81b36dc8ff1912be"
         },
         "date": 1784894459544,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "init_listwatch - peak_bytes",
+            "value": 55194619,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - total_allocated",
+            "value": 76715088,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - alloc_count",
+            "value": 578023,
+            "unit": "allocations"
+          },
+          {
+            "name": "steady_state - peak_bytes",
+            "value": 71381202,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - total_allocated",
+            "value": 109519220,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - alloc_count",
+            "value": 799021,
+            "unit": "allocations"
+          },
+          {
+            "name": "relist - peak_bytes",
+            "value": 99797302,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - total_allocated",
+            "value": 174518628,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - alloc_count",
+            "value": 1189035,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_without_modify - peak_bytes",
+            "value": 141298836,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - total_allocated",
+            "value": 205865000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - alloc_count",
+            "value": 1298020,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_with_modify - peak_bytes",
+            "value": 134853452,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - total_allocated",
+            "value": 162895000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - alloc_count",
+            "value": 1058021,
+            "unit": "allocations"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "kai.wohlfahrt@gmail.com",
+            "name": "Kai Wohlfahrt",
+            "username": "kwohlfahrt"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b60b81c88d37ab1f1f0d1ff7d42ab0ca268b4221",
+          "message": "Allow PredicateFilter to work with dynamic objects (#2054)\n\n* Remove the default trait bound on predicate filter\n\nThis allows the predicate filter to work with dynamic resources.\n\nSigned-off-by: Kai Wohlfahrt <kai.wohlfahrt@gmail.com>\n\n* Add test to cover dynamic object\n\nSigned-off-by: Kai Wohlfahrt <kai.wohlfahrt@gmail.com>\n\n* Remove redundant test\n\nSigned-off-by: Kai Wohlfahrt <kai.wohlfahrt@gmail.com>\n\n* Further reduce type bounds\n\nSigned-off-by: Kai Wohlfahrt <kai.wohlfahrt@gmail.com>\n\n---------\n\nSigned-off-by: Kai Wohlfahrt <kai.wohlfahrt@gmail.com>",
+          "timestamp": "2026-07-28T15:42:27+01:00",
+          "tree_id": "ca7ff05c670f817ba4b69eead6138b34601343ec",
+          "url": "https://github.com/kube-rs/kube/commit/b60b81c88d37ab1f1f0d1ff7d42ab0ca268b4221"
+        },
+        "date": 1785254377033,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
