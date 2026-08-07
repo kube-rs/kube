@@ -89,6 +89,7 @@ pub struct Client {
     // - `BoxFuture` for dynamic response future type
     inner: Buffer<Request<Body>, BoxFuture<'static, Result<Response<Body>, BoxError>>>,
     default_ns: String,
+    base_uri: Option<http::Uri>,
     valid_until: Option<Timestamp>,
 }
 
@@ -167,6 +168,7 @@ impl Client {
         Self {
             inner: Buffer::new(service, 1024),
             default_ns: default_namespace.into(),
+            base_uri: None,
             valid_until: None,
         }
     }
@@ -174,6 +176,10 @@ impl Client {
     /// Sets an expiration timestamp to the client, which has to be checked by the user using [`Client::valid_until`] function.
     pub fn with_valid_until(self, valid_until: Option<Timestamp>) -> Self {
         Client { valid_until, ..self }
+    }
+
+    fn with_base_uri(self, base_uri: Option<http::Uri>) -> Self {
+        Client { base_uri, ..self }
     }
 
     /// Get the expiration timestamp of the client, if it has been set.
@@ -293,8 +299,9 @@ impl Client {
     /// Perform a raw HTTP request against the API and get back the response
     /// as a string
     pub async fn request_text(&self, request: Request<Vec<u8>>) -> Result<String> {
+        let request_uri = request_error_uri(self.base_uri.as_ref(), request.uri());
         let res = self.send(request.map(Body::from)).await?;
-        let res = handle_api_errors(res).await?;
+        let res = handle_api_errors(res, &request_uri).await?;
         let body_bytes = res.into_body().collect().await?.to_bytes();
         let text = String::from_utf8(body_bytes.to_vec()).map_err(Error::FromUtf8)?;
         Ok(text)
@@ -305,8 +312,9 @@ impl Client {
     /// The response can be processed using [`AsyncReadExt`](futures::AsyncReadExt)
     /// and [`AsyncBufReadExt`](futures::AsyncBufReadExt).
     pub async fn request_stream(&self, request: Request<Vec<u8>>) -> Result<impl AsyncBufRead + use<>> {
+        let request_uri = request_error_uri(self.base_uri.as_ref(), request.uri());
         let res = self.send(request.map(Body::from)).await?;
-        let res = handle_api_errors(res).await?;
+        let res = handle_api_errors(res, &request_uri).await?;
         // Map the error, since we want to convert this into an `AsyncBufReader` using
         // `into_async_read` which specifies `std::io::Error` as the stream's error type.
         let body = res.into_body().into_data_stream().map_err(std::io::Error::other);
@@ -540,7 +548,7 @@ impl Client {
 ///
 /// In either case, present an ApiError upstream.
 /// The latter is probably a bug if encountered.
-async fn handle_api_errors(res: Response<Body>) -> Result<Response<Body>> {
+async fn handle_api_errors(res: Response<Body>, uri: &http::Uri) -> Result<Response<Body>> {
     let status = res.status();
     if status.is_client_error() || status.is_server_error() {
         // trace!("Status = {:?} for {}", status, res.url());
@@ -549,17 +557,30 @@ async fn handle_api_errors(res: Response<Body>) -> Result<Response<Body>> {
         // Print better debug when things do fail
         // trace!("Parsing error: {}", text);
         if let Ok(status) = serde_json::from_str::<Status>(&text) {
-            tracing::debug!("Unsuccessful: {status:?}");
+            tracing::debug!("{}", api_error_debug_message(&status, uri, false));
             Err(Error::Api(status.boxed()))
         } else {
             tracing::warn!("Unsuccessful data error parse: {text}");
             let status = Status::failure(&text, "Failed to parse error data").with_code(status.as_u16());
-            tracing::debug!("Unsuccessful: {status:?} (reconstruct)");
+            tracing::debug!("{}", api_error_debug_message(&status, uri, true));
             Err(Error::Api(status.boxed()))
         }
     } else {
         Ok(res)
     }
+}
+
+fn request_error_uri(base_uri: Option<&http::Uri>, request_uri: &http::Uri) -> http::Uri {
+    if let Some(base_uri) = base_uri {
+        middleware::set_base_uri(base_uri, request_uri.path_and_query())
+    } else {
+        request_uri.clone()
+    }
+}
+
+fn api_error_debug_message(status: &Status, uri: &http::Uri, reconstructed: bool) -> String {
+    let suffix = if reconstructed { " (reconstruct)" } else { "" };
+    format!("Unsuccessful: {status:?}, uri: {uri}{suffix}")
 }
 
 impl TryFrom<Config> for Client {
@@ -586,6 +607,7 @@ impl TryFrom<Kubeconfig> for Client {
 mod tests {
     use std::pin::pin;
 
+    use super::Status;
     use crate::{
         Api, Client,
         client::Body,
@@ -776,5 +798,27 @@ mod tests {
             Api::default_namespaced(Client::new(mock_service, "default"));
         let _ = pods.watch(&Default::default(), "0").await;
         spawned.await.unwrap();
+    }
+
+    #[test]
+    fn error_uri_uses_config_base_uri() {
+        let base_uri = http::Uri::from_static("https://example.com/prefix");
+        let request_uri = http::Uri::from_static("/apis/example.com/v1/widgets?limit=1");
+
+        assert_eq!(
+            super::request_error_uri(Some(&base_uri), &request_uri),
+            "https://example.com/prefix/apis/example.com/v1/widgets?limit=1"
+        );
+    }
+
+    #[test]
+    fn error_uri_debug_message_includes_request_uri() {
+        let status = Status::failure("not found", "NotFound").with_code(404);
+        let uri = http::Uri::from_static("https://example.com/apis/example.com/v1/widgets");
+
+        assert_eq!(
+            super::api_error_debug_message(&status, &uri, true),
+            format!("Unsuccessful: {status:?}, uri: {uri} (reconstruct)")
+        );
     }
 }

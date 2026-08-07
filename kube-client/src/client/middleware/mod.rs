@@ -6,6 +6,7 @@ mod base_uri;
 mod extra_headers;
 
 pub use base_uri::{BaseUri, BaseUriLayer};
+pub(in crate::client) use base_uri::set_base_uri;
 pub use extra_headers::{ExtraHeaders, ExtraHeadersLayer};
 
 use super::auth::RefreshableToken;
