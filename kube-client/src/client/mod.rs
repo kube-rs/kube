@@ -345,6 +345,7 @@ impl Client {
         T: Clone + DeserializeOwned,
     {
         let res = self.send(request.map(Body::from)).await?;
+        let res = handle_api_errors(res).await?;
         // trace!("Streaming from {} -> {}", res.url(), res.status().as_str());
         tracing::trace!("headers: {:?}", res.headers());
 
@@ -587,7 +588,7 @@ mod tests {
     use std::pin::pin;
 
     use crate::{
-        Api, Client,
+        Api, Client, Error,
         client::Body,
         config::{AuthInfo, Cluster, Context, Kubeconfig, NamedAuthInfo, NamedCluster, NamedContext},
     };
@@ -775,6 +776,39 @@ mod tests {
         let pods: Api<PartialObjectMeta<Pod>> =
             Api::default_namespaced(Client::new(mock_service, "default"));
         let _ = pods.watch(&Default::default(), "0").await;
+        spawned.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_watch_error_response_is_surfaced() {
+        let (mock_service, handle) = mock::pair::<Request<Body>, Response<Body>>();
+        let spawned = tokio::spawn(async move {
+            let mut handle = pin!(handle);
+            let (_request, send) = handle.next_request().await.expect("service not called");
+            // apiservers pretty-print error bodies for some clients, so this can span several lines
+            let body = serde_json::to_vec_pretty(&serde_json::json!({
+                "kind": "Status",
+                "apiVersion": "v1",
+                "metadata": {},
+                "status": "Failure",
+                "message": "pods is forbidden",
+                "reason": "Forbidden",
+                "code": 403,
+            }))
+            .unwrap();
+            send.send_response(
+                Response::builder()
+                    .status(http::StatusCode::FORBIDDEN)
+                    .body(Body::from(body))
+                    .unwrap(),
+            );
+        });
+
+        let pods: Api<Pod> = Api::default_namespaced(Client::new(mock_service, "default"));
+        let Err(err) = pods.watch(&Default::default(), "0").await else {
+            panic!("watch with an error response should fail");
+        };
+        assert!(matches!(&err, Error::Api(s) if s.code == 403), "got {err:?}");
         spawned.await.unwrap();
     }
 }
