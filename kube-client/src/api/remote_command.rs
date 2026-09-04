@@ -10,7 +10,7 @@ use futures::{
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::{
-    io::{AsyncRead, AsyncWrite, AsyncWriteExt, DuplexStream},
+    io::{AsyncWriteExt, ReadHalf, SimplexStream, WriteHalf},
     select, time,
 };
 use tokio_tungstenite::tungstenite as ws;
@@ -107,9 +107,9 @@ pub struct AttachedProcess {
     has_stdin: bool,
     has_stdout: bool,
     has_stderr: bool,
-    stdin_writer: Option<DuplexStream>,
-    stdout_reader: Option<DuplexStream>,
-    stderr_reader: Option<DuplexStream>,
+    stdin_writer: Option<WriteHalf<SimplexStream>>,
+    stdout_reader: Option<ReadHalf<SimplexStream>>,
+    stderr_reader: Option<ReadHalf<SimplexStream>>,
     status_rx: Option<StatusReceiver>,
     terminal_resize_tx: Option<TerminalSizeSender>,
     task: Option<tokio::task::JoinHandle<Result<(), Error>>>,
@@ -127,15 +127,15 @@ impl AttachedProcess {
     pub(crate) fn new(connection: Connection, ap: &AttachParams) -> Self {
         // To simplify the implementation, always create a pipe for stdin.
         // The caller does not have access to it unless they had requested.
-        let (stdin_writer, stdin_reader) = tokio::io::duplex(ap.max_stdin_buf_size.unwrap_or(MAX_BUF_SIZE));
-        let (stdout_writer, stdout_reader) = if ap.stdout {
-            let (w, r) = tokio::io::duplex(ap.max_stdout_buf_size.unwrap_or(MAX_BUF_SIZE));
+        let (stdin_reader, stdin_writer) = tokio::io::simplex(ap.max_stdin_buf_size.unwrap_or(MAX_BUF_SIZE));
+        let (stdout_reader, stdout_writer) = if ap.stdout {
+            let (w, r) = tokio::io::simplex(ap.max_stdout_buf_size.unwrap_or(MAX_BUF_SIZE));
             (Some(w), Some(r))
         } else {
             (None, None)
         };
-        let (stderr_writer, stderr_reader) = if ap.stderr {
-            let (w, r) = tokio::io::duplex(ap.max_stderr_buf_size.unwrap_or(MAX_BUF_SIZE));
+        let (stderr_reader, stderr_writer) = if ap.stderr {
+            let (w, r) = tokio::io::simplex(ap.max_stderr_buf_size.unwrap_or(MAX_BUF_SIZE));
             (Some(w), Some(r))
         } else {
             (None, None)
@@ -182,7 +182,7 @@ impl AttachedProcess {
     /// # }
     /// ```
     /// Only available if [`AttachParams`](super::AttachParams) had `stdin`.
-    pub fn stdin(&mut self) -> Option<impl AsyncWrite + Unpin + use<>> {
+    pub fn stdin(&mut self) -> Option<WriteHalf<SimplexStream>> {
         if !self.has_stdin {
             return None;
         }
@@ -202,7 +202,7 @@ impl AttachedProcess {
     /// # }
     /// ```
     /// Only available if [`AttachParams`](super::AttachParams) had `stdout`.
-    pub fn stdout(&mut self) -> Option<impl AsyncRead + Unpin + use<>> {
+    pub fn stdout(&mut self) -> Option<ReadHalf<SimplexStream>> {
         if !self.has_stdout {
             return None;
         }
@@ -222,7 +222,7 @@ impl AttachedProcess {
     /// # }
     /// ```
     /// Only available if [`AttachParams`](super::AttachParams) had `stderr`.
-    pub fn stderr(&mut self) -> Option<impl AsyncRead + Unpin + use<>> {
+    pub fn stderr(&mut self) -> Option<ReadHalf<SimplexStream>> {
         if !self.has_stderr {
             return None;
         }
@@ -243,7 +243,9 @@ impl AttachedProcess {
         // If stdout/stderr readers have not been drained, the background task
         // blocks writing to the full DuplexStream buffer while join() blocks
         // waiting for the task.
-        self.stdin_writer = None;
+        if let Some(stdin) = &mut self.stdin_writer {
+            let _ = stdin.shutdown().await;
+        }
         self.stdout_reader = None;
         self.stderr_reader = None;
         self.status_rx = None;
@@ -295,9 +297,9 @@ const CLOSE_CHANNEL: u8 = 255;
 
 async fn start_message_loop(
     connection: Connection,
-    stdin: impl AsyncRead + Unpin,
-    mut stdout: Option<impl AsyncWrite + Unpin>,
-    mut stderr: Option<impl AsyncWrite + Unpin>,
+    stdin: ReadHalf<SimplexStream>,
+    mut stdout: Option<WriteHalf<SimplexStream>>,
+    mut stderr: Option<WriteHalf<SimplexStream>>,
     status_tx: StatusSender,
     mut terminal_size_rx: Option<TerminalSizeReceiver>,
 ) -> Result<(), Error> {
@@ -413,6 +415,14 @@ async fn start_message_loop(
                 }
             },
         }
+    }
+
+    if let Some(mut stdout) = stdout {
+        let _ = stdout.shutdown().await;
+    }
+
+    if let Some(mut stderr) = stderr {
+        let _ = stderr.shutdown().await;
     }
 
     Ok(())
