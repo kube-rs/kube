@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1788485676971,
+  "lastUpdate": 1788645232116,
   "repoUrl": "https://github.com/kube-rs/kube",
   "entries": {
     "Benchmark": [
@@ -5666,6 +5666,105 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/kube-rs/kube/commit/bb2e548219fc30824c96512bc514c20276ba2357"
         },
         "date": 1788485675393,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "init_listwatch - peak_bytes",
+            "value": 55194619,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - total_allocated",
+            "value": 76715088,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - alloc_count",
+            "value": 578023,
+            "unit": "allocations"
+          },
+          {
+            "name": "steady_state - peak_bytes",
+            "value": 71381202,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - total_allocated",
+            "value": 109519220,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - alloc_count",
+            "value": 799021,
+            "unit": "allocations"
+          },
+          {
+            "name": "relist - peak_bytes",
+            "value": 99797302,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - total_allocated",
+            "value": 174518628,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - alloc_count",
+            "value": 1189035,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_without_modify - peak_bytes",
+            "value": 141298836,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - total_allocated",
+            "value": 205865000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - alloc_count",
+            "value": 1298020,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_with_modify - peak_bytes",
+            "value": 134853452,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - total_allocated",
+            "value": 162895000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - alloc_count",
+            "value": 1058021,
+            "unit": "allocations"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "serendipity9210@gmail.com",
+            "name": "Jesik Min",
+            "username": "jessemin"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f2774b13d66910a8a0fe456cc8e6e52414eb1d0e",
+          "message": "resolve an Api's ApiResource directly from a DynamicObject/TypeMeta via Discovery (#2031)\n\nAdd Discovery::resolve_typemeta(&TypeMeta) and Discovery::resolve_object(&DynamicObject),\nthin wrappers over the existing GroupVersionKind::try_from(&TypeMeta) + resolve_gvk, so\ncallers can go from a dynamic object to its ApiResource without hand-assembling a GVK.\n\nCloses #1430\n\nSigned-off-by: Jesik Min <serendipity9210@gmail.com>",
+          "timestamp": "2026-09-05T22:51:50+01:00",
+          "tree_id": "a13dd417a1e040f2cfa6dd41f4b54381f84875fb",
+          "url": "https://github.com/kube-rs/kube/commit/f2774b13d66910a8a0fe456cc8e6e52414eb1d0e"
+        },
+        "date": 1788645230974,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
