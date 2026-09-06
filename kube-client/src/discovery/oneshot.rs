@@ -139,10 +139,17 @@ pub async fn pinned_api<K>(client: &Client, tm: &TypeMeta, ns: Namespaces<'_>) -
 where
     K: Resource<DynamicType = ApiResource, Scope = DynamicResourceScope>,
 {
-    // NB: TypeMeta parsing is infallible in practice (GroupVersion::from_str splits with
-    // splitn(2, '/'), so its error arm is unreachable), but TryFrom still forces the conversion.
+    // NB: GroupVersion::from_str splits with splitn(2, '/'), so it never actually errors and the
+    // map_err below is unreachable. An empty apiVersion does get through it as an empty version,
+    // which would then query `/api/` and fail deserializing an APIVersions as an APIResourceList,
+    // so reject that here rather than surfacing it as a serde error.
     let gvk = GroupVersionKind::try_from(tm)
         .map_err(|ParseGroupVersionError(s)| Error::Discovery(DiscoveryError::InvalidGroupVersion(s)))?;
+    if gvk.version.is_empty() {
+        return Err(Error::Discovery(DiscoveryError::InvalidGroupVersion(
+            tm.api_version.clone(),
+        )));
+    }
     let (ar, caps) = pinned_kind(client, &gvk).await?;
     Ok(Api::scoped_with(client.clone(), ns, &ar, &caps))
 }
@@ -225,6 +232,25 @@ mod tests {
 
         let api = pinned_api_for("v1", "ConfigMap", Namespaces::Default).await.unwrap();
         assert_eq!(api.resource_url(), "/api/v1/namespaces/default/configmaps");
+    }
+
+    // An empty apiVersion would otherwise reach `/api/` and fail deserializing the APIVersions
+    // response as an APIResourceList, which says nothing about what the caller got wrong.
+    #[tokio::test]
+    async fn pinned_api_rejects_an_empty_api_version() {
+        let (mock_service, _handle) = mock::pair::<Request<Body>, Response<Body>>();
+        let client = Client::new(mock_service, "default");
+        let tm = TypeMeta {
+            api_version: String::new(),
+            kind: "ConfigMap".to_string(),
+        };
+        let err = pinned_api::<DynamicObject>(&client, &tm, Namespaces::All)
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(err, Error::Discovery(DiscoveryError::InvalidGroupVersion(_))),
+            "unexpected error: {err:?}"
+        );
     }
 
     #[tokio::test]
