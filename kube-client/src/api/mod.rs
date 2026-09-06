@@ -81,7 +81,7 @@ pub struct Api<K> {
 /// assert_eq!(Namespaces::from(object_namespace), Namespaces::Default);
 /// ```
 #[cfg_attr(docsrs, doc(cfg(feature = "client")))]
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Namespaces<'a> {
     /// Every namespace
@@ -92,8 +92,9 @@ pub enum Namespaces<'a> {
     Default,
     /// One specific namespace, as with [`Api::namespaced_with`]
     ///
-    /// An empty name is Kubernetes' spelling of "every namespace" and is treated as
-    /// [`Namespaces::All`], rather than building a url with an empty path segment.
+    /// [`Api::scoped_with`] treats an empty name the same as [`Namespaces::Default`], since it is
+    /// the other spelling of "no namespace given" and would otherwise build a url with an empty
+    /// path segment.
     One(&'a str),
 }
 
@@ -160,8 +161,8 @@ impl<K: Resource> Api<K> {
     /// Resource in the namespaces selected, honouring the discovered [`Scope`]
     ///
     /// Discovery hands back an [`ApiResource`] and its [`ApiCapabilities`] together, and the
-    /// capabilities carry the [`Scope`]. This constructor consults it so callers do not have to
-    /// branch on it themselves:
+    /// capabilities carry the [`Scope`]. Pass that scope in and this constructor applies the
+    /// selection only where it is meaningful, so callers do not have to branch on it themselves:
     ///
     /// ```no_run
     /// # use kube::{Api, Client, api::{DynamicObject, Namespaces}, discovery::Discovery};
@@ -202,9 +203,11 @@ impl<K: Resource> Api<K> {
         match (scope, ns) {
             (Scope::Cluster, _) => Self::all_with(client, dyntype),
             (Scope::Namespaced, Namespaces::All) => Self::all_with(client, dyntype),
-            // an empty namespace is how Kubernetes itself spells "every namespace"
-            (Scope::Namespaced, Namespaces::One("")) => Self::all_with(client, dyntype),
-            (Scope::Namespaced, Namespaces::Default) => Self::default_namespaced_with(client, dyntype),
+            // an empty name is the other spelling of "no namespace given", so it lands where an
+            // absent one does rather than building `/namespaces//`
+            (Scope::Namespaced, Namespaces::Default | Namespaces::One("")) => {
+                Self::default_namespaced_with(client, dyntype)
+            }
             (Scope::Namespaced, Namespaces::One(ns)) => Self::namespaced_with(client, ns, dyntype),
         }
     }
@@ -380,8 +383,6 @@ mod test {
 
     // The full (scope x selection) matrix, since the scope is what decides whether the
     // selection applies at all.
-    // The full (scope x selection) matrix, since the scope is what decides whether the
-    // selection applies at all.
     #[tokio::test]
     async fn scoped_with_lets_the_discovered_scope_decide() {
         use crate::api::{ApiResource, DynamicObject, Namespaces};
@@ -410,10 +411,10 @@ mod test {
             Some("ns1".into()),
             "/api/v1/namespaces/ns1/configmaps".into()
         ));
-        // an empty namespace means every namespace, not an empty path segment
+        // an empty name is the other spelling of "no namespace given", so it lands with Default
         assert_eq!(build(Namespaces::One(""), &cm, &Scope::Namespaced), (
-            None,
-            "/api/v1/configmaps".into()
+            Some("kube-rs-test".into()),
+            "/api/v1/namespaces/kube-rs-test/configmaps".into()
         ));
 
         // cluster scoped kind: the selection is ignored, including an explicit namespace

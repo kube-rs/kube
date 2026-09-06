@@ -143,8 +143,8 @@ where
     // NB: GroupVersion::from_str splits with splitn(2, '/'), so it never actually errors and the
     // map_err below is unreachable. An empty apiVersion does get through it as an empty version,
     // which would then query `/api/` and fail deserializing an APIVersions as an APIResourceList,
-    // so reject that here rather than surfacing it as a serde error. This is the only public entry
-    // point taking an unparsed apiVersion; the siblings take an already built GroupVersion(Kind).
+    // so reject that here rather than surfacing it as a serde error. `Discovery::resolve_typemeta`
+    // takes an unparsed apiVersion too, but only looks in the cache and never issues that request.
     let gvk = GroupVersionKind::try_from(tm)
         .map_err(|ParseGroupVersionError(s)| Error::Discovery(DiscoveryError::InvalidGroupVersion(s)))?;
     if gvk.version.is_empty() {
@@ -201,6 +201,9 @@ mod tests {
             kind: kind.to_string(),
         };
         let api = pinned_api(&client, &tm, ns).await;
+        // dropped so that a discovery request which never happens closes the mock and panics the
+        // task, rather than leaving `served` pending forever
+        drop(client);
         // asserted out here rather than inside the task, whose panics are otherwise swallowed
         let expected_url = if group_version.contains('/') {
             format!("/apis/{group_version}")
