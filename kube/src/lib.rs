@@ -461,7 +461,7 @@ mod test {
                     continue;
                 }
                 let api: Api<DynamicObject> =
-                    Api::scoped_with(client.clone(), Namespaces::Default, &ar, &caps);
+                    Api::scoped_with(client.clone(), Namespaces::Default, &ar, &caps.scope);
                 api.list(&Default::default()).await?;
             }
         }

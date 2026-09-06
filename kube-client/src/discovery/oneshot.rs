@@ -2,11 +2,12 @@
 //!
 //! These helpers provides a simpler discovery interface, but do not offer any built-in caching.
 //!
-//! This can provide specific information for 4 cases:
-//! - a ready to use [`Api`] for a single kind via [`oneshot::pinned_api`]
+//! This can provide specific information for 3 cases:
 //! - single kind in a particular group at a pinned version via [`oneshot::pinned_kind`]
 //! - all kinds in a group at pinned version: "apiregistration.k8s.io/v1" via [`oneshot::pinned_group`]
 //! - all kinds/version combinations in a group: "apiregistration.k8s.io" via [`oneshot::group`]
+//!
+//! It can also skip straight to a ready to use [`Api`] via [`oneshot::pinned_api`].
 //!
 //! [`oneshot::group`]: crate::discovery::group
 //! [`oneshot::pinned_group`]: crate::discovery::pinned_group
@@ -111,10 +112,10 @@ pub async fn pinned_kind(client: &Client, gvk: &GroupVersionKind) -> Result<(Api
 /// Discovers a single kind from a [`TypeMeta`] and returns a ready to use [`Api`]
 ///
 /// A shortcut around [`oneshot::pinned_kind`](crate::discovery::pinned_kind) for when you have an
-/// `apiVersion` + `kind` (e.g. off a [`DynamicObject`](crate::api::DynamicObject), a manifest, or
-/// an admission request) and want an [`Api`] rather than an [`ApiResource`]. A [`TypeMeta`]
-/// carries no namespace, so one is selected separately, and the discovered
-/// [`Scope`](crate::discovery::Scope) decides whether that selection applies.
+/// `apiVersion` + `kind` (e.g. off a [`DynamicObject`](crate::api::DynamicObject) or a manifest)
+/// and want an [`Api`] rather than an [`ApiResource`]. A [`TypeMeta`] carries no namespace, so one
+/// is selected separately, and the discovered [`Scope`](crate::discovery::Scope) decides whether
+/// that selection applies.
 ///
 /// ```no_run
 /// use kube::{Client, api::{Api, DynamicObject, Namespaces, TypeMeta}, discovery, ResourceExt};
@@ -142,16 +143,18 @@ where
     // NB: GroupVersion::from_str splits with splitn(2, '/'), so it never actually errors and the
     // map_err below is unreachable. An empty apiVersion does get through it as an empty version,
     // which would then query `/api/` and fail deserializing an APIVersions as an APIResourceList,
-    // so reject that here rather than surfacing it as a serde error.
+    // so reject that here rather than surfacing it as a serde error. This is the only public entry
+    // point taking an unparsed apiVersion; the siblings take an already built GroupVersion(Kind).
     let gvk = GroupVersionKind::try_from(tm)
         .map_err(|ParseGroupVersionError(s)| Error::Discovery(DiscoveryError::InvalidGroupVersion(s)))?;
     if gvk.version.is_empty() {
-        return Err(Error::Discovery(DiscoveryError::InvalidGroupVersion(
-            tm.api_version.clone(),
-        )));
+        return Err(Error::Discovery(DiscoveryError::InvalidGroupVersion(format!(
+            "{:?} has no version",
+            tm.api_version
+        ))));
     }
     let (ar, caps) = pinned_kind(client, &gvk).await?;
-    Ok(Api::scoped_with(client.clone(), ns, &ar, &caps))
+    Ok(Api::scoped_with(client.clone(), ns, &ar, &caps.scope))
 }
 
 #[cfg(test)]
@@ -187,22 +190,25 @@ mod tests {
                 resource("deployments", "Deployment", true),
             ],
         };
-        let expected_url = if group_version.contains('/') {
-            format!("/apis/{group_version}")
-        } else {
-            format!("/api/{group_version}")
-        };
-        tokio::spawn(async move {
+        let served = tokio::spawn(async move {
             let (request, send) = handle.next_request().await.expect("discovery is queried");
-            assert_eq!(request.uri().path(), expected_url);
             let body = serde_json::to_vec(&list).unwrap();
             send.send_response(Response::builder().body(Body::from(body)).unwrap());
+            request.uri().path().to_string()
         });
         let tm = TypeMeta {
             api_version: group_version.to_string(),
             kind: kind.to_string(),
         };
-        pinned_api(&client, &tm, ns).await
+        let api = pinned_api(&client, &tm, ns).await;
+        // asserted out here rather than inside the task, whose panics are otherwise swallowed
+        let expected_url = if group_version.contains('/') {
+            format!("/apis/{group_version}")
+        } else {
+            format!("/api/{group_version}")
+        };
+        assert_eq!(served.await.unwrap(), expected_url);
+        api
     }
 
     #[tokio::test]
@@ -238,7 +244,9 @@ mod tests {
     // response as an APIResourceList, which says nothing about what the caller got wrong.
     #[tokio::test]
     async fn pinned_api_rejects_an_empty_api_version() {
-        let (mock_service, _handle) = mock::pair::<Request<Body>, Response<Body>>();
+        let (mock_service, handle) = mock::pair::<Request<Body>, Response<Body>>();
+        // dropped so an unguarded request fails the test rather than pending forever
+        drop(handle);
         let client = Client::new(mock_service, "default");
         let tm = TypeMeta {
             api_version: String::new(),

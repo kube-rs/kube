@@ -19,7 +19,8 @@ async fn main() -> anyhow::Result<()> {
             if !caps.supports_operation(verbs::LIST) {
                 continue;
             }
-            let api: Api<DynamicObject> = Api::scoped_with(client.clone(), Namespaces::Default, &ar, &caps);
+            let api: Api<DynamicObject> =
+                Api::scoped_with(client.clone(), Namespaces::Default, &ar, &caps.scope);
 
             info!("{}/{} : {}", group.name(), ar.version, ar.kind);
 

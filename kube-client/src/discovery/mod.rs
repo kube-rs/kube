@@ -1,6 +1,7 @@
 //! High-level utilities for runtime API discovery.
 
 use crate::{Client, Result};
+pub use crate::api::Namespaces;
 pub use kube_core::discovery::{ApiCapabilities, ApiResource, Scope, verbs};
 use kube_core::gvk::GroupVersionKind;
 use kube_core::{DynamicObject, TypeMeta};
@@ -264,8 +265,8 @@ impl Discovery {
     ///     let discovery = Discovery::new(client.clone()).run().await?;
     ///     if let Some((ar, caps)) = discovery.resolve_object(&object) {
     ///         // the capabilities carry the scope, so `scoped_with` picks the right url shape
-    ///         let ns = object.metadata.namespace.as_deref().map_or(Namespaces::All, Namespaces::One);
-    ///         let api: Api<DynamicObject> = Api::scoped_with(client.clone(), ns, &ar, &caps);
+    ///         let ns = Namespaces::from(object.metadata.namespace.as_deref());
+    ///         let api: Api<DynamicObject> = Api::scoped_with(client.clone(), ns, &ar, &caps.scope);
     ///         // now `api` can be used to interact with the object
     ///         let _ = api;
     ///     }

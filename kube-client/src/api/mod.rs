@@ -25,10 +25,7 @@ pub mod entry;
 #[cfg_attr(docsrs, doc(cfg(feature = "admission")))]
 pub use kube_core::admission;
 pub(crate) use kube_core::params;
-use kube_core::{
-    DynamicResourceScope, NamespaceResourceScope,
-    discovery::{ApiCapabilities, Scope},
-};
+use kube_core::{DynamicResourceScope, NamespaceResourceScope, discovery::Scope};
 pub use kube_core::{
     Resource, ResourceExt,
     dynamic::{ApiResource, DynamicObject},
@@ -73,8 +70,19 @@ pub struct Api<K> {
 /// where it only takes effect for namespaced kinds. A cluster scoped kind has no namespace to
 /// pick, so the selection is ignored there rather than building a url the apiserver does not
 /// serve.
+///
+/// `From` conversions are provided for the shapes a namespace usually arrives in, and an
+/// absent namespace maps to [`Namespaces::Default`]:
+///
+/// ```
+/// # use kube::api::Namespaces;
+/// # let object_namespace: Option<&str> = None;
+/// assert_eq!(Namespaces::from("ns1"), Namespaces::One("ns1"));
+/// assert_eq!(Namespaces::from(object_namespace), Namespaces::Default);
+/// ```
 #[cfg_attr(docsrs, doc(cfg(feature = "client")))]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Namespaces<'a> {
     /// Every namespace
     ///
@@ -83,7 +91,24 @@ pub enum Namespaces<'a> {
     /// The client's default namespace, as with [`Api::default_namespaced_with`]
     Default,
     /// One specific namespace, as with [`Api::namespaced_with`]
+    ///
+    /// An empty name is Kubernetes' spelling of "every namespace" and is treated as
+    /// [`Namespaces::All`], rather than building a url with an empty path segment.
     One(&'a str),
+}
+
+impl<'a> From<&'a str> for Namespaces<'a> {
+    fn from(ns: &'a str) -> Self {
+        Self::One(ns)
+    }
+}
+
+impl<'a> From<Option<&'a str>> for Namespaces<'a> {
+    /// An object without a namespace is not necessarily cluster scoped, so this maps to
+    /// [`Namespaces::Default`] rather than [`Namespaces::All`], which could only list and watch.
+    fn from(ns: Option<&'a str>) -> Self {
+        ns.map_or(Self::Default, Self::One)
+    }
 }
 
 /// Api constructors for Resource implementors with custom DynamicTypes
@@ -145,8 +170,8 @@ impl<K: Resource> Api<K> {
     /// # let object: DynamicObject = todo!();
     /// let discovery = Discovery::new(client.clone()).run().await?;
     /// if let Some((ar, caps)) = discovery.resolve_object(&object) {
-    ///     let ns = object.metadata.namespace.as_deref().map_or(Namespaces::All, Namespaces::One);
-    ///     let api: Api<DynamicObject> = Api::scoped_with(client, ns, &ar, &caps);
+    ///     let ns = Namespaces::from(object.metadata.namespace.as_deref());
+    ///     let api: Api<DynamicObject> = Api::scoped_with(client, ns, &ar, &caps.scope);
     /// }
     /// # Ok(())
     /// # }
@@ -156,23 +181,29 @@ impl<K: Resource> Api<K> {
     /// one it is ignored and the cluster wide url is used. See [`Namespaces`] for what each
     /// selection maps to.
     ///
+    /// Only the [`Scope`] is needed, so a scope known without discovery works too, e.g. one read
+    /// off a [`CustomResourceDefinition`]'s `spec.scope`.
+    ///
     /// This function accepts `K::DynamicType` so it can be used with dynamic resources.
+    ///
+    /// # Warning
+    ///
+    /// [`Namespaces::All`] on a namespaced kind **can only `list` and `watch`**, as with
+    /// [`Api::all_with`]. Other verbs need a specific namespace.
     ///
     /// [`Scope`]: crate::discovery::Scope
     /// [`ApiResource`]: crate::discovery::ApiResource
     /// [`ApiCapabilities`]: crate::discovery::ApiCapabilities
-    pub fn scoped_with(
-        client: Client,
-        ns: Namespaces<'_>,
-        dyntype: &K::DynamicType,
-        caps: &ApiCapabilities,
-    ) -> Self
+    /// [`CustomResourceDefinition`]: k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition
+    pub fn scoped_with(client: Client, ns: Namespaces<'_>, dyntype: &K::DynamicType, scope: &Scope) -> Self
     where
         K: Resource<Scope = DynamicResourceScope>,
     {
-        match (&caps.scope, ns) {
+        match (scope, ns) {
             (Scope::Cluster, _) => Self::all_with(client, dyntype),
             (Scope::Namespaced, Namespaces::All) => Self::all_with(client, dyntype),
+            // an empty namespace is how Kubernetes itself spells "every namespace"
+            (Scope::Namespaced, Namespaces::One("")) => Self::all_with(client, dyntype),
             (Scope::Namespaced, Namespaces::Default) => Self::default_namespaced_with(client, dyntype),
             (Scope::Namespaced, Namespaces::One(ns)) => Self::namespaced_with(client, ns, dyntype),
         }
@@ -349,41 +380,54 @@ mod test {
 
     // The full (scope x selection) matrix, since the scope is what decides whether the
     // selection applies at all.
+    // The full (scope x selection) matrix, since the scope is what decides whether the
+    // selection applies at all.
     #[tokio::test]
     async fn scoped_with_lets_the_discovered_scope_decide() {
         use crate::api::{ApiResource, DynamicObject, Namespaces};
-        use kube_core::discovery::{ApiCapabilities, Scope};
+        use kube_core::discovery::Scope;
 
         let (mock_service, _handle) = mock::pair::<Request<Body>, Response<Body>>();
-        let client = Client::new(mock_service, "default");
-        let caps = |scope| ApiCapabilities {
-            scope,
-            subresources: vec![],
-            operations: vec![],
-        };
-        let namespaced = caps(Scope::Namespaced);
-        let cluster = caps(Scope::Cluster);
+        // deliberately not "default", so `Namespaces::Default` is distinguishable from `One`
+        let client = Client::new(mock_service, "kube-rs-test");
         let cm = ApiResource::erase::<corev1::ConfigMap>(&());
         let node = ApiResource::erase::<corev1::Node>(&());
-        let build = |ns, ar, caps| {
-            let api: Api<DynamicObject> = Api::scoped_with(client.clone(), ns, ar, caps);
+        let build = |ns, ar, scope| {
+            let api: Api<DynamicObject> = Api::scoped_with(client.clone(), ns, ar, scope);
             (api.namespace().map(String::from), api.resource_url().to_string())
         };
 
         // namespaced kind: the selection decides
-        assert_eq!(build(Namespaces::All, &cm, &namespaced), (None, "/api/v1/configmaps".into()));
-        assert_eq!(build(Namespaces::Default, &cm, &namespaced), (
-            Some("default".into()),
-            "/api/v1/namespaces/default/configmaps".into()
+        assert_eq!(build(Namespaces::All, &cm, &Scope::Namespaced), (
+            None,
+            "/api/v1/configmaps".into()
         ));
-        assert_eq!(build(Namespaces::One("ns1"), &cm, &namespaced), (
+        assert_eq!(build(Namespaces::Default, &cm, &Scope::Namespaced), (
+            Some("kube-rs-test".into()),
+            "/api/v1/namespaces/kube-rs-test/configmaps".into()
+        ));
+        assert_eq!(build(Namespaces::One("ns1"), &cm, &Scope::Namespaced), (
             Some("ns1".into()),
             "/api/v1/namespaces/ns1/configmaps".into()
+        ));
+        // an empty namespace means every namespace, not an empty path segment
+        assert_eq!(build(Namespaces::One(""), &cm, &Scope::Namespaced), (
+            None,
+            "/api/v1/configmaps".into()
         ));
 
         // cluster scoped kind: the selection is ignored, including an explicit namespace
         for ns in [Namespaces::All, Namespaces::Default, Namespaces::One("ns1")] {
-            assert_eq!(build(ns, &node, &cluster), (None, "/api/v1/nodes".into()));
+            assert_eq!(build(ns, &node, &Scope::Cluster), (None, "/api/v1/nodes".into()));
         }
+    }
+
+    #[test]
+    fn namespaces_conversions_default_when_absent() {
+        use crate::api::Namespaces;
+
+        assert_eq!(Namespaces::from("ns1"), Namespaces::One("ns1"));
+        assert_eq!(Namespaces::from(Some("ns1")), Namespaces::One("ns1"));
+        assert_eq!(Namespaces::from(None), Namespaces::Default);
     }
 }

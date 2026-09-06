@@ -214,6 +214,12 @@ mod test {
         assert_eq!(api.resource_url(), "/api/v1/namespaces/kube-system/configmaps");
         assert!(!api.list(&Default::default()).await?.items.is_empty());
 
+        // Default resolves against the client rather than the literal "default"
+        let api: Api<DynamicObject> =
+            discovery::pinned_api(&client, &tm("v1", "ConfigMap"), Namespaces::Default).await?;
+        assert_eq!(api.namespace(), Some(client.default_namespace()));
+        api.list(&Default::default()).await?;
+
         // cluster scoped kind: the selection is ignored, and the request the apiserver gets is
         // the cluster wide one rather than a namespaced url it does not serve
         let api: Api<DynamicObject> =

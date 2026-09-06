@@ -248,7 +248,7 @@ fn dynamic_api(
         (false, Some(ns)) => Namespaces::One(ns),
         (false, None) => Namespaces::Default,
     };
-    Api::scoped_with(client, namespaces, &ar, &caps)
+    Api::scoped_with(client, namespaces, &ar, &caps.scope)
 }
 
 fn format_creation(time: Time) -> std::result::Result<String, jiff::Error> {
