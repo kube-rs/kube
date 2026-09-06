@@ -2,7 +2,8 @@
 //!
 //! These helpers provides a simpler discovery interface, but do not offer any built-in caching.
 //!
-//! This can provide specific information for 3 cases:
+//! This can provide specific information for 4 cases:
+//! - a ready to use [`Api`] for a single kind via [`oneshot::pinned_api`]
 //! - single kind in a particular group at a pinned version via [`oneshot::pinned_kind`]
 //! - all kinds in a group at pinned version: "apiregistration.k8s.io/v1" via [`oneshot::pinned_group`]
 //! - all kinds/version combinations in a group: "apiregistration.k8s.io" via [`oneshot::group`]
@@ -10,12 +11,14 @@
 //! [`oneshot::group`]: crate::discovery::group
 //! [`oneshot::pinned_group`]: crate::discovery::pinned_group
 //! [`oneshot::pinned_kind`]: crate::discovery::pinned_kind
+//! [`oneshot::pinned_api`]: crate::discovery::pinned_api
 
 use super::ApiGroup;
-use crate::{Client, Error, Result, error::DiscoveryError};
+use crate::{Api, Client, Error, Result, api::Namespaces, error::DiscoveryError};
 use kube_core::{
+    DynamicResourceScope, Resource, TypeMeta,
     discovery::{ApiCapabilities, ApiResource},
-    gvk::{GroupVersion, GroupVersionKind},
+    gvk::{GroupVersion, GroupVersionKind, ParseGroupVersionError},
 };
 
 /// Discovers all APIs available under a certain group at all versions
@@ -103,4 +106,135 @@ pub async fn pinned_group(client: &Client, gv: &GroupVersion) -> Result<ApiGroup
 /// ```
 pub async fn pinned_kind(client: &Client, gvk: &GroupVersionKind) -> Result<(ApiResource, ApiCapabilities)> {
     ApiGroup::query_gvk(client, gvk).await
+}
+
+/// Discovers a single kind from a [`TypeMeta`] and returns a ready to use [`Api`]
+///
+/// A shortcut around [`oneshot::pinned_kind`](crate::discovery::pinned_kind) for when you have an
+/// `apiVersion` + `kind` (e.g. off a [`DynamicObject`](crate::api::DynamicObject), a manifest, or
+/// an admission request) and want an [`Api`] rather than an [`ApiResource`]. A [`TypeMeta`]
+/// carries no namespace, so one is selected separately, and the discovered
+/// [`Scope`](crate::discovery::Scope) decides whether that selection applies.
+///
+/// ```no_run
+/// use kube::{Client, api::{Api, DynamicObject, Namespaces, TypeMeta}, discovery, ResourceExt};
+/// #[tokio::main]
+/// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+///     let client = Client::try_default().await?;
+///     let tm = TypeMeta { api_version: "apiregistration.k8s.io/v1".into(), kind: "APIService".into() };
+///     let api: Api<DynamicObject> = discovery::pinned_api(&client, &tm, Namespaces::All).await?;
+///     for service in api.list(&Default::default()).await? {
+///         println!("Found APIService: {}", service.name_any());
+///     }
+///     Ok(())
+/// }
+/// ```
+///
+/// This costs one discovery request per call and discards the [`ApiCapabilities`] it looked up.
+/// If you also need those (to check verbs via
+/// [`ApiCapabilities::supports_operation`](crate::discovery::ApiCapabilities::supports_operation),
+/// say), call [`oneshot::pinned_kind`](crate::discovery::pinned_kind) and hand the result to
+/// [`Api::scoped_with`] yourself.
+pub async fn pinned_api<K>(client: &Client, tm: &TypeMeta, ns: Namespaces<'_>) -> Result<Api<K>>
+where
+    K: Resource<DynamicType = ApiResource, Scope = DynamicResourceScope>,
+{
+    // NB: TypeMeta parsing is infallible in practice (GroupVersion::from_str splits with
+    // splitn(2, '/'), so its error arm is unreachable), but TryFrom still forces the conversion.
+    let gvk = GroupVersionKind::try_from(tm)
+        .map_err(|ParseGroupVersionError(s)| Error::Discovery(DiscoveryError::InvalidGroupVersion(s)))?;
+    let (ar, caps) = pinned_kind(client, &gvk).await?;
+    Ok(Api::scoped_with(client.clone(), ns, &ar, &caps))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{api::DynamicObject, client::Body};
+    use http::{Request, Response};
+    use k8s_openapi::apimachinery::pkg::apis::meta::v1::{APIResource, APIResourceList};
+    use tower_test::mock;
+
+    // Serve one discovery response containing a namespaced and a cluster scoped kind, and
+    // assert the url `pinned_api` ends up with. `group_version` drives which discovery url is
+    // expected, since `query_gvk` dispatches core (`/api/v1`) separately from the rest.
+    async fn pinned_api_for(
+        group_version: &str,
+        kind: &str,
+        ns: Namespaces<'_>,
+    ) -> Result<Api<DynamicObject>> {
+        let (mock_service, mut handle) = mock::pair::<Request<Body>, Response<Body>>();
+        let client = Client::new(mock_service, "default");
+        let resource = |name: &str, kind: &str, namespaced: bool| APIResource {
+            name: name.to_string(),
+            kind: kind.to_string(),
+            namespaced,
+            verbs: vec!["get".to_string(), "list".to_string()],
+            ..Default::default()
+        };
+        let list = APIResourceList {
+            group_version: group_version.to_string(),
+            resources: vec![
+                resource("configmaps", "ConfigMap", true),
+                resource("nodes", "Node", false),
+                resource("deployments", "Deployment", true),
+            ],
+        };
+        let expected_url = if group_version.contains('/') {
+            format!("/apis/{group_version}")
+        } else {
+            format!("/api/{group_version}")
+        };
+        tokio::spawn(async move {
+            let (request, send) = handle.next_request().await.expect("discovery is queried");
+            assert_eq!(request.uri().path(), expected_url);
+            let body = serde_json::to_vec(&list).unwrap();
+            send.send_response(Response::builder().body(Body::from(body)).unwrap());
+        });
+        let tm = TypeMeta {
+            api_version: group_version.to_string(),
+            kind: kind.to_string(),
+        };
+        pinned_api(&client, &tm, ns).await
+    }
+
+    #[tokio::test]
+    async fn pinned_api_honours_the_selection_for_namespaced_kinds() {
+        let api = pinned_api_for("apps/v1", "Deployment", Namespaces::One("ns1"))
+            .await
+            .unwrap();
+        assert_eq!(api.resource_url(), "/apis/apps/v1/namespaces/ns1/deployments");
+    }
+
+    #[tokio::test]
+    async fn pinned_api_ignores_the_selection_for_cluster_scoped_kinds() {
+        for ns in [Namespaces::All, Namespaces::Default, Namespaces::One("ns1")] {
+            let api = pinned_api_for("v1", "Node", ns).await.unwrap();
+            assert_eq!(api.resource_url(), "/api/v1/nodes");
+        }
+    }
+
+    // The core group takes the other arm of `query_gvk`'s dispatch, and core kinds
+    // (Pod/ConfigMap/Secret) are the likeliest input to this helper.
+    #[tokio::test]
+    async fn pinned_api_resolves_core_group_kinds() {
+        let api = pinned_api_for("v1", "ConfigMap", Namespaces::One("ns1"))
+            .await
+            .unwrap();
+        assert_eq!(api.resource_url(), "/api/v1/namespaces/ns1/configmaps");
+
+        let api = pinned_api_for("v1", "ConfigMap", Namespaces::Default).await.unwrap();
+        assert_eq!(api.resource_url(), "/api/v1/namespaces/default/configmaps");
+    }
+
+    #[tokio::test]
+    async fn pinned_api_reports_an_undiscovered_kind() {
+        let err = pinned_api_for("apps/v1", "DoesNotExist", Namespaces::All)
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(err, Error::Discovery(DiscoveryError::MissingKind(_))),
+            "unexpected error: {err:?}"
+        );
+    }
 }

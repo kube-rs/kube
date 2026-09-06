@@ -25,7 +25,10 @@ pub mod entry;
 #[cfg_attr(docsrs, doc(cfg(feature = "admission")))]
 pub use kube_core::admission;
 pub(crate) use kube_core::params;
-use kube_core::{DynamicResourceScope, NamespaceResourceScope};
+use kube_core::{
+    DynamicResourceScope, NamespaceResourceScope,
+    discovery::{ApiCapabilities, Scope},
+};
 pub use kube_core::{
     Resource, ResourceExt,
     dynamic::{ApiResource, DynamicObject},
@@ -62,6 +65,25 @@ pub struct Api<K> {
     /// `K` objects, so `Empty` better models our constraints (in particular, `Empty<K>`
     /// is `Send`, even if `K` may not be).
     pub(crate) _phantom: std::iter::Empty<K>,
+}
+
+/// Which namespaces an [`Api`] built from discovery should cover
+///
+/// Passed to [`Api::scoped_with`] and [`discovery::pinned_api`](crate::discovery::pinned_api),
+/// where it only takes effect for namespaced kinds. A cluster scoped kind has no namespace to
+/// pick, so the selection is ignored there rather than building a url the apiserver does not
+/// serve.
+#[cfg_attr(docsrs, doc(cfg(feature = "client")))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Namespaces<'a> {
+    /// Every namespace
+    ///
+    /// For a namespaced kind this can only `list` and `watch`, as with [`Api::all_with`].
+    All,
+    /// The client's default namespace, as with [`Api::default_namespaced_with`]
+    Default,
+    /// One specific namespace, as with [`Api::namespaced_with`]
+    One(&'a str),
 }
 
 /// Api constructors for Resource implementors with custom DynamicTypes
@@ -107,6 +129,52 @@ impl<K: Resource> Api<K> {
             namespace: Some(ns.to_string()),
             metadata_api: K::metadata_api(),
             _phantom: std::iter::empty(),
+        }
+    }
+
+    /// Resource in the namespaces selected, honouring the discovered [`Scope`]
+    ///
+    /// Discovery hands back an [`ApiResource`] and its [`ApiCapabilities`] together, and the
+    /// capabilities carry the [`Scope`]. This constructor consults it so callers do not have to
+    /// branch on it themselves:
+    ///
+    /// ```no_run
+    /// # use kube::{Api, Client, api::{DynamicObject, Namespaces}, discovery::Discovery};
+    /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let client: Client = todo!();
+    /// # let object: DynamicObject = todo!();
+    /// let discovery = Discovery::new(client.clone()).run().await?;
+    /// if let Some((ar, caps)) = discovery.resolve_object(&object) {
+    ///     let ns = object.metadata.namespace.as_deref().map_or(Namespaces::All, Namespaces::One);
+    ///     let api: Api<DynamicObject> = Api::scoped_with(client, ns, &ar, &caps);
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// A [`Namespaces`] selection is only meaningful for a namespaced kind; for a cluster scoped
+    /// one it is ignored and the cluster wide url is used. See [`Namespaces`] for what each
+    /// selection maps to.
+    ///
+    /// This function accepts `K::DynamicType` so it can be used with dynamic resources.
+    ///
+    /// [`Scope`]: crate::discovery::Scope
+    /// [`ApiResource`]: crate::discovery::ApiResource
+    /// [`ApiCapabilities`]: crate::discovery::ApiCapabilities
+    pub fn scoped_with(
+        client: Client,
+        ns: Namespaces<'_>,
+        dyntype: &K::DynamicType,
+        caps: &ApiCapabilities,
+    ) -> Self
+    where
+        K: Resource<Scope = DynamicResourceScope>,
+    {
+        match (&caps.scope, ns) {
+            (Scope::Cluster, _) => Self::all_with(client, dyntype),
+            (Scope::Namespaced, Namespaces::All) => Self::all_with(client, dyntype),
+            (Scope::Namespaced, Namespaces::Default) => Self::default_namespaced_with(client, dyntype),
+            (Scope::Namespaced, Namespaces::One(ns)) => Self::namespaced_with(client, ns, dyntype),
         }
     }
 
@@ -277,5 +345,45 @@ mod test {
         let _: Api<corev1::Pod> = Api::default_namespaced(client.clone());
         let _: Api<corev1::PersistentVolume> = Api::all(client.clone());
         let _: Api<corev1::ConfigMap> = Api::namespaced(client, "default");
+    }
+
+    // The full (scope x selection) matrix, since the scope is what decides whether the
+    // selection applies at all.
+    #[tokio::test]
+    async fn scoped_with_lets_the_discovered_scope_decide() {
+        use crate::api::{ApiResource, DynamicObject, Namespaces};
+        use kube_core::discovery::{ApiCapabilities, Scope};
+
+        let (mock_service, _handle) = mock::pair::<Request<Body>, Response<Body>>();
+        let client = Client::new(mock_service, "default");
+        let caps = |scope| ApiCapabilities {
+            scope,
+            subresources: vec![],
+            operations: vec![],
+        };
+        let namespaced = caps(Scope::Namespaced);
+        let cluster = caps(Scope::Cluster);
+        let cm = ApiResource::erase::<corev1::ConfigMap>(&());
+        let node = ApiResource::erase::<corev1::Node>(&());
+        let build = |ns, ar, caps| {
+            let api: Api<DynamicObject> = Api::scoped_with(client.clone(), ns, ar, caps);
+            (api.namespace().map(String::from), api.resource_url().to_string())
+        };
+
+        // namespaced kind: the selection decides
+        assert_eq!(build(Namespaces::All, &cm, &namespaced), (None, "/api/v1/configmaps".into()));
+        assert_eq!(build(Namespaces::Default, &cm, &namespaced), (
+            Some("default".into()),
+            "/api/v1/namespaces/default/configmaps".into()
+        ));
+        assert_eq!(build(Namespaces::One("ns1"), &cm, &namespaced), (
+            Some("ns1".into()),
+            "/api/v1/namespaces/ns1/configmaps".into()
+        ));
+
+        // cluster scoped kind: the selection is ignored, including an explicit namespace
+        for ns in [Namespaces::All, Namespaces::Default, Namespaces::One("ns1")] {
+            assert_eq!(build(ns, &node, &cluster), (None, "/api/v1/nodes".into()));
+        }
     }
 }
