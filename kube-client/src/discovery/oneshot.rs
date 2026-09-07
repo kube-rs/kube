@@ -174,7 +174,8 @@ mod tests {
         ns: Namespaces<'_>,
     ) -> Result<Api<DynamicObject>> {
         let (mock_service, mut handle) = mock::pair::<Request<Body>, Response<Body>>();
-        let client = Client::new(mock_service, "default");
+        // not "default", so `Namespaces::Default` is distinguishable from `One("default")`
+        let client = Client::new(mock_service, "kube-rs-test");
         let resource = |name: &str, kind: &str, namespaced: bool| APIResource {
             name: name.to_string(),
             kind: kind.to_string(),
@@ -201,16 +202,22 @@ mod tests {
             kind: kind.to_string(),
         };
         let api = pinned_api(&client, &tm, ns).await;
-        // dropped so that a discovery request which never happens closes the mock and panics the
-        // task, rather than leaving `served` pending forever
+        // Dropping the local handle closes the mock when `pinned_api` returned an error without
+        // querying, so that case fails immediately. On the success path the returned `Api` holds
+        // its own clone, so the timeout is what stops an unqueried mock pending forever.
         drop(client);
-        // asserted out here rather than inside the task, whose panics are otherwise swallowed
+        // Asserted out here because a panic inside the responder never sends the response, which
+        // would deadlock the client side rather than surfacing the mismatch.
         let expected_url = if group_version.contains('/') {
             format!("/apis/{group_version}")
         } else {
             format!("/api/{group_version}")
         };
-        assert_eq!(served.await.unwrap(), expected_url);
+        let served = tokio::time::timeout(std::time::Duration::from_secs(5), served)
+            .await
+            .expect("discovery is queried")
+            .unwrap();
+        assert_eq!(served, expected_url);
         api
     }
 
@@ -240,7 +247,7 @@ mod tests {
         assert_eq!(api.resource_url(), "/api/v1/namespaces/ns1/configmaps");
 
         let api = pinned_api_for("v1", "ConfigMap", Namespaces::Default).await.unwrap();
-        assert_eq!(api.resource_url(), "/api/v1/namespaces/default/configmaps");
+        assert_eq!(api.resource_url(), "/api/v1/namespaces/kube-rs-test/configmaps");
     }
 
     // An empty apiVersion would otherwise reach `/api/` and fail deserializing the APIVersions

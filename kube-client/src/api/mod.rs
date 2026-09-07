@@ -92,9 +92,8 @@ pub enum Namespaces<'a> {
     Default,
     /// One specific namespace, as with [`Api::namespaced_with`]
     ///
-    /// [`Api::scoped_with`] treats an empty name the same as [`Namespaces::Default`], since it is
-    /// the other spelling of "no namespace given" and would otherwise build a url with an empty
-    /// path segment.
+    /// [`Api::scoped_with`] treats an empty name the same as [`Namespaces::Default`], since an
+    /// empty `metadata.namespace` is the other spelling of "no namespace given".
     One(&'a str),
 }
 
@@ -204,7 +203,7 @@ impl<K: Resource> Api<K> {
             (Scope::Cluster, _) => Self::all_with(client, dyntype),
             (Scope::Namespaced, Namespaces::All) => Self::all_with(client, dyntype),
             // an empty name is the other spelling of "no namespace given", so it lands where an
-            // absent one does rather than building `/namespaces//`
+            // absent one does
             (Scope::Namespaced, Namespaces::Default | Namespaces::One("")) => {
                 Self::default_namespaced_with(client, dyntype)
             }
