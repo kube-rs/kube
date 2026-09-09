@@ -25,7 +25,7 @@ pub mod entry;
 #[cfg_attr(docsrs, doc(cfg(feature = "admission")))]
 pub use kube_core::admission;
 pub(crate) use kube_core::params;
-use kube_core::{DynamicResourceScope, NamespaceResourceScope, discovery::Scope};
+use kube_core::{DynamicResourceScope, NamespaceResourceScope, NamespaceScope, discovery::Scope};
 pub use kube_core::{
     Resource, ResourceExt,
     dynamic::{ApiResource, DynamicObject},
@@ -54,6 +54,12 @@ pub struct Api<K> {
     /// The client to use (from this library)
     pub(crate) client: Client,
     namespace: Option<String>,
+    /// The type-erased resource, kept so that [`Api::constrain`] can rebuild the url through
+    /// [`Resource::url_path`] rather than editing the finished one
+    ///
+    /// Erased for the same reason `metadata_api` is a bool: a non-generic field needs no bound on
+    /// the struct.
+    resource: ApiResource,
     /// The [`Scope`] of the kind, when it is known
     ///
     /// Only [`Api::dynamic`] is told one; the other constructors leave it `None`, which makes
@@ -92,6 +98,7 @@ impl<K: Resource> Api<K> {
             client,
             request: Request::new(url),
             namespace: None,
+            resource: ApiResource::erase::<K>(dyntype),
             scope: None,
             metadata_api: K::metadata_api(),
             _phantom: std::iter::empty(),
@@ -111,6 +118,7 @@ impl<K: Resource> Api<K> {
             client,
             request: Request::new(url),
             namespace: Some(ns.to_string()),
+            resource: ApiResource::erase::<K>(dyntype),
             scope: None,
             metadata_api: K::metadata_api(),
             _phantom: std::iter::empty(),
@@ -163,7 +171,7 @@ impl<K: Resource> Api<K> {
     /// [`CustomResourceDefinition`]: k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition
     pub fn dynamic(client: Client, dyntype: &K::DynamicType, scope: &Scope) -> Self
     where
-        K: Resource<Scope = DynamicResourceScope>,
+        K: Resource<DynamicType = ApiResource, Scope = DynamicResourceScope>,
     {
         Self {
             scope: Some(scope.clone()),
@@ -173,10 +181,28 @@ impl<K: Resource> Api<K> {
 
     /// Constrain this [`Api`] to a namespace, the way `kubectl -n` does
     ///
-    /// Splices `namespaces/<ns>/` into the collection url when the kind is namespaced, and does
+    /// Rebuilds the collection url with `namespaces/<ns>/` when the kind is namespaced, and does
     /// nothing when it is cluster scoped, mirroring `kubectl get nodes -n whatever`, which drops
     /// the flag rather than erroring. Constraining again replaces the namespace rather than
-    /// nesting it.
+    /// nesting it, so this is also how to move a typed [`Api`] between namespaces without
+    /// building a second one:
+    ///
+    /// ```no_run
+    /// # use kube::{Api, Client};
+    /// # use k8s_openapi::api::core::v1::Pod;
+    /// # let client: Client = todo!();
+    /// let pods: Api<Pod> = Api::namespaced(client, "ns1").constrain("ns2");
+    /// assert_eq!(pods.resource_url(), "/api/v1/namespaces/ns2/pods");
+    /// ```
+    ///
+    /// A cluster scoped kind has no namespace to name, so it is rejected at compile time:
+    ///
+    /// ```compile_fail
+    /// # use kube::{Api, Client};
+    /// # use k8s_openapi::api::core::v1::Node;
+    /// # let client: Client = todo!();
+    /// let nodes: Api<Node> = Api::all(client).constrain("ns1"); // resource not namespaced!
+    /// ```
     ///
     /// ```no_run
     /// # use kube::{Api, Client, api::{ApiResource, DynamicObject}, discovery::Scope};
@@ -189,13 +215,20 @@ impl<K: Resource> Api<K> {
     /// assert_eq!(nodes.constrain("kube-system").resource_url(), "/api/v1/nodes");
     /// ```
     ///
-    /// An empty `ns` is how Kubernetes spells "every namespace", so it drops the constraint and
-    /// gives back the cluster wide url [`Api::dynamic`] starts with. That also makes it the
-    /// inverse of a `constrain`, and it means a kubeconfig context with `namespace: ""` widens
+    /// The url is rebuilt through [`Resource::url_path`] from the type-erased resource the
+    /// [`Api`] keeps, so this never edits the previous url and there is no second copy of the
+    /// path format to keep in sync.
+    ///
+    /// An empty `ns` is how Kubernetes spells "every namespace", and it lands there by the same
+    /// route, as the `None` [`Resource::url_path`] takes: the constraint is dropped and the
+    /// cluster wide url [`Api::dynamic`] starts with comes back, which also makes it the inverse
+    /// of a `constrain`. A kubeconfig context with `namespace: ""` therefore widens
     /// [`constrain_default`](Api::constrain_default) rather than building `namespaces//`.
     ///
-    /// The scope is only known on an [`Api`] from [`Api::dynamic`]. The other constructors do not
-    /// record one, and there the namespace is applied unconditionally, as
+    /// The runtime [`Scope`] check only matters for a dynamic kind, and is only known on an
+    /// [`Api`] from [`Api::dynamic`]. A typed kind is statically namespaced to be here at all, so
+    /// there is nothing to consult. A dynamic [`Api`] from one of the other constructors records
+    /// no scope, and there the namespace is applied unconditionally, as
     /// [`namespaced_with`](Api::namespaced_with) would; a cluster scoped kind then builds a url
     /// the apiserver rejects, rather than quietly dropping the namespace that was asked for.
     ///
@@ -203,28 +236,15 @@ impl<K: Resource> Api<K> {
     #[must_use]
     pub fn constrain(mut self, ns: &str) -> Self
     where
-        K: Resource<Scope = DynamicResourceScope>,
+        K::Scope: NamespaceScope,
     {
         if self.scope == Some(Scope::Cluster) {
             return self;
         }
-        let url = {
-            // `url_path` is always the collection url, so the plural is its last segment and any
-            // namespace segment sits directly before it
-            let path = &self.request.url_path;
-            let (head, plural) = path.rsplit_once('/').unwrap_or(("", path));
-            let base = match &self.namespace {
-                Some(old) => head.strip_suffix(&format!("/namespaces/{old}")).unwrap_or(head),
-                None => head,
-            };
-            if ns.is_empty() {
-                format!("{base}/{plural}")
-            } else {
-                format!("{base}/namespaces/{ns}/{plural}")
-            }
-        };
-        self.request = Request::new(url);
         self.namespace = (!ns.is_empty()).then(|| ns.to_string());
+        // the stored resource is the erased dyntype, so this is `Resource::url_path` on its
+        // canonical carrier - the same string `K::url_path` would build
+        self.request = Request::new(DynamicObject::url_path(&self.resource, self.namespace.as_deref()));
         self
     }
 
@@ -244,7 +264,7 @@ impl<K: Resource> Api<K> {
     #[must_use]
     pub fn constrain_default(self) -> Self
     where
-        K: Resource<Scope = DynamicResourceScope>,
+        K::Scope: NamespaceScope,
     {
         let ns = self.client.default_namespace().to_string();
         self.constrain(&ns)
@@ -325,6 +345,7 @@ where
             client,
             request: Request::new(url),
             namespace: Some(ns.to_string()),
+            resource: ApiResource::erase::<K>(&dyntype),
             scope: None,
             metadata_api: K::metadata_api(),
             _phantom: std::iter::empty(),
@@ -374,6 +395,7 @@ impl<K> Debug for Api<K> {
             request,
             client: _,
             namespace,
+            resource: _,
             scope,
             metadata_api: _,
             _phantom,
@@ -464,6 +486,24 @@ mod test {
             assert_eq!(api.namespace(), None);
             assert_eq!(api.resource_url(), "/api/v1/nodes");
         }
+    }
+
+    // A typed namespaced kind is statically namespaced, so `constrain` is just a namespace
+    // switch on it, and a cluster scoped one does not get the method at all (doc `compile_fail`).
+    #[tokio::test]
+    async fn constrain_switches_namespaces_on_typed_apis() {
+        let client = mock_client();
+
+        let api: Api<corev1::ConfigMap> = Api::namespaced(client.clone(), "ns1").constrain("ns2");
+        assert_eq!(api.namespace(), Some("ns2"));
+        assert_eq!(api.resource_url(), "/api/v1/namespaces/ns2/configmaps");
+
+        // narrowing an `all` Api is the same move in the other direction
+        let api: Api<corev1::Pod> = Api::all(client.clone()).constrain("ns1");
+        assert_eq!(api.resource_url(), "/api/v1/namespaces/ns1/pods");
+
+        let api: Api<corev1::Pod> = Api::all(client).constrain_default();
+        assert_eq!(api.resource_url(), "/api/v1/namespaces/kube-rs-test/pods");
     }
 
     // Without a scope there is nothing to consult, so the namespace is applied rather than

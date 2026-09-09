@@ -4,7 +4,7 @@ use k8s_openapi::{
     apimachinery::pkg::apis::meta::v1::OwnerReference,
 };
 use kube_core::{
-    ApiResource, ClusterResourceScope, DynamicResourceScope, NamespaceResourceScope, Resource,
+    ApiResource, ClusterResourceScope, DynamicObject, DynamicResourceScope, NamespaceScope, Resource,
     object::ObjectList,
     params::{GetParams, ListParams},
     request::Request,
@@ -14,14 +14,10 @@ use std::fmt::Debug;
 
 /// A marker trait to indicate cluster-wide operations are available
 trait ClusterScope {}
-/// A marker trait to indicate namespace-scoped operations are available
-trait NamespaceScope {}
 
 // k8s_openapi scopes get implementations for free
 impl ClusterScope for ClusterResourceScope {}
-impl NamespaceScope for NamespaceResourceScope {}
-// our DynamicResourceScope can masquerade as either
-impl NamespaceScope for DynamicResourceScope {}
+// our DynamicResourceScope can masquerade as either, NamespaceScope being the kube_core one
 impl ClusterScope for DynamicResourceScope {}
 
 /// How to get the url for a collection
@@ -63,9 +59,9 @@ where
     K: Resource,
 {
     fn url_path(&self) -> String {
-        url_path(
+        DynamicObject::url_path(
             &ApiResource::from_gvk(&self.clone().into()),
-            self.namespace.clone(),
+            self.namespace.as_deref(),
         )
     }
 }
@@ -98,7 +94,7 @@ where
     K::Scope: ClusterScope,
 {
     fn url_path(&self) -> String {
-        url_path(&ApiResource::from_gvk(&self.clone().into()), None)
+        DynamicObject::url_path(&ApiResource::from_gvk(&self.clone().into()), None)
     }
 }
 
@@ -383,22 +379,6 @@ impl Client {
         req.extensions_mut().insert("list");
         self.request::<ObjectList<K>>(req).await
     }
-}
-
-// Resource url_path resolver
-fn url_path(r: &ApiResource, namespace: Option<String>) -> String {
-    let n = if let Some(ns) = namespace {
-        format!("namespaces/{ns}/")
-    } else {
-        "".into()
-    };
-    format!(
-        "/{group}/{api_version}/{namespaces}{plural}",
-        group = if r.group.is_empty() { "api" } else { "apis" },
-        api_version = r.api_version,
-        namespaces = n,
-        plural = r.plural
-    )
 }
 
 #[cfg(test)]
