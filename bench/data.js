@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1788645232116,
+  "lastUpdate": 1789127374766,
   "repoUrl": "https://github.com/kube-rs/kube",
   "entries": {
     "Benchmark": [
@@ -5765,6 +5765,105 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/kube-rs/kube/commit/f2774b13d66910a8a0fe456cc8e6e52414eb1d0e"
         },
         "date": 1788645230974,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "init_listwatch - peak_bytes",
+            "value": 55194619,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - total_allocated",
+            "value": 76715088,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - alloc_count",
+            "value": 578023,
+            "unit": "allocations"
+          },
+          {
+            "name": "steady_state - peak_bytes",
+            "value": 71381202,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - total_allocated",
+            "value": 109519220,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - alloc_count",
+            "value": 799021,
+            "unit": "allocations"
+          },
+          {
+            "name": "relist - peak_bytes",
+            "value": 99797302,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - total_allocated",
+            "value": 174518628,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - alloc_count",
+            "value": 1189035,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_without_modify - peak_bytes",
+            "value": 141298836,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - total_allocated",
+            "value": 205865000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - alloc_count",
+            "value": 1298020,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_with_modify - peak_bytes",
+            "value": 134853452,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - total_allocated",
+            "value": 162895000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - alloc_count",
+            "value": 1058021,
+            "unit": "allocations"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "info@accountr.eu",
+            "name": "Julius F",
+            "username": "daemonfire300"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "20caeb96084ae488b095232954de76731869a9e9",
+          "message": "runtime: improvement/test struct for api mode watcher (#2022)\n\n* snapshot, it is too damn hot outside to work on this in the evening\n\nSigned-off-by: Julius Foitzik <info@accountr.eu>\n\n* tests(runtime): proof of concept for #1528\n\nIssue: https://github.com/kube-rs/kube/issues/1528\n\nSigned-off-by: Julius Foitzik <info@accountr.eu>\n\n* remove unused inputs\n\nSigned-off-by: Julius Foitzik <info@accountr.eu>\n\n* chore: cargo fmt\n\nSigned-off-by: Julius Foitzik <info@accountr.eu>\n\n* fix clippy\n\nSigned-off-by: Julius Foitzik <info@accountr.eu>\n\n* fmt\n\nSigned-off-by: Julius Foitzik <info@accountr.eu>\n\n* clippy\n\nSigned-off-by: Julius Foitzik <info@accountr.eu>\n\n* clippy\n\nSigned-off-by: Julius Foitzik <info@accountr.eu>\n\n* clippy (this time I hope I got it right)\n\nSigned-off-by: Julius Foitzik <info@accountr.eu>\n\n* quality of life changes\n\nSigned-off-by: Julius Foitzik <info@accountr.eu>\n\n* revert justfile changes to keep PR smaller (was experimental anyway)\n\nSigned-off-by: Julius Foitzik <info@accountr.eu>\n\n* remove Cargo.lock workarounds and replace with simpler solution\n\nSigned-off-by: Julius Foitzik <info@accountr.eu>\n\n* remove nix files to avoid confusion\n\nSigned-off-by: Julius Foitzik <info@accountr.eu>\n\n* move into dedicated mod,\n\n * intentionally did not put it into the util dir/mod to stop this\n   becoming sink for everything unrelated\n * refactor to have ergonomic ResultPage struct\nfor tests\n * Removed Sequence::Empty because it made no sense and replaced it with\n   Sequence::Terminate\n\nSigned-off-by: Julius Foitzik <info@accountr.eu>\n\n* safe-guard/align TestStream behavior by calling fuse() on it\n\n\"terminated\" streams should continue to return None\n`fuse()` is a helper to achive this\n\nsee [https://docs.rs/futures/0.3.33/futures/stream/trait.StreamExt.html#method.fuse]\n\nSigned-off-by: Julius Foitzik <info@accountr.eu>\n\n* continue rework of TestStream\n\nSigned-off-by: Julius Foitzik <info@accountr.eu>\n\n* fix: Sequence::Wait behaviour would be stuck because it did not register\nits waker\n\nSigned-off-by: Julius Foitzik <info@accountr.eu>\n\n* fix: bug in TestMode watch, we were popping a complete SequenceStep::List and only every returning the first entry discarding the rest\n\nSigned-off-by: Julius Foitzik <info@accountr.eu>\n\n* add SequenceStep::Wait test and use tokio time advance\n\nSigned-off-by: Julius Foitzik <info@accountr.eu>\n\n* introduce helper to check step/step_trampoline result\n\nSigned-off-by: Julius Foitzik <info@accountr.eu>\n\n* clippy/fmt\n\nSigned-off-by: Julius Foitzik <info@accountr.eu>\n\n* stash\n\nSigned-off-by: Julius Foitzik <info@accountr.eu>\n\n* fix: return Poll::Ready(None) on Sequence end instead of Err Seq exhausted\n\nSigned-off-by: Julius Foitzik <info@accountr.eu>\n\n* test: update streaming list resync watch calls\n\nSigned-off-by: Julius Foitzik <info@accountr.eu>\n\n* test: update watch list watch calls\n\nSigned-off-by: Julius Foitzik <info@accountr.eu>\n\n* lint: add exception for test\n\nSigned-off-by: Julius Foitzik <info@accountr.eu>\n\n* chore: remove outdated comments/unused values\n\nSigned-off-by: Julius Foitzik <info@accountr.eu>\n\n* minor(review): improve stub watcher ergonomics\n\nSigned-off-by: Julius Foitzik <info@accountr.eu>\n\n---------\n\nSigned-off-by: Julius Foitzik <info@accountr.eu>",
+          "timestamp": "2026-09-11T12:48:31+01:00",
+          "tree_id": "9ff599efcac02f4f68544e41453809308909ab74",
+          "url": "https://github.com/kube-rs/kube/commit/20caeb96084ae488b095232954de76731869a9e9"
+        },
+        "date": 1789127372640,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
