@@ -553,8 +553,14 @@ async fn handle_api_errors(res: Response<Body>) -> Result<Response<Body>> {
             tracing::debug!("Unsuccessful: {status:?}");
             Err(Error::Api(status.boxed()))
         } else {
-            tracing::warn!("Unsuccessful data error parse: {text}");
-            let status = Status::failure(&text, "Failed to parse error data").with_code(status.as_u16());
+            // Not every error response is a JSON `Status`. A proxy, ingress
+            // controller, or a bare API path that doesn't exist (e.g. a CRD
+            // that isn't installed yet) can return a plain-text or HTML body
+            // instead. This is routine rather than exceptional, so it's
+            // logged at `debug` like the parsed case above rather than `warn`.
+            let text = text.trim();
+            tracing::debug!("Unsuccessful data error parse: {text}");
+            let status = Status::failure(text, "Failed to parse error data").with_code(status.as_u16());
             tracing::debug!("Unsuccessful: {status:?} (reconstruct)");
             Err(Error::Api(status.boxed()))
         }
@@ -809,6 +815,36 @@ mod tests {
             panic!("watch with an error response should fail");
         };
         assert!(matches!(&err, Error::Api(s) if s.code == 403), "got {err:?}");
+        spawned.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_non_json_error_response_is_reconstructed() {
+        let (mock_service, handle) = mock::pair::<Request<Body>, Response<Body>>();
+        let spawned = tokio::spawn(async move {
+            let mut handle = pin!(handle);
+            let (_request, send) = handle.next_request().await.expect("service not called");
+            // Some routers in front of the apiserver (or a probe for a CRD
+            // that isn't installed yet) return a plain-text 404 instead of a
+            // JSON `Status`.
+            send.send_response(
+                Response::builder()
+                    .status(http::StatusCode::NOT_FOUND)
+                    .body(Body::from(b"404 page not found\n".to_vec()))
+                    .unwrap(),
+            );
+        });
+
+        let pods: Api<Pod> = Api::default_namespaced(Client::new(mock_service, "default"));
+        let Err(err) = pods.get("test").await else {
+            panic!("get with a non-JSON error response should fail");
+        };
+        let Error::Api(status) = &err else {
+            panic!("expected Error::Api, got {err:?}");
+        };
+        assert_eq!(status.code, 404);
+        assert_eq!(status.reason, "Failed to parse error data");
+        assert_eq!(status.message, "404 page not found");
         spawned.await.unwrap();
     }
 }
