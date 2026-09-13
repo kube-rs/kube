@@ -38,8 +38,8 @@ async fn main() -> anyhow::Result<()> {
 
     match pods.create(&Default::default(), &p).await {
         Ok(o) => assert_eq!(p.name_unchecked(), o.name_unchecked()),
-        Err(kube::Error::Api(ae)) => assert_eq!(ae.code, 409), // if we failed to clean-up
-        Err(e) => return Err(e.into()),                        // any other case if a failure
+        Err(kube::Error::Api { source: ae, uri: _ }) => assert_eq!(ae.code, 409), // if we failed to clean-up
+        Err(e) => return Err(e.into()), // any other case if a failure
     }
 
     // wait for container to finish

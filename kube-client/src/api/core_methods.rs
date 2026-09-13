@@ -141,7 +141,7 @@ where
     pub async fn get_opt(&self, name: &str) -> Result<Option<K>> {
         match self.get(name).await {
             Ok(obj) => Ok(Some(obj)),
-            Err(Error::Api(status)) if status.is_not_found() => Ok(None),
+            Err(Error::Api {source: status, uri: _}) if status.is_not_found() => Ok(None),
             Err(err) => Err(err),
         }
     }
@@ -196,7 +196,7 @@ where
     ) -> Result<Option<PartialObjectMeta<K>>> {
         match self.get_metadata_with(name, gp).await {
             Ok(meta) => Ok(Some(meta)),
-            Err(Error::Api(status)) if status.is_not_found() => Ok(None),
+            Err(Error::Api {source: status, uri: _}) if status.is_not_found() => Ok(None),
             Err(err) => Err(err),
         }
     }
