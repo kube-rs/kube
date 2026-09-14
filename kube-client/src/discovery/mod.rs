@@ -1,6 +1,7 @@
 //! High-level utilities for runtime API discovery.
 
 use crate::{Client, Result};
+pub use crate::api::Namespaces;
 pub use kube_core::discovery::{ApiCapabilities, ApiResource, Scope, verbs};
 use kube_core::gvk::GroupVersionKind;
 use kube_core::{DynamicObject, TypeMeta};
@@ -11,7 +12,7 @@ pub use apigroup::ApiGroup;
 mod parse;
 
 // re-export one-shots
-pub use oneshot::{group, pinned_group, pinned_kind};
+pub use oneshot::{group, pinned_api, pinned_group, pinned_kind};
 
 /// How the Discovery client decides what api groups to scan
 enum DiscoveryMode {
@@ -256,17 +257,16 @@ impl Discovery {
     /// [`GroupVersionKind`]:
     ///
     /// ```no_run
-    /// use kube::{Client, api::{Api, DynamicObject}, discovery::Discovery};
+    /// use kube::{Client, api::{Api, DynamicObject, Namespaces}, discovery::Discovery};
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     let client = Client::try_default().await?;
     ///     let object: DynamicObject = todo!("an object obtained at runtime");
     ///     let discovery = Discovery::new(client.clone()).run().await?;
-    ///     if let Some((ar, _caps)) = discovery.resolve_object(&object) {
-    ///         let api: Api<DynamicObject> = match object.metadata.namespace.as_deref() {
-    ///             Some(ns) => Api::namespaced_with(client.clone(), ns, &ar),
-    ///             None => Api::all_with(client.clone(), &ar),
-    ///         };
+    ///     if let Some((ar, caps)) = discovery.resolve_object(&object) {
+    ///         // the capabilities carry the scope, so `scoped_with` picks the right url shape
+    ///         let ns = Namespaces::from(object.metadata.namespace.as_deref());
+    ///         let api: Api<DynamicObject> = Api::scoped_with(client.clone(), ns, &ar, &caps.scope);
     ///         // now `api` can be used to interact with the object
     ///         let _ = api;
     ///     }

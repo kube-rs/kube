@@ -194,6 +194,52 @@ mod test {
     }
 
     #[tokio::test]
+    #[ignore = "needs cluster (lists api resources)"]
+    #[cfg(feature = "client")]
+    async fn pinned_api_oneshot() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::{
+            api::Namespaces,
+            core::{DynamicObject, TypeMeta},
+            discovery,
+        };
+        let client = Client::try_default().await?;
+        let tm = |api_version: &str, kind: &str| TypeMeta {
+            api_version: api_version.to_string(),
+            kind: kind.to_string(),
+        };
+
+        // namespaced core kind: the selection is applied
+        let api: Api<DynamicObject> =
+            discovery::pinned_api(&client, &tm("v1", "ConfigMap"), Namespaces::One("kube-system")).await?;
+        assert_eq!(api.resource_url(), "/api/v1/namespaces/kube-system/configmaps");
+        assert!(!api.list(&Default::default()).await?.items.is_empty());
+
+        // Default builds a namespace the apiserver serves (the unit tests cover which one)
+        let api: Api<DynamicObject> =
+            discovery::pinned_api(&client, &tm("v1", "ConfigMap"), Namespaces::Default).await?;
+        api.list(&Default::default()).await?;
+
+        // cluster scoped kind: the selection is ignored, and the request the apiserver gets is
+        // the cluster wide one rather than a namespaced url it does not serve
+        let api: Api<DynamicObject> =
+            discovery::pinned_api(&client, &tm("v1", "Node"), Namespaces::One("kube-system")).await?;
+        assert_eq!(api.resource_url(), "/api/v1/nodes");
+        assert!(!api.list(&Default::default()).await?.items.is_empty());
+
+        // non-core group takes the other arm of the discovery dispatch
+        let api: Api<DynamicObject> = discovery::pinned_api(
+            &client,
+            &tm("apiregistration.k8s.io/v1", "APIService"),
+            Namespaces::All,
+        )
+        .await?;
+        assert_eq!(api.resource_url(), "/apis/apiregistration.k8s.io/v1/apiservices");
+        api.list(&Default::default()).await?;
+
+        Ok(())
+    }
+
+    #[tokio::test]
     #[ignore = "needs cluster (uses aggregated discovery, requires k8s 1.26+)"]
     #[cfg(feature = "client")]
     async fn aggregated_discovery_apis() -> Result<(), Box<dyn std::error::Error>> {

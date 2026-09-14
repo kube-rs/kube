@@ -10,9 +10,9 @@ use k8s_openapi::{
 };
 use kube::{
     Client,
-    api::{Api, DynamicObject, ListParams, Patch, PatchParams, ResourceExt},
+    api::{Api, DynamicObject, ListParams, Namespaces, Patch, PatchParams, ResourceExt},
     core::GroupVersionKind,
-    discovery::{ApiCapabilities, ApiResource, Discovery, Scope},
+    discovery::{ApiCapabilities, ApiResource, Discovery},
     runtime::{
         WatchStreamExt,
         wait::{await_condition, conditions::is_deleted},
@@ -243,13 +243,12 @@ fn dynamic_api(
     ns: Option<&str>,
     all: bool,
 ) -> Api<DynamicObject> {
-    if caps.scope == Scope::Cluster || all {
-        Api::all_with(client, &ar)
-    } else if let Some(namespace) = ns {
-        Api::namespaced_with(client, namespace, &ar)
-    } else {
-        Api::default_namespaced_with(client, &ar)
-    }
+    let namespaces = match (all, ns) {
+        (true, _) => Namespaces::All,
+        (false, Some(ns)) => Namespaces::One(ns),
+        (false, None) => Namespaces::Default,
+    };
+    Api::scoped_with(client, namespaces, &ar, &caps.scope)
 }
 
 fn format_creation(time: Time) -> std::result::Result<String, jiff::Error> {
