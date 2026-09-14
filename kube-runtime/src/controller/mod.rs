@@ -118,6 +118,15 @@ impl Action {
     pub const fn await_change() -> Self {
         Self { requeue_after: None }
     }
+
+    /// Whether this action requests a requeue (rather than awaiting a change).
+    ///
+    /// Used by the [`finalizer`](crate::finalizer) helper to tell apart a completed
+    /// cleanup ([`Action::await_change`]) from one that is still in progress
+    /// ([`Action::requeue`]).
+    pub(crate) const fn wants_requeue(&self) -> bool {
+        self.requeue_after.is_some()
+    }
 }
 
 /// Helper for building custom trigger filters, see the implementations of [`trigger_self`] and [`trigger_owners`] for some examples.
