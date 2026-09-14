@@ -5,7 +5,8 @@ use thiserror::Error;
 
 use crate::util::nonempty;
 
-///
+/// This error enum contains all variants we can hit during `NO_PROXY`/`no_proxy` parsing and
+/// validation.
 #[derive(Debug, Error)]
 pub enum Error {
     /// Comma-separated value is empty
@@ -198,6 +199,9 @@ impl TryFrom<&http::Uri> for Host {
 }
 
 impl Host {
+    /// Checks if the [`Host`] matches a target port and matcher combination.
+    ///
+    /// This is the internal logic for the [`NoProxy::matches`] function.
     fn matches(&self, target_port: Option<u16>, matcher: &NoProxyMatcher) -> bool {
         match &self {
             Host::IpAddr(target_ip_addr) => match matcher {
