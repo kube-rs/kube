@@ -112,7 +112,7 @@ impl<K: Resource> Api<K> {
     where
         K: Resource<Scope = DynamicResourceScope>,
     {
-        // TODO: inspect dyntype scope to verify somehow?
+        // the dyntype carries no scope; `Api::dynamic` takes one explicitly instead
         let url = K::url_path(dyntype, Some(ns));
         Self {
             client,
@@ -157,8 +157,7 @@ impl<K: Resource> Api<K> {
     ///
     /// The [`Scope`] usually arrives from discovery, on the [`ApiCapabilities`] handed back next
     /// to the [`ApiResource`], but any source works, e.g. a [`CustomResourceDefinition`]'s
-    /// `spec.scope`. It has to be passed in because it cannot be read off the dyntype, which is
-    /// what the `TODO` on [`namespaced_with`](Api::namespaced_with) was asking for.
+    /// `spec.scope`.
     ///
     /// # Warning
     ///
@@ -173,19 +172,18 @@ impl<K: Resource> Api<K> {
     where
         K: Resource<DynamicType = ApiResource, Scope = DynamicResourceScope>,
     {
+        // the scope has to be passed in because it cannot be read off the dyntype, which is what
+        // the TODO on `namespaced_with` was asking for
         Self {
             scope: Some(scope.clone()),
             ..Self::all_with(client, dyntype)
         }
     }
 
-    /// Constrain this [`Api`] to a namespace, the way `kubectl -n` does
+    /// Constrain this [`Api`] to a new namespace
     ///
-    /// Rebuilds the collection url with `namespaces/<ns>/` when the kind is namespaced, and does
-    /// nothing when it is cluster scoped, mirroring `kubectl get nodes -n whatever`, which drops
-    /// the flag rather than erroring. Constraining again replaces the namespace rather than
-    /// nesting it, so this is also how to move a typed [`Api`] between namespaces without
-    /// building a second one:
+    /// Allows changing the tracked namespace for a namespace scoped [`Api`], without building a
+    /// second one:
     ///
     /// ```no_run
     /// # use kube::{Api, Client};
@@ -195,7 +193,7 @@ impl<K: Resource> Api<K> {
     /// assert_eq!(pods.resource_url(), "/api/v1/namespaces/ns2/pods");
     /// ```
     ///
-    /// A cluster scoped kind has no namespace to name, so it is rejected at compile time:
+    /// A cluster scoped kind has no namespace to track, so it does not get the method:
     ///
     /// ```compile_fail
     /// # use kube::{Api, Client};
@@ -204,33 +202,12 @@ impl<K: Resource> Api<K> {
     /// let nodes: Api<Node> = Api::all(client).constrain("ns1"); // resource not namespaced!
     /// ```
     ///
-    /// ```no_run
-    /// # use kube::{Api, Client, api::{ApiResource, DynamicObject}, discovery::Scope};
-    /// # use k8s_openapi::api::core::v1::{Node, Pod};
-    /// # let client: Client = todo!();
-    /// let pods = Api::<DynamicObject>::dynamic(client.clone(), &ApiResource::erase::<Pod>(&()), &Scope::Namespaced);
-    /// assert_eq!(pods.constrain("kube-system").resource_url(), "/api/v1/namespaces/kube-system/pods");
+    /// A dynamic kind can only be found to be cluster scoped at runtime, and an [`Api`] from
+    /// [`Api::dynamic`] knows its [`Scope`], so this is a no-op there rather than a compile
+    /// error, mirroring `kubectl get nodes -n whatever`.
     ///
-    /// let nodes = Api::<DynamicObject>::dynamic(client, &ApiResource::erase::<Node>(&()), &Scope::Cluster);
-    /// assert_eq!(nodes.constrain("kube-system").resource_url(), "/api/v1/nodes");
-    /// ```
-    ///
-    /// The url is rebuilt through [`Resource::url_path`] from the type-erased resource the
-    /// [`Api`] keeps, so this never edits the previous url and there is no second copy of the
-    /// path format to keep in sync.
-    ///
-    /// An empty `ns` is how Kubernetes spells "every namespace", and it lands there by the same
-    /// route, as the `None` [`Resource::url_path`] takes: the constraint is dropped and the
-    /// cluster wide url [`Api::dynamic`] starts with comes back, which also makes it the inverse
-    /// of a `constrain`. A kubeconfig context with `namespace: ""` therefore widens
-    /// [`constrain_default`](Api::constrain_default) rather than building `namespaces//`.
-    ///
-    /// The runtime [`Scope`] check only matters for a dynamic kind, and is only known on an
-    /// [`Api`] from [`Api::dynamic`]. A typed kind is statically namespaced to be here at all, so
-    /// there is nothing to consult. A dynamic [`Api`] from one of the other constructors records
-    /// no scope, and there the namespace is applied unconditionally, as
-    /// [`namespaced_with`](Api::namespaced_with) would; a cluster scoped kind then builds a url
-    /// the apiserver rejects, rather than quietly dropping the namespace that was asked for.
+    /// Widen back to every namespace with [`unconstrain`](Api::unconstrain), which an empty `ns`
+    /// also does.
     ///
     /// [`Scope`]: crate::discovery::Scope
     #[must_use]
@@ -248,19 +225,32 @@ impl<K: Resource> Api<K> {
         self
     }
 
+    /// Widen this [`Api`] back to every namespace
+    ///
+    /// The inverse of [`constrain`](Api::constrain), leaving the [`Api`] as [`Api::all`] builds
+    /// it, which for a namespaced kind **can only `list` and `watch`**.
+    ///
+    /// ```no_run
+    /// # use kube::{Api, Client};
+    /// # use k8s_openapi::api::core::v1::Pod;
+    /// # let client: Client = todo!();
+    /// let pods: Api<Pod> = Api::namespaced(client, "ns1").unconstrain();
+    /// assert_eq!(pods.resource_url(), "/api/v1/pods");
+    /// ```
+    #[must_use]
+    pub fn unconstrain(mut self) -> Self
+    where
+        K::Scope: NamespaceScope,
+    {
+        self.namespace = None;
+        self.request = Request::new(DynamicObject::url_path(&self.resource, None));
+        self
+    }
+
     /// Constrain this [`Api`] to the [`Client`]'s default namespace
     ///
     /// The kubectl equivalent of passing no `-n` at all. A shorthand for
-    /// `api.constrain(client.default_namespace())` that does not need the [`Client`] to still be
-    /// in scope, since the [`Api`] already holds one.
-    ///
-    /// ```no_run
-    /// # use kube::{Api, Client, api::{ApiResource, DynamicObject}, discovery::Scope};
-    /// # use k8s_openapi::api::core::v1::Pod;
-    /// # let client: Client = todo!();
-    /// let ar = ApiResource::erase::<Pod>(&());
-    /// let api: Api<DynamicObject> = Api::dynamic(client, &ar, &Scope::Namespaced).constrain_default();
-    /// ```
+    /// `api.constrain(client.default_namespace())`
     #[must_use]
     pub fn constrain_default(self) -> Self
     where
@@ -461,7 +451,8 @@ mod test {
         let api = api.constrain("ns2");
         assert_eq!(api.resource_url(), "/api/v1/namespaces/ns2/configmaps");
 
-        // an empty namespace is "every namespace", so it undoes the constraint
+        // `unconstrain` widens back, and an empty namespace lands in the same place
+        assert_eq!(api.clone().unconstrain().resource_url(), "/api/v1/configmaps");
         let api = api.constrain("");
         assert_eq!(api.namespace(), None);
         assert_eq!(api.resource_url(), "/api/v1/configmaps");
@@ -504,6 +495,11 @@ mod test {
 
         let api: Api<corev1::Pod> = Api::all(client).constrain_default();
         assert_eq!(api.resource_url(), "/api/v1/namespaces/kube-rs-test/pods");
+
+        // and `unconstrain` is the way back, as an empty namespace still is
+        let api: Api<corev1::Pod> = api.unconstrain();
+        assert_eq!(api.namespace(), None);
+        assert_eq!(api.resource_url(), "/api/v1/pods");
     }
 
     // Without a scope there is nothing to consult, so the namespace is applied rather than
