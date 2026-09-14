@@ -1,6 +1,10 @@
-use super::{
-    KubeconfigError,
-    file_config::{AuthInfo, Cluster, Context, Kubeconfig},
+use crate::{
+    config::{
+        KubeconfigError,
+        file_config::{AuthInfo, Cluster, Context, Kubeconfig},
+        no_proxy::NoProxy,
+    },
+    util::nonempty,
 };
 
 /// KubeConfigOptions stores options used when loading kubeconfig file.
@@ -130,17 +134,19 @@ impl ConfigLoader {
     }
 
     pub fn proxy_url(&self) -> Result<Option<http::Uri>, KubeconfigError> {
-        let nonempty = |o: Option<String>| o.filter(|s| !s.is_empty());
-
         if let Some(proxy) = nonempty(self.cluster.proxy_url.clone())
             .or_else(|| nonempty(std::env::var("HTTPS_PROXY").ok()))
             .or_else(|| nonempty(std::env::var("https_proxy").ok()))
         {
-            Ok(Some(
-                proxy
-                    .parse::<http::Uri>()
-                    .map_err(KubeconfigError::ParseProxyUrl)?,
-            ))
+            let uri = proxy
+                .parse::<http::Uri>()
+                .map_err(KubeconfigError::ParseProxyUrl)?;
+            let no_proxy = NoProxy::from_env().map_err(KubeconfigError::ParseNoProxy)?;
+
+            match no_proxy {
+                Some(no_proxy) if no_proxy.matches(&uri).map_err(KubeconfigError::ParseNoProxy)? => Ok(None),
+                _ => Ok(Some(uri)),
+            }
         } else {
             Ok(None)
         }

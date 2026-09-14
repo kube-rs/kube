@@ -54,6 +54,7 @@ http-body-util = { workspace = true, optional = true }
 either = { workspace = true, optional = true }
 thiserror.workspace = true
 futures = { workspace = true, optional = true, features = ["std"] }
+ipnet.workspace = true
 jiff = { workspace = true, optional = true, features = ["std", "serde"] }
 pem = { workspace = true, optional = true }
 openssl = { workspace = true, optional = true }

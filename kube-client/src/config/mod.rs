@@ -15,10 +15,12 @@ use thiserror::Error;
 mod file_config;
 mod file_loader;
 mod incluster_config;
+mod no_proxy;
 
 use file_loader::ConfigLoader;
 pub use file_loader::KubeConfigOptions;
 pub use incluster_config::Error as InClusterError;
+pub use no_proxy::Error as NoProxyError;
 
 /// Failed to infer config
 #[derive(Error, Debug)]
@@ -92,6 +94,10 @@ pub enum KubeconfigError {
     /// Failed to parse PEM-encoded certificates
     #[error("failed to parse PEM-encoded certificates: {0}")]
     ParseCertificates(#[source] pem::PemError),
+
+    /// Failed to parse NO_PROXY/no_proxy env var
+    #[error("failed to parse NO_PROXY/no_proxy env var")]
+    ParseNoProxy(#[source] NoProxyError),
 }
 
 /// Errors from loading data from a base64 string or a file
