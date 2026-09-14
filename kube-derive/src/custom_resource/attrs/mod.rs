@@ -17,6 +17,9 @@ pub use scale::Scale;
 #[darling(attributes(kube))]
 pub struct KubeAttrs {
     pub group: String,
+    /// Path of a `fn(&'static str) -> Cow<'static, str>` that turns the declared group into
+    /// the one used at runtime, for a process that addresses the kind under a group of its own.
+    pub group_resolver: Option<Path>,
     pub version: String,
     pub kind: String,
     pub doc: Option<String>,

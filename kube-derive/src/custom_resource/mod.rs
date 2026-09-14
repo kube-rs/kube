@@ -106,6 +106,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
 
     let KubeAttrs {
         group,
+        group_resolver,
         kind,
         kind_struct,
         version,
@@ -287,14 +288,25 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         ("Cluster", quote! { #kube_core::ClusterResourceScope })
     };
 
+    // A group resolver makes the group a runtime value: it is called with the declared group
+    // and may return another one. Everything derived from the group, the API version and the
+    // CRD's own name, follows it, so a process can address a kind under a group of its own with
+    // no change at the call sites.
     let api_ver = format!("{group}/{version}");
+    let (group_expr, api_version_expr) = match &group_resolver {
+        Some(resolver) => (
+            quote! { #resolver(#group) },
+            quote! { std::borrow::Cow::Owned(format!("{}/{}", #resolver(#group), #version)) },
+        ),
+        None => (quote! { #group.into() }, quote! { #api_ver.into() }),
+    };
     let impl_resource = quote! {
         impl #kube_core::Resource for #rootident {
             type DynamicType = ();
             type Scope = #scope_quote;
 
             fn group(_: &()) -> std::borrow::Cow<'_, str> {
-               #group.into()
+                #group_expr
             }
 
             fn kind(_: &()) -> std::borrow::Cow<'_, str> {
@@ -306,7 +318,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
             }
 
             fn api_version(_: &()) -> std::borrow::Cow<'_, str> {
-                #api_ver.into()
+                #api_version_expr
             }
 
             fn plural(_: &()) -> std::borrow::Cow<'_, str> {
@@ -398,6 +410,18 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         Some(Override::Explicit(warning)) => (quote! { Some(true) }, quote! { Some(#warning.into()) }),
     };
     let crd_meta_name = format!("{plural}.{group}");
+    // With a resolver the CRD's name and group are runtime values as well. The name is
+    // computed once per process, since `crd_name` hands out a `&'static str`.
+    let (crd_name_body, crd_group_expr) = match &group_resolver {
+        Some(resolver) => (
+            quote! {
+                static CRD_NAME: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+                CRD_NAME.get_or_init(|| format!("{}.{}", #plural, #resolver(#group)))
+            },
+            quote! { #resolver(#group).into_owned() },
+        ),
+        None => (quote! { #crd_meta_name }, quote! { #group.into() }),
+    };
 
     let schemagen = if schema_mode.use_in_crd() {
         quote! {
@@ -440,11 +464,11 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
                     metadata: #k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta {
                         annotations: #meta_annotations,
                         labels: #meta_labels,
-                        name: Some(#crd_meta_name.into()),
+                        name: Some(<Self as #extver::CustomResourceExt>::crd_name().into()),
                         ..Default::default()
                     },
                     spec: #apiext::CustomResourceDefinitionSpec {
-                        group: #group.into(),
+                        group: #crd_group_expr,
                         names: #apiext::CustomResourceDefinitionNames {
                             categories: #categories,
                             kind: #kind.into(),
@@ -474,7 +498,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
             }
 
             fn crd_name() -> &'static str {
-                #crd_meta_name
+                #crd_name_body
             }
 
             fn api_resource() -> #kube_core::dynamic::ApiResource {
@@ -665,6 +689,19 @@ mod tests {
     use std::{env, fs};
 
     use super::*;
+
+    #[test]
+    fn test_parse_group_resolver() {
+        let input = quote! {
+            #[derive(CustomResource, Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
+            #[kube(group = "clux.dev", version = "v1", kind = "Foo", group_resolver = "my_crate::keyed_group")]
+            struct FooSpec { foo: String }
+        };
+        let input = syn::parse2(input).unwrap();
+        let kube_attrs = KubeAttrs::from_derive_input(&input).unwrap();
+        let resolver = kube_attrs.group_resolver.expect("group_resolver parses as a path");
+        assert_eq!(quote!(#resolver).to_string(), "my_crate :: keyed_group");
+    }
 
     #[test]
     fn test_parse_default() {

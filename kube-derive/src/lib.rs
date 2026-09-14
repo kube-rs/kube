@@ -331,6 +331,13 @@ mod resource;
 ///
 /// When using `garde` directly, you must add it to your dependencies (with the `derive` feature).
 ///
+/// ### `#[kube(group_resolver = "path::to::function")]`
+/// Makes the group a runtime value. The function, `fn(&'static str) -> Cow<'static, str>`, is
+/// called with the declared group and may return another one; `Resource::group`,
+/// `Resource::api_version` and the name and group of the generated CRD all follow it. A
+/// process that must keep its objects apart from another instance's, under CRDs of its own,
+/// can resolve every kind to a group of its own without touching any `Api` call site.
+///
 /// ### CEL validation (client-side)
 /// CEL rules declared with `#[kube(validation = ...)]` / `#[x_kube(validation = ...)]` are normally
 /// enforced server-side by the apiserver. With `#[kube(cel)]` the derive also generates client-side
