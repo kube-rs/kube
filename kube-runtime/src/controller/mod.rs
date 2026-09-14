@@ -36,6 +36,10 @@ use tracing::{Instrument, info_span};
 
 mod future_hash_map;
 mod runner;
+mod trigger;
+
+use trigger::trigger_others;
+pub use trigger::{trigger_owners, trigger_self, trigger_with};
 
 /// The reasons the internal runner can fail
 pub type RunnerError = runner::Error<reflector::store::WriterDropped>;
@@ -118,181 +122,6 @@ impl Action {
     pub const fn await_change() -> Self {
         Self { requeue_after: None }
     }
-}
-
-/// Helper for building custom trigger filters, see the implementations of [`trigger_self`] and [`trigger_owners`] for some examples.
-pub fn trigger_with<T, K, I, S>(
-    stream: S,
-    mapper: impl Fn(T) -> I,
-) -> impl Stream<Item = Result<ReconcileRequest<K>, S::Error>>
-where
-    S: TryStream<Ok = T>,
-    I: IntoIterator,
-    I::Item: Into<ReconcileRequest<K>>,
-    K: Resource,
-{
-    stream
-        .map_ok(move |obj| stream::iter(mapper(obj).into_iter().map(Into::into).map(Ok)))
-        .try_flatten()
-}
-
-/// Enqueues the object itself for reconciliation
-pub fn trigger_self<K, S>(
-    stream: S,
-    dyntype: K::DynamicType,
-) -> impl Stream<Item = Result<ReconcileRequest<K>, S::Error>>
-where
-    S: TryStream<Ok = K>,
-    K: Resource,
-    K::DynamicType: Clone,
-{
-    trigger_with(stream, move |obj| {
-        Some(ReconcileRequest {
-            obj_ref: ObjectRef::from_obj_with(&obj, dyntype.clone()),
-            reason: ReconcileReason::ObjectUpdated,
-        })
-    })
-}
-
-/// Enqueues the object itself for reconciliation when the object is behind a
-/// shared pointer
-#[cfg(feature = "unstable-runtime-subscribe")]
-fn trigger_self_shared<K, S>(
-    stream: S,
-    dyntype: K::DynamicType,
-) -> impl Stream<Item = Result<ReconcileRequest<K>, S::Error>>
-where
-    // Input stream has item as some Arc'd Resource (via
-    // Controller::for_shared_stream)
-    S: TryStream<Ok = Arc<K>>,
-    K: Resource,
-    K::DynamicType: Clone,
-{
-    trigger_with(stream, move |obj| {
-        Some(ReconcileRequest {
-            obj_ref: ObjectRef::from_obj_with(obj.as_ref(), dyntype.clone()),
-            reason: ReconcileReason::ObjectUpdated,
-        })
-    })
-}
-
-/// Enqueues any mapper returned `K` types for reconciliation
-fn trigger_others<S, K, I>(
-    stream: S,
-    mapper: impl Fn(S::Ok) -> I + Sync + Send + 'static,
-    dyntype: <S::Ok as Resource>::DynamicType,
-) -> impl Stream<Item = Result<ReconcileRequest<K>, S::Error>>
-where
-    // Input stream has items as some Resource (via Controller::watches)
-    S: TryStream,
-    S::Ok: Resource,
-    <S::Ok as Resource>::DynamicType: Clone,
-    // Output stream is requests for the root type K
-    K: Resource,
-    K::DynamicType: Clone,
-    // but the mapper can produce many of them
-    I: 'static + IntoIterator<Item = ObjectRef<K>>,
-    I::IntoIter: Send,
-{
-    trigger_with(stream, move |obj| {
-        let watch_ref = ObjectRef::from_obj_with(&obj, dyntype.clone()).erase();
-        mapper(obj)
-            .into_iter()
-            .map(move |mapped_obj_ref| ReconcileRequest {
-                obj_ref: mapped_obj_ref,
-                reason: ReconcileReason::RelatedObjectUpdated {
-                    obj_ref: Box::new(watch_ref.clone()),
-                },
-            })
-    })
-}
-
-/// Enqueues any mapper returned `Arc<K>` types for reconciliation
-#[cfg(feature = "unstable-runtime-subscribe")]
-fn trigger_others_shared<S, O, K, I>(
-    stream: S,
-    mapper: impl Fn(S::Ok) -> I + Sync + Send + 'static,
-    dyntype: O::DynamicType,
-) -> impl Stream<Item = Result<ReconcileRequest<K>, S::Error>>
-where
-    // Input is some shared resource (`Arc<O>`) obtained via `reflect`
-    S: TryStream<Ok = Arc<O>>,
-    O: Resource,
-    O::DynamicType: Clone,
-    // Output stream is requests for the root type K
-    K: Resource,
-    K::DynamicType: Clone,
-    // but the mapper can produce many of them
-    I: 'static + IntoIterator<Item = ObjectRef<K>>,
-    I::IntoIter: Send,
-{
-    trigger_with(stream, move |obj| {
-        let watch_ref = ObjectRef::from_obj_with(obj.as_ref(), dyntype.clone()).erase();
-        mapper(obj)
-            .into_iter()
-            .map(move |mapped_obj_ref| ReconcileRequest {
-                obj_ref: mapped_obj_ref,
-                reason: ReconcileReason::RelatedObjectUpdated {
-                    obj_ref: Box::new(watch_ref.clone()),
-                },
-            })
-    })
-}
-
-/// Enqueues any owners of type `KOwner` for reconciliation
-pub fn trigger_owners<KOwner, S>(
-    stream: S,
-    owner_type: KOwner::DynamicType,
-    child_type: <S::Ok as Resource>::DynamicType,
-) -> impl Stream<Item = Result<ReconcileRequest<KOwner>, S::Error>>
-where
-    S: TryStream,
-    S::Ok: Resource,
-    <S::Ok as Resource>::DynamicType: Clone,
-    KOwner: Resource,
-    KOwner::DynamicType: Clone,
-{
-    let mapper = move |mut obj: S::Ok| {
-        // `obj` is owned here, so take the metadata instead of deep-cloning the whole
-        // ObjectMeta (labels/annotations/managedFields) just to read two fields.
-        let meta = std::mem::take(obj.meta_mut());
-        let ns = meta.namespace;
-        let owner_type = owner_type.clone();
-        meta.owner_references
-            .into_iter()
-            .flatten()
-            .filter_map(move |owner| ObjectRef::from_owner_ref(ns.as_deref(), &owner, owner_type.clone()))
-    };
-    trigger_others(stream, mapper, child_type)
-}
-
-// TODO: do we really need to deal with a trystream? can we simplify this at
-// all?
-/// Enqueues any owners of type `KOwner` for reconciliation based on a stream of
-/// owned `K` objects
-#[cfg(feature = "unstable-runtime-subscribe")]
-fn trigger_owners_shared<KOwner, S, K>(
-    stream: S,
-    owner_type: KOwner::DynamicType,
-    child_type: K::DynamicType,
-) -> impl Stream<Item = Result<ReconcileRequest<KOwner>, S::Error>>
-where
-    S: TryStream<Ok = Arc<K>>,
-    K: Resource,
-    K::DynamicType: Clone,
-    KOwner: Resource,
-    KOwner::DynamicType: Clone,
-{
-    let mapper = move |obj: S::Ok| {
-        let meta = obj.meta().clone();
-        let ns = meta.namespace;
-        let owner_type = owner_type.clone();
-        meta.owner_references
-            .into_iter()
-            .flatten()
-            .filter_map(move |owner| ObjectRef::from_owner_ref(ns.as_deref(), &owner, owner_type.clone()))
-    };
-    trigger_others_shared(stream, mapper, child_type)
 }
 
 /// A request to reconcile an object, annotated with why that request was made.
@@ -935,7 +764,7 @@ where
         dyntype: K::DynamicType,
     ) -> Self {
         let mut trigger_selector = stream::SelectAll::new();
-        let self_watcher = trigger_self_shared(trigger.map(Ok), dyntype.clone()).boxed();
+        let self_watcher = trigger_self(trigger.map(Ok), dyntype.clone()).boxed();
         trigger_selector.push(self_watcher);
         Self {
             trigger_selector,
@@ -1177,7 +1006,7 @@ where
     where
         Child::DynamicType: Debug + Eq + Hash + Clone,
     {
-        let child_watcher = trigger_owners_shared(trigger.map(Ok), self.dyntype.clone(), dyntype);
+        let child_watcher = trigger_owners::<K, Child, _>(trigger.map(Ok), self.dyntype.clone(), dyntype);
         self.trigger_selector.push(child_watcher.boxed());
         self
     }
@@ -1451,7 +1280,7 @@ where
         I: 'static + IntoIterator<Item = ObjectRef<K>>,
         I::IntoIter: Send,
     {
-        let other_watcher = trigger_others_shared(trigger.map(Ok), mapper, dyntype);
+        let other_watcher = trigger_others::<_, Other, _, _>(trigger.map(Ok), mapper, dyntype);
         self.trigger_selector.push(other_watcher.boxed());
         self
     }
