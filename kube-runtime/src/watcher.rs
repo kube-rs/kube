@@ -14,7 +14,17 @@ use kube_client::{
     error::Status,
 };
 use serde::de::DeserializeOwned;
-use std::{clone::Clone, collections::VecDeque, fmt::Debug, future, time::Duration};
+#[cfg(test)]
+#[path = "stub_watcher.rs"]
+mod stub_watcher;
+
+use std::{
+    clone::Clone,
+    collections::VecDeque,
+    fmt::{Debug, Display},
+    future::{self, Future},
+    time::Duration,
+};
 use thiserror::Error;
 use tracing::{debug, error, warn};
 
@@ -83,6 +93,22 @@ pub enum Event<K> {
     InitDone,
 }
 
+impl<K> Display for Event<K>
+where
+    K: ResourceExt,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let desc = match self {
+            Event::Init => "Init".into(),
+            Event::InitApply(obj) => format!("InitApply({})", obj.name_any()),
+            Event::InitDone => "InitDone".into(),
+            Event::Apply(obj) => format!("Apply({})", obj.name_any()),
+            Event::Delete(obj) => format!("Delete({})", obj.name_any()),
+        };
+        write!(f, "{desc}")
+    }
+}
+
 impl<K> Event<K> {
     /// Map each object in an event through a mutator fn
     ///
@@ -147,21 +173,26 @@ enum State<K> {
 
 /// Used to control whether the watcher receives the full object, or only the
 /// metadata
-trait ApiMode {
-    type Value: Clone;
+trait ApiMode: Send + Sync {
+    type Value: Clone + Send + 'static;
 
-    async fn list(&self, lp: &ListParams) -> kube_client::Result<ObjectList<Self::Value>>;
-    async fn watch(
+    fn list(
+        &self,
+        lp: &ListParams,
+    ) -> impl Future<Output = kube_client::Result<ObjectList<Self::Value>>> + Send;
+    fn watch(
         &self,
         wp: &WatchParams,
         version: &str,
-    ) -> kube_client::Result<BoxStream<'static, kube_client::Result<WatchEvent<Self::Value>>>>;
+    ) -> impl Future<
+        Output = kube_client::Result<BoxStream<'static, kube_client::Result<WatchEvent<Self::Value>>>>,
+    > + Send;
 }
 
 /// A wrapper around the `Api` of a `Resource` type that when used by the
 /// watcher will return the entire (full) object
-struct FullObject<'a, K> {
-    api: &'a Api<K>,
+struct FullObject<K> {
+    api: Api<K>,
 }
 
 /// Configurable list semantics for `watcher` relists
@@ -431,7 +462,7 @@ enum WatchPhase {
     Resumed,
 }
 
-impl<K> ApiMode for FullObject<'_, K>
+impl<K> ApiMode for FullObject<K>
 where
     K: Clone + Debug + DeserializeOwned + Send + 'static,
 {
@@ -452,11 +483,11 @@ where
 
 /// A wrapper around the `Api` of a `Resource` type that when used by the
 /// watcher will return only the metadata associated with an object
-struct MetaOnly<'a, K> {
-    api: &'a Api<K>,
+struct MetaOnly<K> {
+    api: Api<K>,
 }
 
-impl<K> ApiMode for MetaOnly<'_, K>
+impl<K> ApiMode for MetaOnly<K>
 where
     K: Clone + Debug + DeserializeOwned + Send + 'static,
 {
@@ -793,10 +824,20 @@ pub fn watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 'static>(
     api: Api<K>,
     watcher_config: Config,
 ) -> impl Stream<Item = Result<Event<K>>> + Send {
+    watcher_inner(FullObject { api }, watcher_config)
+}
+
+/// [`ApiMode`] compatibility helper. Introduced later so that the core logic of [`watcher`] can be tested without
+/// having to modify its pre-existing signature.
+fn watcher_inner<A>(api: A, watcher_config: Config) -> impl Stream<Item = Result<Event<A::Value>>> + Send
+where
+    A: ApiMode,
+    A::Value: Resource,
+{
     futures::stream::unfold(
         (api, watcher_config, State::default()),
         |(api, watcher_config, state)| async {
-            let (event, state) = step(&FullObject { api: &api }, &watcher_config, state).await;
+            let (event, state) = step(&api, &watcher_config, state).await;
             Some((event, (api, watcher_config, state)))
         },
     )
@@ -861,13 +902,7 @@ pub fn metadata_watcher<K: Resource + Clone + DeserializeOwned + Debug + Send + 
     api: Api<K>,
     watcher_config: Config,
 ) -> impl Stream<Item = Result<Event<PartialObjectMeta<K>>>> + Send {
-    futures::stream::unfold(
-        (api, watcher_config, State::default()),
-        |(api, watcher_config, state)| async {
-            let (event, state) = step(&MetaOnly { api: &api }, &watcher_config, state).await;
-            Some((event, (api, watcher_config, state)))
-        },
-    )
+    watcher_inner(MetaOnly { api }, watcher_config)
 }
 
 /// Watch a single named object for updates
@@ -1008,7 +1043,366 @@ impl Backoff for DefaultBackoff {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::{collections::BTreeMap, time::Duration};
+
+    use futures::StreamExt;
+    use k8s_openapi::{api::core::v1::ConfigMap, apimachinery::pkg::apis::meta::v1::ObjectMeta};
+    use kube_client::{
+        api::{TypeMeta, WatchEvent, WatchParams},
+        core::{
+            Status,
+            watch::{Bookmark, BookmarkMeta},
+        },
+    };
+
+    use crate::watcher::{
+        ApiMode, Config, ExponentialBackoff, State, WatchPhase, next_with_idle_timeout, step,
+        stub_watcher::{
+            Recording, Sequence, SequenceStep, TestMode, error_indicates_graceful_watch_seq_exhaustion,
+        },
+        watcher_inner,
+    };
+
+    use super::stub_watcher::ResultPage;
+
+    fn config_map(name: &str, resource_version: &str) -> ConfigMap {
+        ConfigMap {
+            metadata: ObjectMeta {
+                name: Some(name.to_string()),
+                resource_version: Some(resource_version.to_string()),
+                ..ObjectMeta::default()
+            },
+            ..ConfigMap::default()
+        }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn test_mode_watch_waits_before_returning_next_event() {
+        let api = TestMode::new(vec![], vec![Sequence::new(vec![
+            SequenceStep::Wait(Duration::from_millis(50)),
+            SequenceStep::List(vec![Ok(WatchEvent::Added(config_map("a", "1")))].into()),
+        ])]);
+        let mut stream = api.watch(&WatchParams::default(), "0").await.unwrap();
+
+        assert!(futures::poll!(stream.next()).is_pending());
+        tokio::time::advance(Duration::from_millis(49)).await;
+        assert!(futures::poll!(stream.next()).is_pending());
+        tokio::time::advance(Duration::from_millis(1)).await;
+
+        assert!(matches!(
+            stream.next().await,
+            Some(Ok(WatchEvent::Added(config_map))) if config_map.metadata.name.as_deref() == Some("a")
+        ));
+    }
+
+    #[allow(clippy::too_many_lines)]
+    #[tokio::test]
+    async fn streaming_list_resync() {
+        const LAST_VALID_RESOURCE_VERSION: &str = "5";
+        let mut recoverable_err = Box::new(Status::default());
+        recoverable_err.code = 502;
+        recoverable_err.message = "some err".to_string();
+        recoverable_err.reason = "Something went wrong".to_string();
+        let api = TestMode::new(vec![], vec![
+            Sequence::new(vec![
+                SequenceStep::List(
+                    vec![
+                        Ok(WatchEvent::Added(config_map("a", "2"))),
+                        Ok(WatchEvent::Added(config_map("b", "3"))),
+                        Ok(WatchEvent::Added(config_map("c", "4"))),
+                        // Details here: https://kubernetes.io/docs/reference/using-api/api-concepts/#streaming-lists
+                        // Should only be sent when requested via allowWatchBookmarks=true
+                        // Since TestMode does not contain any real logic and  is not dynamically
+                        // progammable, this is up to the test
+                        // author to return or not for now.
+                        Ok(WatchEvent::Bookmark(Bookmark {
+                            types: TypeMeta::resource::<ConfigMap>(),
+                            metadata: BookmarkMeta {
+                                resource_version: "4".to_string(),
+                                annotations: BTreeMap::from_iter(vec![(
+                                    "k8s.io/initial-events-end".into(),
+                                    "true".into(),
+                                )]),
+                            },
+                        })),
+                    ]
+                    .into(),
+                ),
+                SequenceStep::List(
+                    vec![
+                        Ok(WatchEvent::Modified(config_map("a", LAST_VALID_RESOURCE_VERSION))),
+                        Ok(WatchEvent::Error(recoverable_err)),
+                    ]
+                    .into(),
+                ),
+                // After an error we expect the watcher to request its last(latest) known
+                // resource version to be queried again.
+                SequenceStep::List(
+                    vec![Ok(WatchEvent::Modified(config_map(
+                        "a",
+                        LAST_VALID_RESOURCE_VERSION,
+                    )))]
+                    .into(),
+                ),
+            ]),
+            // After an error we expect the watcher to request its last(latest) known
+            // resource version to be queried again.
+            Sequence::new(vec![SequenceStep::List(
+                vec![
+                    Ok(WatchEvent::Added(config_map("a", "5"))),
+                    Ok(WatchEvent::Bookmark(Bookmark {
+                        types: TypeMeta::resource::<ConfigMap>(),
+                        metadata: BookmarkMeta {
+                            resource_version: "5".to_string(),
+                            annotations: BTreeMap::from_iter(vec![(
+                                "k8s.io/initial-events-end".into(),
+                                "true".into(),
+                            )]),
+                        },
+                    })),
+                ]
+                .into(),
+            )]),
+        ]);
+
+        let config = Config::default()
+            .timeout(1)
+            .streaming_lists()
+            .labels("app=test")
+            .fields("metadata.name!=ignored");
+        // NOTE(juf): The stream which is returned here is not the same stream that an individual `watch` result produces.
+        // That stream is wrapped and hidden behind the inner state [`kube_runtime::watcher::State`] of the watcher implementation.
+        let mut stream = std::pin::pin!(watcher_inner(api.clone(), config));
+
+        for expected in [
+            "InitApply(a)",
+            "InitApply(b)",
+            "InitApply(c)",
+            "InitDone",
+            "Apply(a)",
+            "error returned by apiserver during watch: some err: Something went wrong",
+            "Apply(a)",
+            "Apply(a)",
+        ] {
+            let event = stream.next().await.expect("watcher stream should not end");
+            let repr = match event {
+                Ok(event) => event.to_string(),
+                Err(err) => err.to_string(),
+            };
+            assert_eq!(repr, expected);
+        }
+
+        let event = tokio::time::timeout(Duration::from_millis(100), stream.next())
+            .await
+            .expect("watcher should return when the TestMode sequence is exhausted")
+            .expect("watcher stream should not end");
+        // See function docs for more context, we expect this error, when we want to check whether
+        // the whole watch sequence has been consumed and as breaker to avoid consuming an infinite
+        // async stream that returns None.
+        dbg!(&event);
+        assert!(event.is_err_and(|err| error_indicates_graceful_watch_seq_exhaustion(&err)),);
+
+        let records = api.get_recordings();
+        match &records[..] {
+            [
+                Recording::Watch(initial_params, initial_version),
+                Recording::Watch(resumed_params, resumed_version),
+                Recording::Watch(exhausted_params, exhausted_version),
+            ] => {
+                assert_eq!(initial_version, "0");
+                assert_eq!(initial_params.label_selector.as_deref(), Some("app=test"));
+                assert_eq!(
+                    initial_params.field_selector.as_deref(),
+                    Some("metadata.name!=ignored")
+                );
+                assert!(initial_params.send_initial_events);
+
+                for (watch_params, watch_version) in [
+                    (resumed_params, resumed_version),
+                    (exhausted_params, exhausted_version),
+                ] {
+                    assert_eq!(watch_version, LAST_VALID_RESOURCE_VERSION);
+                    assert_eq!(watch_params.label_selector.as_deref(), Some("app=test"));
+                    assert_eq!(
+                        watch_params.field_selector.as_deref(),
+                        Some("metadata.name!=ignored")
+                    );
+                    assert!(!watch_params.send_initial_events);
+                }
+            }
+            _ => panic!("unexpected API call sequence {records:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn streaming_list_init() {
+        let api = TestMode::new(vec![], vec![Sequence::new(vec![
+            SequenceStep::List(
+                vec![
+                    Ok(WatchEvent::Added(config_map("a", "2"))),
+                    Ok(WatchEvent::Added(config_map("b", "3"))),
+                    Ok(WatchEvent::Added(config_map("c", "4"))),
+                    // Details here: https://kubernetes.io/docs/reference/using-api/api-concepts/#streaming-lists
+                    // Should only be sent when requested via allowWatchBookmarks=true
+                    // Since TestMode does not contain any real logic and  is not dynamically
+                    // progammable, this is up to the test
+                    // author to return or not for now.
+                    Ok(WatchEvent::Bookmark(Bookmark {
+                        types: TypeMeta::resource::<ConfigMap>(),
+                        metadata: BookmarkMeta {
+                            resource_version: "145".to_string(),
+                            annotations: BTreeMap::from_iter(vec![(
+                                "k8s.io/initial-events-end".into(),
+                                "true".into(),
+                            )]),
+                        },
+                    })),
+                ]
+                .into(),
+            ),
+            SequenceStep::List(
+                vec![
+                    Ok(WatchEvent::Modified(config_map("a", "5"))),
+                    Ok(WatchEvent::Deleted(config_map("b", "7"))),
+                    Ok(WatchEvent::Modified(config_map("c", "9"))),
+                ]
+                .into(),
+            ),
+        ])]);
+
+        let config = Config::default()
+            .timeout(1)
+            .streaming_lists()
+            .labels("app=test")
+            .fields("metadata.name!=ignored");
+        let mut state = State::default();
+        for expected in [
+            "InitApply(a)",
+            "InitApply(b)",
+            "InitApply(c)",
+            "InitDone",
+            "Apply(a)",
+            "Delete(b)",
+            "Apply(c)",
+        ] {
+            let (event, next) = step(&api, &config, state).await;
+            state = next;
+            assert_eq!(event.unwrap().to_string(), expected);
+        }
+
+        let (event, _) = tokio::time::timeout(Duration::from_millis(100), step(&api, &config, state))
+            .await
+            .expect("step should return when the TestMode sequence is exhausted");
+        // See function docs for more context, we expect this error, when we want to check whether
+        // the whole watch sequence has been consumed and as breaker to avoid consuming an infinite
+        // async stream that returns None.
+        assert!(event.is_err_and(|err| error_indicates_graceful_watch_seq_exhaustion(&err)));
+
+        let records = api.get_recordings();
+        match &records[..] {
+            [
+                Recording::Watch(initial_params, initial_version),
+                Recording::Watch(resumed_params, resumed_version),
+            ] => {
+                assert_eq!(initial_version, "0");
+                assert_eq!(initial_params.label_selector.as_deref(), Some("app=test"));
+                assert_eq!(
+                    initial_params.field_selector.as_deref(),
+                    Some("metadata.name!=ignored")
+                );
+                assert!(initial_params.send_initial_events);
+
+                assert_eq!(resumed_version, "9");
+                assert_eq!(resumed_params.label_selector.as_deref(), Some("app=test"));
+                assert_eq!(
+                    resumed_params.field_selector.as_deref(),
+                    Some("metadata.name!=ignored")
+                );
+                assert!(!resumed_params.send_initial_events);
+            }
+            _ => panic!("unexpected API call sequence {records:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn listwatch_paginates_initial_list_before_starting_watch() {
+        let api = TestMode::new(
+            vec![
+                Ok(ResultPage::empty()
+                    .items(vec![config_map("a", "1")])
+                    .continue_token("first".into())
+                    .into()),
+                Ok(ResultPage::empty()
+                    .items(vec![config_map("b", "2")])
+                    .resource_version("2".into())
+                    .continue_token("second".into())
+                    .into()),
+                Ok(ResultPage::empty()
+                    .items(vec![config_map("c", "3")])
+                    .resource_version("3".into())
+                    .into()),
+            ],
+            vec![Sequence::new(vec![SequenceStep::List(
+                vec![Ok(WatchEvent::Added(config_map("d", "4")))].into(),
+            )])],
+        );
+
+        let config = Config::default()
+            .page_size(1)
+            .labels("app=test")
+            .fields("metadata.name!=ignored");
+        let mut state = State::default();
+
+        let (event, next) = step(&api, &config, state).await;
+        state = next;
+        assert_eq!(event.unwrap().to_string(), "Init");
+
+        let (event, next) = step(&api, &config, state).await;
+        state = next;
+        assert_eq!(event.unwrap().to_string(), "InitApply(a)");
+
+        let (event, next) = step(&api, &config, state).await;
+        state = next;
+        assert_eq!(event.unwrap().to_string(), "InitApply(b)");
+
+        let (event, next) = step(&api, &config, state).await;
+        state = next;
+        assert_eq!(event.unwrap().to_string(), "InitApply(c)");
+
+        let (event, next) = step(&api, &config, state).await;
+        state = next;
+        assert_eq!(event.unwrap().to_string(), "InitDone");
+
+        let (event, _) = step(&api, &config, state).await;
+        assert_eq!(event.unwrap().to_string(), "Apply(d)");
+
+        let records = api.get_recordings();
+        match &records[..] {
+            [
+                Recording::List(first),
+                Recording::List(second),
+                Recording::List(third),
+                Recording::Watch(watch_params, watch_version),
+            ] => {
+                assert_eq!(first.continue_token.as_deref(), None);
+                assert_eq!(second.continue_token.as_deref(), Some("first"));
+                assert_eq!(third.continue_token.as_deref(), Some("second"));
+
+                assert_eq!(first.limit, Some(1));
+                assert_eq!(first.label_selector.as_deref(), Some("app=test"));
+                assert_eq!(first.field_selector.as_deref(), Some("metadata.name!=ignored"));
+
+                assert_eq!(watch_version, "3");
+                assert_eq!(watch_params.label_selector.as_deref(), Some("app=test"));
+                assert_eq!(
+                    watch_params.field_selector.as_deref(),
+                    Some("metadata.name!=ignored")
+                );
+                assert!(!watch_params.send_initial_events);
+            }
+            _ => panic!("unexpected API call sequence"),
+        }
+    }
 
     #[test]
     fn to_watch_params_initial_phase_with_streaming_list_sets_send_initial_events() {
