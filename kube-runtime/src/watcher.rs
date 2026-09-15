@@ -255,7 +255,6 @@ pub struct Config {
     ///
     /// This limits the duration of the call, regardless of any activity or inactivity.
     /// If unset for a watch call, we will use 290s.
-    /// We limit this to 295s due to [inherent watch limitations](https://github.com/kubernetes/kubernetes/issues/6513).
     pub timeout: Option<u32>,
 
     /// Semantics for list calls.
