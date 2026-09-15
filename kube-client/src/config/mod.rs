@@ -15,11 +15,13 @@ use thiserror::Error;
 mod file_config;
 mod file_loader;
 mod incluster_config;
+#[cfg(any(feature = "http-proxy", feature = "socks5"))]
 mod no_proxy;
 
 use file_loader::ConfigLoader;
 pub use file_loader::KubeConfigOptions;
 pub use incluster_config::Error as InClusterError;
+#[cfg(any(feature = "http-proxy", feature = "socks5"))]
 pub use no_proxy::Error as NoProxyError;
 
 /// Failed to infer config
@@ -96,6 +98,7 @@ pub enum KubeconfigError {
     ParseCertificates(#[source] pem::PemError),
 
     /// Failed to parse NO_PROXY/no_proxy env var
+    #[cfg(any(feature = "http-proxy", feature = "socks5"))]
     #[error("failed to parse NO_PROXY/no_proxy env var")]
     ParseNoProxy(#[source] NoProxyError),
 }

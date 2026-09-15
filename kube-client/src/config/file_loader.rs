@@ -1,8 +1,10 @@
+#[cfg(any(feature = "http-proxy", feature = "socks5"))]
+use crate::config::no_proxy::NoProxy;
+
 use crate::{
     config::{
         KubeconfigError,
         file_config::{AuthInfo, Cluster, Context, Kubeconfig},
-        no_proxy::NoProxy,
     },
     util::nonempty,
 };
@@ -141,12 +143,21 @@ impl ConfigLoader {
             let uri = proxy
                 .parse::<http::Uri>()
                 .map_err(KubeconfigError::ParseProxyUrl)?;
-            let no_proxy = NoProxy::from_env().map_err(KubeconfigError::ParseNoProxy)?;
 
-            match no_proxy {
-                Some(no_proxy) if no_proxy.matches(&uri).map_err(KubeconfigError::ParseNoProxy)? => Ok(None),
-                _ => Ok(Some(uri)),
+            #[cfg(any(feature = "http-proxy", feature = "socks5"))]
+            {
+                let no_proxy = NoProxy::from_env().map_err(KubeconfigError::ParseNoProxy)?;
+
+                match no_proxy {
+                    Some(no_proxy) if no_proxy.matches(&uri).map_err(KubeconfigError::ParseNoProxy)? => {
+                        Ok(None)
+                    }
+                    _ => Ok(Some(uri)),
+                }
             }
+
+            #[cfg(not(any(feature = "http-proxy", feature = "socks5")))]
+            Ok(Some(uri))
         } else {
             Ok(None)
         }

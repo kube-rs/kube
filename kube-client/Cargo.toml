@@ -29,8 +29,8 @@ jsonpatch = ["kube-core/jsonpatch"]
 admission = ["kube-core/admission"]
 config = ["__non_core", "pem"]
 proxy = ["socks5", "http-proxy"]
-socks5 = ["hyper-util/client-proxy"]
-http-proxy = ["hyper-util/client-proxy"]
+socks5 = ["hyper-util/client-proxy", "dep:ipnet"]
+http-proxy = ["hyper-util/client-proxy", "dep:ipnet"]
 unstable-client = []
 
 # private feature sets; do not use
@@ -55,7 +55,7 @@ http-body-util = { workspace = true, optional = true }
 either = { workspace = true, optional = true }
 thiserror.workspace = true
 futures = { workspace = true, optional = true, features = ["std"] }
-ipnet.workspace = true
+ipnet = { workspace = true, optional = true }
 jiff = { workspace = true, optional = true, features = ["std", "serde"] }
 pem = { workspace = true, optional = true }
 openssl = { workspace = true, optional = true }
