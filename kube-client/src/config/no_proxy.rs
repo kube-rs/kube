@@ -65,7 +65,7 @@ impl FromStr for NoProxy {
 
 impl NoProxy {
     /// Parse the configuration from the `NO_PROXY` and `no_proxy` environment variables.
-    /// `no_proxy` takes precedence.
+    /// `NO_PROXY` takes precedence.
     ///
     /// If both environment variables are set but are empty, this function returns `Ok(None)`.
     pub fn from_env() -> Result<Option<Self>, Error> {
