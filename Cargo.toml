@@ -55,6 +55,7 @@ hyper-openssl = "0.10.2"
 hyper-rustls = { version = "0.27.1", default-features = false }
 hyper-timeout = "0.5.1"
 hyper-util = "0.1.16"
+ipnet = "2.12.2"
 jiff = { version = "0.2.16", default-features = false }
 json-patch = "4"
 jsonpath-rust = "1"
