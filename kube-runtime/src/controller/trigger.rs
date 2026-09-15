@@ -3,8 +3,9 @@
 //! Every relation (self, owns, watches) is a mapping from an object in a watched stream
 //! to zero or more reconcile requests for the controlled kind, built on top of [`trigger_with`].
 //!
-//! Input streams can yield either owned objects (`K`) or shared objects (`Arc<K>`), since
-//! both implement [`Borrow<K>`](std::borrow::Borrow).
+//! [`trigger_self`] and [`trigger_others`] accept streams of either owned objects (`K`) or
+//! shared objects (`Arc<K>`), since both implement [`Borrow<K>`](std::borrow::Borrow).
+//! [`trigger_owners`] takes owned objects so it can move out their metadata instead of cloning.
 
 use super::{ReconcileReason, ReconcileRequest};
 use crate::reflector::ObjectRef;
@@ -84,24 +85,49 @@ where
 }
 
 /// Enqueues any owners of type `KOwner` for reconciliation
-///
-/// The stream can yield `K` or `Arc<K>`.
-pub fn trigger_owners<KOwner, K, S>(
+pub fn trigger_owners<KOwner, S>(
+    stream: S,
+    owner_type: KOwner::DynamicType,
+    child_type: <S::Ok as Resource>::DynamicType,
+) -> impl Stream<Item = Result<ReconcileRequest<KOwner>, S::Error>>
+where
+    S: TryStream,
+    S::Ok: Resource,
+    <S::Ok as Resource>::DynamicType: Clone,
+    KOwner: Resource,
+    KOwner::DynamicType: Clone,
+{
+    let mapper = move |mut obj: S::Ok| {
+        // `obj` is owned here, so take the metadata instead of deep-cloning the whole
+        // ObjectMeta (labels/annotations/managedFields) just to read two fields.
+        let meta = std::mem::take(obj.meta_mut());
+        let ns = meta.namespace;
+        let owner_type = owner_type.clone();
+        meta.owner_references
+            .into_iter()
+            .flatten()
+            .filter_map(move |owner| ObjectRef::from_owner_ref(ns.as_deref(), &owner, owner_type.clone()))
+    };
+    trigger_others::<S, S::Ok, KOwner, _>(stream, mapper, child_type)
+}
+
+/// Enqueues any owners of type `KOwner` for reconciliation based on a stream of shared `Arc<K>` objects
+#[cfg(feature = "unstable-runtime-subscribe")]
+pub(crate) fn trigger_owners_shared<KOwner, K, S>(
     stream: S,
     owner_type: KOwner::DynamicType,
     child_type: K::DynamicType,
 ) -> impl Stream<Item = Result<ReconcileRequest<KOwner>, S::Error>>
 where
-    S: TryStream,
-    S::Ok: Borrow<K>,
+    S: TryStream<Ok = std::sync::Arc<K>>,
     K: Resource,
     K::DynamicType: Clone,
     KOwner: Resource,
     KOwner::DynamicType: Clone,
 {
     let mapper = move |obj: S::Ok| {
-        // only clone the two fields we need rather than the whole ObjectMeta
-        let meta = obj.borrow().meta();
+        // `obj` is shared, so clone only the two fields we need rather than the whole ObjectMeta
+        let meta = obj.meta();
         let ns = meta.namespace.clone();
         let owner_type = owner_type.clone();
         meta.owner_references
@@ -183,35 +209,38 @@ mod tests {
         }
     }
 
+    /// A pod owned by a `ReplicaSet` and a `Deployment`, plus an orphan pod
+    fn owned_pods() -> [Pod; 2] {
+        [
+            pod("a", vec![
+                owner_ref::<ReplicaSet>("rs"),
+                owner_ref::<Deployment>("ignored"),
+            ]),
+            pod("b", vec![]),
+        ]
+    }
+
+    /// Only the `ReplicaSet` owner of pod `a` should be enqueued
+    fn assert_owner_requests(reqs: &[ReconcileRequest<ReplicaSet>]) {
+        assert_eq!(reqs.len(), 1);
+        let req = &reqs[0];
+        assert_eq!(req.obj_ref, ObjectRef::new("rs").within("ns"));
+        assert_eq!(req.obj_ref.extra.uid.as_deref(), Some("rs-uid"));
+        assert_related_to(req, &ObjectRef::new("a").within("ns"));
+    }
+
     #[tokio::test]
     async fn trigger_owners_only_enqueues_matching_owner_kind() {
-        let p = pod("a", vec![
-            owner_ref::<ReplicaSet>("rs"),
-            owner_ref::<Deployment>("ignored"),
-        ]);
-        let orphan = pod("b", vec![]);
-        let child_ref = ObjectRef::from_obj(&p);
+        let reqs = collect(trigger_owners::<ReplicaSet, _>(ok(owned_pods().to_vec()), (), ())).await;
+        assert_owner_requests(&reqs);
+    }
 
-        for reqs in [
-            collect(trigger_owners::<ReplicaSet, Pod, _>(
-                ok(vec![p.clone(), orphan.clone()]),
-                (),
-                (),
-            ))
-            .await,
-            collect(trigger_owners::<ReplicaSet, Pod, _>(
-                ok(vec![Arc::new(p.clone()), Arc::new(orphan.clone())]),
-                (),
-                (),
-            ))
-            .await,
-        ] {
-            assert_eq!(reqs.len(), 1);
-            let req = &reqs[0];
-            assert_eq!(req.obj_ref, ObjectRef::new("rs").within("ns"));
-            assert_eq!(req.obj_ref.extra.uid.as_deref(), Some("rs-uid"));
-            assert_related_to(req, &child_ref);
-        }
+    #[cfg(feature = "unstable-runtime-subscribe")]
+    #[tokio::test]
+    async fn trigger_owners_shared_only_enqueues_matching_owner_kind() {
+        let pods = owned_pods().map(Arc::new).to_vec();
+        let reqs = collect(trigger_owners_shared::<ReplicaSet, _, _>(ok(pods), (), ())).await;
+        assert_owner_requests(&reqs);
     }
 
     #[tokio::test]

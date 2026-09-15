@@ -39,6 +39,8 @@ mod runner;
 mod trigger;
 
 use trigger::trigger_others;
+#[cfg(feature = "unstable-runtime-subscribe")]
+use trigger::trigger_owners_shared;
 pub use trigger::{trigger_owners, trigger_self, trigger_with};
 
 /// The reasons the internal runner can fail
@@ -1006,7 +1008,7 @@ where
     where
         Child::DynamicType: Debug + Eq + Hash + Clone,
     {
-        let child_watcher = trigger_owners::<K, Child, _>(trigger.map(Ok), self.dyntype.clone(), dyntype);
+        let child_watcher = trigger_owners_shared(trigger.map(Ok), self.dyntype.clone(), dyntype);
         self.trigger_selector.push(child_watcher.boxed());
         self
     }
