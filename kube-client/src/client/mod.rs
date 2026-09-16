@@ -346,6 +346,8 @@ impl Client {
     {
         // Kubernetes >=1.37 gzips watch streams one member per event, but our decompression
         // middleware only decodes the first member, so opt watch streams out of compression.
+        // Drop this once tower-http decodes multi-member gzip again: tower-rs/tower-http#737,
+        // fixed upstream by Nullus157/async-compression#489.
         request
             .headers_mut()
             .entry(http::header::ACCEPT_ENCODING)
