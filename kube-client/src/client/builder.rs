@@ -86,30 +86,22 @@ impl<Svc> ClientBuilder<Svc> {
 
 pub type GenericService = BoxService<Request<Body>, Response<Box<DynBody>>, BoxError>;
 
-/// Decodes percent-escapes (`%XX`) in a URI userinfo component.
+/// Builds a `Basic` auth header value from a URI userinfo component.
 ///
-/// `http::Uri` never does this itself, so credentials containing characters
-/// that had to be percent-encoded in the proxy URL (e.g. `@`, `:`, `%`) would
-/// otherwise be sent to the proxy still escaped, which any proxy that isn't
-/// also skipping decoding will reject as wrong credentials.
-fn percent_decode(input: &str) -> Vec<u8> {
-    let bytes = input.as_bytes();
-    let mut out = Vec::with_capacity(bytes.len());
-    let mut i = 0;
-    while i < bytes.len() {
-        if bytes[i] == b'%'
-            && i + 2 < bytes.len()
-            && let Ok(hex) = std::str::from_utf8(&bytes[i + 1..i + 3])
-            && let Ok(byte) = u8::from_str_radix(hex, 16)
-        {
-            out.push(byte);
-            i += 3;
-            continue;
-        }
-        out.push(bytes[i]);
-        i += 1;
-    }
-    out
+/// `http::Uri` never decodes percent-escapes, so credentials containing
+/// characters that had to be percent-encoded in the proxy URL (e.g. `@`,
+/// `:`, `%`) are decoded here first — otherwise they'd reach the proxy
+/// still escaped, which any proxy that isn't also skipping decoding will
+/// reject as wrong credentials.
+#[cfg(feature = "http-proxy")]
+fn proxy_basic_auth_value(userinfo: &str) -> String {
+    use base64::Engine;
+
+    format!(
+        "Basic {}",
+        base64::engine::general_purpose::STANDARD
+            .encode(percent_encoding::percent_decode_str(userinfo).collect::<Vec<u8>>())
+    )
 }
 
 #[cfg(feature = "http-proxy")]
@@ -120,14 +112,9 @@ fn with_proxy_basic_auth<C>(
     if let Some(authority) = proxy_url.authority()
         && let Some((userinfo, _)) = authority.as_str().split_once('@')
     {
-        use base64::Engine;
         use http::HeaderValue;
 
-        let value = format!(
-            "Basic {}",
-            base64::engine::general_purpose::STANDARD.encode(percent_decode(userinfo))
-        );
-        if let Ok(header) = HeaderValue::from_str(&value) {
+        if let Ok(header) = HeaderValue::from_str(&proxy_basic_auth_value(userinfo)) {
             connector = connector.with_auth(header);
         }
     }
@@ -137,31 +124,36 @@ fn with_proxy_basic_auth<C>(
 
 #[cfg(all(test, feature = "http-proxy"))]
 mod proxy_auth_tests {
-    use super::percent_decode;
+    use super::proxy_basic_auth_value;
     use base64::Engine;
+
+    fn basic_auth(plain: &str) -> String {
+        format!("Basic {}", base64::engine::general_purpose::STANDARD.encode(plain))
+    }
 
     #[test]
     fn decodes_percent_escapes_before_basic_auth_encoding() {
         // password containing '@' and ':' had to be percent-encoded in the proxy URL
-        let userinfo = "user:pa%40ss%3Aword";
-        let expected = "user:pa@ss:word";
-
-        assert_eq!(percent_decode(userinfo), expected.as_bytes());
         assert_eq!(
-            base64::engine::general_purpose::STANDARD.encode(percent_decode(userinfo)),
-            base64::engine::general_purpose::STANDARD.encode(expected)
+            proxy_basic_auth_value("user:pa%40ss%3Aword"),
+            basic_auth("user:pa@ss:word")
         );
     }
 
     #[test]
     fn leaves_plain_userinfo_unchanged() {
-        assert_eq!(percent_decode("user:pass"), b"user:pass");
+        assert_eq!(proxy_basic_auth_value("user:pass"), basic_auth("user:pass"));
     }
 
     #[test]
-    fn ignores_trailing_incomplete_escape() {
-        assert_eq!(percent_decode("user:pass%"), b"user:pass%");
-        assert_eq!(percent_decode("user:pass%4"), b"user:pass%4");
+    fn passes_through_invalid_escape_with_sign_prefix() {
+        // a leading '+' after '%' is not a valid percent-escape and must not be
+        // treated as one (a naive hex parser like `u8::from_str_radix` would
+        // otherwise accept "+A" as 0x0A instead of passing "%+A" through)
+        assert_eq!(
+            proxy_basic_auth_value("user:pass%+A"),
+            basic_auth("user:pass%+A")
+        );
     }
 }
 

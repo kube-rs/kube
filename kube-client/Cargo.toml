@@ -30,7 +30,7 @@ admission = ["kube-core/admission"]
 config = ["__non_core", "pem"]
 proxy = ["socks5", "http-proxy"]
 socks5 = ["hyper-util/client-proxy", "dep:ipnet"]
-http-proxy = ["hyper-util/client-proxy", "dep:ipnet"]
+http-proxy = ["hyper-util/client-proxy", "dep:ipnet", "dep:percent-encoding"]
 unstable-client = []
 
 # private feature sets; do not use
@@ -78,6 +78,7 @@ secrecy = { workspace = true }
 tracing = { workspace = true, features = ["log"], optional = true }
 hyper-openssl = { workspace = true, features = ["client-legacy", "tokio"], optional = true }
 form_urlencoded = { workspace = true, optional = true }
+percent-encoding = { workspace = true, optional = true }
 k8s-openapi= { workspace = true, features = [] }
 
 [dev-dependencies]
