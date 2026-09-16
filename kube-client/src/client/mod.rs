@@ -339,11 +339,17 @@ impl Client {
     /// Perform a raw request and get back a stream of [`WatchEvent`] objects
     pub async fn request_events<T>(
         &self,
-        request: Request<Vec<u8>>,
+        mut request: Request<Vec<u8>>,
     ) -> Result<impl TryStream<Item = Result<WatchEvent<T>>> + use<T>>
     where
         T: Clone + DeserializeOwned,
     {
+        // Kubernetes >=1.37 gzips watch streams one member per event, but our decompression
+        // middleware only decodes the first member, so opt watch streams out of compression.
+        request
+            .headers_mut()
+            .entry(http::header::ACCEPT_ENCODING)
+            .or_insert(http::HeaderValue::from_static("identity"));
         let res = self.send(request.map(Body::from)).await?;
         let res = handle_api_errors(res).await?;
         // trace!("Streaming from {} -> {}", res.url(), res.status().as_str());
