@@ -236,7 +236,18 @@ fn port_via_scheme(uri: &http::Uri) -> Option<u16> {
 
 #[cfg(test)]
 mod tests {
+    use rstest::rstest;
+
     use super::*;
+
+    fn assert_match(no_proxy: &str, target: &str, matches: bool) {
+        let no_proxy = NoProxy::from_str(no_proxy).expect("static input must parse");
+        let target_uri = http::Uri::from_str(target).expect("static input must parse");
+        assert_eq!(
+            no_proxy.matches(&target_uri).expect("target uri is valid"),
+            matches
+        );
+    }
 
     #[test]
     fn empty() {
@@ -250,27 +261,55 @@ mod tests {
         assert!(matches!(no_proxy, NoProxy::Wildcard));
     }
 
-    #[test]
-    fn cidr() {
-        let cidr = "10.0.0.0/8";
-        let no_proxy = NoProxy::from_str(cidr).expect("static input must parse");
-        let target_uri = http::Uri::from_str("10.0.0.1").expect("static input must parse");
-        assert!(no_proxy.matches(&target_uri).expect("target uri is valid"));
+    #[rstest]
+    // In specified IP address ranges
+    #[case("10.255.255.255", true)]
+    #[case("10.100.100.100", true)]
+    #[case("10.10.10.10", true)]
+    #[case("10.0.0.1", true)]
+    #[case("1.2.3.255", true)]
+    #[case("1.2.3.4", true)]
+    // Out of specified IP address ranges
+    #[case("192.168.0.1", false)]
+    #[case("127.0.0.1", false)]
+    #[case("1.2.4.255", false)]
+    #[case("1.2.4.3", false)]
+    fn cidr(#[case] input: &str, #[case] matches: bool) {
+        assert_match("10.0.0.0/8, 1.2.3.0/24", input, matches);
     }
 
-    #[test]
-    fn ip_addr() {
-        let ip_addr = "10.0.0.1";
-        let no_proxy = NoProxy::from_str(ip_addr).expect("static input must parse");
-        let target_uri = http::Uri::from_str(ip_addr).expect("static input must parse");
-        assert!(no_proxy.matches(&target_uri).expect("target uri is valid"));
+    #[rstest]
+    // Matches one of the specified IP addresses
+    #[case("10.255.255.255", true)]
+    #[case("10.0.0.1", true)]
+    #[case("1.2.3.4", true)]
+    // Does not match any of the specified IP addresses
+    #[case("10.100.100.100", false)]
+    #[case("192.168.0.1", false)]
+    #[case("10.10.10.10", false)]
+    #[case("127.0.0.1", false)]
+    #[case("1.2.4.255", false)]
+    #[case("1.2.3.255", false)]
+    #[case("1.2.4.3", false)]
+    fn ip_addr(#[case] input: &str, #[case] matches: bool) {
+        assert_match("10.255.255.255, 10.0.0.1, 1.2.3.4", input, matches);
     }
 
-    #[test]
-    fn host() {
-        let host = "example.org";
-        let no_proxy = NoProxy::from_str(host).expect("static input must parse");
-        let target_uri = http::Uri::from_str(host).expect("static input must parse");
-        assert!(no_proxy.matches(&target_uri).expect("target uri is valid"));
+    #[rstest]
+    // These match because of '*.', '.', and exact matches
+    #[case("my.nested.exception.example.org", true)]
+    #[case("my.nested.exception.example.com", true)]
+    #[case("exception.example.org", true)]
+    #[case("exception.example.com", true)]
+    #[case("kube.rs", true)]
+    #[case("localhost", true)]
+    // These do not match because they do not exactly match or do not match at all
+    #[case("exception.kube.rs", false)]
+    #[case("example.org", false)]
+    #[case("example.com", false)]
+    #[case("example.net", false)]
+    #[case("local", false)]
+    fn host(#[case] input: &str, #[case] matches: bool) {
+        assert_match("*.example.org, .example.com, kube.rs, localhost", input, matches);
     }
 }
