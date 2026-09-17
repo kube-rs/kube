@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1789127374766,
+  "lastUpdate": 1789638211020,
   "repoUrl": "https://github.com/kube-rs/kube",
   "entries": {
     "Benchmark": [
@@ -5864,6 +5864,105 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/kube-rs/kube/commit/20caeb96084ae488b095232954de76731869a9e9"
         },
         "date": 1789127372640,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "init_listwatch - peak_bytes",
+            "value": 55194619,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - total_allocated",
+            "value": 76715088,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - alloc_count",
+            "value": 578023,
+            "unit": "allocations"
+          },
+          {
+            "name": "steady_state - peak_bytes",
+            "value": 71381202,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - total_allocated",
+            "value": 109519220,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - alloc_count",
+            "value": 799021,
+            "unit": "allocations"
+          },
+          {
+            "name": "relist - peak_bytes",
+            "value": 99797302,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - total_allocated",
+            "value": 174518628,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - alloc_count",
+            "value": 1189035,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_without_modify - peak_bytes",
+            "value": 141298836,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - total_allocated",
+            "value": 205865000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - alloc_count",
+            "value": 1298020,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_with_modify - peak_bytes",
+            "value": 134853452,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - total_allocated",
+            "value": 162895000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - alloc_count",
+            "value": 1058021,
+            "unit": "allocations"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "doxxx93@gmail.com",
+            "name": "doxxx",
+            "username": "doxxx93"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "3e57895bf3764c9a0bb528c755d9300c9a6c23ca",
+          "message": "Opt watch streams out of gzip compression (#2080)\n\n* Opt watch streams out of gzip compression\n\nKubernetes 1.37 enables WatchListCompression by default and closes the gzip\nstream on every flush, so a compressed watch arrives as one gzip member per\nevent. tower-http 0.6.8 disabled multiple_members on its gzip decoder, so we\ndecode the first event and then fail with \"there are extra bytes after body has\nbeen decompressed\".\n\nSet Accept-Encoding: identity on watch requests. tower-http only inserts its own\nheader when the entry is vacant, so ours wins, and entry().or_insert() still\nlets a caller opt back in. LIST keeps gzip, since large list responses are a\nsingle member.\n\nFixes #2079\n\nSigned-off-by: doxxx93 <doxxx93@gmail.com>\n\n* Point the watch identity header at its upstream removal condition\n\nSigned-off-by: doxxx93 <doxxx93@gmail.com>\n\n---------\n\nSigned-off-by: doxxx93 <doxxx93@gmail.com>",
+          "timestamp": "2026-09-17T10:41:29+01:00",
+          "tree_id": "d0330c25e0dbbd912b38ceb1f53d04aa9ad23635",
+          "url": "https://github.com/kube-rs/kube/commit/3e57895bf3764c9a0bb528c755d9300c9a6c23ca"
+        },
+        "date": 1789638209641,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
