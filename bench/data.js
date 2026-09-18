@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1789638211020,
+  "lastUpdate": 1789772971098,
   "repoUrl": "https://github.com/kube-rs/kube",
   "entries": {
     "Benchmark": [
@@ -5963,6 +5963,105 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/kube-rs/kube/commit/3e57895bf3764c9a0bb528c755d9300c9a6c23ca"
         },
         "date": 1789638209641,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "init_listwatch - peak_bytes",
+            "value": 55194619,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - total_allocated",
+            "value": 76715088,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - alloc_count",
+            "value": 578023,
+            "unit": "allocations"
+          },
+          {
+            "name": "steady_state - peak_bytes",
+            "value": 71381202,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - total_allocated",
+            "value": 109519220,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - alloc_count",
+            "value": 799021,
+            "unit": "allocations"
+          },
+          {
+            "name": "relist - peak_bytes",
+            "value": 99797302,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - total_allocated",
+            "value": 174518628,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - alloc_count",
+            "value": 1189035,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_without_modify - peak_bytes",
+            "value": 141298836,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - total_allocated",
+            "value": 205865000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - alloc_count",
+            "value": 1298020,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_with_modify - peak_bytes",
+            "value": 134853452,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - total_allocated",
+            "value": 162895000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - alloc_count",
+            "value": 1058021,
+            "unit": "allocations"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "doxxx93@gmail.com",
+            "name": "doxxx",
+            "username": "doxxx93"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f3619c349faebb4af25df013498af5f2bb85d1f5",
+          "message": "Extend Api with a kubectl style namespace constraint (#2067)\n\n* Extend Api with a kubectl style namespace constraint\n\n`Api::dynamic(client, &ar, &scope)` builds the cluster wide url and keeps the\n`Scope` on a new `Option<Scope>` field, so `Api::constrain(ns)` can apply\n`namespaces/<ns>/` to a namespaced kind and skip a cluster scoped one, the way\n`kubectl get nodes -n whatever` drops the flag rather than erroring.\n`constrain_default()` is the no `-n` case, taking the namespace off the client\nthe `Api` already holds. An empty namespace is the k8s spelling of \"every\nnamespace\", so it drops the constraint and doubles as the inverse.\n\nFolds the three hand-rolled branches on `ApiCapabilities.scope` in the tree\nonto it: `examples/kubectl.rs`, `examples/dynamic_api.rs`, and the discovery\ntest in `kube/src/lib.rs`.\n\nThe existing constructors record no scope; there `constrain` applies the\nnamespace unconditionally, as `namespaced_with` would, since a url the\napiserver rejects beats quietly widening the request to every namespace.\nThis is also the answer to the `// TODO: inspect dyntype scope to verify\nsomehow?` on `namespaced_with`: the scope is not on the dyntype, so it is\npassed in.\n\nRefs #1430\n\nSigned-off-by: doxxx93 <doxxx93@gmail.com>\n\n* Drop the url splicing and offer constrain on typed namespaced kinds\n\nAddresses the review on #2067.\n\n`Api` kept only the finished url, so `constrain` had to find the namespace\nsegment in it and splice a new one in - a second copy of the path format next\nto `Resource::url_path`, and it turned out `client_ext` already held a third,\na verbatim copy of that body taking an `ApiResource`. Keep the type-erased\n`ApiResource` on the `Api` and rebuild from it instead, and route `client_ext`\nthrough the trait, leaving one url formatter in the workspace. `ApiResource`\nis not generic, so this needs no bound on the struct, the same reason\n`metadata_api` is cached as a bool. An empty namespace also stops being a\nspecial case: it is just the `None` that `url_path` already takes.\n\nThat storage then makes the typed half free, so `constrain` is no longer\ndynamic-only. `NamespaceScope` moves out of `client_ext` into `kube-core` as a\npublic marker over `NamespaceResourceScope` and `DynamicResourceScope`, and\nbounds `constrain`. `Api::namespaced(client, \"ns1\").constrain(\"ns2\")` now\nswitches namespace without building a second `Api`, and\n`Api::<Node>::all(client).constrain(..)` is a compile error rather than a url\nthe apiserver rejects.\n\nSigned-off-by: doxxx93 <doxxx93@gmail.com>\n\n* Trim the constrain docs and add unconstrain\n\nReview follow-up on #2067.\n\nDocs: drop the paragraphs on how the url is rebuilt and on when the runtime\nscope is consulted, move the note on why `Api::dynamic` takes a scope into an\ninternal comment, and cut `constrain_default` down to the suggested four lines.\nThe `TODO` on `namespaced_with` is answered, so it says what the answer is\ninstead of asking.\n\n`constrain`'s summary said it does nothing for a cluster scoped kind while the\nexample below it was a `compile_fail`, which are the typed and the dynamic case\nrespectively. They are separate paragraphs now, and the kubectl aside about an\nempty namespace is gone.\n\n`unconstrain` is the explicit inverse, which is what the empty namespace was\ndoing implicitly and the reason that paragraph read ambivalently. The stored\nresource makes it two assignments.\n\nSigned-off-by: doxxx93 <doxxx93@gmail.com>\n\n---------\n\nSigned-off-by: doxxx93 <doxxx93@gmail.com>",
+          "timestamp": "2026-09-19T00:08:22+01:00",
+          "tree_id": "ca094ede02d1ff08462c91188d2ec184fed227aa",
+          "url": "https://github.com/kube-rs/kube/commit/f3619c349faebb4af25df013498af5f2bb85d1f5"
+        },
+        "date": 1789772969639,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
