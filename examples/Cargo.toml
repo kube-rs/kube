@@ -46,6 +46,7 @@ futures = { workspace = true, features = ["async-await"] }
 jsonpath-rust.workspace = true
 kube = { path = "../kube", default-features = false, features = [
     "admission",
+    "http-proxy"
 ] }
 kube-derive = { path = "../kube-derive", default-features = false } # only needed to opt out of schema
 k8s-openapi.workspace = true
