@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1789772971098,
+  "lastUpdate": 1790000492944,
   "repoUrl": "https://github.com/kube-rs/kube",
   "entries": {
     "Benchmark": [
@@ -6062,6 +6062,105 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/kube-rs/kube/commit/f3619c349faebb4af25df013498af5f2bb85d1f5"
         },
         "date": 1789772969639,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "init_listwatch - peak_bytes",
+            "value": 55194619,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - total_allocated",
+            "value": 76715088,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - alloc_count",
+            "value": 578023,
+            "unit": "allocations"
+          },
+          {
+            "name": "steady_state - peak_bytes",
+            "value": 71381202,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - total_allocated",
+            "value": 109519220,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - alloc_count",
+            "value": 799021,
+            "unit": "allocations"
+          },
+          {
+            "name": "relist - peak_bytes",
+            "value": 99797302,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - total_allocated",
+            "value": 174518628,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - alloc_count",
+            "value": 1189035,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_without_modify - peak_bytes",
+            "value": 141298836,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - total_allocated",
+            "value": 205865000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - alloc_count",
+            "value": 1298020,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_with_modify - peak_bytes",
+            "value": 134853452,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - total_allocated",
+            "value": 162895000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - alloc_count",
+            "value": 1058021,
+            "unit": "allocations"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "git@techassi.dev",
+            "name": "Techassi",
+            "username": "Techassi"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "6c56f829fddb7b60eacd0bb5de5796af119a13b6",
+          "message": "client: Add support for NO_PROXY/no_proxy (#2075)\n\n* feat(client): Add support for NO_PROXY/no_proxy\n\nSigned-off-by: Techassi <git@techassi.dev>\n\n* chore(examples): Enable http-proxy support for kube\n\nThis enables HTTP proxy support (including NO_PROXY/no_porxy) for\nall examples. This is especially useful for the kubectl example.\n\nSigned-off-by: Techassi <git@techassi.dev>\n\n* chore(client): Add some missing doc comments\n\nSigned-off-by: Techassi <git@techassi.dev>\n\n* chore(client): Adjust doc comment about env var precedence\n\nSigned-off-by: Techassi <git@techassi.dev>\n\n* feat: Add wrapper \"proxy\" feature gate\n\nThis feature gate enables both socks5 and HTTP proxy support.\n\nSigned-off-by: Techassi <git@techassi.dev>\n\n* feat(client): Gate NO_PROXY support behind feature gates\n\nSigned-off-by: Techassi <git@techassi.dev>\n\n* test(client): Add more unit tests for NoProxy\n\nSigned-off-by: Techassi <git@techassi.dev>\n\n* chore: Add runtime::watcher::Error to ignored large error list\n\nSigned-off-by: Techassi <git@techassi.dev>\n\n* feat(client): Further harden NoProxy parsing\n\nSigned-off-by: Techassi <git@techassi.dev>\n\n* test(client): Add more unit tests for invalid and wildcard inputs\n\nSigned-off-by: Techassi <git@techassi.dev>\n\n* chore: Add kube_client::error::Error to ignored large error list\n\nSigned-off-by: Techassi <git@techassi.dev>\n\n* chore: Add more errors to ignored large error list\n\n- kube_runtime::finalizer::Error\n- kube_runtime::wait::delete::Error\n- kube_runtime::wait::Error\n\nSigned-off-by: Techassi <git@techassi.dev>\n\n---------\n\nSigned-off-by: Techassi <git@techassi.dev>\nCo-authored-by: Eirik A <sszynrae@gmail.com>",
+          "timestamp": "2026-09-21T14:54:50+01:00",
+          "tree_id": "4f015c55faec72496cf46c630f9d5def5afafc0f",
+          "url": "https://github.com/kube-rs/kube/commit/6c56f829fddb7b60eacd0bb5de5796af119a13b6"
+        },
+        "date": 1790000491009,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
