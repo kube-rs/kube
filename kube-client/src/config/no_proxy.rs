@@ -9,6 +9,10 @@ use crate::util::nonempty;
 /// validation.
 #[derive(Debug, Error)]
 pub enum Error {
+    /// The whole input to parse [`NoProxy`] from is empty
+    #[error("unexpected empty input")]
+    EmptyInput,
+
     /// Comma-separated value is empty
     #[error("comma-separated value is empty")]
     EmptyValue,
@@ -44,6 +48,13 @@ impl FromStr for NoProxy {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
+        // Trim both the start and the end to get rid of any leading or trailing whitespace.
+        let s = s.trim();
+
+        if s.is_empty() {
+            return Err(Error::EmptyInput);
+        }
+
         if s == "*" {
             return Ok(Self::Wildcard);
         }
@@ -54,7 +65,8 @@ impl FromStr for NoProxy {
         let mut matchers = Vec::new();
 
         for part in parts {
-            // Trim both the start and the end to get rid of any leading or trailing whitespace.
+            // Trim both the start and the end to get rid of any leading or trailing whitespace in
+            // individual comma-separated values.
             let matcher = NoProxyMatcher::from_str(part.trim())?;
             matchers.push(matcher);
         }
