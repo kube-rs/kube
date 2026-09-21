@@ -261,15 +261,24 @@ mod tests {
         );
     }
 
-    #[test]
-    fn empty() {
-        let no_proxy = NoProxy::from_str("");
-        assert!(no_proxy.is_err());
+    #[rstest]
+    #[case("example.org,")]
+    #[case("  ")]
+    #[case(",,")]
+    #[case(",")]
+    #[case("")]
+    fn invalid(#[case] input: &str) {
+        let result = NoProxy::from_str(input);
+        assert!(result.is_err());
     }
 
-    #[test]
-    fn wildcard() {
-        let no_proxy = NoProxy::from_str("*").expect("static input must parse");
+    #[rstest]
+    #[case(" * ")]
+    #[case("* ")]
+    #[case(" *")]
+    #[case("*")]
+    fn wildcard(#[case] input: &str) {
+        let no_proxy = NoProxy::from_str(input).expect("static input must parse");
         assert!(matches!(no_proxy, NoProxy::Wildcard));
     }
 
