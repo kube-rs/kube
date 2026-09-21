@@ -11,5 +11,8 @@ disallowed-methods = [
 # https://github.com/kube-rs/kube/issues/2081
 large-error-ignored = [
   "kube_runtime::watcher::Error",
+  "kube_runtime::finalizer::Error",
+  "kube_runtime::wait::delete::Error",
+  "kube_runtime::wait::Error",
   "kube_client::error::Error"
 ]
