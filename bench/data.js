@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1790000492944,
+  "lastUpdate": 1790068574044,
   "repoUrl": "https://github.com/kube-rs/kube",
   "entries": {
     "Benchmark": [
@@ -6161,6 +6161,105 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/kube-rs/kube/commit/6c56f829fddb7b60eacd0bb5de5796af119a13b6"
         },
         "date": 1790000491009,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "init_listwatch - peak_bytes",
+            "value": 55194619,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - total_allocated",
+            "value": 76715088,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - alloc_count",
+            "value": 578023,
+            "unit": "allocations"
+          },
+          {
+            "name": "steady_state - peak_bytes",
+            "value": 71381202,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - total_allocated",
+            "value": 109519220,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - alloc_count",
+            "value": 799021,
+            "unit": "allocations"
+          },
+          {
+            "name": "relist - peak_bytes",
+            "value": 99797302,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - total_allocated",
+            "value": 174518628,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - alloc_count",
+            "value": 1189035,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_without_modify - peak_bytes",
+            "value": 141298836,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - total_allocated",
+            "value": 205865000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - alloc_count",
+            "value": 1298020,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_with_modify - peak_bytes",
+            "value": 134853452,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - total_allocated",
+            "value": 162895000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - alloc_count",
+            "value": 1058021,
+            "unit": "allocations"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "git@techassi.dev",
+            "name": "Techassi",
+            "username": "Techassi"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "96ee324151ba09b115547f724c0c88d4e9c3dc2d",
+          "message": "client: Add unit tests for NoProxy to increase coverage (#2083)\n\nSigned-off-by: Techassi <git@techassi.dev>",
+          "timestamp": "2026-09-22T10:15:18+01:00",
+          "tree_id": "35dd45304de2fedd29f26aa9e5354029c39474f2",
+          "url": "https://github.com/kube-rs/kube/commit/96ee324151ba09b115547f724c0c88d4e9c3dc2d"
+        },
+        "date": 1790068572469,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
