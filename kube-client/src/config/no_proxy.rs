@@ -263,6 +263,8 @@ mod tests {
 
     #[rstest]
     #[case("example.org,")]
+    // This is a valid URI without a hostname
+    #[case("no/host")]
     #[case("  ")]
     #[case(",,")]
     #[case(",")]
@@ -277,9 +279,29 @@ mod tests {
     #[case("* ")]
     #[case(" *")]
     #[case("*")]
-    fn wildcard(#[case] input: &str) {
+    fn wildcard_parse(#[case] input: &str) {
         let no_proxy = NoProxy::from_str(input).expect("static input must parse");
         assert!(matches!(no_proxy, NoProxy::Wildcard));
+    }
+
+    // The wildcard matches everything
+    #[rstest]
+    // IP addresses
+    #[case("10.255.255.255")]
+    #[case("10.100.100.100")]
+    #[case("10.10.10.10")]
+    #[case("10.0.0.1")]
+    #[case("1.2.3.255")]
+    #[case("1.2.3.4")]
+    // Hostnames
+    #[case("my.nested.exception.example.org")]
+    #[case("my.nested.exception.example.com")]
+    #[case("example.org")]
+    #[case("example.com")]
+    #[case("kube.rs")]
+    #[case("localhost")]
+    fn wildcard_match(#[case] input: &str) {
+        assert_match("*", input, true);
     }
 
     #[rstest]
@@ -295,6 +317,13 @@ mod tests {
     #[case("127.0.0.1", false)]
     #[case("1.2.4.255", false)]
     #[case("1.2.4.3", false)]
+    // Hostnames will never match IP addresses
+    #[case("my.nested.exception.example.org", false)]
+    #[case("my.nested.exception.example.com", false)]
+    #[case("example.org", false)]
+    #[case("example.com", false)]
+    #[case("example.net", false)]
+    #[case("localhost", false)]
     fn cidr(#[case] input: &str, #[case] matches: bool) {
         assert_match("10.0.0.0/8, 1.2.3.0/24", input, matches);
     }
@@ -312,6 +341,13 @@ mod tests {
     #[case("1.2.4.255", false)]
     #[case("1.2.3.255", false)]
     #[case("1.2.4.3", false)]
+    // Hostnames will never match IP addresses
+    #[case("my.nested.exception.example.org", false)]
+    #[case("my.nested.exception.example.com", false)]
+    #[case("example.org", false)]
+    #[case("example.com", false)]
+    #[case("example.net", false)]
+    #[case("localhost", false)]
     fn ip_addr(#[case] input: &str, #[case] matches: bool) {
         assert_match("10.255.255.255, 10.0.0.1, 1.2.3.4", input, matches);
     }
@@ -330,6 +366,13 @@ mod tests {
     #[case("example.com", false)]
     #[case("example.net", false)]
     #[case("local", false)]
+    // Ip addresses will never match hostnames
+    #[case("10.255.255.255", false)]
+    #[case("10.100.100.100", false)]
+    #[case("10.10.10.10", false)]
+    #[case("10.0.0.1", false)]
+    #[case("1.2.3.255", false)]
+    #[case("1.2.3.4", false)]
     fn host(#[case] input: &str, #[case] matches: bool) {
         assert_match("*.example.org, .example.com, kube.rs, localhost", input, matches);
     }
