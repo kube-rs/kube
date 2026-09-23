@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1790172698494,
+  "lastUpdate": 1790176838250,
   "repoUrl": "https://github.com/kube-rs/kube",
   "entries": {
     "Benchmark": [
@@ -6458,6 +6458,105 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/kube-rs/kube/commit/b7625b042eb8bbda75e97588047870778d56fbc2"
         },
         "date": 1790172697034,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "init_listwatch - peak_bytes",
+            "value": 55194619,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - total_allocated",
+            "value": 76715088,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - alloc_count",
+            "value": 578023,
+            "unit": "allocations"
+          },
+          {
+            "name": "steady_state - peak_bytes",
+            "value": 71381202,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - total_allocated",
+            "value": 109519220,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - alloc_count",
+            "value": 799021,
+            "unit": "allocations"
+          },
+          {
+            "name": "relist - peak_bytes",
+            "value": 99797302,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - total_allocated",
+            "value": 174518628,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - alloc_count",
+            "value": 1189035,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_without_modify - peak_bytes",
+            "value": 141298836,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - total_allocated",
+            "value": 205865000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - alloc_count",
+            "value": 1298020,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_with_modify - peak_bytes",
+            "value": 134853452,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - total_allocated",
+            "value": 162895000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - alloc_count",
+            "value": 1058021,
+            "unit": "allocations"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "902946+zap0xfce2@users.noreply.github.com",
+            "name": "Zap0xfce2",
+            "username": "zap0xfce2"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "9a4d12c8909d17a2f30da7b539e4ce6baae6dee1",
+          "message": "Percent-decode proxy userinfo before Basic auth encoding (#2078)\n\n* fix(client): percent-decode proxy userinfo before Basic auth encoding\n\nkube reads HTTPS_PROXY/http_proxy into Config::proxy_url and, when the URL\ncontains userinfo, sends it as a Proxy-Authorization: Basic header via\nwith_proxy_basic_auth. That function base64-encodes the raw userinfo slice\nfrom http::Uri, which never decodes percent-escapes.\n\nIf a proxy username or password contains a character that had to be\npercent-encoded in the URL (e.g. @ as %40, : as %3A), the client sends the\nstill-escaped literal string as the credential instead of the actual bytes,\nso the proxy rejects the connection with 407 Proxy Authentication Required.\n\nPercent-decode userinfo before encoding it. No new dependency: the decoder\nis ~15 lines (% + two hex digits -> byte, everything else passed through).\n\nTested against a real corporate HTTP proxy with a percent-encoded password;\nconnections that previously failed with \"tunnel error: proxy authorization\nrequired\" now succeed.\n\nSigned-off-by: Zap0xfce2 <902946+zap0xfce2@users.noreply.github.com>\n\n* fix(client): use percent-encoding crate for proxy userinfo decoding\n\nAddress review feedback on the previous commit:\n\n- the hand-rolled percent_decode helper wasn't gated behind the\n  http-proxy feature, so a default build (which doesn't enable it)\n  warned \"function percent_decode is never used\"\n- u8::from_str_radix accepts a leading '+', so the hand-rolled decoder\n  turned an invalid escape like \"%+A\" into 0x0A instead of passing it\n  through unchanged\n\nSwitch to percent_encoding::percent_decode_str, which is already in the\ndependency tree transitively (via form_urlencoded) and implements\npercent-decoding correctly. The new proxy_basic_auth_value helper that\nwraps it is properly cfg-gated behind http-proxy, and the tests now\nexercise it directly, including the %+A case.\n\nSigned-off-by: Zap0xfce2 <902946+zap0xfce2@users.noreply.github.com>\n\n---------\n\nSigned-off-by: Zap0xfce2 <902946+zap0xfce2@users.noreply.github.com>",
+          "timestamp": "2026-09-23T16:19:46+01:00",
+          "tree_id": "b5f30fec65a5e4d6aa7f7663d1a43385b96ed38f",
+          "url": "https://github.com/kube-rs/kube/commit/9a4d12c8909d17a2f30da7b539e4ce6baae6dee1"
+        },
+        "date": 1790176837077,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
