@@ -74,3 +74,7 @@ name = "rand_core"
 [[bans.skip]]
 # need some time to get the whole ecosystem to syn 3
 name = "syn"
+
+[[bans.skip]]
+# serde-saphyr pulls in base64 0.23 while k8s-openapi/pem/tower-http still use 0.22
+name = "base64"
