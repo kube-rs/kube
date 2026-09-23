@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1790068574044,
+  "lastUpdate": 1790156483421,
   "repoUrl": "https://github.com/kube-rs/kube",
   "entries": {
     "Benchmark": [
@@ -6260,6 +6260,105 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/kube-rs/kube/commit/96ee324151ba09b115547f724c0c88d4e9c3dc2d"
         },
         "date": 1790068572469,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "init_listwatch - peak_bytes",
+            "value": 55194619,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - total_allocated",
+            "value": 76715088,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - alloc_count",
+            "value": 578023,
+            "unit": "allocations"
+          },
+          {
+            "name": "steady_state - peak_bytes",
+            "value": 71381202,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - total_allocated",
+            "value": 109519220,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - alloc_count",
+            "value": 799021,
+            "unit": "allocations"
+          },
+          {
+            "name": "relist - peak_bytes",
+            "value": 99797302,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - total_allocated",
+            "value": 174518628,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - alloc_count",
+            "value": 1189035,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_without_modify - peak_bytes",
+            "value": 141298836,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - total_allocated",
+            "value": 205865000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - alloc_count",
+            "value": 1298020,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_with_modify - peak_bytes",
+            "value": 134853452,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - total_allocated",
+            "value": 162895000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - alloc_count",
+            "value": 1058021,
+            "unit": "allocations"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "anant1234466@gmail.com",
+            "name": "anant",
+            "username": "antcybersec"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "01754fc17f4380cd329c1e3bf5aa6fad1c893b6e",
+          "message": "runtime: move controller trigger functions to dedicated module and unify stream bounds (#2076)\n\n* runtime: move controller trigger fns to own module and unify shared variants\n\nMoves `trigger_with`, `trigger_self`, `trigger_others` and `trigger_owners` out of\n`controller/mod.rs` into `controller/trigger.rs`, and replaces the\n`unstable-runtime-subscribe` `*_shared` copies with a single `S::Ok: Borrow<K>`\nbound, so each relation is written once for both `K` and `Arc<K>` streams.\nAdds unit tests for each mapper.\n\n`trigger_owners` gains an explicit child type parameter\n(`trigger_owners::<KOwner, K, S>`), which is a breaking change for callers\nusing turbofish.\n\nRefs #2073\n\nSigned-off-by: anant <170962632+antcybersec@users.noreply.github.com>\n\n* ci: retrigger flaky k3d download and events test\n\nSigned-off-by: anant <170962632+antcybersec@users.noreply.github.com>\n\n* runtime: keep `trigger_owners` signature and restore `mem::take`\n\nAddresses review: `trigger_owners` goes back to its 2-param signature\n(`S::Ok: Resource`) and moves metadata out with `mem::take` again (#2039),\nso the PR is no longer breaking. The `Arc` path gets a crate-private\n`trigger_owners_shared` that clones only `namespace` and `owner_references`.\n\nSigned-off-by: anant <170962632+antcybersec@users.noreply.github.com>\n\n---------\n\nSigned-off-by: anant <170962632+antcybersec@users.noreply.github.com>\nCo-authored-by: anant <170962632+antcybersec@users.noreply.github.com>\nCo-authored-by: Eirik A <sszynrae@gmail.com>",
+          "timestamp": "2026-09-23T09:40:33Z",
+          "tree_id": "54e76fc9f29ec5e2b0fb98c730b5917da8f527cc",
+          "url": "https://github.com/kube-rs/kube/commit/01754fc17f4380cd329c1e3bf5aa6fad1c893b6e"
+        },
+        "date": 1790156481130,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
