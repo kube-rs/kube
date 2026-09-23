@@ -86,6 +86,24 @@ impl<Svc> ClientBuilder<Svc> {
 
 pub type GenericService = BoxService<Request<Body>, Response<Box<DynBody>>, BoxError>;
 
+/// Builds a `Basic` auth header value from a URI userinfo component.
+///
+/// `http::Uri` never decodes percent-escapes, so credentials containing
+/// characters that had to be percent-encoded in the proxy URL (e.g. `@`,
+/// `:`, `%`) are decoded here first — otherwise they'd reach the proxy
+/// still escaped, which any proxy that isn't also skipping decoding will
+/// reject as wrong credentials.
+#[cfg(feature = "http-proxy")]
+fn proxy_basic_auth_value(userinfo: &str) -> String {
+    use base64::Engine;
+
+    format!(
+        "Basic {}",
+        base64::engine::general_purpose::STANDARD
+            .encode(percent_encoding::percent_decode_str(userinfo).collect::<Vec<u8>>())
+    )
+}
+
 #[cfg(feature = "http-proxy")]
 fn with_proxy_basic_auth<C>(
     proxy_url: &http::Uri,
@@ -94,19 +112,49 @@ fn with_proxy_basic_auth<C>(
     if let Some(authority) = proxy_url.authority()
         && let Some((userinfo, _)) = authority.as_str().split_once('@')
     {
-        use base64::Engine;
         use http::HeaderValue;
 
-        let value = format!(
-            "Basic {}",
-            base64::engine::general_purpose::STANDARD.encode(userinfo)
-        );
-        if let Ok(header) = HeaderValue::from_str(&value) {
+        if let Ok(header) = HeaderValue::from_str(&proxy_basic_auth_value(userinfo)) {
             connector = connector.with_auth(header);
         }
     }
 
     connector
+}
+
+#[cfg(all(test, feature = "http-proxy"))]
+mod proxy_auth_tests {
+    use super::proxy_basic_auth_value;
+    use base64::Engine;
+
+    fn basic_auth(plain: &str) -> String {
+        format!("Basic {}", base64::engine::general_purpose::STANDARD.encode(plain))
+    }
+
+    #[test]
+    fn decodes_percent_escapes_before_basic_auth_encoding() {
+        // password containing '@' and ':' had to be percent-encoded in the proxy URL
+        assert_eq!(
+            proxy_basic_auth_value("user:pa%40ss%3Aword"),
+            basic_auth("user:pa@ss:word")
+        );
+    }
+
+    #[test]
+    fn leaves_plain_userinfo_unchanged() {
+        assert_eq!(proxy_basic_auth_value("user:pass"), basic_auth("user:pass"));
+    }
+
+    #[test]
+    fn passes_through_invalid_escape_with_sign_prefix() {
+        // a leading '+' after '%' is not a valid percent-escape and must not be
+        // treated as one (a naive hex parser like `u8::from_str_radix` would
+        // otherwise accept "+A" as 0x0A instead of passing "%+A" through)
+        assert_eq!(
+            proxy_basic_auth_value("user:pass%+A"),
+            basic_auth("user:pass%+A")
+        );
+    }
 }
 
 impl TryFrom<Config> for ClientBuilder<GenericService> {
