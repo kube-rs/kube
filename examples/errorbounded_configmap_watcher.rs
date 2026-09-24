@@ -1,4 +1,8 @@
-#![allow(dead_code)] // demo structs: fields define the parse target, not all are read
+//! An example of watching custom ConfigMaps and abort when an error is encountered.
+
+// demo structs: fields define the parse target, not all are read
+#![allow(dead_code)]
+
 use futures::prelude::*;
 use k8s_openapi::api::core::v1::ConfigMap;
 use kube::{

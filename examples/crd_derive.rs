@@ -1,3 +1,5 @@
+//! An example of how to create a custom resource using the [`CustomResource`] derive macro.
+
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::Condition;
 use kube::{
     CustomResource, CustomResourceExt, Resource,
@@ -42,12 +44,13 @@ pub struct MyFoo {
     info: Option<String>,
 }
 
+/// Our custom status for the custom resource
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, JsonSchema)]
 pub struct FooStatus {
     is_bad: bool,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[schemars(schema_with = "conditions")]
-    pub conditions: Vec<Condition>,
+    conditions: Vec<Condition>,
 }
 
 fn main() {

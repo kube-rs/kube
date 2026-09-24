@@ -1,3 +1,5 @@
+//! An example of how to use a custom type for [`Api`] via type-erasure.
+
 use kube::{
     Client,
     api::{Api, ApiResource, NotUsed, Object, ResourceExt},

@@ -1,7 +1,7 @@
-// Custom client with retry layer example.
-//
-// This demonstrates how to add a retry layer to the kube client
-// that automatically retries requests on transient failures (429, 503, 504).
+//! Custom client with retry layer example.
+//!
+//! This demonstrates how to add a retry layer to the kube client
+//! that automatically retries requests on transient failures (429, 503, 504).
 
 use hyper_util::rt::TokioExecutor;
 use k8s_openapi::api::core::v1::Pod;

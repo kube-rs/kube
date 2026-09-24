@@ -1,3 +1,5 @@
+//! An example of how to define a custom JSON schema for a custom resource (definition).
+
 use std::borrow::Cow;
 
 use kube::CustomResourceExt;

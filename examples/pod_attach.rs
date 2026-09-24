@@ -1,6 +1,9 @@
-use std::io::Write;
-use tracing::*;
+//! An example of how to attach to a container inside a Pod and print separated or combined
+//! stdout/stderr output.
 
+use std::io::Write;
+
+use tracing::*;
 use futures::{StreamExt, TryStreamExt, join, stream};
 use k8s_openapi::api::core::v1::Pod;
 

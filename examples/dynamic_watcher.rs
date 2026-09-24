@@ -1,3 +1,5 @@
+//! Watch any dynamically (via GVK) specified resources.
+
 use futures::{StreamExt, TryStreamExt};
 use kube::{
     api::{Api, DynamicObject, GroupVersionKind, ResourceExt},
