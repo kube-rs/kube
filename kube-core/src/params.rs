@@ -319,6 +319,8 @@ pub struct WatchParams {
     ///
     /// This limits the duration of the call, regardless of any activity or inactivity.
     /// If unset for a watch call, we will use 290s.
+    /// The watcher's dead-connection detection window is this value plus 5s,
+    /// so larger values delay noticing a silently dropped connection.
     pub timeout: Option<u32>,
 
     /// Enables watch events with type "BOOKMARK".
