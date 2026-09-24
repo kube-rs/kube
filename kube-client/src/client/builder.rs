@@ -18,7 +18,10 @@ use tower_http::{ServiceExt as _, classify::ServerErrorsFailureClass, trace::Tra
 use tracing::Span;
 
 use super::body::Body;
-use crate::{Client, Config, Error, Result, client::{ConfigExt, retry::RetryPolicy}};
+use crate::{
+    Client, Config, Error, Result,
+    client::{ConfigExt, retry::RetryPolicy},
+};
 
 /// HTTP body of a dynamic backing type.
 ///
@@ -128,7 +131,10 @@ mod proxy_auth_tests {
     use base64::Engine;
 
     fn basic_auth(plain: &str) -> String {
-        format!("Basic {}", base64::engine::general_purpose::STANDARD.encode(plain))
+        format!(
+            "Basic {}",
+            base64::engine::general_purpose::STANDARD.encode(plain)
+        )
     }
 
     #[test]
@@ -150,10 +156,7 @@ mod proxy_auth_tests {
         // a leading '+' after '%' is not a valid percent-escape and must not be
         // treated as one (a naive hex parser like `u8::from_str_radix` would
         // otherwise accept "+A" as 0x0A instead of passing "%+A" through)
-        assert_eq!(
-            proxy_basic_auth_value("user:pass%+A"),
-            basic_auth("user:pass%+A")
-        );
+        assert_eq!(proxy_basic_auth_value("user:pass%+A"), basic_auth("user:pass%+A"));
     }
 }
 
@@ -217,14 +220,19 @@ impl TryFrom<Config> for ClientBuilder<GenericService> {
                     #[cfg(all(not(feature = "rustls-tls"), feature = "openssl-tls"))]
                     let proxy_connector = config.openssl_https_connector_with_connector(connector)?;
 
-                    let connector =
-                        hyper_util::client::legacy::connect::proxy::Tunnel::new(proxy_url.clone(), proxy_connector);
+                    let connector = hyper_util::client::legacy::connect::proxy::Tunnel::new(
+                        proxy_url.clone(),
+                        proxy_connector,
+                    );
                     let connector = with_proxy_basic_auth(proxy_url, connector);
 
                     make_generic_builder(connector, config)
                 }
 
-                #[cfg(all(feature = "http-proxy", not(any(feature = "rustls-tls", feature = "openssl-tls"))))]
+                #[cfg(all(
+                    feature = "http-proxy",
+                    not(any(feature = "rustls-tls", feature = "openssl-tls"))
+                ))]
                 return Err(Error::TlsRequired);
 
                 #[cfg(not(feature = "http-proxy"))]
@@ -296,7 +304,11 @@ where
 
     let service = ServiceBuilder::new()
         .layer(stack)
-        .option_layer(config.default_retry.then_some(RetryLayer::new(RetryPolicy::server_retry())))
+        .option_layer(
+            config
+                .default_retry
+                .then_some(RetryLayer::new(RetryPolicy::server_retry())),
+        )
         .option_layer(auth_layer)
         .layer(config.extra_headers_layer()?)
         .layer(
@@ -367,7 +379,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    #[cfg(feature = "gzip")] use super::*;
+    #[cfg(feature = "gzip")]
+    use super::*;
 
     #[cfg(all(feature = "gzip", feature = "rustls-tls"))]
     #[tokio::test]
