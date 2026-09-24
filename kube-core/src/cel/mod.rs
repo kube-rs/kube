@@ -435,21 +435,21 @@ pub enum MergeStrategy {
     StructType(StructMerge),
 }
 
-// impl MergeStrategy {
-//     #[allow(dead_code)] // only used in some feature combinations
-//     fn keys(self) -> serde_json::Result<BTreeMap<String, Value>> {
-//         if let Self::ListType(ListMerge::Map(keys)) = self {
-//             let mut data = BTreeMap::new();
-//             data.insert("x-kubernetes-list-type".into(), "map".into());
-//             data.insert("x-kubernetes-list-map-keys".into(), serde_json::to_value(&keys)?);
+impl MergeStrategy {
+    #[allow(dead_code)] // only used in some feature combinations
+    fn keys(self) -> serde_json::Result<BTreeMap<String, Value>> {
+        if let Self::ListType(ListMerge::Map(keys)) = self {
+            let mut data = BTreeMap::new();
+            data.insert("x-kubernetes-list-type".into(), "map".into());
+            data.insert("x-kubernetes-list-map-keys".into(), serde_json::to_value(&keys)?);
 
-//             return Ok(data);
-//         }
+            return Ok(data);
+        }
 
-//         let value = serde_json::to_value(self)?;
-//         serde_json::from_value(value)
-//     }
-// }
+        let value = serde_json::to_value(self)?;
+        serde_json::from_value(value)
+    }
+}
 
 /// Merge strategy property mutates property under property_index of the schema
 /// with the provided set of merge strategy rules.
