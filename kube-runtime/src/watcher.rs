@@ -256,6 +256,8 @@ pub struct Config {
     /// This limits the duration of the call, regardless of any activity or inactivity.
     /// If unset for a watch call, we will use 290s.
     /// We limit this to 295s due to [inherent watch limitations](https://github.com/kubernetes/kubernetes/issues/6513).
+    /// When used by a watcher, an explicit zero timeout disables the client's idle timeout.
+    /// If the client's read timeout is unset (the default), dead connections will not be detected.
     pub timeout: Option<u32>,
 
     /// Semantics for list calls.
