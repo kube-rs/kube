@@ -3,9 +3,9 @@
 
 use std::io::Write;
 
-use tracing::*;
 use futures::{StreamExt, TryStreamExt, join, stream};
 use k8s_openapi::api::core::v1::Pod;
+use tracing::*;
 
 use kube::{
     Client,
