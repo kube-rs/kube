@@ -13,8 +13,7 @@ use std::{collections::BTreeMap, str::FromStr};
 pub use kube_cel::*;
 
 use derive_more::From;
-#[cfg(feature = "schema")]
-use schemars::Schema;
+#[cfg(feature = "schema")] use schemars::Schema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
