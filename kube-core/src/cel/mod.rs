@@ -435,6 +435,7 @@ pub enum MergeStrategy {
 }
 
 impl MergeStrategy {
+    #[allow(dead_code)] // only used in some feature combinations
     fn keys(self) -> serde_json::Result<BTreeMap<String, Value>> {
         if let Self::ListType(ListMerge::Map(keys)) = self {
             let mut data = BTreeMap::new();
