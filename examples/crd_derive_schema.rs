@@ -1,3 +1,5 @@
+//! An example of how to derive the JSOn schema for a custom resource.
+
 use anyhow::{Result, anyhow};
 use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
@@ -19,6 +21,7 @@ use serde::{Deserialize, Serialize};
 // - https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#defaulting
 // - https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#defaulting-and-nullable
 
+/// Our own custom resource
 #[derive(CustomResource, KubeSchema, Serialize, Deserialize, Default, Debug, PartialEq, Eq, Clone)]
 #[kube(
     group = "clux.dev",
@@ -111,6 +114,7 @@ pub struct FooSpec {
     associated_default: bool,
 }
 
+/// A part of our custom resource
 #[derive(KubeSchema, Serialize, Deserialize, Default, Debug, PartialEq, Eq, Clone)]
 pub struct FooSubSpec {
     /// Heterogenous CEL rule set

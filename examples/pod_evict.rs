@@ -1,3 +1,5 @@
+//! An example of how to create and evict a Pod.
+
 use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::api::core::v1::Pod;
 use serde_json::json;

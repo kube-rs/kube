@@ -1,3 +1,5 @@
+//! An example of a limited variant of `kubectl logs`.`
+
 use futures::{AsyncBufReadExt, TryStreamExt};
 use k8s_openapi::{api::core::v1::Pod, jiff::Timestamp};
 use kube::{
@@ -6,7 +8,6 @@ use kube::{
 };
 use tracing::*;
 
-/// limited variant of kubectl logs
 #[derive(clap::Parser)]
 struct App {
     #[arg(long, short = 'c')]

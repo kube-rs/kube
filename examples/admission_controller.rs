@@ -1,3 +1,5 @@
+//! An example implementation of a mutating admission controller.
+
 use axum::{Json, Router, routing::post};
 use axum_server::tls_rustls::RustlsConfig;
 use json_patch::jsonptr::PointerBuf;

@@ -1,3 +1,6 @@
+//! An example of how to implement a limited variant of `kubectl events` to watch events in the
+//! current context's namespace.
+
 use std::pin::pin;
 
 use futures::StreamExt;
