@@ -319,7 +319,8 @@ pub struct WatchParams {
     ///
     /// This limits the duration of the call, regardless of any activity or inactivity.
     /// If unset for a watch call, we will use 290s.
-    /// We limit this to 295s due to [inherent watch limitations](https://github.com/kubernetes/kubernetes/issues/6513).
+    /// The watcher's dead-connection detection window is this value plus 5s,
+    /// so larger values delay noticing a silently dropped connection.
     pub timeout: Option<u32>,
 
     /// Enables watch events with type "BOOKMARK".
@@ -359,12 +360,6 @@ pub struct WatchParams {
 
 impl WatchParams {
     pub(crate) fn validate(&self) -> Result<(), Error> {
-        if let Some(to) = &self.timeout {
-            // https://github.com/kubernetes/kubernetes/issues/6513
-            if *to >= 295 {
-                return Err(Error::Validation("WatchParams::timeout must be < 295s".into()));
-            }
-        }
         if self.send_initial_events && !self.bookmarks {
             return Err(Error::Validation(
                 "WatchParams::bookmarks must be set when using send_initial_events".into(),
@@ -377,7 +372,6 @@ impl WatchParams {
     pub(crate) fn populate_qp(&self, qp: &mut form_urlencoded::Serializer<String>) {
         qp.append_pair("watch", "true");
 
-        // https://github.com/kubernetes/kubernetes/issues/6513
         qp.append_pair("timeoutSeconds", &self.timeout.unwrap_or(290).to_string());
 
         if let Some(fields) = &self.field_selector {
