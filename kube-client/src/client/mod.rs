@@ -359,9 +359,12 @@ impl Client {
 
         let frames = FramedRead::new(
             StreamReader::new(res.into_body().into_data_stream().map_err(|e| {
-                // Unexpected EOF from chunked decoder.
-                // Tends to happen when watching for 300+s. This will be ignored.
-                if e.to_string().contains("unexpected EOF during chunk") {
+                // Resumable watch termination. TLS stacks nest an `io::Error`
+                // of kind `UnexpectedEof`. Chunk decoders still report
+                // "unexpected EOF during chunk" in the error text. Classify
+                // either case by keeping the original error as the source.
+                let chunk_eof = e.to_string().contains("unexpected EOF during chunk");
+                if error_chain_contains_unexpected_eof(&e) || chunk_eof {
                     return std::io::Error::new(std::io::ErrorKind::UnexpectedEof, e);
                 }
                 std::io::Error::other(e)
@@ -394,8 +397,9 @@ impl Client {
                         tracing::warn!("timeout in poll: {}", e); // our client timeout
                         None
                     }
-                    // Unexpected EOF from chunked decoder.
-                    // Tends to happen after 300+s of watching.
+                    // Unexpected EOF from the chunked decoder, or a nested
+                    // `io::ErrorKind::UnexpectedEof`. Tends to happen after 300+s
+                    // of watching. End the stream so it can be resumed.
                     std::io::ErrorKind::UnexpectedEof => {
                         tracing::warn!("eof in poll: {}", e);
                         None
@@ -542,6 +546,27 @@ impl Client {
     }
 }
 
+// `err` or an error reached through `std::error::Error::source` is an
+// `std::io::Error` of kind `UnexpectedEof`.
+fn error_chain_contains_unexpected_eof(err: &(dyn std::error::Error + 'static)) -> bool {
+    // HTTP and TLS stacks nest a handful of errors. Stop if a custom `source`
+    // implementation cycles so a watch poll cannot stall.
+    const MAX_SOURCE_DEPTH: usize = 16;
+    let mut current = Some(err);
+    for _ in 0..MAX_SOURCE_DEPTH {
+        let Some(err) = current else {
+            return false;
+        };
+        if let Some(io_err) = err.downcast_ref::<std::io::Error>()
+            && io_err.kind() == std::io::ErrorKind::UnexpectedEof
+        {
+            return true;
+        }
+        current = err.source();
+    }
+    false
+}
+
 /// Kubernetes returned error handling
 ///
 /// Either kube returned an explicit ApiError struct,
@@ -593,18 +618,25 @@ impl TryFrom<Kubeconfig> for Client {
 
 #[cfg(test)]
 mod tests {
-    use std::pin::pin;
+    use std::{fmt, io::ErrorKind, pin::pin, time::Duration};
 
     use crate::{
-        Api, Client, Error,
+        Api, Client, Error, Result,
+        api::WatchEvent,
         client::Body,
         config::{AuthInfo, Cluster, Context, Kubeconfig, NamedAuthInfo, NamedCluster, NamedContext},
     };
 
+    use bytes::Bytes;
+    use futures::{AsyncReadExt, Stream, StreamExt};
     use http::{Request, Response};
+    use http_body::Frame;
+    use http_body_util::StreamBody;
     use k8s_openapi::api::core::v1::Pod;
     use kube_core::metadata::PartialObjectMeta;
     use tower_test::mock;
+
+    const WATCH_POLL_TIMEOUT: Duration = Duration::from_secs(2);
 
     #[tokio::test]
     async fn test_default_ns() {
@@ -819,4 +851,396 @@ mod tests {
         assert!(matches!(&err, Error::Api(s) if s.code == 403), "got {err:?}");
         spawned.await.unwrap();
     }
+
+    #[tokio::test]
+    async fn watch_direct_unexpected_eof_delivers_added_then_ends() {
+        // Neutral wording: classification must use `ErrorKind`, not the
+        // rustls missing-close-notify message.
+        let body = body_from_chunks(vec![
+            Ok(pod_event_frame("ADDED", "11")),
+            Err(std::io::Error::new(ErrorKind::UnexpectedEof, "connection closed")),
+        ]);
+        let (spawned, stream) = open_watch(body).await;
+        let mut stream = pin!(stream);
+
+        expect_pod(next_event(&mut stream).await, "ADDED", "11");
+        expect_end(next_event(&mut stream).await);
+        spawned.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn watch_wrapped_unexpected_eof_delivers_modified_then_ends() {
+        let body = body_from_chunks(vec![
+            Ok(pod_event_frame("MODIFIED", "22")),
+            Err(nested_io(
+                &["outer transport interruption", "inner transport interruption"],
+                std::io::Error::new(ErrorKind::UnexpectedEof, "connection closed"),
+            )),
+        ]);
+        let (spawned, stream) = open_watch(body).await;
+        let mut stream = pin!(stream);
+
+        expect_pod(next_event(&mut stream).await, "MODIFIED", "22");
+        expect_end(next_event(&mut stream).await);
+        spawned.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn watch_unexpected_eof_before_events_ends() {
+        let body = body_from_chunks(vec![Err(nested_io(
+            &["outer transport interruption", "inner transport interruption"],
+            std::io::Error::new(ErrorKind::UnexpectedEof, "connection closed"),
+        ))]);
+        let (spawned, stream) = open_watch(body).await;
+        let mut stream = pin!(stream);
+
+        expect_end(next_event(&mut stream).await);
+        spawned.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn watch_unexpected_eof_after_truncated_line_keeps_resource_version() {
+        let mut payload = pod_event_json("ADDED", "33");
+        payload.push('\n');
+        payload.push_str(r#"{"type":"MODIFIED","object":{"apiVersion":"v1""#);
+        let body = body_from_chunks(vec![
+            Ok(Bytes::from(payload)),
+            Err(std::io::Error::new(ErrorKind::UnexpectedEof, "connection closed")),
+        ]);
+        let (spawned, stream) = open_watch(body).await;
+        let mut stream = pin!(stream);
+
+        expect_pod(next_event(&mut stream).await, "ADDED", "33");
+        expect_end(next_event(&mut stream).await);
+        spawned.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn watch_clean_end_after_truncated_line_keeps_resource_version() {
+        let mut payload = pod_event_json("MODIFIED", "34");
+        payload.push('\n');
+        payload.push_str(r#"{"type":"ADDED","object":{"apiVersion":"v1""#);
+        let body = body_from_chunks::<std::io::Error>(vec![Ok(Bytes::from(payload))]);
+        let (spawned, stream) = open_watch(body).await;
+        let mut stream = pin!(stream);
+
+        expect_pod(next_event(&mut stream).await, "MODIFIED", "34");
+        expect_end(next_event(&mut stream).await);
+        spawned.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn watch_clean_termination_delivers_every_event() {
+        let payload = format!("{}{}", pod_event_frame_str("ADDED", "1"), pod_event_frame_str("MODIFIED", "2"));
+        let body = body_from_chunks::<std::io::Error>(vec![Ok(Bytes::from(payload))]);
+        let (spawned, stream) = open_watch(body).await;
+        let mut stream = pin!(stream);
+
+        expect_pod(next_event(&mut stream).await, "ADDED", "1");
+        expect_pod(next_event(&mut stream).await, "MODIFIED", "2");
+        expect_end(next_event(&mut stream).await);
+        spawned.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn watch_chunk_decoder_eof_text_ends_stream() {
+        let body = body_from_chunks(vec![
+            Ok(pod_event_frame("ADDED", "44")),
+            Err(ChunkDecoderEof),
+        ]);
+        let (spawned, stream) = open_watch(body).await;
+        let mut stream = pin!(stream);
+
+        expect_pod(next_event(&mut stream).await, "ADDED", "44");
+        expect_end(next_event(&mut stream).await);
+        spawned.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn watch_malformed_json_is_serde_error() {
+        let body = body_from_chunks::<std::io::Error>(vec![Ok(Bytes::from(
+            "{\"type\":\"ADDED\",\"object\":}\n",
+        ))]);
+        let (spawned, stream) = open_watch(body).await;
+        let mut stream = pin!(stream);
+
+        match next_event(&mut stream).await {
+            Some(Err(Error::SerdeError(err))) => assert!(!err.is_eof(), "{err}"),
+            other => panic!("expected a non-eof serde error, got {other:?}"),
+        }
+        spawned.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn watch_nested_non_eof_io_error_is_read_events() {
+        let body = body_from_chunks(vec![
+            Ok(pod_event_frame("ADDED", "55")),
+            Err(nested_io(
+                &["outer transport interruption", "inner transport interruption"],
+                std::io::Error::new(ErrorKind::ConnectionReset, "socket reset"),
+            )),
+        ]);
+        let (spawned, stream) = open_watch(body).await;
+        let mut stream = pin!(stream);
+
+        expect_pod(next_event(&mut stream).await, "ADDED", "55");
+        let io_err = expect_read_events(next_event(&mut stream).await);
+        assert_eq!(io_err.kind(), ErrorKind::Other);
+        let retained = io_err.get_ref().expect("original body error is the source");
+        let body_err = retained.downcast_ref::<Error>().expect("source is the body error");
+        assert!(
+            chain_has_io_kind(body_err, ErrorKind::ConnectionReset),
+            "original source chain dropped ConnectionReset: {body_err:?}"
+        );
+        assert!(
+            chain_has_message(body_err, "outer transport interruption"),
+            "{body_err:?}"
+        );
+        assert!(
+            chain_has_message(body_err, "inner transport interruption"),
+            "{body_err:?}"
+        );
+        spawned.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn watch_close_notify_message_with_other_io_kind_is_read_events() {
+        let body = body_from_chunks(vec![
+            Ok(pod_event_frame("MODIFIED", "66")),
+            Err(std::io::Error::new(
+                ErrorKind::InvalidData,
+                "peer closed connection without sending TLS close_notify",
+            )),
+        ]);
+        let (spawned, stream) = open_watch(body).await;
+        let mut stream = pin!(stream);
+
+        expect_pod(next_event(&mut stream).await, "MODIFIED", "66");
+        let io_err = expect_read_events(next_event(&mut stream).await);
+        assert_eq!(io_err.kind(), ErrorKind::Other);
+        let retained = io_err.get_ref().expect("original body error is the source");
+        let body_err = retained.downcast_ref::<Error>().expect("source is the body error");
+        assert!(
+            chain_has_message(body_err, "close_notify"),
+            "fixture must mention close_notify, got {body_err}"
+        );
+        assert!(
+            chain_has_io_kind(body_err, ErrorKind::InvalidData),
+            "original InvalidData kind dropped: {body_err:?}"
+        );
+        assert!(
+            !chain_has_io_kind(body_err, ErrorKind::UnexpectedEof),
+            "a close_notify message with a different kind was treated as eof: {body_err:?}"
+        );
+        spawned.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn non_watch_body_read_surfaces_unexpected_eof() {
+        let body = body_from_chunks(vec![Err(nested_io(
+            &["outer transport interruption", "inner transport interruption"],
+            std::io::Error::new(ErrorKind::UnexpectedEof, "connection closed"),
+        ))]);
+        let (mock_service, handle) = mock::pair::<Request<Body>, Response<Body>>();
+        let spawned = tokio::spawn(async move {
+            let mut handle = pin!(handle);
+            let (request, send) = handle.next_request().await.expect("service not called");
+            assert!(
+                !request.uri().query().unwrap_or_default().contains("watch=true"),
+                "non-watch read used the watch path: {}",
+                request.uri()
+            );
+            send.send_response(Response::new(body));
+        });
+
+        let client = Client::new(mock_service, "default");
+        let request = Request::get("/api/v1/namespaces/default/pods/test")
+            .body(vec![])
+            .unwrap();
+        let reader = client.request_stream(request).await.expect("response headers");
+        let mut reader = pin!(reader);
+        let mut buf = Vec::new();
+        let err = tokio::time::timeout(WATCH_POLL_TIMEOUT, reader.read_to_end(&mut buf))
+            .await
+            .expect("body read stalled")
+            .expect_err("non-watch UnexpectedEof should surface");
+        assert!(
+            super::error_chain_contains_unexpected_eof(&err),
+            "non-watch read dropped UnexpectedEof: {err} ({err:?})"
+        );
+        assert!(buf.is_empty(), "non-watch read returned data from a failed body");
+        spawned.await.unwrap();
+    }
+
+    fn pod_event_json(action: &str, resource_version: &str) -> String {
+        serde_json::json!({
+            "type": action,
+            "object": {
+                "apiVersion": "v1",
+                "kind": "Pod",
+                "metadata": {
+                    "name": "test",
+                    "namespace": "default",
+                    "resourceVersion": resource_version,
+                },
+                "spec": {
+                    "containers": [{ "name": "test", "image": "test-image" }],
+                }
+            }
+        })
+        .to_string()
+    }
+
+    fn pod_event_frame_str(action: &str, resource_version: &str) -> String {
+        format!("{}\n", pod_event_json(action, resource_version))
+    }
+
+    fn pod_event_frame(action: &str, resource_version: &str) -> Bytes {
+        Bytes::from(pod_event_frame_str(action, resource_version))
+    }
+
+    fn body_from_chunks<E>(chunks: Vec<Result<Bytes, E>>) -> Body
+    where
+        E: std::error::Error + Send + Sync + 'static,
+    {
+        let frames = chunks.into_iter().map(|chunk| chunk.map(Frame::data));
+        Body::wrap_body(StreamBody::new(futures::stream::iter(frames)))
+    }
+
+    /// `Api::watch` calls `Client::request_events`.
+    async fn open_watch(body: Body) -> (tokio::task::JoinHandle<()>, impl Stream<Item = Result<WatchEvent<Pod>>>) {
+        let (mock_service, handle) = mock::pair::<Request<Body>, Response<Body>>();
+        let spawned = tokio::spawn(async move {
+            let mut handle = pin!(handle);
+            let (request, send) = handle.next_request().await.expect("service not called");
+            assert!(
+                request.uri().query().unwrap_or_default().contains("watch=true"),
+                "expected the client watch path, got {}",
+                request.uri()
+            );
+            send.send_response(Response::new(body));
+        });
+        let pods: Api<Pod> = Api::default_namespaced(Client::new(mock_service, "default"));
+        let stream = pods.watch(&Default::default(), "0").await.expect("watch response");
+        (spawned, stream)
+    }
+
+    async fn next_event<S>(stream: &mut S) -> Option<Result<WatchEvent<Pod>>>
+    where
+        S: Stream<Item = Result<WatchEvent<Pod>>> + Unpin,
+    {
+        tokio::time::timeout(WATCH_POLL_TIMEOUT, stream.next())
+            .await
+            .expect("watch stream stalled")
+    }
+
+    fn expect_pod(item: Option<Result<WatchEvent<Pod>>>, action: &str, resource_version: &str) {
+        let pod = match (action, item) {
+            ("ADDED", Some(Ok(WatchEvent::Added(pod)))) => pod,
+            ("MODIFIED", Some(Ok(WatchEvent::Modified(pod)))) => pod,
+            (_, other) => panic!("expected {action} pod, got {other:?}"),
+        };
+        assert_eq!(pod.metadata.name.as_deref(), Some("test"));
+        assert_eq!(
+            pod.metadata.resource_version.as_deref(),
+            Some(resource_version),
+            "completed event must keep its resource version"
+        );
+    }
+
+    fn expect_end(item: Option<Result<WatchEvent<Pod>>>) {
+        assert!(item.is_none(), "expected the watch stream to end, got {item:?}");
+    }
+
+    fn expect_read_events(item: Option<Result<WatchEvent<Pod>>>) -> std::io::Error {
+        match item {
+            Some(Err(Error::ReadEvents(err))) => err,
+            other => panic!("expected ReadEvents, got {other:?}"),
+        }
+    }
+
+    fn nested_io(messages: &[&'static str], io_err: std::io::Error) -> SourceChain {
+        let (outer, rest) = messages.split_first().expect("at least one wrapper");
+        let mut source: Box<dyn std::error::Error + Send + Sync> = Box::new(io_err);
+        for message in rest.iter().rev() {
+            source = Box::new(SourceChain {
+                message,
+                source: Some(source),
+            });
+        }
+        SourceChain {
+            message: outer,
+            source: Some(source),
+        }
+    }
+
+    fn chain_has_io_kind(err: &(dyn std::error::Error + 'static), kind: ErrorKind) -> bool {
+        let mut current = Some(err);
+        for _ in 0..16 {
+            let Some(err) = current else {
+                return false;
+            };
+            if let Some(io_err) = err.downcast_ref::<std::io::Error>()
+                && io_err.kind() == kind
+            {
+                return true;
+            }
+            current = err.source();
+        }
+        false
+    }
+
+    fn chain_has_message(err: &(dyn std::error::Error + 'static), message: &str) -> bool {
+        let mut current = Some(err);
+        for _ in 0..16 {
+            let Some(err) = current else {
+                return false;
+            };
+            if err.to_string().contains(message) {
+                return true;
+            }
+            current = err.source();
+        }
+        false
+    }
+
+    /// Models a `source()` chain without matching on error text.
+    struct SourceChain {
+        message: &'static str,
+        source: Option<Box<dyn std::error::Error + Send + Sync>>,
+    }
+
+    impl fmt::Debug for SourceChain {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.debug_struct("SourceChain")
+                .field("message", &self.message)
+                .field("source", &self.source.as_ref().map(ToString::to_string))
+                .finish()
+        }
+    }
+
+    impl fmt::Display for SourceChain {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.write_str(self.message)
+        }
+    }
+
+    impl std::error::Error for SourceChain {
+        fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+            self.source.as_ref().map(|err| err.as_ref() as _)
+        }
+    }
+
+    /// Legacy chunk-decoder failure. Its display matches the existing text
+    /// check and it is not an `UnexpectedEof` I/O error.
+    #[derive(Debug)]
+    struct ChunkDecoderEof;
+
+    impl fmt::Display for ChunkDecoderEof {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.write_str("unexpected EOF during chunk size line")
+        }
+    }
+
+    impl std::error::Error for ChunkDecoderEof {}
 }
