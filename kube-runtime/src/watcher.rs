@@ -256,6 +256,8 @@ pub struct Config {
     /// This limits the duration of the call, regardless of any activity or inactivity.
     /// If unset for a watch call, we will use 290s.
     /// We limit this to 295s due to [inherent watch limitations](https://github.com/kubernetes/kubernetes/issues/6513).
+    /// When used by a watcher, an explicit zero timeout disables the client's idle timeout.
+    /// If the client's read timeout is unset (the default), dead connections will not be detected.
     pub timeout: Option<u32>,
 
     /// Semantics for list calls.
@@ -517,11 +519,16 @@ const WATCH_IDLE_TIMEOUT_MARGIN: Duration = Duration::from_secs(5);
 ///
 /// Returns `None` when the stream ends **or** when no item arrives within
 /// `timeout + WATCH_IDLE_TIMEOUT_MARGIN`, causing the watcher to
-/// treat the connection as dead and reconnect.
+/// treat the connection as dead and reconnect. An explicit zero timeout
+/// disables this client-side idle timeout.
 async fn next_with_idle_timeout<S, T>(stream: &mut S, timeout: Option<u32>) -> Option<T>
 where
     S: Stream<Item = T> + Unpin,
 {
+    if timeout == Some(0) {
+        return stream.next().await;
+    }
+
     let idle_timeout = Duration::from_secs(u64::from(timeout.unwrap_or(290))) + WATCH_IDLE_TIMEOUT_MARGIN;
     match tokio::time::timeout(idle_timeout, stream.next()).await {
         Ok(item) => item,
@@ -1473,6 +1480,18 @@ mod tests {
         let mut stream = futures::stream::iter(vec![1, 2, 3]);
         let result = next_with_idle_timeout(&mut stream, Some(290)).await;
         assert_eq!(result, Some(1));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn zero_timeout_does_not_trigger_idle_timeout() {
+        let mut stream = futures::stream::once(async {
+            tokio::time::sleep(Duration::from_secs(6)).await;
+            42
+        })
+        .boxed();
+
+        let result = next_with_idle_timeout(&mut stream, Some(0)).await;
+        assert_eq!(result, Some(42));
     }
 
     #[tokio::test(start_paused = true)]
