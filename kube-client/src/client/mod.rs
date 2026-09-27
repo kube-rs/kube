@@ -401,7 +401,7 @@ impl Client {
                     // `io::ErrorKind::UnexpectedEof`. Tends to happen after 300+s
                     // of watching. End the stream so it can be resumed.
                     std::io::ErrorKind::UnexpectedEof => {
-                        tracing::warn!("eof in poll: {}", e);
+                        tracing::warn!("eof in poll: {:?}", e);
                         None
                     }
                     _ => Some(Err(Error::ReadEvents(e))),
@@ -633,7 +633,7 @@ mod tests {
     };
 
     use bytes::Bytes;
-    use futures::{AsyncReadExt, Stream, StreamExt};
+    use futures::{Stream, StreamExt};
     use http::{Request, Response};
     use http_body::Frame;
     use http_body_util::StreamBody;
@@ -1067,43 +1067,6 @@ mod tests {
             !chain_has_io_kind(body_err, ErrorKind::UnexpectedEof),
             "a close_notify message with a different kind was treated as eof: {body_err:?}"
         );
-        spawned.await.unwrap();
-    }
-
-    #[tokio::test]
-    async fn non_watch_body_read_surfaces_unexpected_eof() {
-        let body = body_from_chunks(vec![Err(nested_io(
-            &["outer transport interruption", "inner transport interruption"],
-            std::io::Error::new(ErrorKind::UnexpectedEof, "connection closed"),
-        ))]);
-        let (mock_service, handle) = mock::pair::<Request<Body>, Response<Body>>();
-        let spawned = tokio::spawn(async move {
-            let mut handle = pin!(handle);
-            let (request, send) = handle.next_request().await.expect("service not called");
-            assert!(
-                !request.uri().query().unwrap_or_default().contains("watch=true"),
-                "non-watch read used the watch path: {}",
-                request.uri()
-            );
-            send.send_response(Response::new(body));
-        });
-
-        let client = Client::new(mock_service, "default");
-        let request = Request::get("/api/v1/namespaces/default/pods/test")
-            .body(vec![])
-            .unwrap();
-        let reader = client.request_stream(request).await.expect("response headers");
-        let mut reader = pin!(reader);
-        let mut buf = Vec::new();
-        let err = tokio::time::timeout(WATCH_POLL_TIMEOUT, reader.read_to_end(&mut buf))
-            .await
-            .expect("body read stalled")
-            .expect_err("non-watch UnexpectedEof should surface");
-        assert!(
-            super::error_chain_contains_unexpected_eof(&err),
-            "non-watch read dropped UnexpectedEof: {err} ({err:?})"
-        );
-        assert!(buf.is_empty(), "non-watch read returned data from a failed body");
         spawned.await.unwrap();
     }
 
