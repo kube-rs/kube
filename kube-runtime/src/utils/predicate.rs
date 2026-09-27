@@ -47,6 +47,10 @@ pub trait Predicate<K> {
 
     /// Returns a `Predicate` that falls back to an alternate property if the first does not exist
     ///
+    /// The alternate predicate is only used when the first returns `None`, not when its
+    /// hash is unchanged. In particular, `generation.fallback(resource_version)` can still
+    /// suppress deletions for objects with an unchanged generation.
+    ///
     /// # Usage
     ///
     /// ```
@@ -258,17 +262,54 @@ where
 /// These functions just return a hash of commonly compared values,
 /// to help decide whether to pass a watch event along or not.
 ///
+/// # Choosing a predicate
+///
+/// | Predicate | Use case | Deletion behavior |
+/// | --- | --- | --- |
+/// | [`generation`] | Observe desired-state changes while ignoring status-only updates, for resources supporting generation | Can suppress deletion-related updates and deleted objects when generation is unchanged |
+/// | [`resource_version`] | Observe object revisions, including status-only changes | Retains observed deletes whose resource version differs from the cached version |
+/// | [`labels`], [`annotations`], [`finalizers`] | Observe changes to those fields | Can suppress deletions when the selected fields are unchanged |
+///
+/// # Deletion handling
+///
+/// Predicates operate on decoded objects (versus Events).
+/// After [`touched_objects`](crate::WatchStreamExt::touched_objects), an object from a
+/// delete event is filtered using the same rules as any other object. Deletion does not
+/// necessarily change `metadata.generation` or populate `metadata.deletionTimestamp`,
+/// so predicates based on unchanged fields can suppress that object.
+///
+/// Use [`resource_version`] when observed deletions should trigger reconciliation, for
+/// example to recreate a missing owned resource. The Kubernetes apiserver stamps the
+/// delete revision onto the deleted object. This predicate also passes status-only
+/// changes, so it does not provide the same filtering as [`generation`].
+///
+/// No predicate guarantees delivery of every deletion: events can be missed while a
+/// watcher is unavailable. Reconcilers should check current desired and actual state,
+/// and use a recovery mechanism such as periodic requeues when missed triggers matter.
+/// Use [finalizers](crate::finalizer::finalizer) for cleanup that must complete before
+/// deletion. Filters must also allow the updates that start finalizer cleanup through;
+/// installing a finalizer does not make a generation-only predicate deletion-aware.
+///
 /// Functional rewrite of the [controller-runtime/predicate module](https://github.com/kubernetes-sigs/controller-runtime/blob/main/pkg/predicate/predicate.go).
 pub mod predicates {
     use super::hash;
     use kube_client::{Resource, ResourceExt};
 
     /// Hash the generation of a Resource K
+    ///
+    /// Useful for ignoring status-only updates on resources that support generation.
+    /// Deletion need not change generation, so this can suppress both deletion-timestamp
+    /// updates and objects from delete events. See the [module documentation](crate::predicates).
     pub fn generation<K: Resource>(obj: &K) -> Option<u64> {
         obj.meta().generation.map(|g| hash(&g))
     }
 
     /// Hash the resource version of a Resource K
+    ///
+    /// Use this when observed deletions should trigger reconciliation: the Kubernetes
+    /// apiserver stamps the delete revision onto the deleted object. Status-only changes
+    /// also change resource version and pass this filter. This does not guarantee that
+    /// every deletion is observed; see the [module documentation](crate::predicates).
     pub fn resource_version<K: Resource>(obj: &K) -> Option<u64> {
         obj.meta().resource_version.as_ref().map(hash)
     }

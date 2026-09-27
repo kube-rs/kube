@@ -113,6 +113,12 @@ impl FinalizerState {
 ///
 /// Object deletes will get stuck while the controller is not running, or if `cleanup` fails for some reason.
 ///
+/// If the controller's input stream uses [predicate filtering](crate::WatchStreamExt::predicate_filter),
+/// it must allow updates to `metadata.deletionTimestamp` through so cleanup can begin.
+/// A generation-only predicate can suppress these updates even when a finalizer is installed.
+/// It can also suppress the update that adds the finalizer in the expected flow above.
+/// See [predicate deletion handling](crate::predicates) for guidance.
+///
 /// `reconcile` should take the object that the [`Event`] contains, rather than trying to reuse `obj`, since it may have been updated.
 ///
 /// # Errors

@@ -1045,7 +1045,8 @@ where
     /// # async fn doc(client: kube::Client) {
     /// let sts_stream = metadata_watcher(Api::<StatefulSet>::all(client.clone()), watcher::Config::default())
     ///     .touched_objects()
-    ///     .predicate_filter(predicates::generation, Default::default());
+    ///     // Retain observed deletions so the owner can recreate missing children.
+    ///     .predicate_filter(predicates::resource_version, Default::default());
     ///
     /// Controller::new(Api::<CustomResource>::all(client), watcher::Config::default())
     ///     .owns_stream(sts_stream)
@@ -1054,6 +1055,10 @@ where
     ///     .await;
     /// # }
     /// ```
+    ///
+    /// A generation predicate can suppress deletion triggers because deletion need not
+    /// change generation. Resource-version filtering also passes status-only updates.
+    /// See [predicate deletion handling](crate::predicates) for details.
     #[cfg(feature = "unstable-runtime-stream-control")]
     #[must_use]
     pub fn owns_stream<Child: Resource<DynamicType = ()> + Send + 'static>(
@@ -1311,7 +1316,8 @@ where
     /// let cr: Api<CustomResource> = Api::all(client.clone());
     /// let daemons = watcher(api, watcher::Config::default())
     ///     .touched_objects()
-    ///     .predicate_filter(predicates::generation, Default::default());
+    ///     // Retain observed deletions as triggers for the mapped objects.
+    ///     .predicate_filter(predicates::resource_version, Default::default());
     ///
     /// Controller::new(cr, watcher::Config::default())
     ///     .watches_stream(daemons, mapper)
@@ -1320,6 +1326,10 @@ where
     ///     .await;
     /// # }
     /// ```
+    ///
+    /// A generation predicate can suppress deletion triggers because deletion need not
+    /// change generation. Resource-version filtering also passes status-only updates.
+    /// See [predicate deletion handling](crate::predicates) for details.
     #[cfg(feature = "unstable-runtime-stream-control")]
     #[must_use]
     pub fn watches_stream<Other, I>(

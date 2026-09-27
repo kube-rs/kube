@@ -773,6 +773,11 @@ pub struct DeleteParams {
     /// Value must be non-negative integer. The value zero indicates delete immediately.
     /// If this value is `None`, the default grace period for the specified type will be used.
     /// Defaults to a per object value if not specified. Zero means delete immediately.
+    ///
+    /// Graceful deletion support is resource-specific. Setting this does not generally
+    /// guarantee that `metadata.deletionTimestamp` will be populated: Pods support
+    /// graceful deletion, while resources such as PodDisruptionBudgets do not.
+    /// Use finalizers when cleanup must complete before an object is deleted.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub grace_period_seconds: Option<u32>,
 
