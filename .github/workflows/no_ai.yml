@@ -1,0 +1,17 @@
+name: no-ai
+
+on:
+  pull_request:
+
+jobs:
+  # not going as far as we could, but all detection methods have its flaws
+  # ultimately, we need people to be responsible for their changes
+  # for open source to be in any way sustainable.
+  # plus we don't want to act as marketing proxies for these tools.
+  no-ai-coauthors:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: GoodHatsLLC/no-ai-coauthors@1.0.0
