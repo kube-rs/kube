@@ -116,3 +116,16 @@ The [high-level architecture document](https://kube.rs/architecture/) is written
 ### Contact
 You can ask general questions / share ideas / query the community at the [kube-rs discussions forum](https://github.com/kube-rs/kube/discussions).
 You can reach the maintainers of this project at [#kube](https://discord.gg/tokio) channel on the Tokio discord.
+
+
+## AI Policy
+In concrete terms, kube expects its community members to uphold the following norms around AI:
+
+1. No AI-generated media. Images, 3d models, audio assets (and so on) submitted to kube may not be authored or modified with the use of generative AI tools. Use a permissively licensed asset, make one by hand, or commission an artist.
+2. No AI-generated prose. AI must not be used to write public-facing prose, including documentation, issues, PR descriptions, or release notes.
+3. No AI-generated communication. We want to talk to you, not a machine. Do not paste AI-generated output directly into conversations with humans, no matter where they take place. AI may be used to assist for translation and accessibility purposes, but please include the original untranslated text as well.
+4. No AI-authored commits. Only humans can be commit authors or listed as Co-authored-by.
+5. Ownership. As a contributor, you are responsible for everything you submit. You must personally understand every line of code or documentation that you put forward for review, and be able to articulate the design rationale and implementation tradeoffs when asked. Work within your skill level and knowledge of the project.
+6. Quality. kube holds a high bar for quality, and is willing to take the time to do things well. AI-assisted PRs will be held to the same rigorous standard of review: correctness, tests, rationale, incremental reviewable units, appropriate design and consensus building and so on.
+7. Harassment. Do not harass, demean, pressure, or bully others. This continues to apply, even when the basis of your disagreement centers around use of, abstinence from or views on AI. See the appendix on harassment for examples of acceptable and unacceptable behavior.
+8. Refusal. kube contributors and community members are not required to review AI-assisted work, use AI tools, or engage in discussions about AI. We want to make sure that those who reject AI remain a valued part of both the work and community of kube.
