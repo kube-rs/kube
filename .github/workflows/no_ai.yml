@@ -11,4 +11,4 @@ jobs:
         with:
           # Required so the full commit range is available
           fetch-depth: 0
-      - uses: Jondolf/ai-commit-check@v1
+      - uses: Jondolf/ai-commit-check@7069d4254c6310cdb0395a6ab0ca1f29af897f83
