@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1790396641030,
+  "lastUpdate": 1790589638891,
   "repoUrl": "https://github.com/kube-rs/kube",
   "entries": {
     "Benchmark": [
@@ -6755,6 +6755,105 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/kube-rs/kube/commit/237386c1b9384f4e674a48178907d9cd4f11b0a0"
         },
         "date": 1790396639913,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "init_listwatch - peak_bytes",
+            "value": 55194619,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - total_allocated",
+            "value": 76715088,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - alloc_count",
+            "value": 578023,
+            "unit": "allocations"
+          },
+          {
+            "name": "steady_state - peak_bytes",
+            "value": 71381202,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - total_allocated",
+            "value": 109519220,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - alloc_count",
+            "value": 799021,
+            "unit": "allocations"
+          },
+          {
+            "name": "relist - peak_bytes",
+            "value": 99797302,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - total_allocated",
+            "value": 174518628,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - alloc_count",
+            "value": 1189035,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_without_modify - peak_bytes",
+            "value": 141298836,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - total_allocated",
+            "value": 205865000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - alloc_count",
+            "value": 1298020,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_with_modify - peak_bytes",
+            "value": 134853452,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - total_allocated",
+            "value": 162895000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - alloc_count",
+            "value": 1058021,
+            "unit": "allocations"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "roguestar191@comcast.net",
+            "name": "centerionware",
+            "username": "centerionware"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "fc4669caab4a99999d3809ffa036ec8b8a2a97d5",
+          "message": "core: allow watch timeouts above five minutes (#2069)\n\n* fix(core): allow watch timeouts above five minutes\n\nRemove the stale client-side validation and issue reference while preserving kube-rs’s existing 290-second default for unset watch timeouts.\n\nSigned-off-by: centerionware <centerionware@users.noreply.github.com>\n\n* Update kube-core/src/params.rs\n\nCo-authored-by: doxxx <me@doxxx.dev>\nSigned-off-by: centerionware <roguestar191@comcast.net>\n\n* Update kube-runtime/src/watcher.rs\n\nCo-authored-by: doxxx <me@doxxx.dev>\nSigned-off-by: centerionware <roguestar191@comcast.net>\n\n---------\n\nSigned-off-by: centerionware <centerionware@users.noreply.github.com>\nSigned-off-by: centerionware <roguestar191@comcast.net>\nCo-authored-by: centerionware <centerionware@users.noreply.github.com>\nCo-authored-by: doxxx <me@doxxx.dev>",
+          "timestamp": "2026-09-28T10:58:36+01:00",
+          "tree_id": "4b35cd893a51abafd647019bf5f5b40f0969f160",
+          "url": "https://github.com/kube-rs/kube/commit/fc4669caab4a99999d3809ffa036ec8b8a2a97d5"
+        },
+        "date": 1790589637710,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
