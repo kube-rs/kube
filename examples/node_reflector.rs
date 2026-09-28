@@ -1,3 +1,6 @@
+//! An example of how to keep an up-to-date reflector of Nodes in memory and continuously print out
+//! the Node's information.
+
 use std::pin::pin;
 
 use futures::TryStreamExt;

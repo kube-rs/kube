@@ -1,3 +1,6 @@
+//! An example of how to connect to port 80 of the example pod, send a request, and wait for the
+//! response. This example uses hyper instead of tokio.
+
 use bytes::Bytes;
 use hyper_util::rt::TokioIo;
 use k8s_openapi::api::core::v1::Pod;

@@ -1,3 +1,6 @@
+//! An example of how to keep an up-to-date-reflector of Secrets in memory and periodically read its
+//! state.
+
 use futures::TryStreamExt;
 use k8s_openapi::api::core::v1::Secret;
 use kube::{
