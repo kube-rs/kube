@@ -6,12 +6,11 @@ authors.workspace = true
 edition.workspace = true
 license.workspace = true
 
-[lints.rust]
-missing_docs = "allow"
-unsafe_code = "forbid"
-
 [package.metadata.release]
 release = false
+
+[lints]
+workspace = true
 
 [features]
 default = [

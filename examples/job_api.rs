@@ -1,3 +1,5 @@
+//! An example of how create a Job and wait for its completion.
+
 use k8s_openapi::api::batch::v1::Job;
 use kube::{
     Client,
