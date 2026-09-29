@@ -48,9 +48,13 @@ pub struct ListParams {
     /// Defaults to everything if `None`.
     pub field_selector: Option<String>,
 
-    /// Timeout for the list/watch call.
+    /// Has no effect since this value is not sent with list requests.
     ///
-    /// This limits the duration of the call, regardless of any activity or inactivity.
+    /// To limit the duration of a watch call, use [`WatchParams::timeout`].
+    #[deprecated(
+        since = "5.0.0",
+        note = "has no effect on list requests; use `WatchParams::timeout` for watch calls"
+    )]
     pub timeout: Option<u32>,
 
     /// Limit the number of results.
@@ -129,15 +133,19 @@ impl ListParams {
 /// use kube::api::ListParams;
 /// let lp = ListParams::default()
 ///     .match_any()
-///     .timeout(60)
 ///     .labels("kubernetes.io/lifecycle=spot");
 /// ```
 impl ListParams {
-    /// Configure the timeout for list/watch calls
+    /// Set the timeout field
     ///
-    /// This limits the duration of the call, regardless of any activity or inactivity.
-    /// Defaults to 290s
+    /// Has no effect since this value is not sent with list requests.
+    /// To limit the duration of a watch call, use [`WatchParams::timeout`].
+    #[deprecated(
+        since = "5.0.0",
+        note = "has no effect on list requests; use `WatchParams::timeout` for watch calls"
+    )]
     #[must_use]
+    #[allow(deprecated)]
     pub fn timeout(mut self, timeout_secs: u32) -> Self {
         self.timeout = Some(timeout_secs);
         self

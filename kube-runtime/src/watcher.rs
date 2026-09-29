@@ -251,10 +251,10 @@ pub struct Config {
     /// Defaults to everything if `None`.
     pub field_selector: Option<String>,
 
-    /// Timeout for the list/watch call.
+    /// Timeout for the watch call.
     ///
     /// This limits the duration of the call, regardless of any activity or inactivity.
-    /// If unset for a watch call, we will use 290s.
+    /// If unset, we will use 290s.
     /// The watcher's dead-connection detection window is this value plus 5s,
     /// so larger values delay noticing a silently dropped connection.
     pub timeout: Option<u32>,
@@ -321,7 +321,7 @@ impl Default for Config {
 ///     .labels("kubernetes.io/lifecycle=spot");
 /// ```
 impl Config {
-    /// Configure the timeout for list/watch calls
+    /// Configure the timeout for watch calls
     ///
     /// This limits the duration of the call, regardless of any activity or inactivity.
     /// Defaults to 290s
@@ -429,12 +429,12 @@ impl Config {
         ListParams {
             label_selector: self.label_selector.clone(),
             field_selector: self.field_selector.clone(),
-            timeout: self.timeout,
             version_match,
             resource_version,
             // The watcher handles pagination internally.
             limit: self.page_size,
             continue_token: None,
+            ..Default::default()
         }
     }
 
