@@ -537,10 +537,9 @@ impl Client {
 /// Kubernetes returned error handling
 ///
 /// Either kube returned an explicit ApiError struct,
-/// or it someohow returned something we couldn't parse as one.
+/// or it somehow returned something we couldn't parse as one.
 ///
 /// In either case, present an ApiError upstream.
-/// The latter is probably a bug if encountered.
 async fn handle_api_errors(res: Response<Body>) -> Result<Response<Body>> {
     let status = res.status();
     if status.is_client_error() || status.is_server_error() {
