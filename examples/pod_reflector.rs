@@ -1,3 +1,5 @@
+//! An example of how to keep an up-to-date reflector of Pods in memory and print out their names.
+
 use std::pin::pin;
 
 use futures::TryStreamExt;

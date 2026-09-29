@@ -28,6 +28,15 @@ pub struct KubeAttrs {
     pub singular: Option<String>,
     #[darling(default)]
     pub namespaced: bool,
+
+    /// Put the derived struct's fields at the root of the custom resource instead of under `spec`.
+    ///
+    /// Some CRDs in the wild have no `spec` and sprawl their properties directly on the root
+    /// object. The generated root struct still holds the derived struct in a `spec` field (so
+    /// `HasSpec` and `Api<Foo>` keep working), but it is `#[serde(flatten)]`ed, so the wire
+    /// format and the generated schema have those properties at the top level.
+    #[darling(default)]
+    pub no_spec: bool,
     #[darling(multiple, rename = "derive")]
     pub derives: Vec<String>,
     #[darling(multiple, rename = "attr")]

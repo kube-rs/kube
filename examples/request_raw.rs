@@ -179,7 +179,7 @@ impl Metric {
 
 /// Namespaces a group of constants used as the stat table headers.
 // This way, the names do not have to be prefixed with `HEADER_`.
-pub mod headers {
+mod headers {
     pub const NAME: &str = "NAME";
     pub const USED_MEM: &str = "MEMORY(bytes)";
     pub const USED_CPU: &str = "CPU(cores)";

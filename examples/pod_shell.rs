@@ -1,3 +1,6 @@
+//! An example of how to attach an interactive shell to a Pod's container via the current stdin and
+//! stdout.
+
 use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::api::core::v1::Pod;
 use tracing::*;

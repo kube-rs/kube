@@ -111,6 +111,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         version,
         doc,
         namespaced,
+        no_spec,
         attributes,
         derives,
         schema: schema_mode,
@@ -183,6 +184,27 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         quote! { false }
     };
 
+    // Flattening only has a well-defined meaning for a struct with named fields: the properties
+    // that get hoisted onto the root must not collide with the object meta fields that already
+    // live there, and serde would silently emit duplicate keys if they did.
+    if no_spec && let Err(err) = check_flattenable(&derive_input.data, &ident) {
+        return err.to_compile_error();
+    }
+
+    // `#[kube(no_spec)]` keeps the `spec` field on the root struct -- so `HasSpec`, `Api<Foo>` and
+    // `Foo::new` are unchanged -- but flattens it on the wire and in the schema, so the derived
+    // struct's properties sit at the root of the custom resource.
+    let spec_field = if no_spec {
+        quote! {
+            #[serde(flatten)]
+            #visibility spec: #ident,
+        }
+    } else {
+        quote! {
+            #visibility spec: #ident,
+        }
+    };
+
     let mut derive_paths: Vec<Path> = vec![
         syn::parse_quote! { #serde::Deserialize },
         syn::parse_quote! { Clone },
@@ -233,6 +255,66 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
     let quoted_serde = Literal::string(&serde.to_token_stream().to_string());
     let schemars_attribute = generate_schemars_attribute(schema_mode, &schemars);
 
+    let impl_serialize = if no_spec {
+        // `#[serde(flatten)]` requires a map serializer, which `serialize_struct` is not, and
+        // serde's flattening machinery (`FlatMapSerializer`) is private. Rather than reimplement
+        // it, delegate to a derived shim that serde flattens for us. `apiVersion` and `kind` are
+        // not fields on the root struct, so they are supplied here as they are below.
+        let (repr_status_field, repr_status_init) = match &status {
+            Some(pth) => (
+                quote! {
+                    #[serde(skip_serializing_if = "Option::is_none")]
+                    status: Option<&'a #pth>,
+                },
+                quote! { status: self.status.as_ref(), },
+            ),
+            None => (quote! {}, quote! {}),
+        };
+        quote! {
+            impl #serde::Serialize for #rootident {
+                fn serialize<S: #serde::Serializer>(&self, ser: S) -> #std::result::Result<S::Ok, S::Error> {
+                    #[derive(#serde::Serialize)]
+                    #[allow(missing_docs)]
+                    #[serde(rename_all = "camelCase")]
+                    #[serde(crate = #quoted_serde)]
+                    struct Repr<'a> {
+                        api_version: &'a str,
+                        kind: &'a str,
+                        metadata: &'a #k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta,
+                        #[serde(flatten)]
+                        spec: &'a #ident,
+                        #repr_status_field
+                    }
+
+                    let api_version = <#rootident as #kube_core::Resource>::api_version(&());
+                    let kind = <#rootident as #kube_core::Resource>::kind(&());
+                    #serde::Serialize::serialize(&Repr {
+                        api_version: &api_version,
+                        kind: &kind,
+                        metadata: &self.metadata,
+                        spec: &self.spec,
+                        #repr_status_init
+                    }, ser)
+                }
+            }
+        }
+    } else {
+        quote! {
+            impl #serde::Serialize for #rootident {
+                fn serialize<S: #serde::Serializer>(&self, ser: S) -> #std::result::Result<S::Ok, S::Error> {
+                    use #serde::ser::SerializeStruct;
+                    let mut obj = ser.serialize_struct(#rootident_str, 4 + usize::from(#has_status_value))?;
+                    obj.serialize_field("apiVersion", &<#rootident as #kube_core::Resource>::api_version(&()))?;
+                    obj.serialize_field("kind", &<#rootident as #kube_core::Resource>::kind(&()))?;
+                    obj.serialize_field("metadata", &self.metadata)?;
+                    obj.serialize_field("spec", &self.spec)?;
+                    #serialize_status
+                    obj.end()
+                }
+            }
+        }
+    };
+
     let root_obj = quote! {
         #[doc = #docstr]
         #[automatically_derived]
@@ -246,7 +328,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
         #visibility struct #rootident {
             #schemars_skip
             #visibility metadata: #k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta,
-            #visibility spec: #ident,
+            #spec_field
             #status_field
         }
         impl #rootident {
@@ -264,18 +346,7 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
                 }
             }
         }
-        impl #serde::Serialize for #rootident {
-            fn serialize<S: #serde::Serializer>(&self, ser: S) -> #std::result::Result<S::Ok, S::Error> {
-                use #serde::ser::SerializeStruct;
-                let mut obj = ser.serialize_struct(#rootident_str, 4 + usize::from(#has_status_value))?;
-                obj.serialize_field("apiVersion", &<#rootident as #kube_core::Resource>::api_version(&()))?;
-                obj.serialize_field("kind", &<#rootident as #kube_core::Resource>::kind(&()))?;
-                obj.serialize_field("metadata", &self.metadata)?;
-                obj.serialize_field("spec", &self.spec)?;
-                #serialize_status
-                obj.end()
-            }
-        }
+        #impl_serialize
     };
 
     // 2. Implement Resource trait
@@ -539,6 +610,46 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
     }
 }
 
+/// Fields reserved by the root custom resource object. A `#[kube(no_spec)]` struct flattens its
+/// fields alongside these, so a clash would serialize the same key twice.
+const RESERVED_ROOT_FIELDS: [&str; 5] = ["apiVersion", "api_version", "kind", "metadata", "status"];
+
+/// Check that `data` can be flattened onto the root of a custom resource under `#[kube(no_spec)]`.
+fn check_flattenable(data: &Data, ident: &Ident) -> Result<(), syn::Error> {
+    let fields = match data {
+        Data::Struct(s) => &s.fields,
+        _ => {
+            return Err(syn::Error::new_spanned(
+                ident,
+                r#"#[derive(CustomResource)] `kube(no_spec)` requires a struct with named fields; an enum has no properties to lift onto the root"#,
+            ));
+        }
+    };
+    let syn::Fields::Named(named) = fields else {
+        return Err(syn::Error::new_spanned(
+            ident,
+            r#"#[derive(CustomResource)] `kube(no_spec)` requires a struct with named fields; a tuple or unit struct has no properties to lift onto the root"#,
+        ));
+    };
+
+    for field in &named.named {
+        let Some(field_ident) = &field.ident else { continue };
+        if RESERVED_ROOT_FIELDS
+            .iter()
+            .any(|reserved| field_ident == reserved)
+        {
+            return Err(syn::Error::new_spanned(
+                field_ident,
+                format!(
+                    r#"#[derive(CustomResource)] `kube(no_spec)` lifts this field onto the root object, where `{field_ident}` is already taken"#
+                ),
+            ));
+        }
+    }
+
+    Ok(())
+}
+
 /// This generates the code for the `#kube_core::object::HasSpec` trait implementation.
 ///
 /// All CRDs have a spec so it is implemented for all of them.
@@ -720,6 +831,13 @@ mod tests {
             .unwrap()
             .join("tests")
             .join("crd_schema_test.rs");
+        let file = fs::File::open(path).unwrap();
+        runtime_macros::emulate_derive_macro_expansion(file, &[("CustomResource", derive)]).unwrap();
+
+        let path = env::current_dir()
+            .unwrap()
+            .join("tests")
+            .join("crd_no_spec_test.rs");
         let file = fs::File::open(path).unwrap();
         runtime_macros::emulate_derive_macro_expansion(file, &[("CustomResource", derive)]).unwrap();
     }

@@ -1,3 +1,5 @@
+//! Create and wait for a Job to complete. Delete it afterwards.
+
 use k8s_openapi::api::batch::v1::Job;
 use kube::{
     Client,

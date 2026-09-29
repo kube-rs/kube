@@ -1,3 +1,5 @@
+//! An example of a multi-version derived custom resource.
+
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
 use kube::{
     Client, CustomResource, CustomResourceExt, ResourceExt,
