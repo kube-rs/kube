@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1790589638891,
+  "lastUpdate": 1790654098491,
   "repoUrl": "https://github.com/kube-rs/kube",
   "entries": {
     "Benchmark": [
@@ -6854,6 +6854,105 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/kube-rs/kube/commit/fc4669caab4a99999d3809ffa036ec8b8a2a97d5"
         },
         "date": 1790589637710,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "init_listwatch - peak_bytes",
+            "value": 55194619,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - total_allocated",
+            "value": 76715088,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - alloc_count",
+            "value": 578023,
+            "unit": "allocations"
+          },
+          {
+            "name": "steady_state - peak_bytes",
+            "value": 71381202,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - total_allocated",
+            "value": 109519220,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - alloc_count",
+            "value": 799021,
+            "unit": "allocations"
+          },
+          {
+            "name": "relist - peak_bytes",
+            "value": 99797302,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - total_allocated",
+            "value": 174518628,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - alloc_count",
+            "value": 1189035,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_without_modify - peak_bytes",
+            "value": 141298836,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - total_allocated",
+            "value": 205865000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - alloc_count",
+            "value": 1298020,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_with_modify - peak_bytes",
+            "value": 134853452,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - total_allocated",
+            "value": 162895000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - alloc_count",
+            "value": 1058021,
+            "unit": "allocations"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "roguestar191@comcast.net",
+            "name": "centerionware",
+            "username": "centerionware"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "800ad33859cdb1b6050ee3c5b2b9dc426c00edc3",
+          "message": "fix(runtime): honor zero watch timeout without idle watchdog (#2068)\n\n* fix(runtime): honor zero watch timeout without idle watchdog\n\nSigned-off-by: centerionware <centerionware@users.noreply.github.com>\n\n* docs(runtime): clarify zero watch timeout behavior\n\nSigned-off-by: centerionware <roguestar191@comcast.net>\n\n---------\n\nSigned-off-by: centerionware <centerionware@users.noreply.github.com>\nSigned-off-by: centerionware <roguestar191@comcast.net>\nCo-authored-by: centerionware <centerionware@users.noreply.github.com>",
+          "timestamp": "2026-09-29T12:53:33+09:00",
+          "tree_id": "ab1ae3659f89ab84ce63021994d242f0d9e9416c",
+          "url": "https://github.com/kube-rs/kube/commit/800ad33859cdb1b6050ee3c5b2b9dc426c00edc3"
+        },
+        "date": 1790654097318,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
