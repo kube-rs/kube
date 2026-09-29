@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1790674148897,
+  "lastUpdate": 1790675028791,
   "repoUrl": "https://github.com/kube-rs/kube",
   "entries": {
     "Benchmark": [
@@ -7052,6 +7052,105 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/kube-rs/kube/commit/c724be6eb51d6892e6d531386adf7d6611ee341b"
         },
         "date": 1790674146670,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "init_listwatch - peak_bytes",
+            "value": 55194619,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - total_allocated",
+            "value": 76715088,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - alloc_count",
+            "value": 578023,
+            "unit": "allocations"
+          },
+          {
+            "name": "steady_state - peak_bytes",
+            "value": 71381202,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - total_allocated",
+            "value": 109519220,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - alloc_count",
+            "value": 799021,
+            "unit": "allocations"
+          },
+          {
+            "name": "relist - peak_bytes",
+            "value": 99797302,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - total_allocated",
+            "value": 174518628,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - alloc_count",
+            "value": 1189035,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_without_modify - peak_bytes",
+            "value": 141298836,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - total_allocated",
+            "value": 205865000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - alloc_count",
+            "value": 1298020,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_with_modify - peak_bytes",
+            "value": 134853452,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - total_allocated",
+            "value": 162895000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - alloc_count",
+            "value": 1058021,
+            "unit": "allocations"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "anant1234466@gmail.com",
+            "name": "anant",
+            "username": "antcybersec"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "6752745d6d4cc8b8209c622c9b113a0df52ec294",
+          "message": "client: log non-JSON error bodies at debug, not warn (#2070)\n\n* client: log non-JSON error bodies at debug, not warn\n\n`handle_api_errors` falls back to reconstructing a `Status` whenever\nthe error body it gets back isn't valid JSON. This is expected rather\nthan exceptional: a non-existent API path (e.g. probing whether a CRD\nis installed yet) or a proxy/ingress in front of the apiserver will\noften return a plain-text or HTML 404 instead of a JSON `Status`.\nLogging this at `warn` makes routine 404s noisy for no actionable\nreason, and is inconsistent with the parsed-JSON branch right above it,\nwhich already logs at `debug`.\n\nAlso trim the raw body text before using it as the reconstructed\n`Status` message, since these bodies commonly end in a trailing\nnewline (e.g. `\"404 page not found\\n\"`) that otherwise leaks into the\nerror.\n\nCloses #1604\n\nSigned-off-by: anant <170962632+antcybersec@users.noreply.github.com>\n\n* client: fix handle_api_errors doc comment\n\nDrop the \"probably a bug if encountered\" line, which contradicts the new\ninline comment explaining that non-JSON error bodies are routine, and fix\nthe \"someohow\" typo just above it.\n\nSigned-off-by: anant <170962632+antcybersec@users.noreply.github.com>\n\n---------\n\nSigned-off-by: anant <170962632+antcybersec@users.noreply.github.com>\nCo-authored-by: anant <170962632+antcybersec@users.noreply.github.com>\nCo-authored-by: doxxx <doxxx93@gmail.com>",
+          "timestamp": "2026-09-29T10:42:33+01:00",
+          "tree_id": "cb4de86c8be2b87ad4f4acf3bbc70d46365a3d3e",
+          "url": "https://github.com/kube-rs/kube/commit/6752745d6d4cc8b8209c622c9b113a0df52ec294"
+        },
+        "date": 1790675027095,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
