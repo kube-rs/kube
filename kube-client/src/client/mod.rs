@@ -258,9 +258,10 @@ impl Client {
         upgrade::StreamProtocol::add_to_headers(&mut parts.headers)?;
 
         let res = self.send(Request::from_parts(parts, Body::from(body))).await?;
-        let (protocol, res) = upgrade::verify_response(res, &key)
-            .await
-            .map_err(Error::UpgradeConnection)?;
+        // 4xx/5xx bodies are `metav1.Status`. Surface them as `Error::Api`
+        // before the upgrade check, which only understands 101.
+        let res = handle_api_errors(res).await?;
+        let protocol = upgrade::verify_response(&res, &key).map_err(Error::UpgradeConnection)?;
         match hyper::upgrade::on(res).await {
             Ok(upgraded) => Ok(Connection {
                 stream: WebSocketStream::from_raw_socket(
@@ -1243,4 +1244,44 @@ mod tests {
     }
 
     impl std::error::Error for ChunkDecoderEof {}
+
+    #[cfg(feature = "ws")]
+    #[tokio::test]
+    async fn connect_returns_api_error_for_forbidden_status() {
+        let (mock_service, handle) = mock::pair::<Request<Body>, Response<Body>>();
+        let spawned = tokio::spawn(async move {
+            let mut handle = pin!(handle);
+            let (_request, send) = handle.next_request().await.expect("service not called");
+            let body = serde_json::json!({
+                "status": "Failure",
+                "message": "pods \"my-pod\" is forbidden: User \"system:serviceaccount:default:my-sa\" cannot create resource \"pods/exec\"",
+                "reason": "Forbidden",
+                "code": 403
+            });
+            send.send_response(
+                Response::builder()
+                    .status(403)
+                    .body(Body::from(serde_json::to_vec(&body).unwrap()))
+                    .unwrap(),
+            );
+        });
+
+        let client = Client::new(mock_service, "default");
+        let request = Request::builder()
+            .uri("/api/v1/namespaces/default/pods/my-pod/exec")
+            .body(Vec::new())
+            .unwrap();
+        let err = match client.connect(request).await {
+            Err(err) => err,
+            Ok(_) => panic!("403 is an API error"),
+        };
+        match err {
+            Error::Api(status) => {
+                assert_eq!(status.code, 403);
+                assert!(status.message.contains("forbidden"), "{}", status.message);
+            }
+            other => panic!("expected Api error, got {other}"),
+        }
+        spawned.await.unwrap();
+    }
 }
