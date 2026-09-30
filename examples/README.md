@@ -27,7 +27,7 @@ cargo run --example log_stream -- kafka-manager-7d4f4bd8dc-f6c44
 ```
 
 There's also an example exercising the generic owner-reference and finalizer helpers from
-`kube-core` (`set_controller_reference`, `ResourceExt::{has_finalizer,add_finalizer,remove_finalizer}`)
+`kube-core` (`set_controller_reference`, `has_finalizer`, `add_finalizer`, `remove_finalizer`)
 against a real cluster, covering owner-reference conflicts, garbage-collector cascade delete, and
 finalizer-blocked deletion:
 

@@ -4,12 +4,15 @@
 //! Demonstrates:
 //! - `set_controller_reference` / `set_owner_reference` and the `AlreadyOwnedError` conflict check
 //! - the apiserver's garbage collector cascading a delete via the controller owner reference
-//! - `ResourceExt::{has_finalizer, add_finalizer, remove_finalizer}` blocking and then unblocking a delete
+//! - `has_finalizer` / `add_finalizer` / `remove_finalizer` blocking and then unblocking a delete
 use k8s_openapi::api::core::v1::ConfigMap;
 use kube::{
     Client, Resource,
     api::{Api, DeleteParams, Patch, PatchParams, PostParams, ResourceExt},
-    core::{AlreadyOwnedError, has_owner_reference, set_controller_reference},
+    core::{
+        AlreadyOwnedError, add_finalizer, has_finalizer, has_owner_reference, remove_finalizer,
+        set_controller_reference,
+    },
 };
 use tracing::info;
 
@@ -84,8 +87,11 @@ async fn main() -> anyhow::Result<()> {
     // --- finalizer demo ---
     info!("Creating a ConfigMap with a finalizer");
     let mut protected = create_configmap(&cms, "owner-finalizer-demo-protected").await?;
-    assert!(!protected.has_finalizer("owner-finalizer-demo.kube.rs/cleanup"));
-    assert!(protected.add_finalizer("owner-finalizer-demo.kube.rs/cleanup"));
+    assert!(!has_finalizer(&protected, "owner-finalizer-demo.kube.rs/cleanup"));
+    assert!(add_finalizer(
+        &mut protected,
+        "owner-finalizer-demo.kube.rs/cleanup"
+    ));
     patch_finalizers(&cms, &protected).await?;
 
     info!("Deleting it: the apiserver should keep it around until the finalizer is removed");
@@ -96,11 +102,17 @@ async fn main() -> anyhow::Result<()> {
         .await
         .expect("object with an outstanding finalizer must not be gone yet");
     assert!(still_there.meta().deletion_timestamp.is_some());
-    assert!(still_there.has_finalizer("owner-finalizer-demo.kube.rs/cleanup"));
+    assert!(has_finalizer(
+        &still_there,
+        "owner-finalizer-demo.kube.rs/cleanup"
+    ));
     info!("Confirmed: object is terminating but still present because of the finalizer");
 
     let mut protected = still_there;
-    assert!(protected.remove_finalizer("owner-finalizer-demo.kube.rs/cleanup"));
+    assert!(remove_finalizer(
+        &mut protected,
+        "owner-finalizer-demo.kube.rs/cleanup"
+    ));
     patch_finalizers(&cms, &protected).await?;
 
     let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(30);

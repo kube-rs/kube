@@ -37,6 +37,9 @@ pub use gvk::{GroupVersion, GroupVersionKind, GroupVersionResource};
 pub mod metadata;
 pub use metadata::{ListMeta, ObjectMeta, PartialObjectMeta, PartialObjectMetaExt, TypeMeta};
 
+pub mod finalizers;
+pub use finalizers::{add_finalizer, has_finalizer, remove_finalizer};
+
 pub mod labels;
 
 #[cfg(feature = "kubelet-debug")] pub mod kubelet_debug;
