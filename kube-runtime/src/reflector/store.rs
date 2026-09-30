@@ -115,7 +115,7 @@ where
                 let mut key = obj.to_object_ref(self.dyntype.clone());
                 let mut store = self.store.write();
 
-                store.remove_entry(&key).map(|(original_key, existing)| {
+                if let Some((original_key, existing)) = store.remove_entry(&key) {
                     if self.dispatcher.is_none() {
                     } else if existing.uid().as_deref() == key.extra.uid.as_deref() {
                         // Re-insert the entry with updated key, as insert on its own doesnt modify the key
@@ -124,7 +124,7 @@ where
                     } else {
                         store.insert(original_key, existing);
                     }
-                });
+                }
             }
             watcher::Event::Init => {
                 self.buffer = AHashMap::new();
