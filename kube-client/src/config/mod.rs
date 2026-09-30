@@ -28,7 +28,7 @@ pub use no_proxy::Error as NoProxyError;
 #[derive(Error, Debug)]
 #[error("failed to infer config: in-cluster: ({in_cluster}), kubeconfig: ({kubeconfig})")]
 pub struct InferConfigError {
-    in_cluster: InClusterError,
+    in_cluster: Box<InClusterError>,
     // We can only pick one source, but the kubeconfig failure is more likely to be a user error
     #[source]
     kubeconfig: KubeconfigError,
@@ -227,7 +227,7 @@ impl Config {
                 );
 
                 Self::incluster().map_err(|in_cluster| InferConfigError {
-                    in_cluster,
+                    in_cluster: Box::new(in_cluster),
                     kubeconfig: kubeconfig_err,
                 })?
             }

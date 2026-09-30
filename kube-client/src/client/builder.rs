@@ -187,7 +187,7 @@ impl TryFrom<Config> for ClientBuilder<GenericService> {
 
                 #[cfg(not(feature = "socks5"))]
                 Err(Error::ProxyProtocolDisabled {
-                    proxy_url: proxy_url.clone(),
+                    proxy_url: Box::new(proxy_url.clone()),
                     protocol_feature: "kube/socks5",
                 })
             }
@@ -204,7 +204,7 @@ impl TryFrom<Config> for ClientBuilder<GenericService> {
 
                 #[cfg(not(feature = "http-proxy"))]
                 Err(Error::ProxyProtocolDisabled {
-                    proxy_url: proxy_url.clone(),
+                    proxy_url: Box::new(proxy_url.clone()),
                     protocol_feature: "kube/http-proxy",
                 })
             }
@@ -229,13 +229,13 @@ impl TryFrom<Config> for ClientBuilder<GenericService> {
 
                 #[cfg(not(feature = "http-proxy"))]
                 Err(Error::ProxyProtocolDisabled {
-                    proxy_url: proxy_url.clone(),
+                    proxy_url: Box::new(proxy_url.clone()),
                     protocol_feature: "kube/http-proxy",
                 })
             }
 
             Some(proxy_url) => Err(Error::ProxyProtocolUnsupported {
-                proxy_url: proxy_url.clone(),
+                proxy_url: Box::new(proxy_url.clone()),
             }),
 
             None => make_generic_builder(connector, config),
