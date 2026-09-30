@@ -39,6 +39,8 @@ test:
   cargo test --workspace --doc --all-features --exclude kube-examples --exclude e2e
   cargo test -p kube-examples --examples
   cargo test -p kube-examples --examples --all-features
+  # --lib misses integration tests; kube-derive is the only member with tests/
+  cargo test -p kube-derive --tests
 
 # Integration tests (will modify your current context's cluster)
 test-integration:

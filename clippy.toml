@@ -6,3 +6,13 @@ disallowed-macros = [
 disallowed-methods = [
   "futures::future::ready",     # use instead `std::future::ready`
 ]
+# NOTE (@Techassi): Temporarily allow large errors/results until errors are split up further and/or
+# sources are boxed. See https://github.com/kube-rs/kube/pull/2075#issuecomment-5737367597 and
+# https://github.com/kube-rs/kube/issues/2081
+large-error-ignored = [
+  "kube_runtime::watcher::Error",
+  "kube_runtime::finalizer::Error",
+  "kube_runtime::wait::delete::Error",
+  "kube_runtime::wait::Error",
+  "kube_client::error::Error"
+]

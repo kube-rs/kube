@@ -1,0 +1,5 @@
+error: #[derive(CustomResource)] `kube(no_spec)` lifts this field onto the root object, where `metadata` is already taken
+  --> tests/ui/no_spec_reserved_field.rs:10:5
+   |
+10 |     metadata: String,
+   |     ^^^^^^^^

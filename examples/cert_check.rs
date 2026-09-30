@@ -1,3 +1,6 @@
+//! An example of how to get different custom ConfigMaps, for example ones which contain CA
+//! certificates.
+
 use std::borrow::Cow;
 
 use k8s_openapi::{

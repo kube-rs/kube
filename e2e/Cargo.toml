@@ -9,6 +9,9 @@ license.workspace = true
 [package.metadata.release]
 release = false
 
+[lints]
+workspace = true
+
 [[bin]]
 name = "job"
 path = "job.rs"

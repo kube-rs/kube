@@ -1,3 +1,5 @@
+//! An example of how to watch Pods and print out a warning why they become unready.
+
 use futures::prelude::*;
 use k8s_openapi::api::core::v1::Pod;
 use kube::{

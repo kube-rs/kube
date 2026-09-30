@@ -1,3 +1,5 @@
+//! An example of how to share a store between multiple controllers.
+
 use std::{future, ops::Deref, sync::Arc, time::Duration};
 
 use futures::StreamExt;
@@ -15,12 +17,6 @@ use kube::{
 use tracing::{debug, error, info, warn};
 
 use thiserror::Error;
-
-// Helper module that namespaces two constants describing a Kubernetes status condition
-pub mod condition {
-    pub static UNDOCUMENTED_TYPE: &str = "UndocumentedPort";
-    pub static STATUS_TRUE: &str = "True";
-}
 
 const SUBSCRIBE_BUFFER_SIZE: usize = 256;
 

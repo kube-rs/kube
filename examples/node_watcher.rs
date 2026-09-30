@@ -1,3 +1,5 @@
+//! An example of how to watch Nodes and check for any Node failures.
+
 use std::pin::pin;
 
 use futures::TryStreamExt;

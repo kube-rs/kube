@@ -190,7 +190,6 @@ impl<St, K, P> Stream for PredicateFilter<St, K, P>
 where
     St: Stream<Item = Result<K, Error>>,
     K: Resource,
-    K::DynamicType: Default + Eq + Hash,
     P: Predicate<K>,
 {
     type Item = Result<K, Error>;
@@ -460,5 +459,32 @@ pub(crate) mod tests {
         tx.send(mkobj(1, "uid-1")).await.unwrap();
         let second = filtered.next().now_or_never().unwrap().unwrap().unwrap();
         assert_eq!(second.meta().generation, Some(1));
+    }
+
+    #[tokio::test]
+    async fn predicate_filter_compiles_with_dynamic_resource() {
+        use kube::api::DynamicObject;
+
+        let obj: DynamicObject = serde_json::from_value(json!({
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "name": "blog",
+                "generation": Some(1),
+            },
+        }))
+        .unwrap();
+        let data = stream::iter([Ok(obj)]);
+        let mut rx = pin!(PredicateFilter::new(
+            data,
+            predicates::generation,
+            Config::default()
+        ));
+
+        let first = rx.next().now_or_never().unwrap().unwrap().unwrap();
+        assert_eq!(first.meta().generation, Some(1));
+
+        // Mostly, this check is ensuring that predicate filters compile with
+        // `DynamicObject`, not testing any behaviour.
     }
 }

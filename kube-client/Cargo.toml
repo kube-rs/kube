@@ -28,8 +28,9 @@ client = ["config", "__non_core", "hyper", "hyper-util", "http-body", "http-body
 jsonpatch = ["kube-core/jsonpatch"]
 admission = ["kube-core/admission"]
 config = ["__non_core", "pem"]
-socks5 = ["hyper-util/client-proxy"]
-http-proxy = ["hyper-util/client-proxy"]
+proxy = ["socks5", "http-proxy"]
+socks5 = ["hyper-util/client-proxy", "dep:ipnet"]
+http-proxy = ["hyper-util/client-proxy", "dep:ipnet", "dep:percent-encoding"]
 unstable-client = []
 
 # private feature sets; do not use
@@ -54,6 +55,7 @@ http-body-util = { workspace = true, optional = true }
 either = { workspace = true, optional = true }
 thiserror.workspace = true
 futures = { workspace = true, optional = true, features = ["std"] }
+ipnet = { workspace = true, optional = true }
 jiff = { workspace = true, optional = true, features = ["std", "serde"] }
 pem = { workspace = true, optional = true }
 openssl = { workspace = true, optional = true }
@@ -76,6 +78,7 @@ secrecy = { workspace = true }
 tracing = { workspace = true, features = ["log"], optional = true }
 hyper-openssl = { workspace = true, features = ["client-legacy", "tokio"], optional = true }
 form_urlencoded = { workspace = true, optional = true }
+percent-encoding = { workspace = true, optional = true }
 k8s-openapi= { workspace = true, features = [] }
 
 [dev-dependencies]
@@ -84,6 +87,7 @@ kube = { path = "../kube", features = ["derive", "client", "ws"] }
 tempfile.workspace = true
 futures = { workspace = true, features = ["async-await"] }
 tokio = { workspace = true, features = ["full"] }
+rstest.workspace = true
 schemars.workspace = true
 tokio-test.workspace = true
 tower-test.workspace = true

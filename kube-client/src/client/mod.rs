@@ -339,12 +339,21 @@ impl Client {
     /// Perform a raw request and get back a stream of [`WatchEvent`] objects
     pub async fn request_events<T>(
         &self,
-        request: Request<Vec<u8>>,
+        mut request: Request<Vec<u8>>,
     ) -> Result<impl TryStream<Item = Result<WatchEvent<T>>> + use<T>>
     where
         T: Clone + DeserializeOwned,
     {
+        // Kubernetes >=1.37 gzips watch streams one member per event, but our decompression
+        // middleware only decodes the first member, so opt watch streams out of compression.
+        // Drop this once tower-http decodes multi-member gzip again: tower-rs/tower-http#737,
+        // fixed upstream by Nullus157/async-compression#489.
+        request
+            .headers_mut()
+            .entry(http::header::ACCEPT_ENCODING)
+            .or_insert(http::HeaderValue::from_static("identity"));
         let res = self.send(request.map(Body::from)).await?;
+        let res = handle_api_errors(res).await?;
         // trace!("Streaming from {} -> {}", res.url(), res.status().as_str());
         tracing::trace!("headers: {:?}", res.headers());
 
@@ -536,10 +545,9 @@ impl Client {
 /// Kubernetes returned error handling
 ///
 /// Either kube returned an explicit ApiError struct,
-/// or it someohow returned something we couldn't parse as one.
+/// or it somehow returned something we couldn't parse as one.
 ///
 /// In either case, present an ApiError upstream.
-/// The latter is probably a bug if encountered.
 async fn handle_api_errors(res: Response<Body>) -> Result<Response<Body>> {
     let status = res.status();
     if status.is_client_error() || status.is_server_error() {
@@ -552,8 +560,14 @@ async fn handle_api_errors(res: Response<Body>) -> Result<Response<Body>> {
             tracing::debug!("Unsuccessful: {status:?}");
             Err(Error::Api(status.boxed()))
         } else {
-            tracing::warn!("Unsuccessful data error parse: {text}");
-            let status = Status::failure(&text, "Failed to parse error data").with_code(status.as_u16());
+            // Not every error response is a JSON `Status`. A proxy, ingress
+            // controller, or a bare API path that doesn't exist (e.g. a CRD
+            // that isn't installed yet) can return a plain-text or HTML body
+            // instead. This is routine rather than exceptional, so it's
+            // logged at `debug` like the parsed case above rather than `warn`.
+            let text = text.trim();
+            tracing::debug!("Unsuccessful data error parse: {text}");
+            let status = Status::failure(text, "Failed to parse error data").with_code(status.as_u16());
             tracing::debug!("Unsuccessful: {status:?} (reconstruct)");
             Err(Error::Api(status.boxed()))
         }
@@ -587,7 +601,7 @@ mod tests {
     use std::pin::pin;
 
     use crate::{
-        Api, Client,
+        Api, Client, Error,
         client::Body,
         config::{AuthInfo, Cluster, Context, Kubeconfig, NamedAuthInfo, NamedCluster, NamedContext},
     };
@@ -775,6 +789,69 @@ mod tests {
         let pods: Api<PartialObjectMeta<Pod>> =
             Api::default_namespaced(Client::new(mock_service, "default"));
         let _ = pods.watch(&Default::default(), "0").await;
+        spawned.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_watch_error_response_is_surfaced() {
+        let (mock_service, handle) = mock::pair::<Request<Body>, Response<Body>>();
+        let spawned = tokio::spawn(async move {
+            let mut handle = pin!(handle);
+            let (_request, send) = handle.next_request().await.expect("service not called");
+            // apiservers pretty-print error bodies for some clients, so this can span several lines
+            let body = serde_json::to_vec_pretty(&serde_json::json!({
+                "kind": "Status",
+                "apiVersion": "v1",
+                "metadata": {},
+                "status": "Failure",
+                "message": "pods is forbidden",
+                "reason": "Forbidden",
+                "code": 403,
+            }))
+            .unwrap();
+            send.send_response(
+                Response::builder()
+                    .status(http::StatusCode::FORBIDDEN)
+                    .body(Body::from(body))
+                    .unwrap(),
+            );
+        });
+
+        let pods: Api<Pod> = Api::default_namespaced(Client::new(mock_service, "default"));
+        let Err(err) = pods.watch(&Default::default(), "0").await else {
+            panic!("watch with an error response should fail");
+        };
+        assert!(matches!(&err, Error::Api(s) if s.code == 403), "got {err:?}");
+        spawned.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_non_json_error_response_is_reconstructed() {
+        let (mock_service, handle) = mock::pair::<Request<Body>, Response<Body>>();
+        let spawned = tokio::spawn(async move {
+            let mut handle = pin!(handle);
+            let (_request, send) = handle.next_request().await.expect("service not called");
+            // Some routers in front of the apiserver (or a probe for a CRD
+            // that isn't installed yet) return a plain-text 404 instead of a
+            // JSON `Status`.
+            send.send_response(
+                Response::builder()
+                    .status(http::StatusCode::NOT_FOUND)
+                    .body(Body::from(b"404 page not found\n".to_vec()))
+                    .unwrap(),
+            );
+        });
+
+        let pods: Api<Pod> = Api::default_namespaced(Client::new(mock_service, "default"));
+        let Err(err) = pods.get("test").await else {
+            panic!("get with a non-JSON error response should fail");
+        };
+        let Error::Api(status) = &err else {
+            panic!("expected Error::Api, got {err:?}");
+        };
+        assert_eq!(status.code, 404);
+        assert_eq!(status.reason, "Failed to parse error data");
+        assert_eq!(status.message, "404 page not found");
         spawned.await.unwrap();
     }
 }

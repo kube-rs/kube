@@ -3,6 +3,7 @@
 use crate::{Client, Result};
 pub use kube_core::discovery::{ApiCapabilities, ApiResource, Scope, verbs};
 use kube_core::gvk::GroupVersionKind;
+use kube_core::{DynamicObject, TypeMeta};
 use std::collections::HashMap;
 mod apigroup;
 pub mod oneshot;
@@ -236,5 +237,146 @@ impl Discovery {
             .versioned_resources(&gvk.version)
             .into_iter()
             .find(|res| res.0.kind == gvk.kind)
+    }
+
+    /// Finds an [`ApiResource`] and its [`ApiCapabilities`] from a [`TypeMeta`] after discovery
+    ///
+    /// A convenience wrapper around [`Discovery::resolve_gvk`] for when you have a [`TypeMeta`]
+    /// (e.g. taken from a [`DynamicObject`]) rather than a [`GroupVersionKind`]. Returns `None` if
+    /// the `apiVersion` cannot be parsed or the kind was not discovered.
+    pub fn resolve_typemeta(&self, tm: &TypeMeta) -> Option<(ApiResource, ApiCapabilities)> {
+        let gvk = GroupVersionKind::try_from(tm).ok()?;
+        self.resolve_gvk(&gvk)
+    }
+
+    /// Finds an [`ApiResource`] and its [`ApiCapabilities`] for a [`DynamicObject`] after discovery
+    ///
+    /// This makes it easy to build an [`Api`](crate::Api) for an object obtained dynamically
+    /// (e.g. from an admission request or another watch) without manually assembling a
+    /// [`GroupVersionKind`]:
+    ///
+    /// ```no_run
+    /// use kube::{Client, api::{Api, DynamicObject}, discovery::Discovery};
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///     let client = Client::try_default().await?;
+    ///     let object: DynamicObject = todo!("an object obtained at runtime");
+    ///     let discovery = Discovery::new(client.clone()).run().await?;
+    ///     if let Some((ar, _caps)) = discovery.resolve_object(&object) {
+    ///         let api: Api<DynamicObject> = match object.metadata.namespace.as_deref() {
+    ///             Some(ns) => Api::namespaced_with(client.clone(), ns, &ar),
+    ///             None => Api::all_with(client.clone(), &ar),
+    ///         };
+    ///         // now `api` can be used to interact with the object
+    ///         let _ = api;
+    ///     }
+    ///     Ok(())
+    /// }
+    /// ```
+    ///
+    /// Returns `None` if the object has no [`TypeMeta`], its `apiVersion` cannot be parsed, or the
+    /// kind was not discovered.
+    pub fn resolve_object(&self, obj: &DynamicObject) -> Option<(ApiResource, ApiCapabilities)> {
+        self.resolve_typemeta(obj.types.as_ref()?)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::client::Body;
+    use http::{Request, Response};
+    use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
+    use kube_core::{
+        DynamicObject, TypeMeta,
+        discovery::v2::{
+            APIGroupDiscovery, APIResourceDiscovery, APIVersionDiscovery, GroupVersionKind as V2Gvk,
+        },
+    };
+    use tower_test::mock;
+
+    // Build a Discovery cache serving a single apps/v1 Deployment, with a dummy client
+    // (resolve_typemeta / resolve_object never touch the client).
+    fn test_discovery() -> Discovery {
+        let ag = APIGroupDiscovery {
+            metadata: Some(ObjectMeta {
+                name: Some("apps".to_string()),
+                ..Default::default()
+            }),
+            versions: vec![APIVersionDiscovery {
+                version: Some("v1".to_string()),
+                resources: vec![APIResourceDiscovery {
+                    resource: Some("deployments".to_string()),
+                    response_kind: Some(V2Gvk {
+                        group: None,
+                        version: None,
+                        kind: Some("Deployment".to_string()),
+                    }),
+                    scope: Some("Namespaced".to_string()),
+                    verbs: vec!["get".to_string(), "list".to_string()],
+                    ..Default::default()
+                }],
+                freshness: Some("Current".to_string()),
+            }],
+        };
+        let mut groups = HashMap::new();
+        groups.insert("apps".to_string(), ApiGroup::from_v2(ag).unwrap());
+        let (mock_service, _handle) = mock::pair::<Request<Body>, Response<Body>>();
+        let client = Client::new(mock_service, "default");
+        Discovery {
+            client,
+            groups,
+            mode: DiscoveryMode::Block(vec![]),
+        }
+    }
+
+    #[tokio::test]
+    async fn resolve_typemeta_finds_resource() {
+        let discovery = test_discovery();
+        let tm = TypeMeta {
+            api_version: "apps/v1".to_string(),
+            kind: "Deployment".to_string(),
+        };
+        let (ar, _caps) = discovery.resolve_typemeta(&tm).expect("known typemeta resolves");
+        assert_eq!(ar.group, "apps");
+        assert_eq!(ar.version, "v1");
+        assert_eq!(ar.kind, "Deployment");
+    }
+
+    #[tokio::test]
+    async fn resolve_object_finds_resource() {
+        let discovery = test_discovery();
+        let obj = DynamicObject {
+            types: Some(TypeMeta {
+                api_version: "apps/v1".to_string(),
+                kind: "Deployment".to_string(),
+            }),
+            metadata: Default::default(),
+            data: Default::default(),
+        };
+        let (ar, _caps) = discovery.resolve_object(&obj).expect("object with types resolves");
+        assert_eq!(ar.kind, "Deployment");
+        assert_eq!(ar.api_version, "apps/v1");
+    }
+
+    #[tokio::test]
+    async fn resolve_object_without_typemeta_is_none() {
+        let discovery = test_discovery();
+        let obj = DynamicObject {
+            types: None,
+            metadata: Default::default(),
+            data: Default::default(),
+        };
+        assert!(discovery.resolve_object(&obj).is_none());
+    }
+
+    #[tokio::test]
+    async fn resolve_typemeta_unknown_kind_is_none() {
+        let discovery = test_discovery();
+        let tm = TypeMeta {
+            api_version: "apps/v1".to_string(),
+            kind: "DoesNotExist".to_string(),
+        };
+        assert!(discovery.resolve_typemeta(&tm).is_none());
     }
 }

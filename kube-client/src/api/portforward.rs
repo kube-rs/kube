@@ -125,7 +125,7 @@ impl Portforwarder {
     ///
     /// A value is returned at most once per port.
     #[inline]
-    pub fn take_stream(&mut self, port: u16) -> Option<impl AsyncRead + AsyncWrite + Unpin + use<>> {
+    pub fn take_stream(&mut self, port: u16) -> Option<DuplexStream> {
         self.ports.remove(&port)
     }
 

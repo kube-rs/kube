@@ -46,7 +46,7 @@ pub trait SelectorExt: private::Sealed {
 }
 
 /// A selector expression with existing operations
-#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize)]
 pub enum Expression {
     /// Key exists and in set:
     ///

@@ -1,3 +1,6 @@
+//! An example of how to connect to port 80 of the example pod, send a request, and stream the
+//! response.
+
 use futures::StreamExt;
 use k8s_openapi::api::core::v1::Pod;
 use tracing::*;
