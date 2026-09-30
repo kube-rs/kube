@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1790778545134,
+  "lastUpdate": 1790779218298,
   "repoUrl": "https://github.com/kube-rs/kube",
   "entries": {
     "Benchmark": [
@@ -7349,6 +7349,105 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/kube-rs/kube/commit/86b33d7266b856be8f181326a765c38c7175ae87"
         },
         "date": 1790778543362,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "init_listwatch - peak_bytes",
+            "value": 55194619,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - total_allocated",
+            "value": 76715088,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - alloc_count",
+            "value": 578023,
+            "unit": "allocations"
+          },
+          {
+            "name": "steady_state - peak_bytes",
+            "value": 71381202,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - total_allocated",
+            "value": 109519220,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - alloc_count",
+            "value": 799021,
+            "unit": "allocations"
+          },
+          {
+            "name": "relist - peak_bytes",
+            "value": 99797302,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - total_allocated",
+            "value": 174518628,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - alloc_count",
+            "value": 1189035,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_without_modify - peak_bytes",
+            "value": 141298836,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - total_allocated",
+            "value": 205865000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - alloc_count",
+            "value": 1298020,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_with_modify - peak_bytes",
+            "value": 134853452,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - total_allocated",
+            "value": 162895000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - alloc_count",
+            "value": 1058021,
+            "unit": "allocations"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "doxxx93@gmail.com",
+            "name": "doxxx",
+            "username": "doxxx93"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d22d799cce551d07e5301ee4ca994691d9ae7c29",
+          "message": "Bump syn to 3 along with darling, prettyplease and educe (#2095)\n\ndarling 0.24 moves to syn 3 and adds NestedMeta::NameValueInvalidExpr, which the printcolumn and scale parsers now report with darling's stored parse error. runtime-macros uses syn 2 full APIs without enabling the feature, so the kube-derive dev-deps turn it on now that darling and prettyplease no longer do. educe 0.8 is also on syn 3 and needs quote 1.0.44, so the quote floor moves up for minimal-versions.\n\nSigned-off-by: doxxx93 <doxxx93@gmail.com>",
+          "timestamp": "2026-09-30T14:38:59Z",
+          "tree_id": "1197d246dd73643d6e947c956c9f8a3740cf94cb",
+          "url": "https://github.com/kube-rs/kube/commit/d22d799cce551d07e5301ee4ca994691d9ae7c29"
+        },
+        "date": 1790779216526,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
