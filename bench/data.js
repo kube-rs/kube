@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1790779218298,
+  "lastUpdate": 1790780041409,
   "repoUrl": "https://github.com/kube-rs/kube",
   "entries": {
     "Benchmark": [
@@ -7448,6 +7448,105 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/kube-rs/kube/commit/d22d799cce551d07e5301ee4ca994691d9ae7c29"
         },
         "date": 1790779216526,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "init_listwatch - peak_bytes",
+            "value": 55194619,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - total_allocated",
+            "value": 76715088,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - alloc_count",
+            "value": 578023,
+            "unit": "allocations"
+          },
+          {
+            "name": "steady_state - peak_bytes",
+            "value": 71381202,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - total_allocated",
+            "value": 109519220,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - alloc_count",
+            "value": 799021,
+            "unit": "allocations"
+          },
+          {
+            "name": "relist - peak_bytes",
+            "value": 99797302,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - total_allocated",
+            "value": 174518628,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - alloc_count",
+            "value": 1189035,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_without_modify - peak_bytes",
+            "value": 141298836,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - total_allocated",
+            "value": 205865000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - alloc_count",
+            "value": 1298020,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_with_modify - peak_bytes",
+            "value": 134853452,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - total_allocated",
+            "value": 162895000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - alloc_count",
+            "value": 1058021,
+            "unit": "allocations"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "doxxx93@gmail.com",
+            "name": "doxxx",
+            "username": "doxxx93"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "162c73a53568934116a62d63c83dec8f34e0c02d",
+          "message": "Box large error payloads to keep kube::Error under 128 bytes (#2096)\n\n`kube::Error` was 136 bytes with all features, over clippy's\n`result_large_err` threshold, and was only silenced by the temporary\n`large-error-ignored` list in clippy.toml. That list does not cover\ndownstream types wrapping `kube::Error` (e.g. examples/secret_syncer.rs).\n\nBox the large payloads at the field level, as already done for\n`Error::Api(Box<Status>)` and `KubeconfigError::Parse`:\n\n- `AuthError::AuthExecParse(Box<serde_saphyr::Error>)`\n- `AuthError::AuthExecRun { out: Box<std::process::Output> }`\n- `Error::ProxyProtocolUnsupported/ProxyProtocolDisabled { proxy_url: Box<Uri> }`\n- `NoProxyError::NoHost { uri: Box<Uri> }`\n- `InferConfigError`'s private `in_cluster` field (not `kubeconfig`, which\n  is the `#[source]` and would otherwise stop downcasting to\n  `KubeconfigError`)\n\n`kube::Error` goes from 136 to 72 bytes (64 with default features), and\nthe kube-runtime error types from 144 to 80. Drop the\n`large-error-ignored` list.\n\nRefs #2081\n\nSigned-off-by: doxxx93 <doxxx93@gmail.com>",
+          "timestamp": "2026-09-30T14:52:43Z",
+          "tree_id": "8e627f5f99168eed0b7a3e880df6f1e560b961d6",
+          "url": "https://github.com/kube-rs/kube/commit/162c73a53568934116a62d63c83dec8f34e0c02d"
+        },
+        "date": 1790780040074,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
