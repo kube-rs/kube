@@ -114,12 +114,17 @@ where
             watcher::Event::Delete(obj) => {
                 let mut key = obj.to_object_ref(self.dyntype.clone());
                 let mut store = self.store.write();
-                store.remove(&key);
-                if self.dispatcher.is_some() {
-                    // Re-insert the entry with updated key, as insert on its own doesnt modify the key
-                    key.extra.remaining_lookups = self.dispatcher.as_ref().map(Dispatcher::subscribers);
-                    store.insert(key, Arc::new(obj.clone()));
-                }
+
+                store.remove_entry(&key).map(|(original_key, existing)| {
+                    if self.dispatcher.is_none() {
+                    } else if existing.uid().as_deref() == key.extra.uid.as_deref() {
+                        // Re-insert the entry with updated key, as insert on its own doesnt modify the key
+                        key.extra.remaining_lookups = self.dispatcher.as_ref().map(Dispatcher::subscribers);
+                        store.insert(key, existing);
+                    } else {
+                        store.insert(original_key, existing);
+                    }
+                });
             }
             watcher::Event::Init => {
                 self.buffer = AHashMap::new();
@@ -260,12 +265,16 @@ where
     #[must_use]
     pub fn remove(&self, key: &ObjectRef<K>) -> Option<Arc<K>> {
         let mut store = self.store.write();
-        store.remove_entry(key).map(|(mut key, obj)| {
-            match key.extra.remaining_lookups {
+        store.remove_entry(key).map(|(mut stored_key, obj)| {
+            if key.extra.uid != obj.uid().map(Into::into) {
+                store.insert(stored_key, obj.clone());
+                return obj;
+            }
+            match stored_key.extra.remaining_lookups {
                 Some(..=1) | None => (),
                 Some(lookups) => {
-                    key.extra.remaining_lookups = Some(lookups - 1);
-                    store.insert(key, obj.clone());
+                    stored_key.extra.remaining_lookups = Some(lookups - 1);
+                    store.insert(stored_key, obj.clone());
                 }
             }
 

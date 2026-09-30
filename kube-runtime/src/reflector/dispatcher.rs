@@ -229,10 +229,14 @@ pub(crate) mod test {
         // NOTE: a Delete(_) event will be ignored if the item does not exist in
         // the cache. Same with a Restarted(vec![delete_item])
         let foo = testpod("foo");
+        let mut foo2 = testpod("foo");
+        foo2.metadata.uid = Some("1".to_string());
         let bar = testpod("bar");
         let st = stream::iter(vec![
             Ok(Event::Delete(foo.clone())),
             Ok(Event::Apply(foo.clone())),
+            Ok(Event::Delete(foo2.clone())),
+            Ok(Event::Delete(foo.clone())),
             Err(Error::NoResourceVersion),
             Ok(Event::Init),
             Ok(Event::InitApply(foo.clone())),
@@ -246,9 +250,38 @@ pub(crate) mod test {
         let (reader, writer) = reflector::store_shared(10);
         let mut subscriber = pin!(writer.subscribe().unwrap());
         let mut other_subscriber = pin!(writer.subscribe().unwrap());
+        let mut delayed_subscriber = pin!(writer.subscribe().unwrap());
         let mut reflect = pin!(st.reflect_shared(writer));
 
         // Deleted events should be skipped by subscriber.
+        assert!(matches!(
+            poll!(reflect.next()),
+            Poll::Ready(Some(Ok(Event::Delete(_))))
+        ));
+        assert_eq!(reader.get(&ObjectRef::from_obj(&foo)), None);
+        assert_eq!(poll!(subscriber.next()), Poll::Pending);
+        assert_eq!(poll!(other_subscriber.next()), Poll::Pending);
+        assert_eq!(poll!(delayed_subscriber.next()), Poll::Pending);
+
+        assert!(matches!(
+            poll!(reflect.next()),
+            Poll::Ready(Some(Ok(Event::Apply(_))))
+        ));
+        assert_eq!(poll!(subscriber.next()), Poll::Ready(Some(foo.clone())));
+        assert_eq!(poll!(other_subscriber.next()), Poll::Ready(Some(foo.clone())));
+        assert_eq!(reader.get(&ObjectRef::from_obj(&foo)), Some(foo.clone()));
+
+        // Deleting a different UID with the same name must preserve foo.
+        assert!(matches!(
+            poll!(reflect.next()),
+            Poll::Ready(Some(Ok(Event::Delete(_))))
+        ));
+        assert_eq!(reader.get(&ObjectRef::from_obj(&foo)), Some(foo.clone()));
+        assert_eq!(poll!(subscriber.next()), Poll::Ready(Some(foo.clone())));
+        assert_eq!(poll!(other_subscriber.next()), Poll::Ready(Some(foo.clone())));
+        assert_eq!(reader.get(&ObjectRef::from_obj(&foo)), Some(foo.clone()));
+
+        // Deleting the matching UID removes foo after the last subscriber.
         assert!(matches!(
             poll!(reflect.next()),
             Poll::Ready(Some(Ok(Event::Delete(_))))
@@ -257,13 +290,13 @@ pub(crate) mod test {
         assert_eq!(poll!(subscriber.next()), Poll::Ready(Some(foo.clone())));
         assert_eq!(reader.get(&ObjectRef::from_obj(&foo)), Some(foo.clone()));
         assert_eq!(poll!(other_subscriber.next()), Poll::Ready(Some(foo.clone())));
-        assert_eq!(reader.get(&ObjectRef::from_obj(&foo)), None);
+        assert_eq!(reader.get(&ObjectRef::from_obj(&foo)), Some(foo.clone()));
 
-        assert!(matches!(
-            poll!(reflect.next()),
-            Poll::Ready(Some(Ok(Event::Apply(_))))
-        ));
-        assert_eq!(poll!(subscriber.next()), Poll::Ready(Some(foo.clone())));
+        // The delayed subscriber consumes all queued events from cache with latest state of foo
+        assert_eq!(poll!(delayed_subscriber.next()), Poll::Ready(Some(foo.clone())));
+        assert_eq!(poll!(delayed_subscriber.next()), Poll::Ready(Some(foo.clone())));
+        assert_eq!(poll!(delayed_subscriber.next()), Poll::Ready(Some(foo.clone())));
+        assert_eq!(reader.get(&ObjectRef::from_obj(&foo)), None);
 
         // Errors are not propagated to subscribers.
         assert!(matches!(
