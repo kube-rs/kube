@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1790675028791,
+  "lastUpdate": 1790756886616,
   "repoUrl": "https://github.com/kube-rs/kube",
   "entries": {
     "Benchmark": [
@@ -7151,6 +7151,105 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/kube-rs/kube/commit/6752745d6d4cc8b8209c622c9b113a0df52ec294"
         },
         "date": 1790675027095,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "init_listwatch - peak_bytes",
+            "value": 55194619,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - total_allocated",
+            "value": 76715088,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - alloc_count",
+            "value": 578023,
+            "unit": "allocations"
+          },
+          {
+            "name": "steady_state - peak_bytes",
+            "value": 71381202,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - total_allocated",
+            "value": 109519220,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - alloc_count",
+            "value": 799021,
+            "unit": "allocations"
+          },
+          {
+            "name": "relist - peak_bytes",
+            "value": 99797302,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - total_allocated",
+            "value": 174518628,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - alloc_count",
+            "value": 1189035,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_without_modify - peak_bytes",
+            "value": 141298836,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - total_allocated",
+            "value": 205865000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - alloc_count",
+            "value": 1298020,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_with_modify - peak_bytes",
+            "value": 134853452,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - total_allocated",
+            "value": 162895000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - alloc_count",
+            "value": 1058021,
+            "unit": "allocations"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "mvanhorn@users.noreply.github.com",
+            "name": "Matt Van Horn",
+            "username": "mvanhorn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "bd6b7cc312dcc50f8545726def01315575baa58c",
+          "message": "Recover watch streams after nested unexpected EOF (#2084)\n\n* fix: recover watch streams after nested unexpected EOF\n\nFixes #1915\n\nSigned-off-by: Matt Van Horn <455140+mvanhorn@users.noreply.github.com>\n\n* fix: keep the eof cause in the watch log and drop the non-watch test\n\nLog the `eof in poll` error with its Debug form so a missing\nclose_notify stays visible in the source chain. Drop the request_stream\ntest, since that path is not changed here.\n\nSigned-off-by: Matt Van Horn <455140+mvanhorn@users.noreply.github.com>\n\n---------\n\nSigned-off-by: Matt Van Horn <455140+mvanhorn@users.noreply.github.com>\nCo-authored-by: Matt Van Horn <455140+mvanhorn@users.noreply.github.com>",
+          "timestamp": "2026-09-30T17:27:10+09:00",
+          "tree_id": "1c22b18926d0a1eef869b650ecb76cc6f6a16d6a",
+          "url": "https://github.com/kube-rs/kube/commit/bd6b7cc312dcc50f8545726def01315575baa58c"
+        },
+        "date": 1790756885435,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
