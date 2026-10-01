@@ -109,7 +109,13 @@ where
             watcher::Event::Apply(obj) => {
                 let key = obj.to_object_ref(self.dyntype.clone());
                 let obj = Arc::new(obj.clone());
-                self.store.write().insert(key, obj);
+                let mut store = self.store.write();
+                if self.dispatcher.is_some()
+                    && store.entry(key.clone()).key().extra.remaining_lookups.is_some()
+                {
+                    store.remove(&key);
+                }
+                store.insert(key, obj);
             }
             watcher::Event::Delete(obj) => {
                 let mut key = obj.to_object_ref(self.dyntype.clone());
@@ -266,12 +272,15 @@ where
     pub fn remove(&self, key: &ObjectRef<K>) -> Option<Arc<K>> {
         let mut store = self.store.write();
         store.remove_entry(key).map(|(mut stored_key, obj)| {
-            if key.extra.uid != obj.uid().map(Into::into) {
+            if key.extra.uid.as_deref() != obj.uid().as_deref() {
                 store.insert(stored_key, obj.clone());
                 return obj;
             }
             match stored_key.extra.remaining_lookups {
-                Some(..=1) | None => (),
+                Some(..=1) => (),
+                None => {
+                    store.insert(stored_key, obj.clone());
+                }
                 Some(lookups) => {
                     stored_key.extra.remaining_lookups = Some(lookups - 1);
                     store.insert(stored_key, obj.clone());

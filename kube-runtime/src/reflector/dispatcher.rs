@@ -471,6 +471,59 @@ pub(crate) mod test {
         assert_eq!(poll!(subscriber_slow.next()), Poll::Ready(None));
     }
 
+    #[cfg(feature = "unstable-runtime-subscribe")]
+    #[tokio::test]
+    async fn stale_delete_keeps_reentered_object() {
+        // Same uid comes back, e.g. the object left and re-entered a label selector
+        let mut foo = testpod("foo");
+        foo.metadata.uid = Some("1".into());
+        let st = stream::iter([
+            Ok(Event::Apply(foo.clone())),
+            Ok(Event::Delete(foo.clone())),
+            Ok(Event::Apply(foo.clone())),
+        ]);
+        let (reader, writer) = reflector::store_shared(10);
+        let mut subscriber = pin!(writer.subscribe().unwrap());
+        let mut reflect = pin!(st.reflect_shared(writer));
+        assert!(matches!(poll!(reflect.next()), Poll::Ready(Some(Ok(_)))));
+        assert!(matches!(poll!(reflect.next()), Poll::Ready(Some(Ok(_)))));
+        assert!(matches!(poll!(reflect.next()), Poll::Ready(Some(Ok(_)))));
+
+        // The subscriber catches up after all three events
+        assert!(matches!(poll!(subscriber.next()), Poll::Ready(Some(_))));
+        assert!(matches!(poll!(subscriber.next()), Poll::Ready(Some(_))));
+
+        // Reading the stale delete must not remove the live object
+        assert!(reader.get(&ObjectRef::from_obj(&foo)).is_some());
+        assert!(matches!(poll!(subscriber.next()), Poll::Ready(Some(_))));
+    }
+
+    #[tokio::test]
+    async fn stale_delete_keeps_relisted_object() {
+        let mut foo = testpod("foo");
+        foo.metadata.uid = Some("1".into());
+        let st = stream::iter([
+            Ok(Event::Apply(foo.clone())),
+            Ok(Event::Delete(foo.clone())),
+            Ok(Event::Init),
+            Ok(Event::InitApply(foo.clone())),
+            Ok(Event::InitDone),
+        ]);
+        let (reader, writer) = reflector::store_shared(10);
+        let mut subscriber = pin!(writer.subscribe().unwrap());
+        let mut reflect = pin!(st.reflect_shared(writer));
+        for _ in 0..5 {
+            assert!(matches!(poll!(reflect.next()), Poll::Ready(Some(Ok(_)))));
+        }
+
+        for _ in 0..2 {
+            assert!(matches!(poll!(subscriber.next()), Poll::Ready(Some(_))));
+        }
+        // Reading the stale delete must not remove the relisted object
+        assert!(reader.get(&ObjectRef::from_obj(&foo)).is_some());
+        assert!(matches!(poll!(subscriber.next()), Poll::Ready(Some(_))));
+    }
+
     // TODO (matei): tests around cloning subscribers once a watch stream has already
     // been established. This will depend on the interfaces & impl so are left
     // out for now.
