@@ -174,12 +174,10 @@ jobs:
 
       - uses: nolar/setup-k3d-k3s@v1
         with:
-          version: ${{matrix.k8s}}
+          # channels resolve via update.k3s.io, no GitHub API rate limit
+          channel: ${{matrix.k8s}}
           # k3d-kube
           k3d-name: kube
-          # Used to avoid rate limits when fetching the releases from k3s repo.
-          # Anonymous access is limited to 60 requests / hour / worker
-          # github-token: ${{ secrets.GITHUB_TOKEN }}
           k3d-args: "-p 10250:10250 --no-rollback --k3s-arg --disable=traefik,servicelb,metrics-server@server:*"
 
       - name: Import test images into k3d
@@ -231,12 +229,9 @@ jobs:
 
       - uses: nolar/setup-k3d-k3s@v1
         with:
-          version: "v1.32" # MK8SV
+          channel: "v1.32" # MK8SV
           # k3d-kube
           k3d-name: kube
-          # Used to avoid rate limits when fetching the releases from k3s repo.
-          # Anonymous access is limited to 60 requests / hour / worker
-          # github-token: ${{ secrets.GITHUB_TOKEN }}
           k3d-args: "--no-lb --no-rollback --k3s-arg --disable=traefik,servicelb,metrics-server@server:*"
 
       # Real CI work starts here
@@ -315,11 +310,8 @@ jobs:
 
       - uses: nolar/setup-k3d-k3s@v1
         with:
-          version: latest
+          channel: latest
           k3d-name: kube
-          # Used to avoid rate limits when fetching the releases from k3s repo.
-          # Anonymous access is limited to 60 requests / hour / worker
-          # github-token: ${{ secrets.GITHUB_TOKEN }}
           k3d-args: "--no-lb --no-rollback --k3s-arg --disable=traefik,servicelb,metrics-server@server:*"
       - name: Import image
         run: "k3d image import clux/kube-e2e:${{ github.sha }} --cluster kube"
