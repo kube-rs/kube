@@ -10,6 +10,11 @@ on:
       - "**.toml"
       - "**.yml"
 
+# Spend CI time only on latest ref: https://docs.github.com/en/actions/using-jobs/using-concurrency
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   tarpaulin-codecov:
     runs-on: ubuntu-latest
