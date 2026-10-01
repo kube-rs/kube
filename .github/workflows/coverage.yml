@@ -38,7 +38,7 @@ jobs:
       - name: Import test images into k3d
         run: |
           docker pull busybox:stable
-          k3d image import busybox:stable -c kube
+          k3d image import busybox:stable -c kube --mode direct
 
       - name: Run cargo-tarpaulin
         run: |
