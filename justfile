@@ -26,6 +26,7 @@ deny:
 # Unit tests
 test:
   #!/usr/bin/env bash
+  set -euo pipefail
   if rg "\`\`\`ignored"; then
     echo "ignored doctests are not allowed, use compile_fail or no_run"
     exit 1
