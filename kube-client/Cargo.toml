@@ -88,7 +88,6 @@ tempfile.workspace = true
 futures = { workspace = true, features = ["async-await"] }
 tokio = { workspace = true, features = ["full"] }
 rstest.workspace = true
-schemars.workspace = true
 tokio-test.workspace = true
 tower-test.workspace = true
 k8s-openapi= { workspace = true, features = ["latest"] }
