@@ -268,6 +268,7 @@ where
     /// Return the cached object for `key`, removing it after its last pending lookup.
     ///
     /// Earlier lookups decrement the pending lookup count and leave the object in the cache.
+    #[cfg(feature = "unstable-runtime-subscribe")]
     #[must_use]
     pub fn remove(&self, key: &ObjectRef<K>) -> Option<Arc<K>> {
         let mut store = self.store.write();
