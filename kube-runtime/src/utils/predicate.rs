@@ -51,6 +51,18 @@ pub trait Predicate<K> {
     /// hash is unchanged. In particular, `generation.fallback(resource_version)` can still
     /// suppress deletions for objects with an unchanged generation.
     ///
+    /// Generation support generally depends on the resource type: Deployments and custom
+    /// resources normally populate it, while `ConfigMaps` and Secrets normally do not.
+    /// Thus, `generation.fallback(resource_version)` is useful as a shared policy across
+    /// resource types, but the fallback is redundant for a type known to always provide
+    /// generation. Generation is not normally a field that appears and disappears over
+    /// an object's lifetime, though support can vary by API implementation and version.
+    ///
+    /// Persisted objects returned by ordinary API-server list/watch requests have a
+    /// resource version, so reversing the order to `resource_version.fallback(generation)`
+    /// generally makes the generation fallback redundant. Locally constructed objects
+    /// and non-persisted API responses need not have a resource version.
+    ///
     /// # Usage
     ///
     /// ```
@@ -269,7 +281,7 @@ where
 /// | [`generation`] | Observe desired-state changes while ignoring status-only updates, for resources supporting generation | Can suppress deletion-related updates and deleted objects when generation is unchanged |
 /// | [`resource_version`] | Observe object revisions, including status-only changes | Retains observed deletes whose resource version differs from the cached version |
 /// | [`labels`], [`annotations`], [`finalizers`] | Observe changes to those fields | Can suppress deletions when the selected fields are unchanged |
-/// | [`fallback`] | Fallback handler for cache misses | See predicate specific docs |
+/// | [`fallback`](crate::Predicate::fallback) | Use another predicate when the first has no value | See [`Predicate::fallback`](crate::Predicate::fallback) for the deletion caveat |
 ///
 /// # Deletion handling
 ///
@@ -288,8 +300,10 @@ where
 /// watcher is unavailable. Reconcilers should check current desired and actual state,
 /// and use a recovery mechanism such as periodic requeues when missed triggers matter.
 /// Use [finalizers](crate::finalizer::finalizer) for cleanup that must complete before
-/// deletion. Filters must also allow the updates that start finalizer cleanup through;
-/// installing a finalizer does not make a generation-only predicate deletion-aware.
+/// deletion. The initial deletion marking bumps a positive generation, so a generation-only
+/// predicate lets that update through to start cleanup. It can still suppress the final
+/// delete event and the update that adds the finalizer, since adding a finalizer leaves
+/// generation unchanged. See the [finalizer documentation](crate::finalizer::finalizer).
 ///
 /// Functional rewrite of the [controller-runtime/predicate module](https://github.com/kubernetes-sigs/controller-runtime/blob/main/pkg/predicate/predicate.go).
 pub mod predicates {
