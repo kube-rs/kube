@@ -57,6 +57,7 @@ pub trait Lookup {
             extra: Extra {
                 resource_version: self.resource_version().map(Cow::into_owned),
                 uid: self.uid().map(Cow::into_owned),
+                #[cfg(feature = "unstable-runtime-subscribe")]
                 remaining_lookups: None,
             },
         }
@@ -159,6 +160,7 @@ pub struct Extra {
     /// The uid of the object
     pub uid: Option<String>,
     /// Number of remaining cache lookups on this reference
+    #[cfg(feature = "unstable-runtime-subscribe")]
     pub remaining_lookups: Option<usize>,
 }
 
@@ -235,6 +237,7 @@ impl<K: Lookup> ObjectRef<K> {
                 extra: Extra {
                     resource_version: None,
                     uid: Some(owner.uid.clone()),
+                    #[cfg(feature = "unstable-runtime-subscribe")]
                     remaining_lookups: None,
                 },
             })
@@ -365,6 +368,7 @@ mod tests {
             extra: Extra {
                 resource_version: Some("123".to_string()),
                 uid: Some("638ffacd-f666-4402-ba10-7848c66ef576".to_string()),
+                #[cfg(feature = "unstable-runtime-subscribe")]
                 remaining_lookups: None,
             },
             ..minimal.clone()
