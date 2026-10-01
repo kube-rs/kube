@@ -115,8 +115,8 @@ impl FinalizerState {
 ///
 /// If the controller's input stream uses [predicate filtering](crate::WatchStreamExt::predicate_filter),
 /// it must allow updates to `metadata.deletionTimestamp` through so cleanup can begin.
-/// A generation-only predicate can suppress these updates even when a finalizer is installed.
-/// It can also suppress the update that adds the finalizer in the expected flow above.
+/// A generation-only predicate can suppress the update that adds the finalizer in the expected flow above,
+/// since adding a finalizer leaves generation unchanged. The initial deletion marking does bump generation.
 /// See [predicate deletion handling](crate::predicates) for guidance.
 ///
 /// `reconcile` should take the object that the [`Event`] contains, rather than trying to reuse `obj`, since it may have been updated.
