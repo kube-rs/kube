@@ -298,8 +298,9 @@ pub mod predicates {
     /// Hash the generation of a Resource K
     ///
     /// Useful for ignoring status-only updates on resources that support generation.
-    /// Deletion need not change generation, so this can suppress both deletion-timestamp
-    /// updates and objects from delete events. See the [module documentation](crate::predicates).
+    ///
+    /// Note that the final delete event need not change generation, so this can suppress
+    /// objects from delete events. See the [module documentation](crate::predicates).
     pub fn generation<K: Resource>(obj: &K) -> Option<u64> {
         obj.meta().generation.map(|g| hash(&g))
     }
