@@ -269,6 +269,7 @@ where
 /// | [`generation`] | Observe desired-state changes while ignoring status-only updates, for resources supporting generation | Can suppress deletion-related updates and deleted objects when generation is unchanged |
 /// | [`resource_version`] | Observe object revisions, including status-only changes | Retains observed deletes whose resource version differs from the cached version |
 /// | [`labels`], [`annotations`], [`finalizers`] | Observe changes to those fields | Can suppress deletions when the selected fields are unchanged |
+/// | [`fallback`] | Fallback handler for cache misses | See predicate specific docs |
 ///
 /// # Deletion handling
 ///
