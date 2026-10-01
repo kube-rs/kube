@@ -1,6 +1,10 @@
 name: test
 on:
   pull_request:
+  # main runs populate the rust-cache that PR runs restore from
+  push:
+    branches:
+      - main
 
 env:
   RUST_BACKTRACE: 1
@@ -29,6 +33,8 @@ jobs:
       # - https://github.com/rust-lang/cargo/issues/8603
       # - https://github.com/actions/cache/issues/403
       - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       # Install OpenSSL Libraries for Windows
       # - name: install openssl
@@ -102,6 +108,8 @@ jobs:
       - name: Install nightly toolchain
         uses: dtolnay/rust-toolchain@nightly
       - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: taiki-e/install-action@cargo-hack
       - uses: extractions/setup-just@v4
       - name: Check minimal versions
@@ -122,6 +130,8 @@ jobs:
         with:
           toolchain: ${{ steps.msrv.outputs.msrv }}
       - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Check
         run: cargo check --workspace
       - name: Check rust-version keys matches advertised MSRV
@@ -159,6 +169,8 @@ jobs:
       # - https://github.com/rust-lang/cargo/issues/8603
       # - https://github.com/actions/cache/issues/403
       - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - uses: nolar/setup-k3d-k3s@v1
         with:
@@ -214,6 +226,8 @@ jobs:
       # - https://github.com/rust-lang/cargo/issues/8603
       # - https://github.com/actions/cache/issues/403
       - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - uses: nolar/setup-k3d-k3s@v1
         with:
