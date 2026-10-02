@@ -109,11 +109,38 @@ where
             watcher::Event::Apply(obj) => {
                 let key = obj.to_object_ref(self.dyntype.clone());
                 let obj = Arc::new(obj.clone());
-                self.store.write().insert(key, obj);
+                let mut store = self.store.write();
+                #[cfg(feature = "unstable-runtime-subscribe")]
+                if self.dispatcher.is_some()
+                    && store.entry(key.clone()).key().extra.remaining_lookups.is_some()
+                {
+                    store.remove(&key);
+                }
+                store.insert(key, obj);
             }
             watcher::Event::Delete(obj) => {
-                let key = obj.to_object_ref(self.dyntype.clone());
-                self.store.write().remove(&key);
+                if cfg!(not(feature = "unstable-runtime-subscribe")) {
+                    let key = obj.to_object_ref(self.dyntype.clone());
+                    self.store.write().remove(&key);
+                } else {
+                    #[cfg(feature = "unstable-runtime-subscribe")]
+                    let mut key = obj.to_object_ref(self.dyntype.clone());
+                    #[cfg(feature = "unstable-runtime-subscribe")]
+                    let mut store = self.store.write();
+
+                    #[cfg(feature = "unstable-runtime-subscribe")]
+                    if let Some((original_key, existing)) = store.remove_entry(&key) {
+                        if self.dispatcher.is_none() {
+                        } else if existing.uid().as_deref() == key.extra.uid.as_deref() {
+                            // Re-insert the entry with updated key, as insert on its own doesnt modify the key
+                            key.extra.remaining_lookups =
+                                self.dispatcher.as_ref().map(Dispatcher::subscribers);
+                            store.insert(key, existing);
+                        } else {
+                            store.insert(original_key, existing);
+                        }
+                    }
+                }
             }
             watcher::Event::Init => {
                 self.buffer = AHashMap::new();
@@ -162,6 +189,13 @@ where
                     for obj_ref in obj_refs {
                         dispatcher.broadcast(obj_ref).await;
                     }
+                }
+
+                #[cfg(feature = "unstable-runtime-subscribe")]
+                watcher::Event::Delete(obj) => {
+                    let mut obj_ref = obj.to_object_ref(self.dyntype.clone());
+                    obj_ref.extra.remaining_lookups = Some(dispatcher.subscribers());
+                    dispatcher.broadcast(obj_ref).await;
                 }
 
                 _ => {}
@@ -240,6 +274,33 @@ where
             })
             // Clone to let go of the entry lock ASAP
             .cloned()
+    }
+
+    /// Return the cached object for `key`, removing it after its last pending lookup.
+    ///
+    /// Earlier lookups decrement the pending lookup count and leave the object in the cache.
+    #[cfg(feature = "unstable-runtime-subscribe")]
+    #[must_use]
+    pub(crate) fn remove(&self, key: &ObjectRef<K>) -> Option<Arc<K>> {
+        let mut store = self.store.write();
+        store.remove_entry(key).map(|(mut stored_key, obj)| {
+            if key.extra.uid.as_deref() != obj.uid().as_deref() {
+                store.insert(stored_key, obj.clone());
+                return obj;
+            }
+            match stored_key.extra.remaining_lookups {
+                Some(..=1) => (),
+                None => {
+                    store.insert(stored_key, obj.clone());
+                }
+                Some(lookups) => {
+                    stored_key.extra.remaining_lookups = Some(lookups - 1);
+                    store.insert(stored_key, obj.clone());
+                }
+            }
+
+            obj
+        })
     }
 
     /// Return a full snapshot of the current values
