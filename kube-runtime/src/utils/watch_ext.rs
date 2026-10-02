@@ -51,6 +51,10 @@ pub trait WatchStreamExt: Stream {
     /// Decode a [`watcher()`] stream into a stream of touched objects
     ///
     /// All Added/Modified/Deleted events are passed through, and critical errors bubble up.
+    /// Only the objects are retained; the original event type is discarded. An object
+    /// from a delete event need not have a deletion timestamp or a changed generation.
+    /// A subsequent [`predicate_filter`](Self::predicate_filter) can therefore suppress
+    /// it if the selected properties are unchanged. See [deletion handling](crate::predicates).
     fn touched_objects<K>(self) -> EventDecode<Self>
     where
         Self: Stream<Item = Result<watcher::Event<K>, watcher::Error>> + Sized,
@@ -93,7 +97,7 @@ pub trait WatchStreamExt: Stream {
         EventModify::new(self, f)
     }
 
-    /// Filter a stream based on on [`predicates`](crate::predicates).
+    /// Filter a stream based on [`predicates`](crate::predicates).
     ///
     /// This will filter out repeat calls where the predicate returns the same result.
     /// Common use case for this is to avoid repeat events for status updates
@@ -101,6 +105,30 @@ pub trait WatchStreamExt: Stream {
     ///
     /// The cache entries have a configurable time-to-live (TTL) to prevent unbounded
     /// memory growth. By default, entries expire after 1 hour.
+    ///
+    /// ## Deletion handling
+    ///
+    /// This method filters decoded objects without access to their original event type.
+    /// After [`touched_objects`](Self::touched_objects), a generation-only predicate can
+    /// suppress objects from delete events because deletion need not change generation.
+    /// Use [`predicates::resource_version`](crate::predicates::resource_version) when
+    /// observed deletions should remain reconciliation triggers:
+    ///
+    /// ```no_run
+    /// # use kube::Api;
+    /// # use kube_runtime::{watcher, WatchStreamExt, predicates};
+    /// # use k8s_openapi::api::apps::v1::Deployment;
+    /// # fn example(api: Api<Deployment>) {
+    /// let stream = watcher(api, watcher::Config::default())
+    ///     .default_backoff()
+    ///     .touched_objects()
+    ///     .predicate_filter(predicates::resource_version, Default::default());
+    /// # }
+    /// ```
+    ///
+    /// This also passes status-only changes and does not guarantee delivery of every
+    /// deletion. See the [predicate documentation](crate::predicates) for choosing a
+    /// predicate and handling cleanup with finalizers.
     ///
     /// ## Usage
     /// ```no_run
