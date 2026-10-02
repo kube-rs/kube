@@ -579,6 +579,93 @@ fn test_optional_int_or_string_nullable() {
     assert_eq!(optional.nullable, Some(true));
 }
 
+// Untagged enums of unit enums (issue #1622)
+#[derive(Serialize, Deserialize, Debug, Clone, JsonSchema)]
+enum BreakfastItem {
+    Spam,
+    Eggs,
+}
+
+/// Documented meal
+#[derive(Serialize, Deserialize, Debug, Clone, JsonSchema)]
+enum BreakfastMeal {
+    FullBreakfast,
+    Eggs,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, JsonSchema)]
+#[serde(untagged)]
+enum Breakfast {
+    /// Documented variant
+    Meal(BreakfastMeal),
+    Item(BreakfastItem),
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, JsonSchema)]
+enum BreakfastVariantUntagged {
+    FullBreakfast,
+    #[serde(untagged)]
+    Item(BreakfastItem),
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, JsonSchema)]
+#[serde(untagged)]
+enum BreakfastOrString {
+    Item(BreakfastItem),
+    Other(String),
+}
+
+#[derive(CustomResource, Serialize, Deserialize, Debug, Clone, JsonSchema)]
+#[kube(group = "clux.dev", version = "v1", kind = "BreakfastTest")]
+struct BreakfastTestSpec {
+    breakfast: Breakfast,
+    maybe: Option<Breakfast>,
+    variant_untagged: BreakfastVariantUntagged,
+    mixed: BreakfastOrString,
+}
+
+#[test]
+fn untagged_unit_enums_are_merged() {
+    use kube::core::CustomResourceExt;
+    let crd = BreakfastTest::crd();
+    let spec_schema = &crd.spec.versions[0]
+        .schema
+        .as_ref()
+        .unwrap()
+        .open_api_v3_schema
+        .as_ref()
+        .unwrap()
+        .properties
+        .as_ref()
+        .unwrap()["spec"];
+
+    assert_json_eq!(
+        spec_schema.properties,
+        serde_json::json!({
+            "breakfast": {
+                "type": "string",
+                "enum": ["FullBreakfast", "Eggs", "Spam"],
+            },
+            "maybe": {
+                "type": "string",
+                "enum": ["FullBreakfast", "Eggs", "Spam"],
+                "nullable": true,
+            },
+            "variant_untagged": {
+                "type": "string",
+                "enum": ["FullBreakfast", "Spam", "Eggs"],
+            },
+            // Not all branches are string enums, left untouched
+            "mixed": {
+                "anyOf": [
+                    { "type": "string", "enum": ["Spam", "Eggs"] },
+                    {},
+                ],
+            },
+        })
+    );
+}
+
 // Client-side CEL validation (`#[kube(cel)]` / `#[x_kube(cel)]`), issue #1670.
 // One struct exercises both surfaces:
 // - root `#[kube(cel, validation = ...)]` → `CelTest::validate_cel` / `validate_cel_update`
