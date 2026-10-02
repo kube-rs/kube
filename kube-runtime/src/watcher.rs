@@ -67,8 +67,14 @@ pub enum Event<K> {
     Apply(K),
     /// An object was deleted
     ///
+    /// The object need not have `metadata.deletionTimestamp` set or a changed
+    /// `metadata.generation`. After decoding with
+    /// [`touched_objects`](crate::WatchStreamExt::touched_objects), predicates based on
+    /// unchanged fields can suppress it. See [predicate deletion handling](crate::predicates).
+    ///
     /// NOTE: This should not be used for managing persistent state elsewhere, since
-    /// events may be lost if the watcher is unavailable. Use Finalizers instead.
+    /// events may be lost if the watcher is unavailable. Use
+    /// [finalizers](crate::finalizer::finalizer) instead.
     Delete(K),
     /// The watch stream was restarted.
     ///
