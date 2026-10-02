@@ -12,7 +12,7 @@ use hyper_util::{
 };
 
 use jiff::Timestamp;
-use std::time::Duration;
+use std::{pin::Pin, time::Duration};
 use tower::{BoxError, Layer, Service, ServiceBuilder, ServiceExt as _, retry::RetryLayer, util::BoxService};
 use tower_http::{ServiceExt as _, classify::ServerErrorsFailureClass, trace::TraceLayer};
 use tracing::Span;
@@ -163,8 +163,57 @@ mod proxy_auth_tests {
 impl TryFrom<Config> for ClientBuilder<GenericService> {
     type Error = Error;
 
-    /// Builds a default [`ClientBuilder`] stack from a given configuration
+    /// Builds a default [`ClientBuilder`] stack from a given configuration.
+    ///
+    /// By default, the client builder builds an HTTP client that relies on a
+    /// [`TokioExecutor`] to spawn background tasks. To install an executor
+    /// that propagates [`tracing`] spans, use
+    /// [`<ClientBuilder<Svc> as TryFrom<(Config, E)>>::try_from()`].
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use kube_client::{client::ClientBuilder, config::Config};
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let config = Config::infer().await.unwrap();
+    ///     let builder = ClientBuilder::try_from(config).unwrap();
+    ///     let client = builder.build();
+    /// }
+    /// ```
     fn try_from(config: Config) -> Result<Self> {
+        let executor = TokioExecutor::new();
+        Self::try_from((config, executor))
+    }
+}
+
+impl<E> TryFrom<(Config, E)> for ClientBuilder<GenericService>
+where
+    E: hyper::rt::Executor<Pin<Box<dyn Future<Output = ()> + Send>>> + Send + Sync + Clone + 'static,
+{
+    type Error = Error;
+
+    /// Builds a default [`ClientBuilder`] stack from a given configuration.
+    ///
+    /// # Examples
+    ///
+    /// Install a tracing executor that propagates [`tracing`] spans to
+    /// spawned tasks.
+    ///
+    /// ```no_run
+    /// use hyper_util::rt::{CurrentSpanExecutor, TokioExecutor};
+    /// use kube_client::{client::ClientBuilder, config::Config};
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let config = Config::infer().await.unwrap();
+    ///     let executor = CurrentSpanExecutor::new(TokioExecutor::new());
+    ///     let builder = ClientBuilder::try_from((config, executor)).unwrap();
+    ///     let client = builder.build();
+    /// }
+    /// ```
+    fn try_from((config, executor): (Config, E)) -> Result<Self> {
         let mut connector = HttpConnector::new();
         connector.enforce_http(false);
 
@@ -185,7 +234,7 @@ impl TryFrom<Config> for ClientBuilder<GenericService> {
                         proxy_url.clone(),
                         connector,
                     );
-                    make_generic_builder(connector, config)
+                    make_generic_builder(executor, connector, config)
                 }
 
                 #[cfg(not(feature = "socks5"))]
@@ -202,7 +251,7 @@ impl TryFrom<Config> for ClientBuilder<GenericService> {
                         hyper_util::client::legacy::connect::proxy::Tunnel::new(proxy_url.clone(), connector);
                     let connector = with_proxy_basic_auth(proxy_url, connector);
 
-                    make_generic_builder(connector, config)
+                    make_generic_builder(executor, connector, config)
                 }
 
                 #[cfg(not(feature = "http-proxy"))]
@@ -226,7 +275,7 @@ impl TryFrom<Config> for ClientBuilder<GenericService> {
                     );
                     let connector = with_proxy_basic_auth(proxy_url, connector);
 
-                    make_generic_builder(connector, config)
+                    make_generic_builder(executor, connector, config)
                 }
 
                 #[cfg(all(
@@ -246,19 +295,24 @@ impl TryFrom<Config> for ClientBuilder<GenericService> {
                 proxy_url: Box::new(proxy_url.clone()),
             }),
 
-            None => make_generic_builder(connector, config),
+            None => make_generic_builder(executor, connector, config),
         }
     }
 }
 
 /// Helper function for implementation of [`TryFrom<Config>`] for [`ClientBuilder`].
 /// Ignores [`Config::proxy_url`], which at this point is already handled.
-fn make_generic_builder<H>(connector: H, config: Config) -> Result<ClientBuilder<GenericService>, Error>
+fn make_generic_builder<E, H>(
+    executor: E,
+    connector: H,
+    config: Config,
+) -> Result<ClientBuilder<GenericService>, Error>
 where
     H: 'static + Clone + Send + Sync + Service<http::Uri>,
     H::Response: 'static + Connection + Read + Write + Send + Unpin,
     H::Future: 'static + Send,
     H::Error: 'static + Send + Sync + std::error::Error,
+    E: hyper::rt::Executor<Pin<Box<dyn Future<Output = ()> + Send>>> + Send + Sync + Clone + 'static,
 {
     let default_ns = config.default_namespace.clone();
     let auth_layer = config.auth_layer()?;
@@ -286,7 +340,7 @@ where
         connector.set_read_timeout(config.read_timeout);
         connector.set_write_timeout(config.write_timeout);
 
-        hyper_util::client::legacy::Builder::new(TokioExecutor::new()).build(connector)
+        hyper_util::client::legacy::Builder::new(executor).build(connector)
     };
 
     let stack = ServiceBuilder::new().layer(config.base_uri_layer()).into_inner();
@@ -432,7 +486,8 @@ mod tests {
 
         // confirm gzip echoed back with default config
         let config = Config { ..Config::new(uri) };
-        let client = make_generic_builder(HttpConnector::new(), config.clone())?.build();
+        let client =
+            make_generic_builder(TokioExecutor::new(), HttpConnector::new(), config.clone())?.build();
         let response = client.request_text(http::Request::default()).await?;
         assert_eq!(&response, "gzip");
 
@@ -441,7 +496,7 @@ mod tests {
             disable_compression: true,
             ..config
         };
-        let client = make_generic_builder(HttpConnector::new(), config)?.build();
+        let client = make_generic_builder(TokioExecutor::new(), HttpConnector::new(), config)?.build();
         let response = client.request_text(http::Request::default()).await?;
         assert_eq!(&response, "");
 
