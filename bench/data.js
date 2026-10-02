@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1790938809537,
+  "lastUpdate": 1790947215794,
   "repoUrl": "https://github.com/kube-rs/kube",
   "entries": {
     "Benchmark": [
@@ -7745,6 +7745,105 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/kube-rs/kube/commit/885b2648424ddebd6e20bb169c5a98fd925d7e8c"
         },
         "date": 1790938807186,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "init_listwatch - peak_bytes",
+            "value": 55194619,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - total_allocated",
+            "value": 76715088,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - alloc_count",
+            "value": 578023,
+            "unit": "allocations"
+          },
+          {
+            "name": "steady_state - peak_bytes",
+            "value": 71381202,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - total_allocated",
+            "value": 109519220,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - alloc_count",
+            "value": 799021,
+            "unit": "allocations"
+          },
+          {
+            "name": "relist - peak_bytes",
+            "value": 99797302,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - total_allocated",
+            "value": 174518628,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - alloc_count",
+            "value": 1189035,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_without_modify - peak_bytes",
+            "value": 141298836,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - total_allocated",
+            "value": 205865000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - alloc_count",
+            "value": 1298020,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_with_modify - peak_bytes",
+            "value": 134853452,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - total_allocated",
+            "value": 162895000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - alloc_count",
+            "value": 1058021,
+            "unit": "allocations"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "doxxx93@gmail.com",
+            "name": "doxxx",
+            "username": "doxxx93"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e9b29f7bd43cc6b22d7079b8bfd8f72895381a60",
+          "message": "Warm PR caches from main and avoid k3d API rate limits (#2102)\n\n* Warm PR rust-cache from main\n\nThe test workflow only ran on pull_request, so main never held a\nrust-cache entry and every new PR started cold. Run it on push to main\nand only save the cache there, so PRs restore from main instead of\nfilling the 10GB quota with per-PR entries.\n\nSigned-off-by: doxxx93 <doxxx93@gmail.com>\n\n* Cancel superseded PR runs in every workflow\n\nAdd concurrency cancellation to clippy, lint and coverage, and key all\ngroups on the PR number instead of head_ref, so fork PRs that share a\nbranch name no longer cancel each other.\n\nSigned-off-by: doxxx93 <doxxx93@gmail.com>\n\n* Remove unused dev-dependencies\n\nschemars in kube-client, serde-saphyr in kube and backon in examples have no references in their crates.\n\nSigned-off-by: doxxx93 <doxxx93@gmail.com>\n\n* Fail just test on the first failing step\n\nThe bash recipe had no set -e, so it exited 0 whenever the last command passed, even if an earlier one failed.\n\nSigned-off-by: doxxx93 <doxxx93@gmail.com>\n\n* Resolve k3s through release channels in k3d setup\n\nsetup-k3d-k3s looks up `version:` through the GitHub releases API anonymously, which intermittently fails with 403 rate limits. With `channel:` k3d resolves the image via update.k3s.io and the API is never called, so the commented-out token is no longer relevant.\n\nSigned-off-by: doxxx93 <doxxx93@gmail.com>\n\n* Import images into k3d in direct mode\n\nThe default tools-node mode intermittently loses its tarball (ctr: open /k3d/images/...tar: no such file or directory) yet still reports success, so the e2e job later fails with image can't be pulled (k3d-io/k3d#1484). Direct mode loads images straight into the nodes without the intermediate file.\n\nSigned-off-by: doxxx93 <doxxx93@gmail.com>\n\n* Keep re-runs from cancelling the newest run\n\nA re-run of an older run joins the same concurrency group and, with cancel-in-progress: true, cancels the newest run for the PR. Only cancel on first attempts so re-runs queue instead. The comparison has to be against the string '1'; == 1 evaluates false and disables cancellation altogether.\n\nSigned-off-by: doxxx93 <doxxx93@gmail.com>\n\n---------\n\nSigned-off-by: doxxx93 <doxxx93@gmail.com>\nCo-authored-by: Eirik A <sszynrae@gmail.com>",
+          "timestamp": "2026-10-02T13:19:18Z",
+          "tree_id": "dba7069964f82fca9e0318a02509fb7fa6aa609e",
+          "url": "https://github.com/kube-rs/kube/commit/e9b29f7bd43cc6b22d7079b8bfd8f72895381a60"
+        },
+        "date": 1790947214774,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
