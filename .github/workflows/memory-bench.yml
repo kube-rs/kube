@@ -34,6 +34,8 @@ jobs:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Run memory benchmark
         run: cargo bench -p kube-runtime --bench memory > bench-result.json
