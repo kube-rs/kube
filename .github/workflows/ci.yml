@@ -1,14 +1,19 @@
 name: test
 on:
   pull_request:
+  # main runs populate the rust-cache that PR runs restore from
+  push:
+    branches:
+      - main
 
 env:
   RUST_BACKTRACE: 1
 
 # Spend CI time only on latest ref: https://docs.github.com/en/actions/using-jobs/using-concurrency
 concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  # re-runs (attempt > 1) queue behind the newest run instead of cancelling it
+  cancel-in-progress: ${{ github.run_attempt == '1' }}
 
 jobs:
   unit:
@@ -29,6 +34,8 @@ jobs:
       # - https://github.com/rust-lang/cargo/issues/8603
       # - https://github.com/actions/cache/issues/403
       - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       # Install OpenSSL Libraries for Windows
       # - name: install openssl
@@ -102,6 +109,8 @@ jobs:
       - name: Install nightly toolchain
         uses: dtolnay/rust-toolchain@nightly
       - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: taiki-e/install-action@cargo-hack
       - uses: extractions/setup-just@v4
       - name: Check minimal versions
@@ -122,6 +131,8 @@ jobs:
         with:
           toolchain: ${{ steps.msrv.outputs.msrv }}
       - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Check
         run: cargo check --workspace
       - name: Check rust-version keys matches advertised MSRV
@@ -159,21 +170,21 @@ jobs:
       # - https://github.com/rust-lang/cargo/issues/8603
       # - https://github.com/actions/cache/issues/403
       - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - uses: nolar/setup-k3d-k3s@v1
         with:
-          version: ${{matrix.k8s}}
+          # channels resolve via update.k3s.io, no GitHub API rate limit
+          channel: ${{matrix.k8s}}
           # k3d-kube
           k3d-name: kube
-          # Used to avoid rate limits when fetching the releases from k3s repo.
-          # Anonymous access is limited to 60 requests / hour / worker
-          # github-token: ${{ secrets.GITHUB_TOKEN }}
           k3d-args: "-p 10250:10250 --no-rollback --k3s-arg --disable=traefik,servicelb,metrics-server@server:*"
 
       - name: Import test images into k3d
         run: |
           docker pull busybox:stable
-          k3d image import busybox:stable -c kube
+          k3d image import busybox:stable -c kube --mode direct
 
       # Real CI work starts here
       - name: Build workspace
@@ -214,15 +225,14 @@ jobs:
       # - https://github.com/rust-lang/cargo/issues/8603
       # - https://github.com/actions/cache/issues/403
       - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - uses: nolar/setup-k3d-k3s@v1
         with:
-          version: "v1.32" # MK8SV
+          channel: "v1.32" # MK8SV
           # k3d-kube
           k3d-name: kube
-          # Used to avoid rate limits when fetching the releases from k3s repo.
-          # Anonymous access is limited to 60 requests / hour / worker
-          # github-token: ${{ secrets.GITHUB_TOKEN }}
           k3d-args: "--no-lb --no-rollback --k3s-arg --disable=traefik,servicelb,metrics-server@server:*"
 
       # Real CI work starts here
@@ -301,14 +311,13 @@ jobs:
 
       - uses: nolar/setup-k3d-k3s@v1
         with:
-          version: latest
+          channel: latest
           k3d-name: kube
-          # Used to avoid rate limits when fetching the releases from k3s repo.
-          # Anonymous access is limited to 60 requests / hour / worker
-          # github-token: ${{ secrets.GITHUB_TOKEN }}
           k3d-args: "--no-lb --no-rollback --k3s-arg --disable=traefik,servicelb,metrics-server@server:*"
       - name: Import image
-        run: "k3d image import clux/kube-e2e:${{ github.sha }} --cluster kube"
+        # direct mode skips the tools-node tarball, which intermittently goes missing
+        # while k3d still reports success: https://github.com/k3d-io/k3d/issues/1484
+        run: "k3d image import clux/kube-e2e:${{ github.sha }} --cluster kube --mode direct"
       - name: Template the yaml and verify we are testing what we built
         run: |
           sed -i 's/latest/${{ github.sha }}/g' e2e/deployment.yaml
