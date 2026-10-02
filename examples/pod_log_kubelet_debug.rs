@@ -1,3 +1,5 @@
+//! An example of how read debug logs directly for a Node via the kubelet,
+
 use futures::TryStreamExt;
 use k8s_openapi::api::core::v1::Pod;
 use tracing::*;

@@ -1,0 +1,14 @@
+name: no-ai
+
+on:
+  pull_request:
+
+jobs:
+  no-ai-commits:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # Required so the full commit range is available
+          fetch-depth: 0
+      - uses: Jondolf/ai-commit-check@7069d4254c6310cdb0395a6ab0ca1f29af897f83

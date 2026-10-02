@@ -257,11 +257,12 @@ pub struct Config {
     /// Defaults to everything if `None`.
     pub field_selector: Option<String>,
 
-    /// Timeout for the list/watch call.
+    /// Timeout for the watch call.
     ///
     /// This limits the duration of the call, regardless of any activity or inactivity.
-    /// If unset for a watch call, we will use 290s.
-    /// We limit this to 295s due to [inherent watch limitations](https://github.com/kubernetes/kubernetes/issues/6513).
+    /// If unset, we will use 290s.
+    /// The watcher's dead-connection detection window is this value plus 5s,
+    /// so larger values delay noticing a silently dropped connection.
     pub timeout: Option<u32>,
 
     /// Semantics for list calls.
@@ -326,7 +327,7 @@ impl Default for Config {
 ///     .labels("kubernetes.io/lifecycle=spot");
 /// ```
 impl Config {
-    /// Configure the timeout for list/watch calls
+    /// Configure the timeout for watch calls
     ///
     /// This limits the duration of the call, regardless of any activity or inactivity.
     /// Defaults to 290s
@@ -434,12 +435,12 @@ impl Config {
         ListParams {
             label_selector: self.label_selector.clone(),
             field_selector: self.field_selector.clone(),
-            timeout: self.timeout,
             version_match,
             resource_version,
             // The watcher handles pagination internally.
             limit: self.page_size,
             continue_token: None,
+            ..Default::default()
         }
     }
 
@@ -523,11 +524,16 @@ const WATCH_IDLE_TIMEOUT_MARGIN: Duration = Duration::from_secs(5);
 ///
 /// Returns `None` when the stream ends **or** when no item arrives within
 /// `timeout + WATCH_IDLE_TIMEOUT_MARGIN`, causing the watcher to
-/// treat the connection as dead and reconnect.
+/// treat the connection as dead and reconnect. An explicit zero timeout
+/// disables this client-side idle timeout.
 async fn next_with_idle_timeout<S, T>(stream: &mut S, timeout: Option<u32>) -> Option<T>
 where
     S: Stream<Item = T> + Unpin,
 {
+    if timeout == Some(0) {
+        return stream.next().await;
+    }
+
     let idle_timeout = Duration::from_secs(u64::from(timeout.unwrap_or(290))) + WATCH_IDLE_TIMEOUT_MARGIN;
     match tokio::time::timeout(idle_timeout, stream.next()).await {
         Ok(item) => item,
@@ -1479,6 +1485,18 @@ mod tests {
         let mut stream = futures::stream::iter(vec![1, 2, 3]);
         let result = next_with_idle_timeout(&mut stream, Some(290)).await;
         assert_eq!(result, Some(1));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn zero_timeout_does_not_trigger_idle_timeout() {
+        let mut stream = futures::stream::once(async {
+            tokio::time::sleep(Duration::from_secs(6)).await;
+            42
+        })
+        .boxed();
+
+        let result = next_with_idle_timeout(&mut stream, Some(0)).await;
+        assert_eq!(result, Some(42));
     }
 
     #[tokio::test(start_paused = true)]

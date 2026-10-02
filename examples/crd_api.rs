@@ -1,3 +1,6 @@
+//! An example of how to manipulate a CustomResourceDefinition (CRD) and the custom resources it
+//! defines.
+
 use anyhow::{Result, bail};
 use either::Either::{Left, Right};
 use garde::Validate;
@@ -15,7 +18,7 @@ use kube::{
     core::crd::CustomResourceExt,
 };
 
-// Own custom resource
+/// Our own custom resource
 #[derive(CustomResource, Deserialize, Serialize, Clone, Debug, Validate, JsonSchema)]
 #[kube(group = "clux.dev", version = "v1", kind = "Foo", namespaced)]
 #[kube(status = "FooStatus")]
@@ -34,6 +37,7 @@ pub struct FooSpec {
     replicas: i32,
 }
 
+/// Our own custom status for our custom resource
 #[derive(Deserialize, Serialize, Clone, Debug, Default, JsonSchema)]
 pub struct FooStatus {
     is_bad: bool,

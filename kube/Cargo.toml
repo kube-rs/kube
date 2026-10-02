@@ -43,6 +43,8 @@ ws = ["kube-client/ws", "kube-core/ws"]
 oauth = ["kube-client/oauth", "client"]
 ## enable client oidc support
 oidc = ["kube-client/oidc", "client"]
+## enable both socks5 and HTTP proxy support
+proxy = ["kube-client/proxy", "client"]
 ## enable client socks5 support
 socks5 = ["kube-client/socks5", "client"]
 ## enable client http proxy support

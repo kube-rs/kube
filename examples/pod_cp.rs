@@ -1,3 +1,5 @@
+//! An example of how to implement a limited `kubectl cp`.
+
 use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::api::core::v1::Pod;
 use tracing::*;
@@ -7,8 +9,6 @@ use kube::{
     api::{Api, AttachParams, DeleteParams, PostParams, ResourceExt, WatchEvent, WatchParams},
 };
 use tokio::io::AsyncWriteExt;
-
-// A `kubectl cp` analog example.
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

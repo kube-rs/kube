@@ -1,3 +1,5 @@
+//! An example of how to list pods and select a field using a JSONPath expression.
+
 use jsonpath_rust::JsonPath;
 use k8s_openapi::api::core::v1::Pod;
 use kube::{

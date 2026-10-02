@@ -5,10 +5,12 @@ version.workspace = true
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
-lints.workspace = true
 
 [package.metadata.release]
 release = false
+
+[lints]
+workspace = true
 
 [features]
 default = [
@@ -46,6 +48,7 @@ futures = { workspace = true, features = ["async-await"] }
 jsonpath-rust.workspace = true
 kube = { path = "../kube", default-features = false, features = [
     "admission",
+    "http-proxy"
 ] }
 kube-derive = { path = "../kube-derive", default-features = false } # only needed to opt out of schema
 k8s-openapi.workspace = true
