@@ -12,7 +12,8 @@ env:
 # Spend CI time only on latest ref: https://docs.github.com/en/actions/using-jobs/using-concurrency
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
-  cancel-in-progress: true
+  # re-runs (attempt > 1) queue behind the newest run instead of cancelling it
+  cancel-in-progress: ${{ github.run_attempt == '1' }}
 
 jobs:
   unit:
