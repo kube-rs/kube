@@ -28,6 +28,8 @@ openssl-tls = ["kube-client/openssl-tls", "client"]
 ##
 ## To install tracing telemetry in the HTTP client stack, use an executor like
 ## `CurrentSpanExecutor` to propagate tracing spans to background tasks.
+## See https://docs.rs/hyper-util/latest/hyper_util/rt/tracing/index.html
+## for more information.
 hyper-util-tracing = ["kube-client/hyper-util-tracing", "client"]
 ## aws rustls provider
 aws-lc-rs = ["kube-client?/aws-lc-rs"]
