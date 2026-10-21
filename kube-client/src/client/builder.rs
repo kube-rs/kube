@@ -277,6 +277,7 @@ where
         connector.set_connect_timeout(config.connect_timeout);
         connector.set_read_timeout(config.read_timeout);
         connector.set_write_timeout(config.write_timeout);
+        connector.set_reset_reader_on_write(config.reset_reader_on_write);
 
         hyper_util::client::legacy::Builder::new(TokioExecutor::new()).build(connector)
     };
