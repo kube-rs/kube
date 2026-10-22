@@ -169,8 +169,8 @@ mod openssl_tls_server_name_tests {
         rsa::Rsa,
         ssl::{NameType, SslAcceptor, SslMethod},
         x509::{
+            X509, X509NameBuilder,
             extension::{BasicConstraints, SubjectAlternativeName},
-            X509NameBuilder, X509,
         },
     };
     use tower::ServiceExt as _;
@@ -199,8 +199,12 @@ mod openssl_tls_server_name_tests {
         builder.set_subject_name(&name).unwrap();
         builder.set_issuer_name(&name).unwrap();
         builder.set_pubkey(&pkey).unwrap();
-        builder.set_not_before(&Asn1Time::days_from_now(0).unwrap()).unwrap();
-        builder.set_not_after(&Asn1Time::days_from_now(1).unwrap()).unwrap();
+        builder
+            .set_not_before(&Asn1Time::days_from_now(0).unwrap())
+            .unwrap();
+        builder
+            .set_not_after(&Asn1Time::days_from_now(1).unwrap())
+            .unwrap();
         builder
             .append_extension(BasicConstraints::new().critical().ca().build().unwrap())
             .unwrap();
@@ -381,6 +385,23 @@ impl ConfigExt for Config {
                 ));
             }
         }
+        if let Some(impersonate_user_extra) = &self.auth_info.impersonate_user_extra {
+            for (extra_key, extra_values) in impersonate_user_extra {
+                let name: HeaderName = format!("impersonate-extra-{extra_key}")
+                    .try_into()
+                    .map_err(http::Error::from)
+                    .map_err(Error::HttpError)?;
+
+                for value in extra_values {
+                    headers.push((
+                        name.clone(),
+                        HeaderValue::from_str(value)
+                            .map_err(http::Error::from)
+                            .map_err(Error::HttpError)?,
+                    ))
+                }
+            }
+        }
         Ok(ExtraHeadersLayer {
             headers: Arc::new(headers),
         })
@@ -406,11 +427,8 @@ impl ConfigExt for Config {
         if !self.accept_invalid_certs
             && let Some(path) = &self.root_cert_file
         {
-            let verifier =
-                tls::rustls_tls::ReloadingVerifier::new(path.clone()).map_err(Error::RustlsTls)?;
-            config
-                .dangerous()
-                .set_certificate_verifier(Arc::new(verifier));
+            let verifier = tls::rustls_tls::ReloadingVerifier::new(path.clone()).map_err(Error::RustlsTls)?;
+            config.dangerous().set_certificate_verifier(Arc::new(verifier));
         }
         Ok(config)
     }
