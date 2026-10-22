@@ -375,6 +375,14 @@ impl ConfigExt for Config {
                     .map_err(Error::HttpError)?,
             ));
         }
+        if let Some(impersonate_uid) = &self.auth_info.impersonate_uid {
+            headers.push((
+                HeaderName::from_static("impersonate-uid"),
+                HeaderValue::from_str(impersonate_uid)
+                    .map_err(http::Error::from)
+                    .map_err(Error::HttpError)?,
+            ))
+        }
         if let Some(impersonate_groups) = &self.auth_info.impersonate_groups {
             for group in impersonate_groups {
                 headers.push((
