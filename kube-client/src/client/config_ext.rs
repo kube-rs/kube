@@ -395,11 +395,7 @@ impl ConfigExt for Config {
         }
         if let Some(impersonate_user_extra) = &self.auth_info.impersonate_user_extra {
             for (extra_key, extra_values) in impersonate_user_extra {
-                let name: HeaderName = format!("impersonate-extra-{extra_key}")
-                    .try_into()
-                    .map_err(http::Error::from)
-                    .map_err(Error::HttpError)?;
-
+                let name = impersonate_extra_header_name(extra_key)?;
                 for value in extra_values {
                     headers.push((
                         name.clone(),
@@ -563,5 +559,64 @@ impl Config {
             }
             _ => (None, None),
         }
+    }
+}
+
+/// Generate the appropriate header name for an `impersonate_user_extra` key.
+///
+/// Percent-escapes extra keys so that they are valid header names, using the same percent-escape
+/// set as the Go client (illegal header name bytes and '%').
+fn impersonate_extra_header_name(key: &str) -> Result<HeaderName> {
+    // Source: https://github.com/kubernetes/kubernetes/blob/8f5bbad3e20a347aaae13afd78cc955e642c68e4/staging/src/k8s.io/client-go/transport/round_trippers.go#L714
+    // Note that we don't remove '%' here, since we do want to escape it.
+    const NEEDS_ESCAPE: percent_encoding::AsciiSet = percent_encoding::NON_ALPHANUMERIC
+        .remove(b'!')
+        .remove(b'#')
+        .remove(b'$')
+        .remove(b'&')
+        .remove(b'\\')
+        .remove(b'*')
+        .remove(b'+')
+        .remove(b'-')
+        .remove(b'.')
+        .remove(b'^')
+        .remove(b'_')
+        .remove(b'`')
+        .remove(b'|')
+        .remove(b'~');
+
+    let encoded_key = percent_encoding::percent_encode(key.as_bytes(), &NEEDS_ESCAPE);
+    format!("impersonate-extra-{encoded_key}")
+        .try_into()
+        .map_err(http::Error::from)
+        .map_err(Error::HttpError)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::impersonate_extra_header_name;
+
+    #[test]
+    fn impersonate_user_extra_no_unnecessary_escape() {
+        assert_eq!(
+            impersonate_extra_header_name("FOO-bar.baz_123").unwrap().as_str(),
+            "impersonate-extra-foo-bar.baz_123"
+        );
+    }
+
+    #[test]
+    fn impersonate_user_extra_escapes_percent() {
+        assert_eq!(
+            impersonate_extra_header_name("foo%2f").unwrap().as_str(),
+            "impersonate-extra-foo%252f"
+        );
+    }
+
+    #[test]
+    fn impersonate_user_extra_escapes_slash() {
+        assert_eq!(
+            impersonate_extra_header_name("foo.com/bar").unwrap().as_str(),
+            "impersonate-extra-foo.com%2fbar"
+        );
     }
 }
