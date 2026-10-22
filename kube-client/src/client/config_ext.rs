@@ -574,7 +574,7 @@ fn impersonate_extra_header_name(key: &str) -> Result<HeaderName> {
         .remove(b'#')
         .remove(b'$')
         .remove(b'&')
-        .remove(b'\\')
+        .remove(b'\'')
         .remove(b'*')
         .remove(b'+')
         .remove(b'-')
@@ -618,5 +618,18 @@ mod tests {
             impersonate_extra_header_name("foo.com/bar").unwrap().as_str(),
             "impersonate-extra-foo.com%2fbar"
         );
+    }
+
+    #[test]
+    fn impersonate_user_extra_roundtrips() {
+        for chr in 0..128 {
+            let key = str::from_utf8(&[chr]).unwrap().to_lowercase();
+            let encoded = impersonate_extra_header_name(&key).unwrap();
+            let decoded = percent_encoding::percent_decode_str(encoded.as_str())
+                .decode_utf8()
+                .unwrap();
+
+            assert_eq!(format!("impersonate-extra-{key}"), decoded);
+        }
     }
 }
