@@ -18,6 +18,7 @@ use std::collections::{BTreeMap, BTreeSet, btree_map::Entry};
 /// The following two transformations are applied
 ///  * Rewrite enums from `oneOf` to `object`s with multiple variants ([schemars#84](https://github.com/GREsau/schemars/issues/84))
 ///  * Rewrite untagged enums from `anyOf` to `object`s with multiple variants ([kube#1028](https://github.com/kube-rs/kube/pull/1028))
+///  * Merge untagged enums of plain enums from `anyOf` into a single `enum` ([kube#1622](https://github.com/kube-rs/kube/issues/1622))
 ///  * Rewrite `additionalProperties` from `#[serde(flatten)]` to `x-kubernetes-preserve-unknown-fields` ([kube#844](https://github.com/kube-rs/kube/issues/844))
 ///
 /// This is used automatically by `kube::derive`'s `#[derive(CustomResource)]`,
@@ -319,6 +320,9 @@ impl Transform for StructuralSchemaRewriter {
     fn transform(&mut self, transform_schema: &mut schemars::Schema) {
         schemars::transform::transform_subschemas(self, transform_schema);
 
+        // Untagged enums of plain enums are serialized using `any_of` with one enum per variant
+        merge_any_of_enum_values(transform_schema);
+
         let mut schema: SchemaObject = match serde_json::from_value(transform_schema.clone().to_value()).ok()
         {
             Some(schema) => schema,
@@ -494,6 +498,56 @@ fn hoist_subschema_enum_values(
     })
 }
 
+/// Merge `anyOf` branches into a single enum when every branch is a plain enum of the same type.
+///
+/// Branch descriptions are dropped, since Kubernetes can't attach them to individual values.
+/// Any other `anyOf` is left untouched.
+fn merge_any_of_enum_values(schema: &mut schemars::Schema) {
+    let Some(obj) = schema.as_object_mut() else {
+        return;
+    };
+    if obj.contains_key("type") || obj.contains_key("enum") {
+        return;
+    }
+    let Some(Value::Array(any_of)) = obj.get("anyOf") else {
+        return;
+    };
+
+    let mut instance_type = None;
+    let mut enum_values = Vec::new();
+    for branch in any_of {
+        let Some(branch) = branch.as_object() else {
+            return;
+        };
+        if branch
+            .keys()
+            .any(|k| !matches!(k.as_str(), "type" | "enum" | "description"))
+        {
+            return;
+        }
+        let (Some(variant_type @ Value::String(_)), Some(Value::Array(variant_values))) =
+            (branch.get("type"), branch.get("enum"))
+        else {
+            return;
+        };
+        if instance_type.get_or_insert(variant_type) != &variant_type {
+            return;
+        }
+        for value in variant_values {
+            if !enum_values.contains(value) {
+                enum_values.push(value.clone());
+            }
+        }
+    }
+
+    let Some(instance_type) = instance_type.cloned() else {
+        return;
+    };
+    obj.remove("anyOf");
+    obj.insert("type".into(), instance_type);
+    obj.insert("enum".into(), enum_values.into());
+}
+
 /// Bring all property definitions from subschemas up to the root schema,
 /// since Kubernetes doesn't allow subschemas to define properties.
 fn hoist_subschema_properties(
@@ -590,6 +644,46 @@ fn merge_metadata(
                     "variant defined type {variant_type:?}, conflicting with existing type {common_type:?}"
                 );
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn merged(schema: Value) -> Value {
+        let mut schema: schemars::Schema = serde_json::from_value(schema).unwrap();
+        merge_any_of_enum_values(&mut schema);
+        schema.to_value()
+    }
+
+    #[test]
+    fn merge_any_of_enum_values_merges_same_type_enums() {
+        assert_eq!(
+            merged(json!({
+                "description": "kept",
+                "anyOf": [
+                    { "type": "integer", "enum": [1, 2], "description": "dropped" },
+                    { "type": "integer", "enum": [2, 3] },
+                ],
+            })),
+            json!({ "description": "kept", "type": "integer", "enum": [1, 2, 3] })
+        );
+    }
+
+    #[test]
+    fn merge_any_of_enum_values_skips_other_any_of() {
+        for schema in [
+            // mismatched types
+            json!({ "anyOf": [{ "type": "string", "enum": ["a"] }, { "type": "integer", "enum": [1] }] }),
+            // Option<Enum>, handled by OptionalEnum
+            json!({ "anyOf": [{ "type": "string", "enum": ["a"] }, { "enum": [null], "nullable": true }] }),
+            // extra keywords
+            json!({ "anyOf": [{ "type": "string", "enum": ["a"] }, { "type": "string", "enum": ["b"], "format": "x" }] }),
+            json!({ "anyOf": [] }),
+        ] {
+            assert_eq!(merged(schema.clone()), schema);
         }
     }
 }
