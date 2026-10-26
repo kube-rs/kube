@@ -110,6 +110,13 @@ pub enum Error {
     #[error("Reference resolve error: {0}")]
     RefResolve(String),
 
+    /// Trying to configure optional user impersonation info on a `Client`
+    /// without having first called `with_impersonate_user`.
+    #[cfg(feature = "unstable-client")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "unstable-client")))]
+    #[error("Impersonated user is not set")]
+    ImpersonatedUserNotSet,
+
     /// Failed to infer custom configuration
     #[error("Failed to infer provided configuration: {0}")]
     InferKubeconfig(#[from] crate::config::KubeconfigError),
