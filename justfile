@@ -68,7 +68,7 @@ hack:
 minimal-versions:
   cargo hack --remove-dev-deps --workspace
   cargo +nightly update -Z direct-minimal-versions
-  K8S_OPENAPI_ENABLED_VERSION=1.32 cargo check --all-features
+  K8S_OPENAPI_ENABLED_VERSION=v1.33 cargo check --all-features
 
 readme:
   rustdoc README.md --test --edition=2024
@@ -134,5 +134,5 @@ bump-k8s:
   badge="[![Tested against Kubernetes ${min_dots} and above](https://img.shields.io/badge/MK8SV-${min_dots}-326ce5.svg)](https://kube.rs/kubernetes-version)"
   sd "^.+badge/MK8SV.+$" "${badge}" README.md
   # bump K8S_OPENAPI_ENABLED_VERSION in minimal-versions recipe (TODO: fix this)
-  sd "K8S_OPENAPI_ENABLED_VERSION=\S+" "K8S_OPENAPI_ENABLED_VERSION=${min_dots}" justfile
+  sd "K8S_OPENAPI_ENABLED_VERSION=v1.33 "K8S_OPENAPI_ENABLED_VERSION=v1.33 justfile
   echo "remember to bump kubernetes-version.md in kube-rs/website"
