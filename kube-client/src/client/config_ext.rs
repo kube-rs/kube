@@ -169,8 +169,8 @@ mod openssl_tls_server_name_tests {
         rsa::Rsa,
         ssl::{NameType, SslAcceptor, SslMethod},
         x509::{
+            X509, X509NameBuilder,
             extension::{BasicConstraints, SubjectAlternativeName},
-            X509NameBuilder, X509,
         },
     };
     use tower::ServiceExt as _;
@@ -199,8 +199,12 @@ mod openssl_tls_server_name_tests {
         builder.set_subject_name(&name).unwrap();
         builder.set_issuer_name(&name).unwrap();
         builder.set_pubkey(&pkey).unwrap();
-        builder.set_not_before(&Asn1Time::days_from_now(0).unwrap()).unwrap();
-        builder.set_not_after(&Asn1Time::days_from_now(1).unwrap()).unwrap();
+        builder
+            .set_not_before(&Asn1Time::days_from_now(0).unwrap())
+            .unwrap();
+        builder
+            .set_not_after(&Asn1Time::days_from_now(1).unwrap())
+            .unwrap();
         builder
             .append_extension(BasicConstraints::new().critical().ca().build().unwrap())
             .unwrap();
@@ -371,6 +375,14 @@ impl ConfigExt for Config {
                     .map_err(Error::HttpError)?,
             ));
         }
+        if let Some(impersonate_uid) = &self.auth_info.impersonate_uid {
+            headers.push((
+                HeaderName::from_static("impersonate-uid"),
+                HeaderValue::from_str(impersonate_uid)
+                    .map_err(http::Error::from)
+                    .map_err(Error::HttpError)?,
+            ))
+        }
         if let Some(impersonate_groups) = &self.auth_info.impersonate_groups {
             for group in impersonate_groups {
                 headers.push((
@@ -379,6 +391,19 @@ impl ConfigExt for Config {
                         .map_err(http::Error::from)
                         .map_err(Error::HttpError)?,
                 ));
+            }
+        }
+        if let Some(impersonate_user_extra) = &self.auth_info.impersonate_user_extra {
+            for (extra_key, extra_values) in impersonate_user_extra {
+                let name = impersonate_extra_header_name(extra_key)?;
+                for value in extra_values {
+                    headers.push((
+                        name.clone(),
+                        HeaderValue::from_str(value)
+                            .map_err(http::Error::from)
+                            .map_err(Error::HttpError)?,
+                    ))
+                }
             }
         }
         Ok(ExtraHeadersLayer {
@@ -406,11 +431,8 @@ impl ConfigExt for Config {
         if !self.accept_invalid_certs
             && let Some(path) = &self.root_cert_file
         {
-            let verifier =
-                tls::rustls_tls::ReloadingVerifier::new(path.clone()).map_err(Error::RustlsTls)?;
-            config
-                .dangerous()
-                .set_certificate_verifier(Arc::new(verifier));
+            let verifier = tls::rustls_tls::ReloadingVerifier::new(path.clone()).map_err(Error::RustlsTls)?;
+            config.dangerous().set_certificate_verifier(Arc::new(verifier));
         }
         Ok(config)
     }
@@ -536,6 +558,78 @@ impl Config {
                 (Some(buffer), expiration)
             }
             _ => (None, None),
+        }
+    }
+}
+
+/// Generate the appropriate header name for an `impersonate_user_extra` key.
+///
+/// Percent-escapes extra keys so that they are valid header names, using the same percent-escape
+/// set as the Go client (illegal header name bytes and '%').
+pub(super) fn impersonate_extra_header_name(key: &str) -> Result<HeaderName> {
+    // Source: https://github.com/kubernetes/kubernetes/blob/8f5bbad3e20a347aaae13afd78cc955e642c68e4/staging/src/k8s.io/client-go/transport/round_trippers.go#L714
+    // Note that we don't remove '%' here, since we do want to escape it.
+    const NEEDS_ESCAPE: percent_encoding::AsciiSet = percent_encoding::NON_ALPHANUMERIC
+        .remove(b'!')
+        .remove(b'#')
+        .remove(b'$')
+        .remove(b'&')
+        .remove(b'\'')
+        .remove(b'*')
+        .remove(b'+')
+        .remove(b'-')
+        .remove(b'.')
+        .remove(b'^')
+        .remove(b'_')
+        .remove(b'`')
+        .remove(b'|')
+        .remove(b'~');
+
+    let encoded_key = percent_encoding::percent_encode(key.as_bytes(), &NEEDS_ESCAPE);
+    format!("impersonate-extra-{encoded_key}")
+        .try_into()
+        .map_err(http::Error::from)
+        .map_err(Error::HttpError)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::impersonate_extra_header_name;
+
+    #[test]
+    fn impersonate_user_extra_no_unnecessary_escape() {
+        assert_eq!(
+            impersonate_extra_header_name("FOO-bar.baz_123").unwrap().as_str(),
+            "impersonate-extra-foo-bar.baz_123"
+        );
+    }
+
+    #[test]
+    fn impersonate_user_extra_escapes_percent() {
+        assert_eq!(
+            impersonate_extra_header_name("foo%2f").unwrap().as_str(),
+            "impersonate-extra-foo%252f"
+        );
+    }
+
+    #[test]
+    fn impersonate_user_extra_escapes_slash() {
+        assert_eq!(
+            impersonate_extra_header_name("foo.com/bar").unwrap().as_str(),
+            "impersonate-extra-foo.com%2fbar"
+        );
+    }
+
+    #[test]
+    fn impersonate_user_extra_roundtrips() {
+        for chr in 0..128 {
+            let key = str::from_utf8(&[chr]).unwrap().to_lowercase();
+            let encoded = impersonate_extra_header_name(&key).unwrap();
+            let decoded = percent_encoding::percent_decode_str(encoded.as_str())
+                .decode_utf8()
+                .unwrap();
+
+            assert_eq!(format!("impersonate-extra-{key}"), decoded);
         }
     }
 }

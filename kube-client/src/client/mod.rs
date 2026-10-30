@@ -7,12 +7,14 @@
 //!
 //! The [`Client`] can also be used with [`Discovery`](crate::Discovery) to dynamically
 //! retrieve the resources served by the kubernetes API.
+
+#[cfg(feature = "unstable-client")] use std::sync::Arc;
+
 use either::{Either, Left, Right};
 use futures::{AsyncBufRead, StreamExt, TryStream, TryStreamExt, future::BoxFuture};
 use http::{self, Request, Response};
 use http_body_util::BodyExt;
-#[cfg(feature = "ws")]
-use hyper_util::rt::TokioIo;
+#[cfg(feature = "ws")] use hyper_util::rt::TokioIo;
 use jiff::Timestamp;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1 as k8s_meta_v1;
 use kube_core::{discovery::v2::ACCEPT_AGGREGATED_DISCOVERY_V2, response::Status};
@@ -40,24 +42,23 @@ pub use kube_core::discovery::v2::{
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable-client")))]
 #[cfg(feature = "unstable-client")]
 mod client_ext;
+#[cfg(feature = "unstable-client")] use client_ext::ImpersonationHeaders;
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable-client")))]
 #[cfg(feature = "unstable-client")]
 pub use client_ext::scope;
+
 mod config_ext;
 pub use auth::Error as AuthError;
 pub use config_ext::ConfigExt;
 pub mod middleware;
 pub mod retry;
 
-#[cfg(any(feature = "rustls-tls", feature = "openssl-tls"))]
-mod tls;
+#[cfg(any(feature = "rustls-tls", feature = "openssl-tls"))] mod tls;
 
 #[cfg(feature = "openssl-tls")]
 pub use tls::openssl_tls::Error as OpensslTlsError;
-#[cfg(feature = "rustls-tls")]
-pub use tls::rustls_tls::Error as RustlsTlsError;
-#[cfg(feature = "ws")]
-mod upgrade;
+#[cfg(feature = "rustls-tls")] pub use tls::rustls_tls::Error as RustlsTlsError;
+#[cfg(feature = "ws")] mod upgrade;
 
 #[cfg(feature = "oauth")]
 #[cfg_attr(docsrs, doc(cfg(feature = "oauth")))]
@@ -67,8 +68,7 @@ pub use auth::OAuthError;
 #[cfg_attr(docsrs, doc(cfg(feature = "oidc")))]
 pub use auth::oidc_errors;
 
-#[cfg(feature = "ws")]
-pub use upgrade::UpgradeConnectionError;
+#[cfg(feature = "ws")] pub use upgrade::UpgradeConnectionError;
 
 #[cfg(feature = "kubelet-debug")]
 #[cfg_attr(docsrs, doc(cfg(feature = "kubelet-debug")))]
@@ -90,6 +90,8 @@ pub struct Client {
     inner: Buffer<Request<Body>, BoxFuture<'static, Result<Response<Body>, BoxError>>>,
     default_ns: String,
     valid_until: Option<Timestamp>,
+    #[cfg(feature = "unstable-client")]
+    impersonation_headers: Option<Arc<ImpersonationHeaders>>,
 }
 
 /// Represents a WebSocket connection.
@@ -168,6 +170,8 @@ impl Client {
             inner: Buffer::new(service, 1024),
             default_ns: default_namespace.into(),
             valid_until: None,
+            #[cfg(feature = "unstable-client")]
+            impersonation_headers: None,
         }
     }
 
@@ -214,7 +218,13 @@ impl Client {
     /// Perform a raw HTTP request against the API and return the raw response back.
     /// This method can be used to get raw access to the API which may be used to, for example,
     /// create a proxy server or application-level gateway between localhost and the API server.
-    pub async fn send(&self, request: Request<Body>) -> Result<Response<Body>> {
+    #[allow(unused_mut)] // for when unstable-client is not active
+    pub async fn send(&self, mut request: Request<Body>) -> Result<Response<Body>> {
+        #[cfg(feature = "unstable-client")]
+        if let Some(impersonation_headers) = &self.impersonation_headers {
+            impersonation_headers.apply(&mut request);
+        }
+
         let mut svc = self.inner.clone();
         let res = svc
             .ready()
@@ -727,22 +737,18 @@ mod tests {
                 request.headers().get(http::header::ACCEPT).unwrap(),
                 "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1"
             );
-            let pod_meta: PartialObjectMeta<Pod> =
-                serde_json::from_value(serde_json::json!({
-                    "apiVersion": "meta.k8s.io/v1",
-                    "kind": "PartialObjectMetadata",
-                    "metadata": {
-                        "name": "test",
-                    },
-                }))
-                .unwrap();
-            send.send_response(Response::new(Body::from(
-                serde_json::to_vec(&pod_meta).unwrap(),
-            )));
+            let pod_meta: PartialObjectMeta<Pod> = serde_json::from_value(serde_json::json!({
+                "apiVersion": "meta.k8s.io/v1",
+                "kind": "PartialObjectMetadata",
+                "metadata": {
+                    "name": "test",
+                },
+            }))
+            .unwrap();
+            send.send_response(Response::new(Body::from(serde_json::to_vec(&pod_meta).unwrap())));
         });
 
-        let pods: Api<PartialObjectMeta<Pod>> =
-            Api::default_namespaced(Client::new(mock_service, "default"));
+        let pods: Api<PartialObjectMeta<Pod>> = Api::default_namespaced(Client::new(mock_service, "default"));
         let pod = pods.get("test").await.unwrap();
         assert_eq!(pod.metadata.name, Some("test".to_string()));
         spawned.await.unwrap();
@@ -769,8 +775,7 @@ mod tests {
             )));
         });
 
-        let pods: Api<PartialObjectMeta<Pod>> =
-            Api::default_namespaced(Client::new(mock_service, "default"));
+        let pods: Api<PartialObjectMeta<Pod>> = Api::default_namespaced(Client::new(mock_service, "default"));
         let list = pods.list(&Default::default()).await.unwrap();
         assert_eq!(list.items.len(), 0);
         spawned.await.unwrap();
@@ -799,8 +804,7 @@ mod tests {
             )));
         });
 
-        let pods: Api<PartialObjectMeta<Pod>> =
-            Api::default_namespaced(Client::new(mock_service, "default"));
+        let pods: Api<PartialObjectMeta<Pod>> = Api::default_namespaced(Client::new(mock_service, "default"));
         let patch = Patch::Merge(serde_json::json!({ "metadata": { "labels": { "a": "b" } } }));
         let pod = pods.patch("test", &PatchParams::default(), &patch).await.unwrap();
         assert_eq!(pod.metadata.name, Some("test".to_string()));
@@ -821,8 +825,7 @@ mod tests {
             send.send_response(Response::new(Body::from(vec![])));
         });
 
-        let pods: Api<PartialObjectMeta<Pod>> =
-            Api::default_namespaced(Client::new(mock_service, "default"));
+        let pods: Api<PartialObjectMeta<Pod>> = Api::default_namespaced(Client::new(mock_service, "default"));
         let _ = pods.watch(&Default::default(), "0").await;
         spawned.await.unwrap();
     }
@@ -969,7 +972,11 @@ mod tests {
 
     #[tokio::test]
     async fn watch_clean_termination_delivers_every_event() {
-        let payload = format!("{}{}", pod_event_frame_str("ADDED", "1"), pod_event_frame_str("MODIFIED", "2"));
+        let payload = format!(
+            "{}{}",
+            pod_event_frame_str("ADDED", "1"),
+            pod_event_frame_str("MODIFIED", "2")
+        );
         let body = body_from_chunks::<std::io::Error>(vec![Ok(Bytes::from(payload))]);
         let (spawned, stream) = open_watch(body).await;
         let mut stream = pin!(stream);
@@ -982,10 +989,7 @@ mod tests {
 
     #[tokio::test]
     async fn watch_chunk_decoder_eof_text_ends_stream() {
-        let body = body_from_chunks(vec![
-            Ok(pod_event_frame("ADDED", "44")),
-            Err(ChunkDecoderEof),
-        ]);
+        let body = body_from_chunks(vec![Ok(pod_event_frame("ADDED", "44")), Err(ChunkDecoderEof)]);
         let (spawned, stream) = open_watch(body).await;
         let mut stream = pin!(stream);
 
@@ -996,9 +1000,8 @@ mod tests {
 
     #[tokio::test]
     async fn watch_malformed_json_is_serde_error() {
-        let body = body_from_chunks::<std::io::Error>(vec![Ok(Bytes::from(
-            "{\"type\":\"ADDED\",\"object\":}\n",
-        ))]);
+        let body =
+            body_from_chunks::<std::io::Error>(vec![Ok(Bytes::from("{\"type\":\"ADDED\",\"object\":}\n"))]);
         let (spawned, stream) = open_watch(body).await;
         let mut stream = pin!(stream);
 
@@ -1025,7 +1028,9 @@ mod tests {
         let io_err = expect_read_events(next_event(&mut stream).await);
         assert_eq!(io_err.kind(), ErrorKind::Other);
         let retained = io_err.get_ref().expect("original body error is the source");
-        let body_err = retained.downcast_ref::<Error>().expect("source is the body error");
+        let body_err = retained
+            .downcast_ref::<Error>()
+            .expect("source is the body error");
         assert!(
             chain_has_io_kind(body_err, ErrorKind::ConnectionReset),
             "original source chain dropped ConnectionReset: {body_err:?}"
@@ -1057,7 +1062,9 @@ mod tests {
         let io_err = expect_read_events(next_event(&mut stream).await);
         assert_eq!(io_err.kind(), ErrorKind::Other);
         let retained = io_err.get_ref().expect("original body error is the source");
-        let body_err = retained.downcast_ref::<Error>().expect("source is the body error");
+        let body_err = retained
+            .downcast_ref::<Error>()
+            .expect("source is the body error");
         assert!(
             chain_has_message(body_err, "close_notify"),
             "fixture must mention close_notify, got {body_err}"
@@ -1109,7 +1116,12 @@ mod tests {
     }
 
     /// `Api::watch` calls `Client::request_events`.
-    async fn open_watch(body: Body) -> (tokio::task::JoinHandle<()>, impl Stream<Item = Result<WatchEvent<Pod>>>) {
+    async fn open_watch(
+        body: Body,
+    ) -> (
+        tokio::task::JoinHandle<()>,
+        impl Stream<Item = Result<WatchEvent<Pod>>>,
+    ) {
         let (mock_service, handle) = mock::pair::<Request<Body>, Response<Body>>();
         let spawned = tokio::spawn(async move {
             let mut handle = pin!(handle);
@@ -1122,7 +1134,10 @@ mod tests {
             send.send_response(Response::new(body));
         });
         let pods: Api<Pod> = Api::default_namespaced(Client::new(mock_service, "default"));
-        let stream = pods.watch(&Default::default(), "0").await.expect("watch response");
+        let stream = pods
+            .watch(&Default::default(), "0")
+            .await
+            .expect("watch response");
         (spawned, stream)
     }
 
