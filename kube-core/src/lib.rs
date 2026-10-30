@@ -37,12 +37,18 @@ pub use gvk::{GroupVersion, GroupVersionKind, GroupVersionResource};
 pub mod metadata;
 pub use metadata::{ListMeta, ObjectMeta, PartialObjectMeta, PartialObjectMetaExt, TypeMeta};
 
+pub mod finalizers;
+pub use finalizers::{add_finalizer, has_finalizer, remove_finalizer};
+
 pub mod labels;
 
 #[cfg(feature = "kubelet-debug")] pub mod kubelet_debug;
 
 pub mod object;
 pub use object::{NotUsed, Object, ObjectList};
+
+pub mod owner_ref;
+pub use owner_ref::{AlreadyOwnedError, has_owner_reference, set_controller_reference, set_owner_reference};
 
 pub mod params;
 
