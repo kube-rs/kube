@@ -570,7 +570,7 @@ where
             }),
             InitialListStrategy::StreamingList => {
                 match api.watch(&wc.to_watch_params(WatchPhase::Initial), "0").await {
-                    Ok(stream) => (None, State::InitialWatch { stream }),
+                    Ok(stream) => (Some(Ok(Event::Init)), State::InitialWatch { stream }),
                     Err(err) => {
                         if std::matches!(err, ClientErr::Api(ref status) if status.is_forbidden()) {
                             warn!("watch initlist error with 403: {err:?}");
@@ -1182,6 +1182,7 @@ mod tests {
         let mut stream = std::pin::pin!(watcher_inner(api.clone(), config));
 
         for expected in [
+            "Init",
             "InitApply(a)",
             "InitApply(b)",
             "InitApply(c)",
@@ -1284,6 +1285,7 @@ mod tests {
             .fields("metadata.name!=ignored");
         let mut state = State::default();
         for expected in [
+            "Init",
             "InitApply(a)",
             "InitApply(b)",
             "InitApply(c)",
@@ -1326,6 +1328,155 @@ mod tests {
                     Some("metadata.name!=ignored")
                 );
                 assert!(!resumed_params.send_initial_events);
+            }
+            _ => panic!("unexpected API call sequence {records:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn streaming_list_initial_stream_eof_before_bookmark_drops_partial_objects() {
+        let api = TestMode::new(vec![], vec![
+            Sequence::new(vec![SequenceStep::List(
+                vec![
+                    Ok(WatchEvent::Added(config_map("a", "1"))),
+                    Ok(WatchEvent::Added(config_map("b", "2"))),
+                ]
+                .into(),
+            )]),
+            Sequence::new(vec![SequenceStep::List(
+                vec![
+                    Ok(WatchEvent::Added(config_map("a", "1"))),
+                    Ok(WatchEvent::Bookmark(Bookmark {
+                        types: TypeMeta::resource::<ConfigMap>(),
+                        metadata: BookmarkMeta {
+                            resource_version: "1".to_string(),
+                            annotations: BTreeMap::from_iter(vec![(
+                                "k8s.io/initial-events-end".into(),
+                                "true".into(),
+                            )]),
+                        },
+                    })),
+                ]
+                .into(),
+            )]),
+        ]);
+
+        let config = Config::default().streaming_lists();
+        let (reader, mut writer) = crate::reflector::store::<ConfigMap>();
+        let mut state = State::default();
+        for expected in [
+            "Init",
+            "InitApply(a)",
+            "InitApply(b)",
+            "Init",
+            "InitApply(a)",
+            "InitDone",
+        ] {
+            let (event, next) = step(&api, &config, state).await;
+            state = next;
+            let event = event.unwrap();
+            assert_eq!(event.to_string(), expected);
+            writer.apply_watcher_event(&event);
+        }
+
+        let mut names: Vec<_> = reader
+            .state()
+            .iter()
+            .filter_map(|cm| cm.metadata.name.clone())
+            .collect();
+        names.sort();
+        assert_eq!(names, ["a".to_string()]);
+
+        let records = api.get_recordings();
+        match &records[..] {
+            [
+                Recording::Watch(first, first_version),
+                Recording::Watch(second, second_version),
+            ] => {
+                assert_eq!(first_version, "0");
+                assert!(first.send_initial_events);
+                assert_eq!(second_version, "0");
+                assert!(second.send_initial_events);
+            }
+            _ => panic!("unexpected API call sequence {records:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn streaming_list_initial_watch_410_before_bookmark_drops_partial_objects() {
+        let mut gone = Box::new(Status::default());
+        gone.code = 410;
+        gone.message = "expired".to_string();
+        gone.reason = "Expired".to_string();
+        let api = TestMode::new(vec![], vec![
+            Sequence::new(vec![SequenceStep::List(
+                vec![
+                    Ok(WatchEvent::Added(config_map("a", "1"))),
+                    Ok(WatchEvent::Added(config_map("b", "2"))),
+                    Ok(WatchEvent::Error(gone)),
+                ]
+                .into(),
+            )]),
+            Sequence::new(vec![SequenceStep::List(
+                vec![
+                    Ok(WatchEvent::Added(config_map("a", "1"))),
+                    Ok(WatchEvent::Bookmark(Bookmark {
+                        types: TypeMeta::resource::<ConfigMap>(),
+                        metadata: BookmarkMeta {
+                            resource_version: "1".to_string(),
+                            annotations: BTreeMap::from_iter(vec![(
+                                "k8s.io/initial-events-end".into(),
+                                "true".into(),
+                            )]),
+                        },
+                    })),
+                ]
+                .into(),
+            )]),
+        ]);
+
+        let config = Config::default().streaming_lists();
+        let (reader, mut writer) = crate::reflector::store::<ConfigMap>();
+        let mut state = State::default();
+        for expected in [
+            "Init",
+            "InitApply(a)",
+            "InitApply(b)",
+            "error returned by apiserver during watch: expired: Expired",
+            "Init",
+            "InitApply(a)",
+            "InitDone",
+        ] {
+            let (event, next) = step(&api, &config, state).await;
+            state = next;
+            let repr = match &event {
+                Ok(event) => event.to_string(),
+                Err(err) => err.to_string(),
+            };
+            assert_eq!(repr, expected);
+            if let Ok(event) = &event {
+                writer.apply_watcher_event(event);
+            }
+        }
+
+        let mut names: Vec<_> = reader
+            .state()
+            .iter()
+            .filter_map(|cm| cm.metadata.name.clone())
+            .collect();
+        names.sort();
+        assert_eq!(names, ["a".to_string()]);
+
+        let records = api.get_recordings();
+        match &records[..] {
+            [
+                Recording::Watch(first, first_version),
+                Recording::Watch(second, second_version),
+            ] => {
+                assert_eq!(first_version, "0");
+                assert!(first.send_initial_events);
+                assert_eq!(second_version, "0");
+                assert!(second.send_initial_events);
             }
             _ => panic!("unexpected API call sequence {records:?}"),
         }
