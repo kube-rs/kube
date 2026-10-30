@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793315898021,
+  "lastUpdate": 1793392218195,
   "repoUrl": "https://github.com/kube-rs/kube",
   "entries": {
     "Benchmark": [
@@ -7943,6 +7943,105 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/kube-rs/kube/commit/a3804dd82a53b86af76e3a0337fcf8bbeb39df5f"
         },
         "date": 1793315896290,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "init_listwatch - peak_bytes",
+            "value": 55194619,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - total_allocated",
+            "value": 76715088,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - alloc_count",
+            "value": 578023,
+            "unit": "allocations"
+          },
+          {
+            "name": "steady_state - peak_bytes",
+            "value": 71381202,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - total_allocated",
+            "value": 109519220,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - alloc_count",
+            "value": 799021,
+            "unit": "allocations"
+          },
+          {
+            "name": "relist - peak_bytes",
+            "value": 99797302,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - total_allocated",
+            "value": 174518628,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - alloc_count",
+            "value": 1189035,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_without_modify - peak_bytes",
+            "value": 141298836,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - total_allocated",
+            "value": 205865000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - alloc_count",
+            "value": 1298020,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_with_modify - peak_bytes",
+            "value": 134853452,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - total_allocated",
+            "value": 162895000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - alloc_count",
+            "value": 1058021,
+            "unit": "allocations"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "git@katelyn.world",
+            "name": "katelyn martin",
+            "username": "cratelyn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "03cdd718890b5302bb26ca84778e31eacbe20b89",
+          "message": "feat(client): allow customizable `hyper::rt::Executor` (#2103)\n\n* feat(client): allow customizable `hyper::rt::Executor<F>`\n\nfixes #1775.\n\nin https://github.com/hyperium/hyper-util/pull/166,\n`hyper_util::rt::TokioExecutor` began propagating tracing spans to\nspawned tasks if the `tracing` feature was enabled.\nhttps://github.com/kube-rs/kube/pull/1734 connected this to kube-rs so\nthat this tracing functionality can be enabled in the executor used by a\n`kube_client::Client`. in https://github.com/kube-rs/kube/pull/1972,\nthis was made opt-in.\n\ndifferent tracing subscriber implementations, particularly those that\nexport spans to OpenTelemetry, have different semantics regarding the\nlifecycle of distributed tracing spans, however. this meant that\npropagating spans caused issues for some users, because traces would not\nbe visible until long-lived connections were disposed of. see\nhttps://github.com/kube-rs/kube/issues/1775 for more information.\n\nin hyper-util v0.1.21, spans are no longer propagated to futures spawned\nby `TokioExecutor`, even when the `tracing` feature is active. a new set\nof executors in `hyper_util::rt::tracing` are now available to users\nthat wish to instrument background tasks for a hyper client. see\nhttps://github.com/hyperium/hyper-util/pull/323 for more information.\nsee the module-level docs at\nhttps://docs.rs/hyper-util/latest/hyper_util/rt/tracing/index.html#choosing-an-executor\nfor examples.\n\nas a _temporary_ workaround, hyper-util dependents can enable the\n`rt-tracing-exec-force` feature to preserve the behavior from v0.1.20\nand prior. note that this feature may be removed in the future.\n\nbecause `kube` users should select a `hyper::rt::Executor`\nimplementation that meets their particular needs, this branch introduces\na way to provide an executor to the client builder.\n\n`ClientBuilder<Svc>` can be constructed from a `Config`, via\n`std::convert::TryFrom<T>`. this implementation will continue to use\n`TokioExecutor` as before.\n\nthis branch introduces an additional `TryFrom<(Config, E)>`\nimplementation, for users that wish to propagate the current tracing\nspan to spawned futures, or mark causal relationships between spans.\n\n```rust\n use hyper_util::rt::{CurrentSpanExecutor, TokioExecutor};\n use kube_client::{client::ClientBuilder, config::Config};\n\n #[tokio::main]\n async fn main() {\n     let config = Config::infer().await.unwrap();\n     let executor = CurrentSpanExecutor::new(TokioExecutor::new());\n     let builder = ClientBuilder::try_from((config, executor)).unwrap();\n     let client = builder.build();\n }\n```\n\nas part of this change, the hyper-util version is lifted to v0.1.21, and\nthe hyper version is lifted to 1.9.0. to enable code examples\ndemonstrating this to be added to the crate's documentation, the\n`hyper-util/tracing` feature is enabled for docs.rs builds.\n\n---\n\n**related**\n\n* https://github.com/kube-rs/kube/issues/1775\n* https://github.com/hyperium/hyper/issues/3904\n* https://github.com/hyperium/hyper-util/pull/322\n* https://github.com/hyperium/hyper-util/pull/323\n* https://github.com/hyperium/hyper-util/pull/166\n* https://github.com/kube-rs/kube/pull/1734\n* https://github.com/kube-rs/kube/pull/1972\n\nSigned-off-by: katelyn martin <git@katelyn.world>\n\n* doc(kube): update feature flag comment\n\nhttps://github.com/kube-rs/kube/pull/2103#pullrequestreview-5397177687\n\nSigned-off-by: katelyn martin <git@katelyn.world>\n\n* doc: remove stray \"when\" from Cargo.toml comment\n\nSigned-off-by: katelyn martin <git@katelyn.world>\n\n* doc: add link to `hyper-util::rt::tracing` docs\n\nSigned-off-by: katelyn martin <git@katelyn.world>\n\n---------\n\nSigned-off-by: katelyn martin <git@katelyn.world>\nCo-authored-by: doxxx <doxxx93@gmail.com>",
+          "timestamp": "2026-10-30T20:29:14Z",
+          "tree_id": "d23a1c16133166e0f1bda8fd79710a9b3593c678",
+          "url": "https://github.com/kube-rs/kube/commit/03cdd718890b5302bb26ca84778e31eacbe20b89"
+        },
+        "date": 1793392216786,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
