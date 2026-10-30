@@ -134,5 +134,5 @@ bump-k8s:
   badge="[![Tested against Kubernetes ${min_dots} and above](https://img.shields.io/badge/MK8SV-${min_dots}-326ce5.svg)](https://kube.rs/kubernetes-version)"
   sd "^.+badge/MK8SV.+$" "${badge}" README.md
   # bump K8S_OPENAPI_ENABLED_VERSION in minimal-versions recipe (TODO: fix this)
-  sd "K8S_OPENAPI_ENABLED_VERSION=v1.33 "K8S_OPENAPI_ENABLED_VERSION=v1.33 justfile
+  sd "K8S_OPENAPI_ENABLED_VERSION=\S+" "K8S_OPENAPI_ENABLED_VERSION=${min_dots}" justfile
   echo "remember to bump kubernetes-version.md in kube-rs/website"
