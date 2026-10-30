@@ -24,7 +24,12 @@ rustls-tls = ["kube-client/rustls-tls", "client"]
 
 ## legacy tls stack (must disable rustls-tls to use)
 openssl-tls = ["kube-client/openssl-tls", "client"]
-## enable hyper-util's internal tracing spans in the HTTP client stack
+## enable hyper-util's tracing features.
+##
+## To install tracing telemetry in the HTTP client stack, use an executor like
+## `CurrentSpanExecutor` to propagate tracing spans to background tasks.
+## See https://docs.rs/hyper-util/latest/hyper_util/rt/tracing/index.html
+## for more information.
 hyper-util-tracing = ["kube-client/hyper-util-tracing", "client"]
 ## aws rustls provider
 aws-lc-rs = ["kube-client?/aws-lc-rs"]
@@ -86,7 +91,6 @@ tokio = { workspace = true, features = ["full"] }
 futures.workspace = true
 serde_json.workspace = true
 serde = { workspace = true, features = ["derive"] }
-serde-saphyr.workspace = true
 schemars.workspace = true
 http.workspace = true
 tower-test.workspace = true

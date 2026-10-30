@@ -37,7 +37,7 @@ unstable-client = []
 __non_core = ["tracing", "serde-saphyr", "base64"]
 
 [package.metadata.docs.rs]
-features = ["client", "rustls-tls", "openssl-tls", "ws", "oauth", "oidc", "jsonpatch", "admission", "k8s-openapi/latest", "socks5", "unstable-client", "http-proxy"]
+features = ["client", "rustls-tls", "openssl-tls", "ws", "oauth", "oidc", "jsonpatch", "admission", "k8s-openapi/latest", "socks5", "unstable-client", "http-proxy", "hyper-util-tracing"]
 # Define the configuration attribute `docsrs`. Used to enable `doc_cfg` feature.
 rustdoc-args = ["--cfg", "docsrs"]
 
@@ -88,7 +88,6 @@ tempfile.workspace = true
 futures = { workspace = true, features = ["async-await"] }
 tokio = { workspace = true, features = ["full"] }
 rstest.workspace = true
-schemars.workspace = true
 tokio-test.workspace = true
 tower-test.workspace = true
 k8s-openapi= { workspace = true, features = ["latest"] }
