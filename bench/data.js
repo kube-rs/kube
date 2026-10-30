@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793401187734,
+  "lastUpdate": 1793401612279,
   "repoUrl": "https://github.com/kube-rs/kube",
   "entries": {
     "Benchmark": [
@@ -8636,6 +8636,105 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/kube-rs/kube/commit/debe79e4a00a86a22fef9d1b483be125f944c178"
         },
         "date": 1793401186706,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "init_listwatch - peak_bytes",
+            "value": 55194619,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - total_allocated",
+            "value": 76715088,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - alloc_count",
+            "value": 578023,
+            "unit": "allocations"
+          },
+          {
+            "name": "steady_state - peak_bytes",
+            "value": 71381202,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - total_allocated",
+            "value": 109519220,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - alloc_count",
+            "value": 799021,
+            "unit": "allocations"
+          },
+          {
+            "name": "relist - peak_bytes",
+            "value": 99797302,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - total_allocated",
+            "value": 174518628,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - alloc_count",
+            "value": 1189035,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_without_modify - peak_bytes",
+            "value": 141298836,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - total_allocated",
+            "value": 205865000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - alloc_count",
+            "value": 1298020,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_with_modify - peak_bytes",
+            "value": 134853452,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - total_allocated",
+            "value": 162895000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - alloc_count",
+            "value": 1058021,
+            "unit": "allocations"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "doxxx93@gmail.com",
+            "name": "doxxx",
+            "username": "doxxx93"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "1f316bb72e40c9e09748cea03a89a2e1b25bbc68",
+          "message": "Drop redundant status field from AuthError::AuthExecRun (#2099)\n\n`AuthExecRun` carried `status: ExitStatus` next to `out: Box<Output>`,\nand both construction sites set it to `out.status`. Remove the field and\nread the status from `out` in the error message, which stays the same.\n\nFollow-up to #2096, which already changed this variant for 5.0.0.\n\nSigned-off-by: doxxx93 <doxxx93@gmail.com>\nCo-authored-by: Eirik A <sszynrae@gmail.com>",
+          "timestamp": "2026-10-30T23:05:46Z",
+          "tree_id": "653f271c5ab8a759faad153565066a6e054a401f",
+          "url": "https://github.com/kube-rs/kube/commit/1f316bb72e40c9e09748cea03a89a2e1b25bbc68"
+        },
+        "date": 1793401611263,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
