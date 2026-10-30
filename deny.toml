@@ -78,3 +78,13 @@ name = "syn"
 [[bans.skip]]
 # serde-saphyr pulls in base64 0.23 while k8s-openapi/pem/tower-http still use 0.22
 name = "base64"
+
+[[bans.skip]]
+# hyper-openssl 0.10.3 moved to parking_lot 0.13 while tokio still uses 0.12
+name = "parking_lot"
+[[bans.skip]]
+name = "parking_lot_core"
+[[bans.skip]]
+name = "lock_api"
+[[bans.skip]]
+name = "redox_syscall"
