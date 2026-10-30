@@ -256,10 +256,11 @@ pub mod conditions {
                 && let Some(s) = &depl.status
                 && let Some(conds) = &s.conditions
                 && let Some(dcond) = conds.iter().find(|c| {
-                    c.type_ == "Progressing" && c.reason == Some("NewReplicaSetAvailable".to_string())
+                    c.type_.as_deref() == Some("Progressing")
+                        && c.reason.as_deref() == Some("NewReplicaSetAvailable")
                 })
             {
-                return dcond.status == "True";
+                return dcond.status.as_deref() == Some("True");
             }
             false
         }

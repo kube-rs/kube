@@ -137,6 +137,7 @@ mod test {
                         audiences: Some(audiences.clone()),
                         bound_object_ref: None,
                         expiration_seconds: None,
+                        attestations: None,
                     }),
                     status: None,
                 },
