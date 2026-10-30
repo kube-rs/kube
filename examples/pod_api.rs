@@ -1,3 +1,5 @@
+//! An example of how to manipulate Pods, like creation, mutation and deletion.
+
 use k8s_openapi::api::core::v1::Pod;
 use serde_json::json;
 use tracing::*;

@@ -89,6 +89,38 @@ mod resource;
 /// ## `#[kube(root = "StructName")]`
 /// Customize the name of the generated root struct (defaults to `.kind` value).
 ///
+/// ## `#[kube(no_spec)]`
+/// For custom resources that have no `spec`, and sprawl their properties directly on the root
+/// object instead. Some CRDs in the wild are shaped this way, and without this they need
+/// [manual workarounds](https://github.com/kube-rs/kube/discussions/1762).
+///
+/// The derived struct is still the `spec` on the Rust side -- `HasSpec`,
+/// `Foo::new(name, spec)` and `Api<Foo>` all work unchanged -- but the field is
+/// [`#[serde(flatten)]`](https://serde.rs/attr-flatten.html)ed, so its properties sit at the top
+/// level both on the wire and in the generated schema:
+///
+/// ```ignore
+/// #[derive(CustomResource, Serialize, Deserialize, Debug, Clone, JsonSchema)]
+/// #[kube(group = "clux.dev", version = "v1", kind = "Bucket", namespaced, no_spec)]
+/// struct BucketFields {
+///     name: String,
+/// }
+/// ```
+///
+/// serializes as:
+///
+/// ```yaml
+/// apiVersion: clux.dev/v1
+/// kind: Bucket
+/// metadata:
+///   name: blobs
+/// name: blobs
+/// ```
+///
+/// Note that JSON paths in `printcolumn`, `selectable` and `scale` must drop the `.spec` prefix
+/// accordingly, and that the flattened struct must not itself declare `metadata`, `status`, `kind`
+/// or `apiVersion` fields (this is a compile error).
+///
 /// ## `#[kube(crates(kube_core = "::kube::core"))]`
 /// Customize the crate name the generated code will reach into (defaults to `::kube::core`).
 /// Should be one of `kube::core`, `kube_client::core` or `kube_core`.

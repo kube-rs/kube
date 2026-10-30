@@ -1,3 +1,5 @@
+//! An example of how to create and apply a ConfigMap from a ConfigMapGenerator.
+
 // Nightly clippy (0.1.64) considers Drop a side effect, see https://github.com/rust-lang/rust-clippy/issues/9608
 #![allow(clippy::unnecessary_lazy_evaluations)]
 

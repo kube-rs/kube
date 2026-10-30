@@ -113,16 +113,13 @@ fn valid_enum_3() {
             "spec": {
               "group": "clux.dev",
               "names": {
-                "categories": [],
                 "kind": "ValidEnum3",
                 "plural": "validenum3s",
-                "shortNames": [],
                 "singular": "validenum3"
               },
               "scope": "Cluster",
               "versions": [
                 {
-                  "additionalPrinterColumns": [],
                   "name": "v1",
                   "schema": {
                     "openAPIV3Schema": {
@@ -166,7 +163,6 @@ fn valid_enum_3() {
                   },
                   "served": true,
                   "storage": true,
-                  "subresources": {}
                 }
               ]
             }
@@ -189,16 +185,13 @@ fn valid_enum_4() {
             "spec": {
               "group": "clux.dev",
               "names": {
-                "categories": [],
                 "kind": "ValidEnum4",
                 "plural": "validenum4s",
-                "shortNames": [],
                 "singular": "validenum4"
               },
               "scope": "Cluster",
               "versions": [
                 {
-                  "additionalPrinterColumns": [],
                   "name": "v1",
                   "schema": {
                     "openAPIV3Schema": {
@@ -247,7 +240,6 @@ fn valid_enum_4() {
                   },
                   "served": true,
                   "storage": true,
-                  "subresources": {}
                 }
               ]
             }
@@ -276,16 +268,13 @@ fn valid_enum_6() {
               "spec": {
                 "group": "clux.dev",
                 "names": {
-                  "categories": [],
                   "kind": "ValidEnum6",
                   "plural": "validenum6s",
-                  "shortNames": [],
                   "singular": "validenum6"
                 },
                 "scope": "Cluster",
                 "versions": [
                   {
-                    "additionalPrinterColumns": [],
                     "name": "v1",
                     "schema": {
                       "openAPIV3Schema": {
@@ -330,7 +319,6 @@ fn valid_enum_6() {
                     },
                     "served": true,
                     "storage": true,
-                    "subresources": {}
                   }
                 ]
               }

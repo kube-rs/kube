@@ -12,7 +12,7 @@ use hyper_util::{
 };
 
 use jiff::Timestamp;
-use std::time::Duration;
+use std::{pin::Pin, time::Duration};
 use tower::{BoxError, Layer, Service, ServiceBuilder, ServiceExt as _, retry::RetryLayer, util::BoxService};
 use tower_http::{ServiceExt as _, classify::ServerErrorsFailureClass, trace::TraceLayer};
 use tracing::Span;
@@ -86,6 +86,24 @@ impl<Svc> ClientBuilder<Svc> {
 
 pub type GenericService = BoxService<Request<Body>, Response<Box<DynBody>>, BoxError>;
 
+/// Builds a `Basic` auth header value from a URI userinfo component.
+///
+/// `http::Uri` never decodes percent-escapes, so credentials containing
+/// characters that had to be percent-encoded in the proxy URL (e.g. `@`,
+/// `:`, `%`) are decoded here first — otherwise they'd reach the proxy
+/// still escaped, which any proxy that isn't also skipping decoding will
+/// reject as wrong credentials.
+#[cfg(feature = "http-proxy")]
+fn proxy_basic_auth_value(userinfo: &str) -> String {
+    use base64::Engine;
+
+    format!(
+        "Basic {}",
+        base64::engine::general_purpose::STANDARD
+            .encode(percent_encoding::percent_decode_str(userinfo).collect::<Vec<u8>>())
+    )
+}
+
 #[cfg(feature = "http-proxy")]
 fn with_proxy_basic_auth<C>(
     proxy_url: &http::Uri,
@@ -94,14 +112,9 @@ fn with_proxy_basic_auth<C>(
     if let Some(authority) = proxy_url.authority()
         && let Some((userinfo, _)) = authority.as_str().split_once('@')
     {
-        use base64::Engine;
         use http::HeaderValue;
 
-        let value = format!(
-            "Basic {}",
-            base64::engine::general_purpose::STANDARD.encode(userinfo)
-        );
-        if let Ok(header) = HeaderValue::from_str(&value) {
+        if let Ok(header) = HeaderValue::from_str(&proxy_basic_auth_value(userinfo)) {
             connector = connector.with_auth(header);
         }
     }
@@ -109,11 +122,98 @@ fn with_proxy_basic_auth<C>(
     connector
 }
 
+#[cfg(all(test, feature = "http-proxy"))]
+mod proxy_auth_tests {
+    use super::proxy_basic_auth_value;
+    use base64::Engine;
+
+    fn basic_auth(plain: &str) -> String {
+        format!("Basic {}", base64::engine::general_purpose::STANDARD.encode(plain))
+    }
+
+    #[test]
+    fn decodes_percent_escapes_before_basic_auth_encoding() {
+        // password containing '@' and ':' had to be percent-encoded in the proxy URL
+        assert_eq!(
+            proxy_basic_auth_value("user:pa%40ss%3Aword"),
+            basic_auth("user:pa@ss:word")
+        );
+    }
+
+    #[test]
+    fn leaves_plain_userinfo_unchanged() {
+        assert_eq!(proxy_basic_auth_value("user:pass"), basic_auth("user:pass"));
+    }
+
+    #[test]
+    fn passes_through_invalid_escape_with_sign_prefix() {
+        // a leading '+' after '%' is not a valid percent-escape and must not be
+        // treated as one (a naive hex parser like `u8::from_str_radix` would
+        // otherwise accept "+A" as 0x0A instead of passing "%+A" through)
+        assert_eq!(
+            proxy_basic_auth_value("user:pass%+A"),
+            basic_auth("user:pass%+A")
+        );
+    }
+}
+
 impl TryFrom<Config> for ClientBuilder<GenericService> {
     type Error = Error;
 
-    /// Builds a default [`ClientBuilder`] stack from a given configuration
+    /// Builds a default [`ClientBuilder`] stack from a given configuration.
+    ///
+    /// By default, the client builder builds an HTTP client that relies on a
+    /// [`TokioExecutor`] to spawn background tasks. To install an executor
+    /// that propagates [`tracing`] spans, use
+    /// `<ClientBuilder<Svc> as TryFrom<(Config, E)>>::try_from()`.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use kube_client::{client::ClientBuilder, config::Config};
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let config = Config::infer().await.unwrap();
+    ///     let builder = ClientBuilder::try_from(config).unwrap();
+    ///     let client = builder.build();
+    /// }
+    /// ```
     fn try_from(config: Config) -> Result<Self> {
+        let executor = TokioExecutor::new();
+        Self::try_from((config, executor))
+    }
+}
+
+impl<E> TryFrom<(Config, E)> for ClientBuilder<GenericService>
+where
+    E: hyper::rt::Executor<Pin<Box<dyn Future<Output = ()> + Send>>> + Send + Sync + Clone + 'static,
+{
+    type Error = Error;
+
+    /// Builds a default [`ClientBuilder`] stack from a given configuration.
+    ///
+    /// # Examples
+    ///
+    /// Install a tracing executor that propagates [`tracing`] spans to
+    /// spawned tasks.
+    ///
+    /// ```no_run
+    /// # #[cfg(feature = "hyper-util-tracing")]
+    /// # {
+    /// use hyper_util::rt::{CurrentSpanExecutor, TokioExecutor};
+    /// use kube_client::{client::ClientBuilder, config::Config};
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let config = Config::infer().await.unwrap();
+    ///     let executor = CurrentSpanExecutor::new(TokioExecutor::new());
+    ///     let builder = ClientBuilder::try_from((config, executor)).unwrap();
+    ///     let client = builder.build();
+    /// }
+    /// # }
+    /// ```
+    fn try_from((config, executor): (Config, E)) -> Result<Self> {
         let mut connector = HttpConnector::new();
         connector.enforce_http(false);
 
@@ -134,12 +234,12 @@ impl TryFrom<Config> for ClientBuilder<GenericService> {
                         proxy_url.clone(),
                         connector,
                     );
-                    make_generic_builder(connector, config)
+                    make_generic_builder(executor, connector, config)
                 }
 
                 #[cfg(not(feature = "socks5"))]
                 Err(Error::ProxyProtocolDisabled {
-                    proxy_url: proxy_url.clone(),
+                    proxy_url: Box::new(proxy_url.clone()),
                     protocol_feature: "kube/socks5",
                 })
             }
@@ -151,12 +251,12 @@ impl TryFrom<Config> for ClientBuilder<GenericService> {
                         hyper_util::client::legacy::connect::proxy::Tunnel::new(proxy_url.clone(), connector);
                     let connector = with_proxy_basic_auth(proxy_url, connector);
 
-                    make_generic_builder(connector, config)
+                    make_generic_builder(executor, connector, config)
                 }
 
                 #[cfg(not(feature = "http-proxy"))]
                 Err(Error::ProxyProtocolDisabled {
-                    proxy_url: proxy_url.clone(),
+                    proxy_url: Box::new(proxy_url.clone()),
                     protocol_feature: "kube/http-proxy",
                 })
             }
@@ -173,7 +273,7 @@ impl TryFrom<Config> for ClientBuilder<GenericService> {
                         hyper_util::client::legacy::connect::proxy::Tunnel::new(proxy_url.clone(), proxy_connector);
                     let connector = with_proxy_basic_auth(proxy_url, connector);
 
-                    make_generic_builder(connector, config)
+                    make_generic_builder(executor, connector, config)
                 }
 
                 #[cfg(all(feature = "http-proxy", not(any(feature = "rustls-tls", feature = "openssl-tls"))))]
@@ -181,28 +281,33 @@ impl TryFrom<Config> for ClientBuilder<GenericService> {
 
                 #[cfg(not(feature = "http-proxy"))]
                 Err(Error::ProxyProtocolDisabled {
-                    proxy_url: proxy_url.clone(),
+                    proxy_url: Box::new(proxy_url.clone()),
                     protocol_feature: "kube/http-proxy",
                 })
             }
 
             Some(proxy_url) => Err(Error::ProxyProtocolUnsupported {
-                proxy_url: proxy_url.clone(),
+                proxy_url: Box::new(proxy_url.clone()),
             }),
 
-            None => make_generic_builder(connector, config),
+            None => make_generic_builder(executor, connector, config),
         }
     }
 }
 
 /// Helper function for implementation of [`TryFrom<Config>`] for [`ClientBuilder`].
 /// Ignores [`Config::proxy_url`], which at this point is already handled.
-fn make_generic_builder<H>(connector: H, config: Config) -> Result<ClientBuilder<GenericService>, Error>
+fn make_generic_builder<E, H>(
+    executor: E,
+    connector: H,
+    config: Config,
+) -> Result<ClientBuilder<GenericService>, Error>
 where
     H: 'static + Clone + Send + Sync + Service<http::Uri>,
     H::Response: 'static + Connection + Read + Write + Send + Unpin,
     H::Future: 'static + Send,
     H::Error: 'static + Send + Sync + std::error::Error,
+    E: hyper::rt::Executor<Pin<Box<dyn Future<Output = ()> + Send>>> + Send + Sync + Clone + 'static,
 {
     let default_ns = config.default_namespace.clone();
     let auth_layer = config.auth_layer()?;
@@ -230,7 +335,7 @@ where
         connector.set_read_timeout(config.read_timeout);
         connector.set_write_timeout(config.write_timeout);
 
-        hyper_util::client::legacy::Builder::new(TokioExecutor::new()).build(connector)
+        hyper_util::client::legacy::Builder::new(executor).build(connector)
     };
 
     let stack = ServiceBuilder::new().layer(config.base_uri_layer()).into_inner();
@@ -321,13 +426,17 @@ where
 mod tests {
     #[cfg(feature = "gzip")] use super::*;
 
-    #[cfg(feature = "gzip")]
+    #[cfg(all(feature = "gzip", feature = "rustls-tls"))]
     #[tokio::test]
     async fn test_no_accept_encoding_header_sent_when_compression_disabled()
     -> Result<(), Box<dyn std::error::Error>> {
         use http::Uri;
         use std::net::SocketAddr;
         use tokio::net::{TcpListener, TcpStream};
+
+        // make_generic_builder skips the provider install in TryFrom<Config>
+        #[cfg(feature = "aws-lc-rs")]
+        let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
 
         // setup a server that echoes back any encoding header value
         let addr: SocketAddr = ([127, 0, 0, 1], 0).into();
@@ -367,7 +476,8 @@ mod tests {
 
         // confirm gzip echoed back with default config
         let config = Config { ..Config::new(uri) };
-        let client = make_generic_builder(HttpConnector::new(), config.clone())?.build();
+        let client =
+            make_generic_builder(TokioExecutor::new(), HttpConnector::new(), config.clone())?.build();
         let response = client.request_text(http::Request::default()).await?;
         assert_eq!(&response, "gzip");
 
@@ -376,7 +486,7 @@ mod tests {
             disable_compression: true,
             ..config
         };
-        let client = make_generic_builder(HttpConnector::new(), config)?.build();
+        let client = make_generic_builder(TokioExecutor::new(), HttpConnector::new(), config)?.build();
         let response = client.request_text(http::Request::default()).await?;
         assert_eq!(&response, "");
 

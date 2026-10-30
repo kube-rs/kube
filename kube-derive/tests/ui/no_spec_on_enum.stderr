@@ -1,0 +1,5 @@
+error: #[derive(CustomResource)] `kube(no_spec)` requires a struct with named fields; an enum has no properties to lift onto the root
+ --> tests/ui/no_spec_on_enum.rs:9:6
+  |
+9 | enum FooFields {
+  |      ^^^^^^^^^

@@ -26,6 +26,7 @@ deny:
 # Unit tests
 test:
   #!/usr/bin/env bash
+  set -euo pipefail
   if rg "\`\`\`ignored"; then
     echo "ignored doctests are not allowed, use compile_fail or no_run"
     exit 1
@@ -39,6 +40,8 @@ test:
   cargo test --workspace --doc --all-features --exclude kube-examples --exclude e2e
   cargo test -p kube-examples --examples
   cargo test -p kube-examples --examples --all-features
+  # --lib misses integration tests; kube-derive is the only member with tests/
+  cargo test -p kube-derive --tests
 
 # Integration tests (will modify your current context's cluster)
 test-integration:
@@ -82,7 +85,7 @@ e2e-mink8s:
 e2e-incluster features:
   docker build --build-arg FEATURES="{{features}}" \
     -t clux/kube-e2e:{{VERSION}} . -f e2e/Dockerfile
-  k3d image import clux/kube-e2e:{{VERSION}} -c=$(k3d cluster list -ojson |jq '.[0].name' -r)
+  k3d image import clux/kube-e2e:{{VERSION}} -c=$(k3d cluster list -ojson |jq '.[0].name' -r) --mode direct
   sed -i 's/latest/{{VERSION}}/g' e2e/deployment.yaml
   kubectl apply -f e2e/deployment.yaml
   sed -i 's/{{VERSION}}/latest/g' e2e/deployment.yaml

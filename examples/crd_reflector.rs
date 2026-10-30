@@ -1,3 +1,6 @@
+//! An example of how to keep an up-to-date reflector of CustomResourceDefinitions (CRDs) in memory
+//! and periodically read its state.
+
 use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
 use tracing::*;
@@ -11,6 +14,7 @@ use kube::{
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+/// Our custom resource
 #[derive(CustomResource, Deserialize, Serialize, Clone, Debug, JsonSchema)]
 #[kube(group = "clux.dev", version = "v1", kind = "Foo", namespaced)]
 pub struct FooSpec {

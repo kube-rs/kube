@@ -12,6 +12,15 @@ pub use k8s_openapi::{ClusterResourceScope, NamespaceResourceScope, ResourceScop
 pub struct DynamicResourceScope {}
 impl ResourceScope for DynamicResourceScope {}
 
+/// Marks the [`ResourceScope`]s that a namespace can be named in
+///
+/// Implemented for [`NamespaceResourceScope`] and [`DynamicResourceScope`], the two scopes whose
+/// url can carry a `namespaces/<ns>/` segment. [`ClusterResourceScope`] is deliberately absent, so
+/// that operations taking a namespace can be offered on exactly the types they make sense for.
+pub trait NamespaceScope: ResourceScope {}
+impl NamespaceScope for NamespaceResourceScope {}
+impl NamespaceScope for DynamicResourceScope {}
+
 /// An accessor trait for a kubernetes Resource.
 ///
 /// This is for a subset of Kubernetes type that do not end in `List`.

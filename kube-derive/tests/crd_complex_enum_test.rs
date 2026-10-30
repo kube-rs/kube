@@ -130,16 +130,13 @@ fn complex_enum() {
             "spec": {
               "group": "clux.dev",
               "names": {
-                "categories": [],
                 "kind": "ComplexEnumTest",
                 "plural": "complexenumtests",
-                "shortNames": [],
                 "singular": "complexenumtest"
               },
               "scope": "Cluster",
               "versions": [
                 {
-                  "additionalPrinterColumns": [],
                   "name": "v1",
                   "schema": {
                     "openAPIV3Schema": {
@@ -224,7 +221,6 @@ fn complex_enum() {
                   },
                   "served": true,
                   "storage": true,
-                  "subresources": {}
                 }
               ]
             }
@@ -247,16 +243,13 @@ fn normal_enum() {
             "spec": {
               "group": "clux.dev",
               "names": {
-                "categories": [],
                 "kind": "NormalEnumTest",
                 "plural": "normalenumtests",
-                "shortNames": [],
                 "singular": "normalenumtest"
               },
               "scope": "Cluster",
               "versions": [
                 {
-                  "additionalPrinterColumns": [],
                   "name": "v1",
                   "schema": {
                     "openAPIV3Schema": {
@@ -290,7 +283,6 @@ fn normal_enum() {
                   },
                   "served": true,
                   "storage": true,
-                  "subresources": {}
                 }
               ]
             }
@@ -313,16 +305,13 @@ fn optional_enum() {
             "spec": {
               "group": "clux.dev",
               "names": {
-                "categories": [],
                 "kind": "OptionalEnumTest",
                 "plural": "optionalenumtests",
-                "shortNames": [],
                 "singular": "optionalenumtest"
               },
               "scope": "Cluster",
               "versions": [
                 {
-                  "additionalPrinterColumns": [],
                   "name": "v1",
                   "schema": {
                     "openAPIV3Schema": {
@@ -354,7 +343,6 @@ fn optional_enum() {
                   },
                   "served": true,
                   "storage": true,
-                  "subresources": {}
                 }
               ]
             }
@@ -377,16 +365,13 @@ fn normal_enum_without_descriptions() {
               "spec": {
                 "group": "clux.dev",
                 "names": {
-                  "categories": [],
                   "kind": "NormalEnumWithoutDescriptionsTest",
                   "plural": "normalenumwithoutdescriptionstests",
-                  "shortNames": [],
                   "singular": "normalenumwithoutdescriptionstest"
                 },
                 "scope": "Cluster",
                 "versions": [
                   {
-                    "additionalPrinterColumns": [],
                     "name": "v1",
                     "schema": {
                       "openAPIV3Schema": {
@@ -419,7 +404,6 @@ fn normal_enum_without_descriptions() {
                     },
                     "served": true,
                     "storage": true,
-                    "subresources": {}
                   }
                 ]
               }
@@ -441,15 +425,12 @@ fn optional_complex_enum() {
             "spec": {
                 "group": "clux.dev",
                 "names": {
-                    "categories": [],
                     "kind": "OptionalComplexEnumTest",
                     "plural": "optionalcomplexenumtests",
-                    "shortNames": [],
                     "singular": "optionalcomplexenumtest"
                 },
                 "scope": "Cluster",
                 "versions": [{
-                    "additionalPrinterColumns": [],
                     "name": "v1",
                     "schema": {
                         "openAPIV3Schema": {
@@ -507,7 +488,6 @@ fn optional_complex_enum() {
                     },
                     "served": true,
                     "storage": true,
-                    "subresources": {}
                 }]
             }
         })
@@ -528,16 +508,13 @@ fn flattened_untagged_enum() {
             "spec": {
               "group": "clux.dev",
               "names": {
-                "categories": [],
                 "kind": "FlattenedUntaggedEnumTest",
                 "plural": "flatteneduntaggedenumtests",
-                "shortNames": [],
                 "singular": "flatteneduntaggedenumtest"
               },
               "scope": "Cluster",
               "versions": [
                 {
-                  "additionalPrinterColumns": [],
                   "name": "v1",
                   "schema": {
                     "openAPIV3Schema": {
@@ -597,7 +574,6 @@ fn flattened_untagged_enum() {
                   },
                   "served": true,
                   "storage": true,
-                  "subresources": {}
                 }
               ]
             }

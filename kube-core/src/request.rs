@@ -822,10 +822,13 @@ mod test {
     }
 
     #[test]
-    fn watch_timeout_error() {
+    fn watch_timeout_allows_long_duration() {
         let url = corev1::Pod::url_path(&(), Some("ns"));
-        let wp = WatchParams::default().timeout(100000);
-        let err = Request::new(url).watch(&wp, "").unwrap_err();
-        assert!(format!("{err}").contains("timeout must be < 295s"));
+        let wp = WatchParams::default().timeout(1800);
+        let req = Request::new(url).watch(&wp, "0").unwrap();
+        assert_eq!(
+            req.uri(),
+            "/api/v1/namespaces/ns/pods?&watch=true&timeoutSeconds=1800&allowWatchBookmarks=true&resourceVersion=0"
+        );
     }
 }

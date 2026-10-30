@@ -403,7 +403,7 @@ mod test {
     async fn derived_resources_discoverable() -> Result<(), Box<dyn std::error::Error>> {
         use crate::{
             core::{DynamicObject, GroupVersion, GroupVersionKind},
-            discovery::{self, ApiGroup, Discovery, Scope, verbs},
+            discovery::{self, ApiGroup, Discovery, verbs},
             runtime::wait::{Condition, await_condition, conditions},
         };
 
@@ -459,11 +459,8 @@ mod test {
                 if !caps.supports_operation(verbs::LIST) {
                     continue;
                 }
-                let api: Api<DynamicObject> = if caps.scope == Scope::Namespaced {
-                    Api::default_namespaced_with(client.clone(), &ar)
-                } else {
-                    Api::all_with(client.clone(), &ar)
-                };
+                let api: Api<DynamicObject> =
+                    Api::dynamic(client.clone(), &ar, &caps.scope).constrain_default();
                 api.list(&Default::default()).await?;
             }
         }

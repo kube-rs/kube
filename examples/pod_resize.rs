@@ -1,3 +1,5 @@
+//! An example of how to resize a Pod's container CPU and memory requests/limits.
+
 use k8s_openapi::{api::core::v1::Pod, apimachinery::pkg::api::resource::Quantity};
 use kube::{
     Client,

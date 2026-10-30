@@ -1,3 +1,5 @@
+//! An example of how to execute a command on a container of a Pod.
+
 use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::api::core::v1::Pod;
 use tracing::*;

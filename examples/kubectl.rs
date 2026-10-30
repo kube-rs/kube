@@ -12,7 +12,7 @@ use kube::{
     Client,
     api::{Api, DynamicObject, ListParams, Patch, PatchParams, ResourceExt},
     core::GroupVersionKind,
-    discovery::{ApiCapabilities, ApiResource, Discovery, Scope},
+    discovery::{ApiCapabilities, ApiResource, Discovery},
     runtime::{
         WatchStreamExt,
         wait::{await_condition, conditions::is_deleted},
@@ -243,12 +243,11 @@ fn dynamic_api(
     ns: Option<&str>,
     all: bool,
 ) -> Api<DynamicObject> {
-    if caps.scope == Scope::Cluster || all {
-        Api::all_with(client, &ar)
-    } else if let Some(namespace) = ns {
-        Api::namespaced_with(client, namespace, &ar)
-    } else {
-        Api::default_namespaced_with(client, &ar)
+    let api = Api::dynamic(client, &ar, &caps.scope);
+    match (all, ns) {
+        (true, _) => api,
+        (false, Some(ns)) => api.constrain(ns),
+        (false, None) => api.constrain_default(),
     }
 }
 

@@ -1,3 +1,5 @@
+//! An example of how to attach an interactive shell to a Pod's container via [`crossterm`].
+
 use futures::{SinkExt, StreamExt, channel::mpsc::Sender};
 use k8s_openapi::api::core::v1::Pod;
 

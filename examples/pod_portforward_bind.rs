@@ -1,6 +1,7 @@
+//! An example of how to listen on port 8080 locally, forwarding to port 80 in the example pod.
+//! Similar to `kubectl port-forward pod/example 8080:80`.
+
 use anyhow::Context;
-// Example to listen on port 8080 locally, forwarding to port 80 in the example pod.
-// Similar to `kubectl port-forward pod/example 8080:80`.
 use futures::{StreamExt, TryStreamExt};
 use std::net::SocketAddr;
 use tokio::{

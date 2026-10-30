@@ -1,3 +1,5 @@
+//! An example of how to watch multiple resources at the same time.
+
 use futures::{StreamExt, TryStreamExt, stream};
 use k8s_openapi::api::{
     apps::v1::Deployment,

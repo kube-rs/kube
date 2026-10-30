@@ -1,4 +1,5 @@
-// Custom client example with TraceLayer.
+//! Custom client example with TraceLayer.
+
 use http::{Request, Response};
 use hyper::body::Incoming;
 use hyper_util::rt::TokioExecutor;

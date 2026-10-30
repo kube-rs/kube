@@ -1,5 +1,6 @@
+//! Minimal custom client example.
+
 use hyper_util::rt::TokioExecutor;
-// Minimal custom client example.
 use k8s_openapi::api::core::v1::Pod;
 use tower::BoxError;
 use tracing::*;
