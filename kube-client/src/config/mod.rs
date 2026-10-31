@@ -161,11 +161,26 @@ pub struct Config {
     /// Defaults to `None` to avoid breaking long-lived connections such as
     /// exec, attach and port-forward sessions.  Watch streams are protected
     /// by a watcher-level idle timeout instead.
+    ///
+    /// If you set this, consider also turning on [`Self::reset_reader_on_write`].
+    /// Otherwise the time a pooled connection sat idle before being handed out
+    /// (up to 90 s) counts against this timeout for the next response on that
+    /// connection.
     pub read_timeout: Option<std::time::Duration>,
     /// Set the timeout for the Kubernetes API request.
     ///
     /// A value of `None` means no timeout
     pub write_timeout: Option<std::time::Duration>,
+    /// Whether to make every completed write reset the read timeout. The timeout then counts from
+    /// when a request is sent, not from when its pooled connection went idle (which is potentially a
+    /// long time before the connection was handed out for a request).
+    ///
+    /// Has an effect only when [`Self::read_timeout`] is set.
+    ///
+    /// The tradeoff is that this makes things like kube's 60 s WebSocket pings also reset it on
+    /// exec/attach, and thus the read timeout no longer catches a peer that stops answering while the
+    /// client keeps writing.
+    pub reset_reader_on_write: bool,
     /// Whether to accept invalid certificates
     pub accept_invalid_certs: bool,
     /// Stores information to tell the cluster who you are.
@@ -199,6 +214,7 @@ impl Config {
             connect_timeout: Some(DEFAULT_CONNECT_TIMEOUT),
             read_timeout: None,
             write_timeout: Some(DEFAULT_WRITE_TIMEOUT),
+            reset_reader_on_write: false,
             accept_invalid_certs: false,
             auth_info: AuthInfo::default(),
             disable_compression: false,
@@ -281,6 +297,7 @@ impl Config {
             connect_timeout: Some(DEFAULT_CONNECT_TIMEOUT),
             read_timeout: None,
             write_timeout: Some(DEFAULT_WRITE_TIMEOUT),
+            reset_reader_on_write: false,
             accept_invalid_certs: false,
             auth_info: AuthInfo {
                 token_file: Some(incluster_config::token_file()),
@@ -347,6 +364,7 @@ impl Config {
             connect_timeout: Some(DEFAULT_CONNECT_TIMEOUT),
             read_timeout: None,
             write_timeout: Some(DEFAULT_WRITE_TIMEOUT),
+            reset_reader_on_write: false,
             accept_invalid_certs,
             disable_compression,
             proxy_url: loader.proxy_url()?,
