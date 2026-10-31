@@ -33,7 +33,7 @@ jobs:
           tool: cargo-tarpaulin@0.32.8
       - uses: nolar/setup-k3d-k3s@v1
         with:
-          channel: "v1.32" # MK8SV
+          channel: "v1.33" # MK8SV
           # k3d-kube
           k3d-name: kube
           k3d-args: "-p 10250:10250 --no-rollback --k3s-arg --disable=traefik,servicelb,metrics-server@server:*"
