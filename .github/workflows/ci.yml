@@ -184,7 +184,9 @@ jobs:
       - name: Import test images into k3d
         run: |
           docker pull busybox:stable
-          k3d image import busybox:stable -c kube --mode direct
+          # Docker 29 (ubuntu-26.04) exports the full multi-arch index, which ctr cannot import without the other platforms
+          docker save --platform linux/amd64 busybox:stable -o busybox.tar
+          k3d image import busybox.tar -c kube --mode direct
 
       # Real CI work starts here
       - name: Build workspace
