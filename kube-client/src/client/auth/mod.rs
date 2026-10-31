@@ -52,13 +52,11 @@ pub enum Error {
     AuthExecStart(#[source] std::io::Error),
 
     /// Failed to run auth exec command
-    #[error("auth exec command '{cmd}' failed with status {status}: {out:?}")]
+    #[error("auth exec command '{cmd}' failed with status {}: {out:?}", .out.status)]
     AuthExecRun {
         /// The failed command
         cmd: String,
-        /// The exit status or exit code of the failed command
-        status: std::process::ExitStatus,
-        /// Stdout/Stderr of the failed command
+        /// Exit status and stdout/stderr of the failed command
         out: Box<std::process::Output>,
     },
 
@@ -456,7 +454,6 @@ fn token_from_gcp_provider(provider: &AuthProviderConfig) -> Result<ProviderToke
         if !output.status.success() {
             return Err(Error::AuthExecRun {
                 cmd: format!("{cmd} {params}"),
-                status: output.status,
                 out: Box::new(output),
             });
         }
@@ -635,7 +632,6 @@ fn auth_exec(auth: &ExecConfig) -> Result<ExecCredential, Error> {
     if !out.status.success() {
         return Err(Error::AuthExecRun {
             cmd: format!("{cmd:?}"),
-            status: out.status,
             out: Box::new(out),
         });
     }
