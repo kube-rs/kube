@@ -377,7 +377,7 @@ mod tests {
 
     #[tokio::test]
     async fn scheduler_pending_message_should_not_block_head_of_line() {
-        let mut scheduler = Box::pin(scheduler(
+        let mut scheduler = pin!(scheduler(
             stream::iter(vec![
                 ScheduleRequest {
                     message: 1,
