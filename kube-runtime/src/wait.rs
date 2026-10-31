@@ -256,11 +256,21 @@ pub mod conditions {
                 && let Some(s) = &depl.status
                 && let Some(conds) = &s.conditions
                 && let Some(dcond) = conds.iter().find(|c| {
-                    c.type_.as_deref() == Some("Progressing")
-                        && c.reason.as_deref() == Some("NewReplicaSetAvailable")
+                    k8s_openapi::k8s_if_ge_1_37! {
+                        c.type_.as_deref() == Some("Progressing")
+                            && c.reason.as_deref() == Some("NewReplicaSetAvailable")
+                    }
+                    k8s_openapi::k8s_if_le_1_36! {
+                        c.type_ == "Progressing" && c.reason == Some("NewReplicaSetAvailable".to_string())
+                    }
                 })
             {
-                return dcond.status.as_deref() == Some("True");
+                k8s_openapi::k8s_if_ge_1_37! {
+                  return dcond.status.as_deref() == Some("True");
+                }
+                k8s_openapi::k8s_if_le_1_36! {
+                  return dcond.status == "True";
+                }
             }
             false
         }
