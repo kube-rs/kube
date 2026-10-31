@@ -500,6 +500,9 @@ fn hoist_subschema_enum_values(
 
 /// Merge `anyOf` branches into a single enum when every branch is a plain enum of the same type.
 ///
+/// A branch with only a `type` (e.g. `String` next to a unit enum) accepts any value of that type,
+/// so the merged schema keeps the `type` and drops the `enum`.
+///
 /// Branch descriptions are dropped, since Kubernetes can't attach them to individual values.
 /// Any other `anyOf` is left untouched.
 fn merge_any_of_enum_values(schema: &mut schemars::Schema) {
@@ -513,8 +516,32 @@ fn merge_any_of_enum_values(schema: &mut schemars::Schema) {
         return;
     };
 
+    // `Option<T>` of a composite `T` is `anyOf: [T, null]`. Once `T` has collapsed to a bare scalar
+    // type, unwrap it like schemars does for plain types, before the rewriter strips the branch's type.
+    // Parents with other keywords are hand-written schemas, not an `Option` wrapper, so leave them.
+    if let [Value::Object(inner), null] = any_of.as_slice()
+        && null == &json!({ "enum": [null], "nullable": true })
+        && obj
+            .keys()
+            .all(|k| matches!(k.as_str(), "anyOf" | "description" | "default"))
+        && matches!(
+            inner.get("type").and_then(Value::as_str),
+            Some("string" | "integer" | "number" | "boolean")
+        )
+        && inner.keys().all(|k| matches!(k.as_str(), "type" | "description"))
+    {
+        let inner = inner.clone();
+        obj.remove("anyOf");
+        for (key, value) in inner {
+            obj.entry(key).or_insert(value);
+        }
+        obj.insert("nullable".into(), Value::Bool(true));
+        return;
+    }
+
     let mut instance_type = None;
     let mut enum_values = Vec::new();
+    let mut unrestricted = false;
     for branch in any_of {
         let Some(branch) = branch.as_object() else {
             return;
@@ -525,27 +552,34 @@ fn merge_any_of_enum_values(schema: &mut schemars::Schema) {
         {
             return;
         }
-        let (Some(variant_type @ Value::String(_)), Some(Value::Array(variant_values))) =
-            (branch.get("type"), branch.get("enum"))
-        else {
+        let Some(variant_type @ Value::String(_)) = branch.get("type") else {
             return;
         };
         if instance_type.get_or_insert(variant_type) != &variant_type {
             return;
         }
-        for value in variant_values {
-            if !enum_values.contains(value) {
-                enum_values.push(value.clone());
+        match branch.get("enum") {
+            Some(Value::Array(variant_values)) => {
+                for value in variant_values {
+                    if !enum_values.contains(value) {
+                        enum_values.push(value.clone());
+                    }
+                }
             }
+            None => unrestricted = true,
+            Some(_) => return,
         }
     }
 
-    let Some(instance_type) = instance_type.cloned() else {
+    // Only rewrite unions of enums; leave enum-free `anyOf`s to the existing rewrites
+    let Some(instance_type) = instance_type.cloned().filter(|_| !enum_values.is_empty()) else {
         return;
     };
     obj.remove("anyOf");
     obj.insert("type".into(), instance_type);
-    obj.insert("enum".into(), enum_values.into());
+    if !unrestricted {
+        obj.insert("enum".into(), enum_values.into());
+    }
 }
 
 /// Bring all property definitions from subschemas up to the root schema,
@@ -673,6 +707,33 @@ mod tests {
     }
 
     #[test]
+    fn merge_any_of_enum_values_drops_enum_for_plain_type_branch() {
+        assert_eq!(
+            merged(json!({
+                "anyOf": [
+                    { "type": "string", "enum": ["a", "b"] },
+                    { "type": "string" },
+                ],
+            })),
+            json!({ "type": "string" })
+        );
+    }
+
+    #[test]
+    fn merge_any_of_enum_values_unwraps_optional_plain_type() {
+        assert_eq!(
+            merged(json!({
+                "description": "field",
+                "anyOf": [
+                    { "type": "string", "description": "type" },
+                    { "enum": [null], "nullable": true },
+                ],
+            })),
+            json!({ "description": "field", "type": "string", "nullable": true })
+        );
+    }
+
+    #[test]
     fn merge_any_of_enum_values_skips_other_any_of() {
         for schema in [
             // mismatched types
@@ -681,6 +742,15 @@ mod tests {
             json!({ "anyOf": [{ "type": "string", "enum": ["a"] }, { "enum": [null], "nullable": true }] }),
             // extra keywords
             json!({ "anyOf": [{ "type": "string", "enum": ["a"] }, { "type": "string", "enum": ["b"], "format": "x" }] }),
+            // no enum branch at all
+            json!({ "anyOf": [{ "type": "string" }, { "type": "string" }] }),
+            // nullable non-scalar
+            json!({ "anyOf": [{ "type": "array" }, { "enum": [null], "nullable": true }] }),
+            // nullable with other keywords on the parent
+            json!({
+                "x-kubernetes-preserve-unknown-fields": true,
+                "anyOf": [{ "type": "string" }, { "enum": [null], "nullable": true }],
+            }),
             json!({ "anyOf": [] }),
         ] {
             assert_eq!(merged(schema.clone()), schema);

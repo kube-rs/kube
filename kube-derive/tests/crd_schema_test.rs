@@ -622,6 +622,8 @@ struct BreakfastTestSpec {
     maybe: Option<Breakfast>,
     variant_untagged: BreakfastVariantUntagged,
     mixed: BreakfastOrString,
+    maybe_mixed: Option<BreakfastOrString>,
+    mixed_list: Vec<Option<BreakfastOrString>>,
 }
 
 #[test]
@@ -655,12 +657,20 @@ fn untagged_unit_enums_are_merged() {
                 "type": "string",
                 "enum": ["FullBreakfast", "Spam", "Eggs"],
             },
-            // Not all branches are string enums, left untouched
+            // `Other(String)` accepts any string, so the enum is dropped
             "mixed": {
-                "anyOf": [
-                    { "type": "string", "enum": ["Spam", "Eggs"] },
-                    {},
-                ],
+                "type": "string",
+            },
+            "maybe_mixed": {
+                "type": "string",
+                "nullable": true,
+            },
+            "mixed_list": {
+                "type": "array",
+                "items": {
+                    "type": "string",
+                    "nullable": true,
+                },
             },
         })
     );
