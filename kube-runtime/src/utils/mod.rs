@@ -9,12 +9,6 @@ mod reflect;
 mod stream_backoff;
 mod watch_ext;
 
-/// Deprecated type alias for `EventDecode`
-#[deprecated(
-    since = "0.96.0",
-    note = "renamed to by `EventDecode`. This alias will be removed in 0.100.0."
-)]
-pub use EventDecode as EventFlatten;
 pub use backoff_reset_timer::{Backoff, ResetTimerBackoff};
 pub use event_decode::EventDecode;
 pub use event_modify::EventModify;
