@@ -30,7 +30,7 @@
 //! # }
 //! ```
 
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use http::{Request, Response, StatusCode};
 use tower::{
@@ -41,6 +41,7 @@ use tower::{
     },
     util::rng::HasherRng,
 };
+use tokio::time::Instant;
 
 use super::Body;
 
@@ -154,8 +155,10 @@ impl<Res> Policy<Request<Body>, Response<Res>, BoxError> for RetryPolicy {
                     && let Some(retry_after) = retry_after.parse::<u64>().ok()
                 {
                     let server_delay = Duration::from_secs(retry_after);
-                    let retry_after = Instant::now() + server_delay;
-                    if backoff.deadline().le(&retry_after.into()) {
+                    if Instant::now()
+                        .checked_add(server_delay)
+                        .is_some_and(|retry_after| backoff.deadline() <= retry_after)
+                    {
                         return Some(tokio::time::sleep(server_delay));
                     }
                 }
@@ -222,5 +225,24 @@ mod tests {
         let policy = RetryPolicy::server_retry();
         assert!(policy.server_aware);
         assert_eq!(policy.max_retries, 15);
+    }
+
+    fn retry_after(policy: &mut RetryPolicy, secs: &str) -> Instant {
+        let mut req = Request::new(Body::empty());
+        let mut res: Result<_, BoxError> = Ok(Response::builder()
+            .status(StatusCode::TOO_MANY_REQUESTS)
+            .header("Retry-After", secs)
+            .body(())
+            .unwrap());
+        policy.retry(&mut req, &mut res).expect("429 is retried").deadline()
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn retry_after_overflow_falls_back_to_backoff() {
+        let now = Instant::now();
+        let mut policy = RetryPolicy::server_retry();
+        assert_eq!(retry_after(&mut policy, "30"), now + Duration::from_secs(30));
+        // `now + Retry-After` overflows an Instant; must not panic.
+        assert!(retry_after(&mut policy, &u64::MAX.to_string()) < now + Duration::from_secs(1));
     }
 }

@@ -360,7 +360,7 @@ mod test {
 
     use k8s_openapi::{
         api::{
-            core::v1::{ComponentStatus, Service},
+            core::v1::{ComponentStatus, Namespace, Service},
             events::v1::Event as K8sEvent,
         },
         apimachinery::pkg::apis::meta::v1::MicroTime,
@@ -475,12 +475,14 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore = "needs cluster (creates an event for the default kubernetes service)"]
+    #[ignore = "needs cluster (creates an event for the default namespace)"]
     async fn event_recorder_cache_retain() -> Result<(), Box<dyn std::error::Error>> {
         let client = Client::try_default().await?;
 
-        let svcs: Api<Service> = Api::namespaced(client.clone(), "default");
-        let s = svcs.get("kubernetes").await?; // always a kubernetes service in default
+        // Not the kubernetes service: event names are `{name}.{nanos}`, so a parallel test
+        // publishing for the same name can collide (#2122)
+        let nss: Api<Namespace> = Api::all(client.clone());
+        let s = nss.get("default").await?;
 
         let reference = s.object_ref(&());
         let reporter: Reporter = "kube".into();

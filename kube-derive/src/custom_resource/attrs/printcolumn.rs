@@ -96,6 +96,8 @@ impl FromMeta for PrintColumn {
                 darling::ast::NestedMeta::Lit(lit) => {
                     errors.push(darling::Error::unsupported_format("literal").with_span(&lit.span()))
                 }
+                // `key = <not an expression>`; darling kept the parse error, surface it as-is
+                darling::ast::NestedMeta::NameValueInvalidExpr(invalid) => errors.push(invalid.error.clone()),
             }
         }
 

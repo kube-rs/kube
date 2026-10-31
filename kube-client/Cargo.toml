@@ -30,14 +30,14 @@ admission = ["kube-core/admission"]
 config = ["__non_core", "pem"]
 proxy = ["socks5", "http-proxy"]
 socks5 = ["hyper-util/client-proxy", "dep:ipnet"]
-http-proxy = ["hyper-util/client-proxy", "dep:ipnet", "dep:percent-encoding"]
+http-proxy = ["hyper-util/client-proxy", "dep:ipnet"]
 unstable-client = []
 
 # private feature sets; do not use
 __non_core = ["tracing", "serde-saphyr", "base64"]
 
 [package.metadata.docs.rs]
-features = ["client", "rustls-tls", "openssl-tls", "ws", "oauth", "oidc", "jsonpatch", "admission", "k8s-openapi/latest", "socks5", "unstable-client", "http-proxy"]
+features = ["client", "rustls-tls", "openssl-tls", "ws", "oauth", "oidc", "jsonpatch", "admission", "k8s-openapi/latest", "socks5", "unstable-client", "http-proxy", "hyper-util-tracing"]
 # Define the configuration attribute `docsrs`. Used to enable `doc_cfg` feature.
 rustdoc-args = ["--cfg", "docsrs"]
 
@@ -78,7 +78,7 @@ secrecy = { workspace = true }
 tracing = { workspace = true, features = ["log"], optional = true }
 hyper-openssl = { workspace = true, features = ["client-legacy", "tokio"], optional = true }
 form_urlencoded = { workspace = true, optional = true }
-percent-encoding = { workspace = true, optional = true }
+percent-encoding = { workspace = true }
 k8s-openapi= { workspace = true, features = [] }
 
 [dev-dependencies]
@@ -88,7 +88,6 @@ tempfile.workspace = true
 futures = { workspace = true, features = ["async-await"] }
 tokio = { workspace = true, features = ["full"] }
 rstest.workspace = true
-schemars.workspace = true
 tokio-test.workspace = true
 tower-test.workspace = true
 k8s-openapi= { workspace = true, features = ["latest"] }
