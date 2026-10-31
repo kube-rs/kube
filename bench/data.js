@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793437711300,
+  "lastUpdate": 1793463354545,
   "repoUrl": "https://github.com/kube-rs/kube",
   "entries": {
     "Benchmark": [
@@ -8933,6 +8933,105 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/kube-rs/kube/commit/4610180667161d2ead83e96f3e4e6d2bd6ff8b79"
         },
         "date": 1793437710319,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "init_listwatch - peak_bytes",
+            "value": 55194619,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - total_allocated",
+            "value": 76715088,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - alloc_count",
+            "value": 578023,
+            "unit": "allocations"
+          },
+          {
+            "name": "steady_state - peak_bytes",
+            "value": 71381202,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - total_allocated",
+            "value": 109519220,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - alloc_count",
+            "value": 799021,
+            "unit": "allocations"
+          },
+          {
+            "name": "relist - peak_bytes",
+            "value": 99797302,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - total_allocated",
+            "value": 174518628,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - alloc_count",
+            "value": 1189035,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_without_modify - peak_bytes",
+            "value": 141298836,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - total_allocated",
+            "value": 205865000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - alloc_count",
+            "value": 1298020,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_with_modify - peak_bytes",
+            "value": 134853452,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - total_allocated",
+            "value": 162895000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - alloc_count",
+            "value": 1058021,
+            "unit": "allocations"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "sszynrae@gmail.com",
+            "name": "Eirik A",
+            "username": "clux"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b19476355428deffec0281278372ea34944a9df3",
+          "message": "update k8s-openapi to 0.29 (#2120)\n\n* update k8s-openapi to 0.29\n\nSigned-off-by: clux <sszynrae@gmail.com>\n\n* undo self-breakage of justfile\n\nSigned-off-by: clux <sszynrae@gmail.com>\n\n* fix compile errors\n\nSigned-off-by: clux <sszynrae@gmail.com>\n\n* undo more dmg\n\nSigned-off-by: clux <sszynrae@gmail.com>\n\n* actually no this is right\n\nSigned-off-by: clux <sszynrae@gmail.com>\n\n* remove old k8s_if_ge_1_33 checks\n\nSigned-off-by: clux <sszynrae@gmail.com>\n\n* account for two sets of types\n\nSigned-off-by: clux <sszynrae@gmail.com>\n\n---------\n\nSigned-off-by: clux <sszynrae@gmail.com>",
+          "timestamp": "2026-10-31T16:14:58Z",
+          "tree_id": "b16c39d3638971347cb221a2d1b02fb5dc6caf01",
+          "url": "https://github.com/kube-rs/kube/commit/b19476355428deffec0281278372ea34944a9df3"
+        },
+        "date": 1793463353184,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
