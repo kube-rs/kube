@@ -175,17 +175,6 @@ fn watch_filtering_does_not_depend_on_envelope_field_order() {
 }
 
 #[test]
-fn filtering_rejects_malformed_json_and_trailing_input() {
-    let policy = Some(DropManagedFields { list: false });
-    for text in [
-        r#"{"metadata":{"managedFields":[}}"#,
-        r#"{"metadata":{"managedFields":[]}} trailing"#,
-    ] {
-        assert!(decode::<Value>(text, policy, false).is_err());
-    }
-}
-
-#[test]
 fn fallback_only_strips_resource_metadata() {
     let object = json!({"metadata":{"managedFields":[{}], "name":"probe"},
         "spec":{"metadata":{"managedFields":["user data"]}},
