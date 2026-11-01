@@ -38,7 +38,7 @@ pub mod metadata;
 pub use metadata::{ListMeta, ObjectMeta, PartialObjectMeta, PartialObjectMetaExt, TypeMeta};
 
 pub mod finalizers;
-pub use finalizers::{add_finalizer, has_finalizer, remove_finalizer};
+pub use finalizers::FinalizerExt;
 
 pub mod labels;
 

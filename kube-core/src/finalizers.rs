@@ -7,69 +7,83 @@
 //! back later does not guarantee.
 use crate::resource::{Resource, ResourceExt};
 
-/// Returns whether `obj` has the given finalizer
+/// Extension trait for managing finalizers on any [`Resource`]
+///
+/// Kept separate from [`ResourceExt`] so that it is only in scope when imported explicitly, and
+/// does not collide with downstream extension traits defining the same method names.
+///
+/// These methods only change the object in memory. For reconcilers, prefer
+/// `kube_runtime::finalizer`, which persists the finalizer before any cleanup-relevant work starts
+/// (see the [module docs](self)).
 ///
 /// ```
 /// use k8s_openapi::api::core::v1::Pod;
-/// use kube_core::{add_finalizer, has_finalizer};
+/// use kube_core::FinalizerExt;
 ///
 /// let mut pod = Pod::default();
-/// assert!(!has_finalizer(&pod, "my.finalizer"));
-/// add_finalizer(&mut pod, "my.finalizer");
-/// assert!(has_finalizer(&pod, "my.finalizer"));
+/// assert!(!pod.has_finalizer("my.finalizer"));
+/// assert!(pod.add_finalizer("my.finalizer"));
+/// assert!(pod.has_finalizer("my.finalizer"));
+/// assert!(pod.remove_finalizer("my.finalizer"));
 /// ```
-pub fn has_finalizer<K: Resource>(obj: &K, name: &str) -> bool {
-    obj.finalizers().iter().any(|f| f == name)
+pub trait FinalizerExt: Resource {
+    /// Returns whether the given finalizer is present
+    fn has_finalizer(&self, name: &str) -> bool;
+    /// Adds a finalizer if it is not already present
+    ///
+    /// Returns `true` if the finalizer was added, `false` if it was already present.
+    fn add_finalizer(&mut self, name: &str) -> bool;
+    /// Removes a finalizer if present
+    ///
+    /// Returns `true` if the finalizer was removed, `false` if it was not present.
+    fn remove_finalizer(&mut self, name: &str) -> bool;
 }
 
-/// Adds a finalizer to `obj` if it is not already present
-///
-/// Returns `true` if the finalizer was added, `false` if it was already present.
-///
-/// This only changes `obj` in memory. For reconcilers, prefer `kube_runtime::finalizer`, which
-/// persists the finalizer before any cleanup-relevant work starts (see the [module docs](self)).
-pub fn add_finalizer<K: Resource>(obj: &mut K, name: &str) -> bool {
-    if has_finalizer(obj, name) {
-        return false;
+impl<K: Resource> FinalizerExt for K {
+    fn has_finalizer(&self, name: &str) -> bool {
+        self.finalizers().iter().any(|f| f == name)
     }
-    obj.finalizers_mut().push(name.to_string());
-    true
-}
 
-/// Removes a finalizer from `obj` if present
-///
-/// Returns `true` if the finalizer was removed, `false` if it was not present.
-pub fn remove_finalizer<K: Resource>(obj: &mut K, name: &str) -> bool {
-    let finalizers = obj.finalizers_mut();
-    let len_before = finalizers.len();
-    finalizers.retain(|f| f != name);
-    finalizers.len() != len_before
+    fn add_finalizer(&mut self, name: &str) -> bool {
+        if self.has_finalizer(name) {
+            return false;
+        }
+        self.finalizers_mut().push(name.to_string());
+        true
+    }
+
+    fn remove_finalizer(&mut self, name: &str) -> bool {
+        let finalizers = self.finalizers_mut();
+        let len_before = finalizers.len();
+        finalizers.retain(|f| f != name);
+        finalizers.len() != len_before
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{add_finalizer, has_finalizer, remove_finalizer};
+    use super::FinalizerExt;
     use crate::ResourceExt;
     use k8s_openapi::api::core::v1::Pod;
 
     #[test]
     fn finalizer_add_is_idempotent() {
         let mut pod = Pod::default();
-        assert!(!has_finalizer(&pod, "my.finalizer"));
-        assert!(add_finalizer(&mut pod, "my.finalizer"));
-        assert!(has_finalizer(&pod, "my.finalizer"));
+        assert!(!pod.has_finalizer("my.finalizer"));
+        assert!(pod.add_finalizer("my.finalizer"));
+        assert!(pod.has_finalizer("my.finalizer"));
         // Adding again is a no-op
-        assert!(!add_finalizer(&mut pod, "my.finalizer"));
+        assert!(!pod.add_finalizer("my.finalizer"));
         assert_eq!(pod.finalizers(), &["my.finalizer".to_string()]);
     }
 
     #[test]
     fn finalizer_remove_reports_whether_anything_changed() {
         let mut pod = Pod::default();
-        add_finalizer(&mut pod, "my.finalizer");
-        assert!(remove_finalizer(&mut pod, "my.finalizer"));
-        assert!(!has_finalizer(&pod, "my.finalizer"));
+        pod.add_finalizer("my.finalizer");
+        assert!(pod.remove_finalizer("my.finalizer"));
+        assert!(!pod.has_finalizer("my.finalizer"));
         // Removing again is a no-op
-        assert!(!remove_finalizer(&mut pod, "my.finalizer"));
+        assert!(!pod.remove_finalizer("my.finalizer"));
     }
 }
