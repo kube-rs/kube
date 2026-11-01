@@ -26,6 +26,7 @@ deny:
 # Unit tests
 test:
   #!/usr/bin/env bash
+  set -euo pipefail
   if rg "\`\`\`ignored"; then
     echo "ignored doctests are not allowed, use compile_fail or no_run"
     exit 1
@@ -57,7 +58,7 @@ coverage:
 hack:
   time cargo hack check --feature-powerset --no-private -p kube \
     --skip=oauth,oidc \
-    --group-features=socks5,http-proxy,gzip,ws \
+    --group-features=proxy,socks5,http-proxy,gzip,ws \
     --group-features=admission,jsonpatch,derive,cel \
     --group-features=rustls-tls,aws-lc-rs
   # Test groups features with minimal overlap that are grouped to reduce combinations.
@@ -67,7 +68,7 @@ hack:
 minimal-versions:
   cargo hack --remove-dev-deps --workspace
   cargo +nightly update -Z direct-minimal-versions
-  K8S_OPENAPI_ENABLED_VERSION=1.32 cargo check --all-features
+  K8S_OPENAPI_ENABLED_VERSION=1.33 cargo check --all-features
 
 readme:
   rustdoc README.md --test --edition=2024
@@ -84,7 +85,7 @@ e2e-mink8s:
 e2e-incluster features:
   docker build --build-arg FEATURES="{{features}}" \
     -t clux/kube-e2e:{{VERSION}} . -f e2e/Dockerfile
-  k3d image import clux/kube-e2e:{{VERSION}} -c=$(k3d cluster list -ojson |jq '.[0].name' -r)
+  k3d image import clux/kube-e2e:{{VERSION}} -c=$(k3d cluster list -ojson |jq '.[0].name' -r) --mode direct
   sed -i 's/latest/{{VERSION}}/g' e2e/deployment.yaml
   kubectl apply -f e2e/deployment.yaml
   sed -i 's/{{VERSION}}/latest/g' e2e/deployment.yaml

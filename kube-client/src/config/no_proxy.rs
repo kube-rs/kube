@@ -28,7 +28,7 @@ pub enum Error {
     #[error("failed to find valid host in parsed uri \"{uri}\"")]
     NoHost {
         /// The URI not containing a host
-        uri: http::Uri,
+        uri: Box<http::Uri>,
     },
 }
 
@@ -150,7 +150,7 @@ impl FromStr for NoProxyMatcher {
 
         if let Ok(uri) = http::Uri::from_str(s) {
             let Some(mut host) = uri.host() else {
-                return Err(Error::NoHost { uri });
+                return Err(Error::NoHost { uri: Box::new(uri) });
             };
 
             let port = port_via_scheme(&uri);
@@ -205,7 +205,9 @@ impl TryFrom<&http::Uri> for Host {
             }
             // NOTE (@Techassi): We could instead use unwrap_or_default() here or ignore the error
             // above if we want to be less strict.
-            None => Err(Error::NoHost { uri: uri.clone() }),
+            None => Err(Error::NoHost {
+                uri: Box::new(uri.clone()),
+            }),
         }
     }
 }

@@ -35,4 +35,7 @@ jiff.workspace = true
 trybuild.workspace = true
 assert-json-diff.workspace = true
 runtime-macros.workspace = true
+# runtime-macros uses syn 2 `full` APIs without enabling the feature; darling and prettyplease
+# used to enable it for us on syn 2, so turn it on explicitly now that they moved to syn 3.
+syn2 = { package = "syn", version = "2", features = ["full"] }
 prettyplease.workspace = true

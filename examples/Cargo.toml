@@ -78,7 +78,6 @@ hyper-util = { workspace = true, features = [
     "tracing",
 ] }
 thiserror.workspace = true
-backon.workspace = true
 clap = { version = "4.0", default-features = false, features = [
     "std",
     "cargo",
