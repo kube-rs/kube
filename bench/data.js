@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793549786941,
+  "lastUpdate": 1793566747202,
   "repoUrl": "https://github.com/kube-rs/kube",
   "entries": {
     "Benchmark": [
@@ -9329,6 +9329,105 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/kube-rs/kube/commit/54a3128acbd51aae51bf5c4af4e1d19146fc66bd"
         },
         "date": 1793549785172,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "init_listwatch - peak_bytes",
+            "value": 55194619,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - total_allocated",
+            "value": 76715088,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - alloc_count",
+            "value": 578023,
+            "unit": "allocations"
+          },
+          {
+            "name": "steady_state - peak_bytes",
+            "value": 71381202,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - total_allocated",
+            "value": 109519220,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - alloc_count",
+            "value": 799021,
+            "unit": "allocations"
+          },
+          {
+            "name": "relist - peak_bytes",
+            "value": 99797302,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - total_allocated",
+            "value": 174518628,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - alloc_count",
+            "value": 1189035,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_without_modify - peak_bytes",
+            "value": 141298836,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - total_allocated",
+            "value": 205865000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - alloc_count",
+            "value": 1298020,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_with_modify - peak_bytes",
+            "value": 134853452,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - total_allocated",
+            "value": 162895000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - alloc_count",
+            "value": 1058021,
+            "unit": "allocations"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "p-alik@users.noreply.github.com",
+            "name": "Alexei Pastuchov",
+            "username": "p-alik"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "9ad462c0920687c688e15fbf78c58d8bab6d337b",
+          "message": "kube-core: add generic owner-reference and finalizer helpers (#2048)\n\n* kube-core: add generic owner-reference and finalizer helpers\n\nAdds set_owner_reference/set_controller_reference/has_owner_reference\nand ResourceExt::has_finalizer/add_finalizer/remove_finalizer, ported\nfrom controller-runtime's controllerutil, so that reconcilers no\nlonger need to hand-roll scan-and-mutate logic for these common\nmetadata patterns.\n\nCloses kube-rs/kube#428\n\nSigned-off-by: Alexei Pastuchov <info@maximka.de>\n\n* examples: add owner_finalizer_demo exercising the new kube-core helpers\n\nRuns set_controller_reference/AlreadyOwnedError and\nadd_finalizer/remove_finalizer against a real apiserver, verifying\nowner-reference conflict detection, garbage-collector cascade delete,\nand finalizer-blocked deletion end to end.\n\nSigned-off-by: Alexei Pastuchov <info@maximka.de>\n\n* examples: mention owner_finalizer_demo in examples/README.md\n\nSigned-off-by: Alexei Pastuchov <info@maximka.de>\n\n* kube-core: make finalizer helpers free functions\n\nMove has_finalizer/add_finalizer/remove_finalizer out of ResourceExt\ninto a new kube_core::finalizers module, re-exported from the crate\nroot like the owner-reference helpers. ResourceExt is blanket-impl'd\nfor every Resource, so new methods on it collide (E0034) with\ndownstream extension traits that already define these names.\n\nAlso document that the helpers only mutate the object in memory and\npoint reconcilers at kube_runtime::finalizer, which persists the\nfinalizer before any work starts.\n\nSigned-off-by: Alexei Pastuchov <info@maximka.de>\n\n* kube-core: expose finalizer helpers as a FinalizerExt trait\n\nReplace the has_finalizer/add_finalizer/remove_finalizer free functions\nwith a FinalizerExt extension trait, blanket-impl'd for every Resource\nand re-exported from the crate root, so users can import a single trait\nand call the helpers as methods.\n\nThe trait is deliberately separate from ResourceExt and not part of\nkube::prelude, so it only comes into scope when imported explicitly and\ndoes not collide with downstream extension traits defining the same\nmethod names.\n\nSigned-off-by: Alexei Pastuchov <info@maximka.de>\n\n* kube-core: expose owner helpers as an OwnerRefExt trait\n\nMove free functions has_owner_reference, set_owner_reference and\nset_controller_reference to methods on the trait OwnerRefExt, which\nis implemented for every Resource with the controlled object as receiver.\nOwnerRefExt is not exported by kube::prelude.\n\nSigned-off-by: Alexei Pastuchov <info@maximka.de>\n\n---------\n\nSigned-off-by: Alexei Pastuchov <info@maximka.de>\nCo-authored-by: Eirik A <sszynrae@gmail.com>",
+          "timestamp": "2026-11-01T20:58:01Z",
+          "tree_id": "4d5e858e9a68733398f07bba363a6808a1a46d64",
+          "url": "https://github.com/kube-rs/kube/commit/9ad462c0920687c688e15fbf78c58d8bab6d337b"
+        },
+        "date": 1793566746022,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
