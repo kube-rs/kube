@@ -2,14 +2,14 @@
 //! (see <https://github.com/kube-rs/kube/issues/428>) against a real apiserver.
 //!
 //! Demonstrates:
-//! - `set_controller_reference` / `set_owner_reference` and the `AlreadyOwnedError` conflict check
+//! - `OwnerRefExt::{set_controller_reference, set_owner_reference}` and the `AlreadyOwnedError` conflict check
 //! - the apiserver's garbage collector cascading a delete via the controller owner reference
 //! - `FinalizerExt::{has_finalizer, add_finalizer, remove_finalizer}` blocking and then unblocking a delete
 use k8s_openapi::api::core::v1::ConfigMap;
 use kube::{
     Client, Resource,
     api::{Api, DeleteParams, Patch, PatchParams, PostParams, ResourceExt},
-    core::{AlreadyOwnedError, FinalizerExt, has_owner_reference, set_controller_reference},
+    core::{AlreadyOwnedError, FinalizerExt, OwnerRefExt},
 };
 use tracing::info;
 
@@ -47,10 +47,10 @@ async fn main() -> anyhow::Result<()> {
     let owner = create_configmap(&cms, "owner-finalizer-demo-owner").await?;
     let mut child = create_configmap(&cms, "owner-finalizer-demo-child").await?;
 
-    set_controller_reference(&owner, &(), &mut child)?;
+    child.set_controller_reference(&owner, &())?;
     let child = patch_owner_references(&cms, &child).await?;
     let owner_uid = owner.uid().expect("created object has a uid");
-    assert!(has_owner_reference(&child, &owner_uid));
+    assert!(child.has_owner_reference(&owner_uid));
     info!(
         "Child now has a controller owner reference pointing at owner uid {}",
         owner_uid
@@ -59,7 +59,9 @@ async fn main() -> anyhow::Result<()> {
     info!("Verifying a conflicting controller is rejected");
     let other_owner = create_configmap(&cms, "owner-finalizer-demo-other-owner").await?;
     let mut child_copy = child.clone();
-    let err: AlreadyOwnedError = set_controller_reference(&other_owner, &(), &mut child_copy).unwrap_err();
+    let err: AlreadyOwnedError = child_copy
+        .set_controller_reference(&other_owner, &())
+        .unwrap_err();
     assert_eq!(err.existing_uid, owner_uid);
     assert_eq!(err.new_uid, other_owner.uid().expect("created object has a uid"));
     info!("Got expected conflict error: {err}");

@@ -48,7 +48,7 @@ pub mod object;
 pub use object::{NotUsed, Object, ObjectList};
 
 pub mod owner_ref;
-pub use owner_ref::{AlreadyOwnedError, has_owner_reference, set_controller_reference, set_owner_reference};
+pub use owner_ref::{AlreadyOwnedError, OwnerRefExt};
 
 pub mod params;
 
