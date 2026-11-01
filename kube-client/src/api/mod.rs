@@ -69,6 +69,7 @@ pub struct Api<K> {
     /// (cached from `K::metadata_api()` at construction so that `impl<K> Api<K>`
     /// method blocks don't have to tighten to `K: Resource`).
     pub(crate) metadata_api: bool,
+    drop_managed_fields: bool,
     /// Note: Using `iter::Empty` over `PhantomData`, because we never actually keep any
     /// `K` objects, so `Empty` better models our constraints (in particular, `Empty<K>`
     /// is `Send`, even if `K` may not be).
@@ -101,6 +102,7 @@ impl<K: Resource> Api<K> {
             resource: ApiResource::erase::<K>(dyntype),
             scope: None,
             metadata_api: K::metadata_api(),
+            drop_managed_fields: false,
             _phantom: std::iter::empty(),
         }
     }
@@ -121,6 +123,7 @@ impl<K: Resource> Api<K> {
             resource: ApiResource::erase::<K>(dyntype),
             scope: None,
             metadata_api: K::metadata_api(),
+            drop_managed_fields: false,
             _phantom: std::iter::empty(),
         }
     }
@@ -338,6 +341,7 @@ where
             resource: ApiResource::erase::<K>(&dyntype),
             scope: None,
             metadata_api: K::metadata_api(),
+            drop_managed_fields: false,
             _phantom: std::iter::empty(),
         }
     }
@@ -378,6 +382,40 @@ impl<K> From<Api<K>> for Client {
     }
 }
 
+impl<K> Api<K> {
+    /// Omit `metadata.managedFields` from resource responses (KEP-5958).
+    ///
+    /// Requests server-side omission and skips any remaining managed fields during
+    /// deserialization, including on servers that do not support KEP-5958.
+    /// Applies to lists, watches, write responses, and resource subresources;
+    /// request bodies are unchanged. Clones and watchers inherit this policy.
+    /// Do not enable this when your application needs field ownership information.
+    ///
+    /// ```no_run
+    /// use k8s_openapi::api::core::v1::Pod;
+    /// use kube::{Api, Client, api::ListParams};
+    ///
+    /// # async fn example() -> Result<(), kube::Error> {
+    /// let pods: Api<Pod> = Api::all(Client::try_default().await?).without_managed_fields();
+    /// let list = pods.list(&ListParams::default()).await?;
+    /// assert!(list.items.iter().all(|pod| pod.metadata.managed_fields.is_none()));
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[must_use]
+    pub fn without_managed_fields(mut self) -> Self {
+        self.drop_managed_fields = true;
+        self
+    }
+
+    fn prepare_request(&self, mut request: http::Request<Vec<u8>>) -> http::Request<Vec<u8>> {
+        if self.drop_managed_fields {
+            crate::client::managed_fields::prepare(&mut request);
+        }
+        request
+    }
+}
+
 impl<K> Debug for Api<K> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // Intentionally destructuring, to cause compile errors when new fields are added
@@ -388,6 +426,7 @@ impl<K> Debug for Api<K> {
             resource: _,
             scope,
             metadata_api: _,
+            drop_managed_fields,
             _phantom,
         } = self;
         f.debug_struct("Api")
@@ -395,6 +434,7 @@ impl<K> Debug for Api<K> {
             .field("client", &"...")
             .field("namespace", &namespace)
             .field("scope", &scope)
+            .field("drop_managed_fields", &drop_managed_fields)
             .finish()
     }
 }

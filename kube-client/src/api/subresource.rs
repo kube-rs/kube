@@ -31,7 +31,7 @@ where
             .get_subresource("scale", name)
             .map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("get_scale");
-        self.client.request::<Scale>(req).await
+        self.client.request::<Scale>(self.prepare_request(req)).await
     }
 
     /// Update the scale subresource
@@ -46,7 +46,7 @@ where
             .patch_subresource("scale", name, pp, patch)
             .map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("patch_scale");
-        self.client.request::<Scale>(req).await
+        self.client.request::<Scale>(self.prepare_request(req)).await
     }
 
     /// Replace the scale subresource
@@ -61,7 +61,7 @@ where
             )
             .map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("replace_scale");
-        self.client.request::<Scale>(req).await
+        self.client.request::<Scale>(self.prepare_request(req)).await
     }
 }
 
@@ -77,7 +77,7 @@ where
             .get_subresource(subresource_name, name)
             .map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("get_subresource");
-        self.client.request::<K>(req).await
+        self.client.request::<K>(self.prepare_request(req)).await
     }
 
     /// Create an instance of the subresource
@@ -102,7 +102,7 @@ where
             )
             .map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("create_subresource");
-        self.client.request::<T>(req).await
+        self.client.request::<T>(self.prepare_request(req)).await
     }
 
     /// Patch an instance of the subresource
@@ -118,7 +118,7 @@ where
             .patch_subresource(subresource_name, name, pp, patch)
             .map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("patch_subresource");
-        self.client.request::<K>(req).await
+        self.client.request::<K>(self.prepare_request(req)).await
     }
 
     /// Replace an instance of the subresource
@@ -142,7 +142,7 @@ where
             )
             .map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("replace_subresource");
-        self.client.request::<K>(req).await
+        self.client.request::<K>(self.prepare_request(req)).await
     }
 }
 
@@ -221,7 +221,7 @@ where
             )
             .map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("replace_ephemeralcontainers");
-        self.client.request::<K>(req).await
+        self.client.request::<K>(self.prepare_request(req)).await
     }
 
     /// Patch the ephemeral containers sub resource
@@ -285,7 +285,7 @@ where
             .map_err(Error::BuildRequest)?;
 
         req.extensions_mut().insert("patch_ephemeralcontainers");
-        self.client.request::<K>(req).await
+        self.client.request::<K>(self.prepare_request(req)).await
     }
 
     /// Get the named resource with the ephemeral containers subresource.
@@ -298,7 +298,7 @@ where
             .map_err(Error::BuildRequest)?;
 
         req.extensions_mut().insert("get_ephemeralcontainers");
-        self.client.request::<K>(req).await
+        self.client.request::<K>(self.prepare_request(req)).await
     }
 }
 
@@ -341,7 +341,7 @@ k8s_openapi::k8s_if_ge_1_33! {
                 .get_subresource("resize", name)
                 .map_err(Error::BuildRequest)?;
             req.extensions_mut().insert("get_resize");
-            self.client.request::<K>(req).await
+            self.client.request::<K>(self.prepare_request(req)).await
         }
 
         /// Patch the resize sub resource.
@@ -392,7 +392,7 @@ k8s_openapi::k8s_if_ge_1_33! {
                 .patch_subresource("resize", name, pp, patch)
                 .map_err(Error::BuildRequest)?;
             req.extensions_mut().insert("patch_resize");
-            self.client.request::<K>(req).await
+            self.client.request::<K>(self.prepare_request(req)).await
         }
 
         /// Replace the resize sub resource entirely.
@@ -443,7 +443,7 @@ k8s_openapi::k8s_if_ge_1_33! {
                 )
                 .map_err(Error::BuildRequest)?;
             req.extensions_mut().insert("replace_resize");
-            self.client.request::<K>(req).await
+            self.client.request::<K>(self.prepare_request(req)).await
         }
     }
 }
@@ -466,7 +466,7 @@ where
             .get_subresource("status", name)
             .map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("get_status");
-        self.client.request::<K>(req).await
+        self.client.request::<K>(self.prepare_request(req)).await
     }
 
     /// Patch fields on the status object
@@ -502,7 +502,7 @@ where
             .patch_subresource("status", name, pp, patch)
             .map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("patch_status");
-        self.client.request::<K>(req).await
+        self.client.request::<K>(self.prepare_request(req)).await
     }
 
     /// Replace every field on the status object
@@ -537,7 +537,7 @@ where
             )
             .map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("replace_status");
-        self.client.request::<K>(req).await
+        self.client.request::<K>(self.prepare_request(req)).await
     }
 }
 
@@ -637,7 +637,7 @@ where
     pub async fn evict(&self, name: &str, ep: &EvictParams) -> Result<Status> {
         let mut req = self.request.evict(name, ep).map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("evict");
-        self.client.request::<Status>(req).await
+        self.client.request::<Status>(self.prepare_request(req)).await
     }
 }
 

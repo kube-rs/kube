@@ -97,6 +97,7 @@ cfg_client! {
     pub mod api;
     pub mod discovery;
     pub mod client;
+    mod request_operation;
 
     #[doc(inline)]
     pub use api::Api;

@@ -403,7 +403,7 @@ mod tests {
 
         let count = Arc::new(Mutex::new(0));
         let (mut sched_tx, sched_rx) = mpsc::unbounded();
-        let mut runner = Box::pin(
+        let mut runner = std::pin::pin!(
             Runner::new(scheduler(sched_rx), 2, |_| {
                 let mut num = count.lock().unwrap();
                 *num += 1;
@@ -459,7 +459,7 @@ mod tests {
         assert_eq!(*count.lock().unwrap(), 4);
 
         let (mut sched_tx, sched_rx) = mpsc::unbounded();
-        let mut runner = Box::pin(
+        let mut runner = std::pin::pin!(
             Runner::new(scheduler(sched_rx), 1, |_| {
                 DurationalFuture::new(Duration::from_secs(2))
             })

@@ -33,6 +33,7 @@ use crate::{Config, Error, Result, api::WatchEvent, config::Kubeconfig};
 mod auth;
 mod body;
 mod builder;
+pub(crate) mod managed_fields;
 pub use kube_core::discovery::v2::{
     APIGroupDiscovery, APIGroupDiscoveryList, APIResourceDiscovery, APISubresourceDiscovery,
     APIVersionDiscovery, GroupVersionKind as DiscoveryGroupVersionKind,
@@ -285,9 +286,13 @@ impl Client {
     where
         T: DeserializeOwned,
     {
+        let policy = request
+            .extensions()
+            .get::<managed_fields::DropManagedFields>()
+            .copied();
         let text = self.request_text(request).await?;
 
-        serde_json::from_str(&text).map_err(|e| {
+        managed_fields::decode(&text, policy, false).map_err(|e| {
             tracing::warn!("{}, {:?}", text, e);
             Error::SerdeError(e)
         })
@@ -322,6 +327,10 @@ impl Client {
     where
         T: DeserializeOwned,
     {
+        let policy = request
+            .extensions()
+            .get::<managed_fields::DropManagedFields>()
+            .copied();
         let text = self.request_text(request).await?;
         // It needs to be JSON:
         let v: Value = serde_json::from_str(&text).map_err(Error::SerdeError)?;
@@ -332,10 +341,12 @@ impl Client {
                 Error::SerdeError(e)
             })?))
         } else {
-            Ok(Left(serde_json::from_str::<T>(&text).map_err(|e| {
-                tracing::warn!("{}, {:?}", text, e);
-                Error::SerdeError(e)
-            })?))
+            Ok(Left(managed_fields::decode::<T>(&text, policy, false).map_err(
+                |e| {
+                    tracing::warn!("{}, {:?}", text, e);
+                    Error::SerdeError(e)
+                },
+            )?))
         }
     }
 
@@ -355,6 +366,10 @@ impl Client {
             .headers_mut()
             .entry(http::header::ACCEPT_ENCODING)
             .or_insert(http::HeaderValue::from_static("identity"));
+        let policy = request
+            .extensions()
+            .get::<managed_fields::DropManagedFields>()
+            .copied();
         let res = self.send(request.map(Body::from)).await?;
         let res = handle_api_errors(res).await?;
         // trace!("Streaming from {} -> {}", res.url(), res.status().as_str());
@@ -375,9 +390,9 @@ impl Client {
             LinesCodec::new(),
         );
 
-        Ok(frames.filter_map(|res| async {
+        Ok(frames.filter_map(move |res| async move {
             match res {
-                Ok(line) => match serde_json::from_str::<WatchEvent<T>>(&line) {
+                Ok(line) => match managed_fields::decode::<WatchEvent<T>>(&line, policy, true) {
                     Ok(event) => Some(Ok(event)),
                     Err(e) => {
                         // Ignore EOF error that can happen for incomplete line from `decode_eof`.

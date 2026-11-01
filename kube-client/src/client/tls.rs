@@ -213,86 +213,6 @@ pub mod rustls_tls {
         }
     }
 
-    #[cfg(test)]
-    mod tests {
-        use super::*;
-
-        // EC P-256 self-signed CAs, valid until 2126. Regenerate with:
-        //   openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes \
-        //     -keyout /dev/null -out ca.pem -days 36500 -subj "/CN=test-ca-N"
-        const CA1: &str = "-----BEGIN CERTIFICATE-----
-MIIBgDCCASWgAwIBAgIUVrQf5d//S01a0fbXxYRIx9wc0VQwCgYIKoZIzj0EAwIw
-FDESMBAGA1UEAwwJdGVzdC1jYS0xMCAXDTI2MDMwNDEzMDk1MFoYDzIxMjYwMjA4
-MTMwOTUwWjAUMRIwEAYDVQQDDAl0ZXN0LWNhLTEwWTATBgcqhkjOPQIBBggqhkjO
-PQMBBwNCAARg57mWJPDsAIEQAgXqMOOfjMQP+PE9HqcZobycO8z94r/uRuV0wKx/
-0SvMsKFtnreut0bjgFtmZaWY+6d87Is9o1MwUTAdBgNVHQ4EFgQUjtGuhkM7LtHB
-gMPCJIxMwbY69OQwHwYDVR0jBBgwFoAUjtGuhkM7LtHBgMPCJIxMwbY69OQwDwYD
-VR0TAQH/BAUwAwEB/zAKBggqhkjOPQQDAgNJADBGAiEAj/WzNVJDg/cBtLqQVM77
-tkB+QyIXLG3Vi9Xj1YfW9QECIQDDFW8yFtgLeCg2Zhr4xQNq3/24r/01kI2rjFPO
-xBkDMw==
------END CERTIFICATE-----
-";
-        const CA2: &str = "-----BEGIN CERTIFICATE-----
-MIIBfjCCASWgAwIBAgIUZ7Qsiwan2joRz01p25/cy1XNNiwwCgYIKoZIzj0EAwIw
-FDESMBAGA1UEAwwJdGVzdC1jYS0yMCAXDTI2MDMwNDEzMDk1MFoYDzIxMjYwMjA4
-MTMwOTUwWjAUMRIwEAYDVQQDDAl0ZXN0LWNhLTIwWTATBgcqhkjOPQIBBggqhkjO
-PQMBBwNCAARJle2/yiOD5zp0UkjZg9Yy6ZHBItTLrqv/uzB2YMQg03frnqEUMzSV
-mFinosBcGpX/dPGfHNPhBMOpHmlocZu9o1MwUTAdBgNVHQ4EFgQUsqG0hSGDYsz2
-eGIsLIwJnCR5SFIwHwYDVR0jBBgwFoAUsqG0hSGDYsz2eGIsLIwJnCR5SFIwDwYD
-VR0TAQH/BAUwAwEB/zAKBggqhkjOPQQDAgNHADBEAiApvLu9DIC3/K/+G9ooOm75
-a72Cjw62aM8NfPe7ILs8SgIgL0VHe6ksTyB176RECCm3MJVnlhOop6b1tNvxjrru
-FRU=
------END CERTIFICATE-----
-";
-
-        fn expire(v: &ReloadingVerifier) {
-            // Can't move Instant backwards; instead, reach past the guard.
-            // The test pokes private state the same way auth::tests::token_file does.
-            v.inner.write().unwrap().1 = Instant::now().checked_sub(Duration::from_secs(120)).unwrap();
-        }
-
-        #[test]
-        fn reloading_verifier() {
-            #[cfg(feature = "aws-lc-rs")]
-            let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
-
-            let file = tempfile::NamedTempFile::new().unwrap();
-            std::fs::write(file.path(), CA1).unwrap();
-
-            let verifier = ReloadingVerifier::new(file.path().to_path_buf()).unwrap();
-            let first = verifier.current();
-
-            // File changed but we're still within the reload interval: no reload.
-            std::fs::write(file.path(), CA2).unwrap();
-            assert!(Arc::ptr_eq(&verifier.current(), &first));
-
-            // Force expiry: reload picks up CA2.
-            expire(&verifier);
-            let second = verifier.current();
-            assert!(!Arc::ptr_eq(&second, &first));
-
-            // File gone, expired again: keep stale verifier.
-            drop(file);
-            expire(&verifier);
-            assert!(Arc::ptr_eq(&verifier.current(), &second));
-        }
-    }
-
-    #[cfg(all(test, not(feature = "webpki-roots")))]
-    mod platform_verifier_tests {
-        use super::*;
-
-        // With no kubeconfig CA, the client config must fall back to the OS-native
-        // verifier instead of producing an empty (reject-everything) trust store.
-        #[test]
-        fn no_ca_falls_back_to_platform_verifier() {
-            #[cfg(feature = "aws-lc-rs")]
-            let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
-
-            rustls_client_config(None, None, false).expect("platform verifier config should build");
-        }
-    }
-
     fn client_auth(data: &[u8]) -> Result<(Vec<CertificateDer<'static>>, PrivateKeyDer<'static>), Error> {
         use rustls::pki_types::pem::{self, SectionKind};
 
@@ -374,6 +294,87 @@ FRU=
             ]
         }
     }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        // EC P-256 self-signed CAs, valid until 2126. Regenerate with:
+        //   openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes \
+        //     -keyout /dev/null -out ca.pem -days 36500 -subj "/CN=test-ca-N"
+        const CA1: &str = "-----BEGIN CERTIFICATE-----
+MIIBgDCCASWgAwIBAgIUVrQf5d//S01a0fbXxYRIx9wc0VQwCgYIKoZIzj0EAwIw
+FDESMBAGA1UEAwwJdGVzdC1jYS0xMCAXDTI2MDMwNDEzMDk1MFoYDzIxMjYwMjA4
+MTMwOTUwWjAUMRIwEAYDVQQDDAl0ZXN0LWNhLTEwWTATBgcqhkjOPQIBBggqhkjO
+PQMBBwNCAARg57mWJPDsAIEQAgXqMOOfjMQP+PE9HqcZobycO8z94r/uRuV0wKx/
+0SvMsKFtnreut0bjgFtmZaWY+6d87Is9o1MwUTAdBgNVHQ4EFgQUjtGuhkM7LtHB
+gMPCJIxMwbY69OQwHwYDVR0jBBgwFoAUjtGuhkM7LtHBgMPCJIxMwbY69OQwDwYD
+VR0TAQH/BAUwAwEB/zAKBggqhkjOPQQDAgNJADBGAiEAj/WzNVJDg/cBtLqQVM77
+tkB+QyIXLG3Vi9Xj1YfW9QECIQDDFW8yFtgLeCg2Zhr4xQNq3/24r/01kI2rjFPO
+xBkDMw==
+-----END CERTIFICATE-----
+";
+        const CA2: &str = "-----BEGIN CERTIFICATE-----
+MIIBfjCCASWgAwIBAgIUZ7Qsiwan2joRz01p25/cy1XNNiwwCgYIKoZIzj0EAwIw
+FDESMBAGA1UEAwwJdGVzdC1jYS0yMCAXDTI2MDMwNDEzMDk1MFoYDzIxMjYwMjA4
+MTMwOTUwWjAUMRIwEAYDVQQDDAl0ZXN0LWNhLTIwWTATBgcqhkjOPQIBBggqhkjO
+PQMBBwNCAARJle2/yiOD5zp0UkjZg9Yy6ZHBItTLrqv/uzB2YMQg03frnqEUMzSV
+mFinosBcGpX/dPGfHNPhBMOpHmlocZu9o1MwUTAdBgNVHQ4EFgQUsqG0hSGDYsz2
+eGIsLIwJnCR5SFIwHwYDVR0jBBgwFoAUsqG0hSGDYsz2eGIsLIwJnCR5SFIwDwYD
+VR0TAQH/BAUwAwEB/zAKBggqhkjOPQQDAgNHADBEAiApvLu9DIC3/K/+G9ooOm75
+a72Cjw62aM8NfPe7ILs8SgIgL0VHe6ksTyB176RECCm3MJVnlhOop6b1tNvxjrru
+FRU=
+-----END CERTIFICATE-----
+";
+
+        fn expire(v: &ReloadingVerifier) {
+            // Can't move Instant backwards; instead, reach past the guard.
+            // The test pokes private state the same way auth::tests::token_file does.
+            v.inner.write().unwrap().1 = Instant::now().checked_sub(Duration::from_secs(120)).unwrap();
+        }
+
+        #[test]
+        fn reloading_verifier() {
+            #[cfg(feature = "aws-lc-rs")]
+            let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+
+            let file = tempfile::NamedTempFile::new().unwrap();
+            std::fs::write(file.path(), CA1).unwrap();
+
+            let verifier = ReloadingVerifier::new(file.path().to_path_buf()).unwrap();
+            let first = verifier.current();
+
+            // File changed but we're still within the reload interval: no reload.
+            std::fs::write(file.path(), CA2).unwrap();
+            assert!(Arc::ptr_eq(&verifier.current(), &first));
+
+            // Force expiry: reload picks up CA2.
+            expire(&verifier);
+            let second = verifier.current();
+            assert!(!Arc::ptr_eq(&second, &first));
+
+            // File gone, expired again: keep stale verifier.
+            drop(file);
+            expire(&verifier);
+            assert!(Arc::ptr_eq(&verifier.current(), &second));
+        }
+    }
+
+    #[cfg(all(test, not(feature = "webpki-roots")))]
+    mod platform_verifier_tests {
+        use super::*;
+
+        // With no kubeconfig CA, the client config must fall back to the OS-native
+        // verifier instead of producing an empty (reject-everything) trust store.
+        #[test]
+        fn no_ca_falls_back_to_platform_verifier() {
+            #[cfg(feature = "aws-lc-rs")]
+            let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+
+            rustls_client_config(None, None, false).expect("platform verifier config should build");
+        }
+    }
+
 }
 
 #[cfg(feature = "openssl-tls")]

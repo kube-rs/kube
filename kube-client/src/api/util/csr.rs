@@ -16,7 +16,9 @@ impl Api<CertificateSigningRequest> {
             .patch_subresource("approval", name, pp, patch)
             .map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("approval");
-        self.client.request::<CertificateSigningRequest>(req).await
+        self.client
+            .request::<CertificateSigningRequest>(self.prepare_request(req))
+            .await
     }
 
     /// Get the CertificateSigningRequest. May differ from get(name)

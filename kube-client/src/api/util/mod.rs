@@ -19,7 +19,7 @@ where
     pub async fn restart(&self, name: &str) -> Result<K> {
         let mut req = self.request.restart(name).map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("restart");
-        self.client.request::<K>(req).await
+        self.client.request::<K>(self.prepare_request(req)).await
     }
 }
 
@@ -28,14 +28,14 @@ impl Api<Node> {
     pub async fn cordon(&self, name: &str) -> Result<Node> {
         let mut req = self.request.cordon(name).map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("cordon");
-        self.client.request::<Node>(req).await
+        self.client.request::<Node>(self.prepare_request(req)).await
     }
 
     /// Uncordon a Node.
     pub async fn uncordon(&self, name: &str) -> Result<Node> {
         let mut req = self.request.uncordon(name).map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("cordon");
-        self.client.request::<Node>(req).await
+        self.client.request::<Node>(self.prepare_request(req)).await
     }
 }
 
@@ -53,7 +53,9 @@ impl Api<ServiceAccount> {
             .create_subresource("token", name, pp, bytes)
             .map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("create_token_request");
-        self.client.request::<TokenRequest>(req).await
+        self.client
+            .request::<TokenRequest>(self.prepare_request(req))
+            .await
     }
 }
 

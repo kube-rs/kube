@@ -87,7 +87,7 @@ where
         }
         .map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("get");
-        self.client.request::<K>(req).await
+        self.client.request::<K>(self.prepare_request(req)).await
     }
 
     ///  [Get](`Api::get_metadata`) the metadata of an object using an explicit `resourceVersion`
@@ -118,7 +118,9 @@ where
     pub async fn get_metadata_with(&self, name: &str, gp: &GetParams) -> Result<PartialObjectMeta<K>> {
         let mut req = self.request.get_metadata(name, gp).map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("get_metadata");
-        self.client.request::<PartialObjectMeta<K>>(req).await
+        self.client
+            .request::<PartialObjectMeta<K>>(self.prepare_request(req))
+            .await
     }
 
     /// [Get](`Api::get`) a named resource if it exists, returns [`None`] if it doesn't exist
@@ -226,8 +228,10 @@ where
             self.request.list(lp)
         }
         .map_err(Error::BuildRequest)?;
-        req.extensions_mut().insert("list");
-        self.client.request::<ObjectList<K>>(req).await
+        req.extensions_mut().insert(crate::request_operation::LIST);
+        self.client
+            .request::<ObjectList<K>>(self.prepare_request(req))
+            .await
     }
 
     /// Get a list of resources that contains only their metadata as
@@ -253,8 +257,10 @@ where
     /// ```
     pub async fn list_metadata(&self, lp: &ListParams) -> Result<ObjectList<PartialObjectMeta<K>>> {
         let mut req = self.request.list_metadata(lp).map_err(Error::BuildRequest)?;
-        req.extensions_mut().insert("list_metadata");
-        self.client.request::<ObjectList<PartialObjectMeta<K>>>(req).await
+        req.extensions_mut().insert(crate::request_operation::LIST_METADATA);
+        self.client
+            .request::<ObjectList<PartialObjectMeta<K>>>(self.prepare_request(req))
+            .await
     }
 
     /// Create a resource
@@ -283,7 +289,7 @@ where
         let bytes = serde_json::to_vec(&data).map_err(Error::SerdeError)?;
         let mut req = self.request.create(pp, bytes).map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("create");
-        self.client.request::<K>(req).await
+        self.client.request::<K>(self.prepare_request(req)).await
     }
 
     /// Delete a named resource
@@ -310,7 +316,7 @@ where
     pub async fn delete(&self, name: &str, dp: &DeleteParams) -> Result<Either<K, Status>> {
         let mut req = self.request.delete(name, dp).map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("delete");
-        self.client.request_status::<K>(req).await
+        self.client.request_status::<K>(self.prepare_request(req)).await
     }
 
     /// Delete a collection of resources
@@ -349,8 +355,10 @@ where
             .request
             .delete_collection(dp, lp)
             .map_err(Error::BuildRequest)?;
-        req.extensions_mut().insert("delete_collection");
-        self.client.request_status::<ObjectList<K>>(req).await
+        req.extensions_mut().insert(crate::request_operation::DELETE_COLLECTION);
+        self.client
+            .request_status::<ObjectList<K>>(self.prepare_request(req))
+            .await
     }
 
     /// Patch a subset of a resource's properties
@@ -398,7 +406,7 @@ where
         }
         .map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("patch");
-        self.client.request::<K>(req).await
+        self.client.request::<K>(self.prepare_request(req)).await
     }
 
     /// Patch a metadata subset of a resource's properties from [`PartialObjectMeta`]
@@ -448,7 +456,9 @@ where
             .patch_metadata(name, pp, patch)
             .map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("patch_metadata");
-        self.client.request::<PartialObjectMeta<K>>(req).await
+        self.client
+            .request::<PartialObjectMeta<K>>(self.prepare_request(req))
+            .await
     }
 
     /// Replace a resource entirely with a new one
@@ -508,7 +518,7 @@ where
             .replace(name, pp, bytes)
             .map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("replace");
-        self.client.request::<K>(req).await
+        self.client.request::<K>(self.prepare_request(req)).await
     }
 
     /// Watch a list of resources
@@ -560,7 +570,7 @@ where
         }
         .map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("watch");
-        self.client.request_events::<K>(req).await
+        self.client.request_events::<K>(self.prepare_request(req)).await
     }
 
     /// Watch a list of metadata for a given resources
@@ -612,6 +622,8 @@ where
             .watch_metadata(wp, version)
             .map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("watch_metadata");
-        self.client.request_events::<PartialObjectMeta<K>>(req).await
+        self.client
+            .request_events::<PartialObjectMeta<K>>(self.prepare_request(req))
+            .await
     }
 }

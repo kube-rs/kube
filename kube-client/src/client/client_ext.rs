@@ -376,7 +376,7 @@ impl Client {
         let mut req = Request::new(scope.url_path())
             .list(lp)
             .map_err(Error::BuildRequest)?;
-        req.extensions_mut().insert("list");
+        req.extensions_mut().insert(crate::request_operation::LIST);
         self.request::<ObjectList<K>>(req).await
     }
 }

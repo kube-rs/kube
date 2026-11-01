@@ -258,7 +258,7 @@ mod resource;
 ///
 /// ## `#[kube(validation = Rule::new("self == oldSelf").message("field is immutable"))]`
 /// Inject a top level CEL validation rule for the top level generated struct.
-/// This attribute is for resources deriving [`KubeSchema`] instead of [`schemars::JsonSchema`].
+/// This attribute is for resources deriving [`KubeSchema`] instead of `schemars::JsonSchema`.
 ///
 /// ## Example with all properties
 ///
@@ -550,7 +550,7 @@ pub fn derive_schema_validation(input: proc_macro::TokenStream) -> proc_macro::T
 /// ```
 ///
 /// The example above will generate:
-/// ```
+/// ```text
 /// // impl kube::Resource for FooMap { .. }
 /// ```
 /// [`kube`]: https://docs.rs/kube
