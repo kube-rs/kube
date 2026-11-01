@@ -1,12 +1,16 @@
 //! API helpers for structured interaction with the Kubernetes API
 
 mod core_methods;
-#[cfg(feature = "ws")] mod remote_command;
+#[cfg(feature = "ws")]
+mod remote_command;
 use std::fmt::Debug;
 
-#[cfg(feature = "ws")] pub use remote_command::{AttachedProcess, TerminalSize};
-#[cfg(feature = "ws")] mod portforward;
-#[cfg(feature = "ws")] pub use portforward::Portforwarder;
+#[cfg(feature = "ws")]
+pub use remote_command::{AttachedProcess, TerminalSize};
+#[cfg(feature = "ws")]
+mod portforward;
+#[cfg(feature = "ws")]
+pub use portforward::Portforwarder;
 
 mod subresource;
 #[cfg_attr(docsrs, doc(cfg(feature = "k8s_if_ge_1_33")))]
@@ -41,6 +45,19 @@ pub use params::{
 };
 
 use crate::Client;
+
+/// Policy allows the user to opt-in to either pure server-side drop `metadata.managedFields` or to
+/// use the client-side fallback in addition to it.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ManagedFieldsPolicy {
+    /// Request server-side omission only (KEP-5958).
+    ///
+    /// Servers without support may still return managed fields.
+    ServerOnly,
+    /// Request server-side omission and strip any remaining fields during deserialization.
+    ClientFallback,
+}
+
 /// The generic Api abstraction
 ///
 /// This abstracts over a [`Request`] and a type `K` so that
@@ -69,7 +86,7 @@ pub struct Api<K> {
     /// (cached from `K::metadata_api()` at construction so that `impl<K> Api<K>`
     /// method blocks don't have to tighten to `K: Resource`).
     pub(crate) metadata_api: bool,
-    drop_managed_fields: bool,
+    drop_managed_fields: Option<ManagedFieldsPolicy>,
     /// Note: Using `iter::Empty` over `PhantomData`, because we never actually keep any
     /// `K` objects, so `Empty` better models our constraints (in particular, `Empty<K>`
     /// is `Send`, even if `K` may not be).
@@ -102,7 +119,7 @@ impl<K: Resource> Api<K> {
             resource: ApiResource::erase::<K>(dyntype),
             scope: None,
             metadata_api: K::metadata_api(),
-            drop_managed_fields: false,
+            drop_managed_fields: None,
             _phantom: std::iter::empty(),
         }
     }
@@ -123,7 +140,7 @@ impl<K: Resource> Api<K> {
             resource: ApiResource::erase::<K>(dyntype),
             scope: None,
             metadata_api: K::metadata_api(),
-            drop_managed_fields: false,
+            drop_managed_fields: None,
             _phantom: std::iter::empty(),
         }
     }
@@ -341,7 +358,7 @@ where
             resource: ApiResource::erase::<K>(&dyntype),
             scope: None,
             metadata_api: K::metadata_api(),
-            drop_managed_fields: false,
+            drop_managed_fields: None,
             _phantom: std::iter::empty(),
         }
     }
@@ -385,32 +402,34 @@ impl<K> From<Api<K>> for Client {
 impl<K> Api<K> {
     /// Omit `metadata.managedFields` from resource responses (KEP-5958).
     ///
-    /// Requests server-side omission and skips any remaining managed fields during
-    /// deserialization, including on servers that do not support KEP-5958.
+    /// Both policies request server-side omission. [`ManagedFieldsPolicy::ClientFallback`]
+    /// also skips remaining managed fields during deserialization on older servers.
+    /// Use [`ManagedFieldsPolicy::ServerOnly`] to disable that fallback.
     /// Applies to lists, watches, write responses, and resource subresources;
     /// request bodies are unchanged. Clones and watchers inherit this policy.
     /// Do not enable this when your application needs field ownership information.
     ///
     /// ```no_run
     /// use k8s_openapi::api::core::v1::Pod;
-    /// use kube::{Api, Client, api::ListParams};
+    /// use kube::{Api, Client, api::{ListParams, ManagedFieldsPolicy}};
     ///
     /// # async fn example() -> Result<(), kube::Error> {
-    /// let pods: Api<Pod> = Api::all(Client::try_default().await?).without_managed_fields();
+    /// let pods: Api<Pod> = Api::all(Client::try_default().await?)
+    ///     .without_managed_fields(ManagedFieldsPolicy::ClientFallback);
     /// let list = pods.list(&ListParams::default()).await?;
     /// assert!(list.items.iter().all(|pod| pod.metadata.managed_fields.is_none()));
     /// # Ok(())
     /// # }
     /// ```
     #[must_use]
-    pub fn without_managed_fields(mut self) -> Self {
-        self.drop_managed_fields = true;
+    pub fn without_managed_fields(mut self, policy: ManagedFieldsPolicy) -> Self {
+        self.drop_managed_fields = Some(policy);
         self
     }
 
     fn prepare_request(&self, mut request: http::Request<Vec<u8>>) -> http::Request<Vec<u8>> {
-        if self.drop_managed_fields {
-            crate::client::managed_fields::prepare(&mut request);
+        if let Some(policy) = self.drop_managed_fields {
+            crate::client::managed_fields::prepare(&mut request, policy);
         }
         request
     }
@@ -499,7 +518,9 @@ mod test {
 
         // a non-core group has a longer prefix to splice into
         assert_eq!(
-            dynamic(&deploy, &Scope::Namespaced).constrain("ns1").resource_url(),
+            dynamic(&deploy, &Scope::Namespaced)
+                .constrain("ns1")
+                .resource_url(),
             "/apis/apps/v1/namespaces/ns1/deployments"
         );
 

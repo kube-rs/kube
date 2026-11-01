@@ -1,5 +1,5 @@
 use super::*;
-use crate::{Api, Client, client::Body};
+use crate::{Api, Client, api::ManagedFieldsPolicy, client::Body};
 use futures::{FutureExt, TryStreamExt};
 use http::Response;
 use http_body_util::BodyExt;
@@ -14,63 +14,20 @@ fn has_fields(object: &Value) -> bool {
     object.pointer("/metadata/managedFields").is_some()
 }
 
-fn assert_wire_stripped(value: &Value, watch: bool, list: bool) {
-    if watch {
-        assert!(
-            !has_fields(&value["object"]),
-            "server returned managedFields: {value}"
-        );
-    } else if list {
-        let items = value["items"].as_array().expect("expected a list response");
-        assert!(
-            items.iter().all(|item| !has_fields(item)),
-            "server returned managedFields: {value}"
-        );
-    } else {
-        assert!(!has_fields(value), "server returned managedFields: {value}");
-    }
+#[tokio::test]
+#[ignore = "requires a Kubernetes cluster"]
+async fn managed_fields_with_fallback_live_test() -> Result<(), tower::BoxError> {
+    check_managed_fields_against_apiserver(ManagedFieldsPolicy::ClientFallback).await
 }
 
 #[tokio::test]
-#[ignore = "requires a Kubernetes cluster; KUBE_RS_REQUIRE_MANAGED_FIELDS_DROP=1 requires KEP-5958 enabled"]
-async fn managed_fields_cluster() -> Result<(), tower::BoxError> {
-    let require_server = std::env::var("KUBE_RS_REQUIRE_MANAGED_FIELDS_DROP").as_deref() == Ok("1");
-    let underlying = Client::try_default().await?;
-    // Observe the bytes before kube-rs deserialization/fallback. The strict run
-    // must fail if the server ignores the header, even if fallback would work.
-    let service = tower::service_fn(move |request: Request<Body>| {
-        let client = underlying.clone();
-        async move {
-            let policy = request.extensions().get::<DropManagedFields>().copied();
-            let watch = request.uri().query().is_some_and(|q| q.contains("watch=true"));
-            if policy.is_some() {
-                assert!(
-                    request.headers()[ACCEPT]
-                        .to_str()?
-                        .contains(";drop=metadata.managedFields")
-                );
-            }
-            let response = client.send(request).await?;
-            if require_server
-                && response.status().is_success()
-                && let Some(policy) = policy
-            {
-                let (parts, body) = response.into_parts();
-                let bytes = body.collect().await?.to_bytes();
-                if watch {
-                    for line in bytes.split(|b| *b == b'\n').filter(|line| !line.is_empty()) {
-                        assert_wire_stripped(&serde_json::from_slice(line)?, true, false);
-                    }
-                } else {
-                    assert_wire_stripped(&serde_json::from_slice(&bytes)?, false, policy.list);
-                }
-                Ok::<_, tower::BoxError>(Response::from_parts(parts, Body::from(bytes)))
-            } else {
-                Ok(response)
-            }
-        }
-    });
-    let client = Client::new(service, "default");
+#[ignore = "requires a Kubernetes cluster with KEP-5958 enabled"]
+async fn managed_fields_server_side_only_live_test() -> Result<(), tower::BoxError> {
+    check_managed_fields_against_apiserver(ManagedFieldsPolicy::ServerOnly).await
+}
+
+async fn check_managed_fields_against_apiserver(policy: ManagedFieldsPolicy) -> Result<(), tower::BoxError> {
+    let client = Client::try_default().await?;
     let namespaces: Api<Namespace> = Api::all(client.clone());
     let ns = namespaces
         .create(
@@ -85,7 +42,7 @@ async fn managed_fields_cluster() -> Result<(), tower::BoxError> {
         .unwrap();
     let result = std::panic::AssertUnwindSafe(async {
         let full: Api<ConfigMap> = Api::namespaced(client.clone(), &ns);
-        let stripped = full.clone().without_managed_fields();
+        let stripped = full.clone().without_managed_fields(policy);
         let pp = PostParams {
             field_manager: Some("kube-rs-test".into()),
             ..Default::default()
@@ -102,7 +59,6 @@ async fn managed_fields_cluster() -> Result<(), tower::BoxError> {
         assert_eq!(listed.items.len(), 1);
         assert!(listed.items[0].metadata.managed_fields.is_none());
         let wp = WatchParams::default().timeout(1).fields("metadata.name=probe");
-        // Strict mode collects the response inside watch(), so bound setup as well.
         let event = tokio::time::timeout(std::time::Duration::from_secs(15), async {
             let events = stripped.watch(&wp, "0").await?;
             std::pin::pin!(events).try_next().await
@@ -287,6 +243,43 @@ fn pod_with_managed_fields() -> Value {
 
 const DROP_ACCEPT: &str = "application/json;drop=metadata.managedFields, application/json";
 
+#[rstest::rstest]
+#[case::server_only(ManagedFieldsPolicy::ServerOnly, true)]
+#[case::client_fallback(ManagedFieldsPolicy::ClientFallback, false)]
+#[tokio::test]
+async fn fallback_policy_controls_deserialization(
+    #[case] policy: ManagedFieldsPolicy,
+    #[case] fields_remain: bool,
+) {
+    let api = |response| {
+        let client = responding_client(response, |request| {
+            async move {
+                assert_eq!(request.headers()[ACCEPT], DROP_ACCEPT);
+            }
+            .boxed()
+        });
+        Api::<Pod>::namespaced(client, "default").without_managed_fields(policy)
+    };
+
+    let pod = api(pod_with_managed_fields()).get("probe").await.unwrap();
+    assert_eq!(pod.metadata.managed_fields.is_some(), fields_remain);
+
+    let list = api(json!({"items":[pod_with_managed_fields()]}))
+        .list(&ListParams::default())
+        .await
+        .unwrap();
+    assert_eq!(list.items[0].metadata.managed_fields.is_some(), fields_remain);
+
+    let events = api(json!({"type":"ADDED", "object":pod_with_managed_fields()}))
+        .watch(&WatchParams::default(), "0")
+        .await
+        .unwrap();
+    let Some(WatchEvent::Added(pod)) = std::pin::pin!(events).try_next().await.unwrap() else {
+        panic!("expected an added Pod");
+    };
+    assert_eq!(pod.metadata.managed_fields.is_some(), fields_remain);
+}
+
 // Each scenario supplies its response explicitly
 fn responding_client(
     response: Value,
@@ -310,7 +303,7 @@ fn stripped_api(response: Value) -> Api<Pod> {
         }
         .boxed()
     });
-    Api::namespaced(client, "default").without_managed_fields()
+    Api::namespaced(client, "default").without_managed_fields(ManagedFieldsPolicy::ClientFallback)
 }
 
 #[tokio::test]
@@ -326,7 +319,9 @@ async fn opt_in_is_local_to_the_api_clone() {
         .boxed()
     });
     let full: Api<Pod> = Api::namespaced(client, "default");
-    let stripped = full.clone().without_managed_fields();
+    let stripped = full
+        .clone()
+        .without_managed_fields(ManagedFieldsPolicy::ClientFallback);
     assert!(full.get("probe").await.unwrap().metadata.managed_fields.is_some());
     assert!(
         stripped
@@ -366,7 +361,8 @@ async fn replace_preserves_the_request_body_and_filters_the_response() {
         }
         .boxed()
     });
-    let stripped: Api<Pod> = Api::namespaced(client, "default").without_managed_fields();
+    let stripped: Api<Pod> =
+        Api::namespaced(client, "default").without_managed_fields(ManagedFieldsPolicy::ClientFallback);
     assert!(
         stripped
             .replace("probe", &PostParams::default(), &pod)
@@ -510,7 +506,8 @@ async fn metadata_negotiation_preserves_the_requested_representation(#[case] lis
         }
         .boxed()
     });
-    let api: Api<PartialObjectMeta<Pod>> = Api::namespaced(client, "default").without_managed_fields();
+    let api: Api<PartialObjectMeta<Pod>> =
+        Api::namespaced(client, "default").without_managed_fields(ManagedFieldsPolicy::ClientFallback);
     if !list {
         assert!(api.get("probe").await.unwrap().metadata.managed_fields.is_none());
     } else {

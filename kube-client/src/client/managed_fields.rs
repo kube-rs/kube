@@ -15,7 +15,7 @@ pub(crate) struct DropManagedFields {
 }
 
 /// Add the drop parameter while preserving the original representation as a fallback.
-pub(crate) fn prepare(request: &mut Request<Vec<u8>>) {
+pub(crate) fn prepare(request: &mut Request<Vec<u8>>, policy: crate::api::ManagedFieldsPolicy) {
     // Preserve metadata-only negotiation, including its fallback representation.
     let accept = request
         .headers()
@@ -26,6 +26,9 @@ pub(crate) fn prepare(request: &mut Request<Vec<u8>>) {
     request
         .headers_mut()
         .insert(ACCEPT, value.parse().expect("valid generated Accept header"));
+    if policy == crate::api::ManagedFieldsPolicy::ServerOnly {
+        return;
+    }
     let list = matches!(
         request.extensions().get::<&'static str>().copied(),
         Some(LIST | LIST_METADATA | DELETE_COLLECTION)
