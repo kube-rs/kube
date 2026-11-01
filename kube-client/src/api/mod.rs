@@ -43,6 +43,7 @@ pub use params::{
 };
 
 use crate::Client;
+
 /// The generic Api abstraction
 ///
 /// This abstracts over a [`Request`] and a type `K` so that
@@ -380,12 +381,40 @@ impl<K> From<Api<K>> for Client {
     }
 }
 
+impl<K> Api<K> {
+    /// Omit `metadata.managedFields` from resource responses (KEP-5958).
+    ///
+    /// Requests server-side omission. Servers without support may still return managed fields.
+    /// Applies to lists, watches, write responses, and resource subresources;
+    /// request bodies are unchanged. Clones and watchers inherit this policy.
+    /// Converting this API into a [`Client`] also retains the policy for typed JSON requests.
+    /// Do not enable this when your application needs field ownership information.
+    ///
+    /// ```no_run
+    /// use k8s_openapi::api::core::v1::Pod;
+    /// use kube::{Api, Client, api::ListParams};
+    ///
+    /// # async fn example() -> Result<(), kube::Error> {
+    /// let pods: Api<Pod> = Api::all(Client::try_default().await?)
+    ///     .without_managed_fields();
+    /// let list = pods.list(&ListParams::default()).await?;
+    /// // Servers supporting KEP-5958 omit managed fields from the returned objects.
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[must_use]
+    pub fn without_managed_fields(mut self) -> Self {
+        self.client.managed_fields = true;
+        self
+    }
+}
+
 impl<K> Debug for Api<K> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // Intentionally destructuring, to cause compile errors when new fields are added
         let Self {
             request,
-            client: _,
+            client,
             namespace,
             resource: _,
             scope,
@@ -397,6 +426,7 @@ impl<K> Debug for Api<K> {
             .field("client", &"...")
             .field("namespace", &namespace)
             .field("scope", &scope)
+            .field("drop_managed_fields", &client.managed_fields)
             .finish()
     }
 }

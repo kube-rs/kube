@@ -550,7 +550,7 @@ pub fn derive_schema_validation(input: proc_macro::TokenStream) -> proc_macro::T
 /// ```
 ///
 /// The example above will generate:
-/// ```
+/// ```text
 /// // impl kube::Resource for FooMap { .. }
 /// ```
 /// [`kube`]: https://docs.rs/kube
