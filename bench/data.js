@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793624628860,
+  "lastUpdate": 1793624871163,
   "repoUrl": "https://github.com/kube-rs/kube",
   "entries": {
     "Benchmark": [
@@ -9626,6 +9626,105 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/kube-rs/kube/commit/39a9c2608164900ff3e8f9208d9fe6b9ebe639b8"
         },
         "date": 1793624627035,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "init_listwatch - peak_bytes",
+            "value": 55194619,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - total_allocated",
+            "value": 76715088,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - alloc_count",
+            "value": 578023,
+            "unit": "allocations"
+          },
+          {
+            "name": "steady_state - peak_bytes",
+            "value": 71381202,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - total_allocated",
+            "value": 109519220,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - alloc_count",
+            "value": 799021,
+            "unit": "allocations"
+          },
+          {
+            "name": "relist - peak_bytes",
+            "value": 99797302,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - total_allocated",
+            "value": 174518628,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - alloc_count",
+            "value": 1189035,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_without_modify - peak_bytes",
+            "value": 141298836,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - total_allocated",
+            "value": 205865000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - alloc_count",
+            "value": 1298020,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_with_modify - peak_bytes",
+            "value": 134853452,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - total_allocated",
+            "value": 162895000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - alloc_count",
+            "value": 1058021,
+            "unit": "allocations"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "49699333+dependabot[bot]@users.noreply.github.com",
+            "name": "dependabot[bot]",
+            "username": "dependabot[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d956e12ae744ed81b4acd58df0d0cc6d91210983",
+          "message": "Chore(deps): Update parking_lot requirement from 0.12.0 to 0.13.0 (#2132)\n\nUpdates the requirements on [parking_lot](https://github.com/Amanieu/parking_lot) to permit the latest version.\n- [Release notes](https://github.com/Amanieu/parking_lot/releases)\n- [Changelog](https://github.com/Amanieu/parking_lot/blob/master/CHANGELOG.md)\n- [Commits](https://github.com/Amanieu/parking_lot/compare/parking_lot-v0.12.4...parking_lot-v0.13.0)\n\n---\nupdated-dependencies:\n- dependency-name: parking_lot\n  dependency-version: 0.13.0\n  dependency-type: direct:production\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>\nCo-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>\nCo-authored-by: doxxx <doxxx93@gmail.com>",
+          "timestamp": "2026-11-02T13:06:46Z",
+          "tree_id": "4b86f7b57f56ddc4b9b12d0399bd4356d28d03bc",
+          "url": "https://github.com/kube-rs/kube/commit/d956e12ae744ed81b4acd58df0d0cc6d91210983"
+        },
+        "date": 1793624869235,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
