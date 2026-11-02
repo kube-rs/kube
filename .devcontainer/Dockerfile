@@ -1,4 +1,4 @@
-FROM docker.io/rust:1.95.0-trixie
+FROM docker.io/rust:1.95.0-bookworm
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt update && apt upgrade -y
