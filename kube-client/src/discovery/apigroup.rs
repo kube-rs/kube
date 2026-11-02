@@ -219,7 +219,7 @@ impl ApiGroup {
     /// - Alpha versions (with the last being the first)
     /// - Other versions, alphabetically
     pub fn versions(&self) -> impl Iterator<Item = &str> {
-        self.data.as_slice().iter().map(|gvd| gvd.version.as_str())
+        self.data.iter().map(|gvd| gvd.version.as_str())
     }
 
     /// Returns preferred version for working with given group.
@@ -388,9 +388,12 @@ mod tests {
             versions: vec![APIVersionDiscovery {
                 version: Some("v1".to_string()),
                 resources: vec![
-                    make_v2_resource("deployments", "Deployment", "Namespaced", vec![
-                        "get", "list", "create",
-                    ]),
+                    make_v2_resource(
+                        "deployments",
+                        "Deployment",
+                        "Namespaced",
+                        vec!["get", "list", "create"],
+                    ),
                     make_v2_resource("replicasets", "ReplicaSet", "Namespaced", vec!["get", "list"]),
                 ],
                 freshness: Some("Current".to_string()),
