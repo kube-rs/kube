@@ -68,7 +68,7 @@ pin-project = "1.1.3"
 proc-macro2 = "1.0.93"
 quote = "1.0.44"
 rand = "0.10.0"
-rstest = "0.27.0"
+rstest = "0.28.0"
 runtime-macros = "1.1.1"
 rustls = { version = "0.23.27", default-features = false }
 rustls-platform-verifier = "0.7.0"
