@@ -453,6 +453,7 @@ impl Config {
             bookmarks: self.bookmarks,
             send_initial_events: phase == WatchPhase::Initial
                 && self.initial_list_strategy == InitialListStrategy::StreamingList,
+            shard_selector: None,
         }
     }
 }
