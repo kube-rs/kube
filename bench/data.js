@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793624871163,
+  "lastUpdate": 1793783467319,
   "repoUrl": "https://github.com/kube-rs/kube",
   "entries": {
     "Benchmark": [
@@ -9725,6 +9725,105 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/kube-rs/kube/commit/d956e12ae744ed81b4acd58df0d0cc6d91210983"
         },
         "date": 1793624869235,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "init_listwatch - peak_bytes",
+            "value": 55194619,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - total_allocated",
+            "value": 76715088,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - alloc_count",
+            "value": 578023,
+            "unit": "allocations"
+          },
+          {
+            "name": "steady_state - peak_bytes",
+            "value": 71381202,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - total_allocated",
+            "value": 109519220,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - alloc_count",
+            "value": 799021,
+            "unit": "allocations"
+          },
+          {
+            "name": "relist - peak_bytes",
+            "value": 99797302,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - total_allocated",
+            "value": 174518628,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - alloc_count",
+            "value": 1189035,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_without_modify - peak_bytes",
+            "value": 141298836,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - total_allocated",
+            "value": 205865000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - alloc_count",
+            "value": 1298020,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_with_modify - peak_bytes",
+            "value": 134853452,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - total_allocated",
+            "value": 162895000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - alloc_count",
+            "value": 1058021,
+            "unit": "allocations"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "p-alik@users.noreply.github.com",
+            "name": "Alexei Pastuchov",
+            "username": "p-alik"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "1fa58766fc3bd7e4e959edeac54d10ef413598a5",
+          "message": "kube-client: report dropped log stream connections as UnexpectedEof (#2127)\n\nTurns out `Client::request_stream` was hiding useful error information.\nWhen a log stream connection dropped, callers got a generic\n`io::Error::other` with no way to tell what happened.\n\nNow request_stream reuses the error classification from request_events.\nDropped connections show up as `io::ErrorKind::UnexpectedEof`, so the\ncaller can check `e.kind()` directly and resume with `since_time`.\nWatch behaviour unchanged.\n\nFixes #1075\n\nSigned-off-by: Alexei Pastuchov <info@maximka.de>\nCo-authored-by: doxxx <doxxx93@gmail.com>",
+          "timestamp": "2026-11-04T09:09:36Z",
+          "tree_id": "40eccb942162b9795cdfa3f30e090a11d0d81b24",
+          "url": "https://github.com/kube-rs/kube/commit/1fa58766fc3bd7e4e959edeac54d10ef413598a5"
+        },
+        "date": 1793783466265,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
