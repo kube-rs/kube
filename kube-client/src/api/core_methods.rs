@@ -307,10 +307,42 @@ where
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// This function assumes that the object exists, and will return an error if it does not.
+    /// Consider using [`Api::delete_opt`] if you need to handle missing objects gracefully.
     pub async fn delete(&self, name: &str, dp: &DeleteParams) -> Result<Either<K, Status>> {
         let mut req = self.request.delete(name, dp).map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("delete");
         self.client.request_status::<K>(req).await
+    }
+
+    /// Like [`delete`](`Api::delete`), but returns `None` if the resource is not found, instead of an error.
+    ///
+    /// ```no_run
+    /// use kube::api::{Api, DeleteParams};
+    /// use k8s_openapi::api::core::v1::Pod;
+    ///
+    /// # async fn wrapper() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let client: kube::Client = todo!();
+    /// let pods: Api<Pod> = Api::namespaced(client, "apps");
+    /// match pods.delete_opt("blog", &DeleteParams::default()).await? {
+    ///     Some(res) => {
+    ///         res.map_left(|pod| println!("Deleting: {:?}", pod.metadata.name))
+    ///             .map_right(|status| println!("Deleted: {status:?}"));
+    ///     }
+    ///     None => println!("Already gone"),
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn delete_opt(&self, name: &str, dp: &DeleteParams) -> Result<Option<Either<K, Status>>> {
+        match self.delete(name, dp).await {
+            Ok(res) => Ok(Some(res)),
+            Err(Error::Api(status)) if status.is_not_found() => Ok(None),
+            Err(err) => Err(err),
+        }
     }
 
     /// Delete a collection of resources
@@ -613,5 +645,64 @@ where
             .map_err(Error::BuildRequest)?;
         req.extensions_mut().insert("watch_metadata");
         self.client.request_events::<PartialObjectMeta<K>>(req).await
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::{Api, Client, Error, client::Body};
+    use either::Either;
+    use http::{Method, Request, Response, StatusCode};
+    use k8s_openapi::api::core::v1::Pod;
+    use kube_core::{params::DeleteParams, response::Status};
+    use serde_json::json;
+    use std::pin::pin;
+    use tower_test::mock;
+
+    async fn delete_opt_with_response(code: StatusCode, body: String) -> crate::Result<Option<Either<Pod, Status>>> {
+        let (mock_service, handle) = mock::pair::<Request<Body>, Response<Body>>();
+        let spawned = tokio::spawn(async move {
+            let mut handle = pin!(handle);
+            let (request, send) = handle.next_request().await.expect("service not called");
+            assert_eq!(request.method(), Method::DELETE);
+            assert_eq!(request.uri().path(), "/api/v1/namespaces/default/pods/test");
+            let response = Response::builder().status(code).body(Body::from(body.into_bytes()));
+            send.send_response(response.unwrap());
+        });
+        let pods: Api<Pod> = Api::default_namespaced(Client::new(mock_service, "default"));
+        let res = pods.delete_opt("test", &DeleteParams::default()).await;
+        spawned.await.unwrap();
+        res
+    }
+
+    fn failure(code: u16, reason: &str) -> String {
+        json!({ "kind": "Status", "apiVersion": "v1", "status": "Failure", "code": code, "reason": reason, "message": "test" })
+            .to_string()
+    }
+
+    #[tokio::test]
+    async fn delete_opt_returns_object_when_deletion_started() {
+        let pod = json!({ "apiVersion": "v1", "kind": "Pod", "metadata": { "name": "test" } });
+        let res = delete_opt_with_response(StatusCode::OK, pod.to_string()).await;
+        assert!(matches!(res, Ok(Some(Either::Left(p))) if p.metadata.name.as_deref() == Some("test")));
+    }
+
+    #[tokio::test]
+    async fn delete_opt_returns_status_when_object_removed() {
+        let status = json!({ "kind": "Status", "apiVersion": "v1", "status": "Success" });
+        let res = delete_opt_with_response(StatusCode::OK, status.to_string()).await;
+        assert!(matches!(res, Ok(Some(Either::Right(s))) if s.is_success()));
+    }
+
+    #[tokio::test]
+    async fn delete_opt_returns_none_when_object_missing() {
+        let res = delete_opt_with_response(StatusCode::NOT_FOUND, failure(404, "NotFound")).await;
+        assert!(matches!(res, Ok(None)));
+    }
+
+    #[tokio::test]
+    async fn delete_opt_propagates_other_api_errors() {
+        let res = delete_opt_with_response(StatusCode::CONFLICT, failure(409, "Conflict")).await;
+        assert!(matches!(res, Err(Error::Api(s)) if s.is_conflict()));
     }
 }
