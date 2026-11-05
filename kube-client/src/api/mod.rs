@@ -18,8 +18,8 @@ mod subresource;
 pub use subresource::Resize;
 #[cfg(feature = "ws")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
-pub use subresource::{Attach, AttachParams, Ephemeral, Execute, Portforward};
-pub use subresource::{Evict, EvictParams, Log, LogParams, ScaleSpec, ScaleStatus};
+pub use subresource::{Attach, AttachParams, Execute, Portforward};
+pub use subresource::{Ephemeral, Evict, EvictParams, Log, LogParams, ScaleSpec, ScaleStatus};
 
 mod util;
 
