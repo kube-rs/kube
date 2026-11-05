@@ -13,8 +13,9 @@ use std::{
     },
     hash::{Hash, Hasher},
     marker::PhantomData,
-    time::{Duration, Instant},
+    time::Duration,
 };
+use tokio::time::Instant;
 
 fn hash<T: Hash + ?Sized>(t: &T) -> u64 {
     let mut hasher = DefaultHasher::new();
@@ -462,7 +463,7 @@ pub(crate) mod tests {
         assert!(matches!(poll!(rx.next()), Poll::Ready(None)));
     }
 
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn predicate_cache_ttl_evicts_expired_entries() {
         use futures::{SinkExt, channel::mpsc};
         use k8s_openapi::api::core::v1::Pod;
@@ -489,8 +490,8 @@ pub(crate) mod tests {
             p
         };
 
-        // Use a very short TTL for testing
-        let config = Config::default().ttl(Duration::from_millis(50));
+        // Time is paused, so the TTL only expires via tokio::time::advance below
+        let config = Config::default().ttl(Duration::from_secs(10));
 
         // Use a channel so we can send items with delays
         let (mut tx, rx) = mpsc::unbounded();
@@ -510,7 +511,7 @@ pub(crate) mod tests {
         assert!(matches!(poll!(filtered.next()), Poll::Pending));
 
         // Wait for TTL to expire
-        tokio::time::sleep(Duration::from_millis(100)).await;
+        tokio::time::advance(Duration::from_secs(20)).await;
 
         // Send same object after TTL - should pass through due to eviction
         tx.send(mkobj(1, "uid-1")).await.unwrap();

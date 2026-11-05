@@ -1,4 +1,5 @@
-use std::time::{Duration, Instant};
+use std::time::Duration;
+use tokio::time::Instant;
 
 /// A mostly internal trait to allow resetting backoff based on a reset duration
 pub trait Backoff: Iterator<Item = Duration> + Send + Sync + Unpin {
@@ -36,7 +37,7 @@ impl<B: Backoff> Iterator for ResetTimerBackoff<B> {
 
     fn next(&mut self) -> Option<Duration> {
         if let Some(last_backoff) = self.last_backoff
-            && tokio::time::Instant::now().into_std() > last_backoff + self.reset_duration
+            && Instant::now() > last_backoff + self.reset_duration
         {
             tracing::debug!(
                 ?last_backoff,
@@ -45,7 +46,7 @@ impl<B: Backoff> Iterator for ResetTimerBackoff<B> {
             );
             self.backoff.reset();
         }
-        self.last_backoff = Some(tokio::time::Instant::now().into_std());
+        self.last_backoff = Some(Instant::now());
         self.backoff.next()
     }
 }
