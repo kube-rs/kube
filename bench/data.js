@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793884637815,
+  "lastUpdate": 1793896252033,
   "repoUrl": "https://github.com/kube-rs/kube",
   "entries": {
     "Benchmark": [
@@ -10022,6 +10022,105 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/kube-rs/kube/commit/764294cdcd92a8a1490b4e127a28afaba8c9fb09"
         },
         "date": 1793884635665,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "init_listwatch - peak_bytes",
+            "value": 55194619,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - total_allocated",
+            "value": 76715088,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - alloc_count",
+            "value": 578023,
+            "unit": "allocations"
+          },
+          {
+            "name": "steady_state - peak_bytes",
+            "value": 71381202,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - total_allocated",
+            "value": 109519220,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - alloc_count",
+            "value": 799021,
+            "unit": "allocations"
+          },
+          {
+            "name": "relist - peak_bytes",
+            "value": 99797302,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - total_allocated",
+            "value": 174518628,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - alloc_count",
+            "value": 1189035,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_without_modify - peak_bytes",
+            "value": 141298836,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - total_allocated",
+            "value": 205865000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - alloc_count",
+            "value": 1298020,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_with_modify - peak_bytes",
+            "value": 134853452,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - total_allocated",
+            "value": 162895000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - alloc_count",
+            "value": 1058021,
+            "unit": "allocations"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "p-alik@users.noreply.github.com",
+            "name": "Alexei Pastuchov",
+            "username": "p-alik"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "4edd4d600822bf42e2b078683e3dba4fa7a6bde4",
+          "message": "kube-client: introduce delete_opt (#2137)\n\nLike delete, delete_opt provides a possibility to determine if deletion\nis ongoing, completed or failed. But for a missing object it returns\nNone instead of an error.\n\nAs proposed in #1107 delete_opt returns\n* Some(Left(obj)): deletion has started\n* Some(Right(status)): the object was removed straight away\n* None: the object was already gone\n* Err: any other error, including precondition conflicts from\n  DeleteParams\n\nTest coverage by four mock-client tests.\nexamples/secret_syncer.rs cleanup now calls delete_opt instead of\nignoring the 404.\n\nSigned-off-by: Alexei Pastuchov <info@maximka.de>\nCo-authored-by: doxxx <doxxx93@gmail.com>",
+          "timestamp": "2026-11-05T16:29:24Z",
+          "tree_id": "68dda9fd0e6dd10bfa4f07c30f33658f2530e918",
+          "url": "https://github.com/kube-rs/kube/commit/4edd4d600822bf42e2b078683e3dba4fa7a6bde4"
+        },
+        "date": 1793896250812,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
