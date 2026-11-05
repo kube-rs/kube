@@ -68,6 +68,7 @@ pub use auth::OAuthError;
 pub use auth::oidc_errors;
 
 #[cfg(feature = "ws")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
 pub use upgrade::UpgradeConnectionError;
 
 #[cfg(feature = "kubelet-debug")]

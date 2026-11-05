@@ -6,10 +6,12 @@ mod remote_command;
 use std::fmt::Debug;
 
 #[cfg(feature = "ws")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
 pub use remote_command::{AttachedProcess, TerminalSize};
 #[cfg(feature = "ws")]
 mod portforward;
 #[cfg(feature = "ws")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
 pub use portforward::Portforwarder;
 
 mod subresource;
