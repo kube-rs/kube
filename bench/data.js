@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793896319393,
+  "lastUpdate": 1793896546425,
   "repoUrl": "https://github.com/kube-rs/kube",
   "entries": {
     "Benchmark": [
@@ -10220,6 +10220,105 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/kube-rs/kube/commit/12a544c83b18efbcd2e5d706998813b38b0cc210"
         },
         "date": 1793896318028,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "init_listwatch - peak_bytes",
+            "value": 55194619,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - total_allocated",
+            "value": 76715088,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - alloc_count",
+            "value": 578023,
+            "unit": "allocations"
+          },
+          {
+            "name": "steady_state - peak_bytes",
+            "value": 71381202,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - total_allocated",
+            "value": 109519220,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - alloc_count",
+            "value": 799021,
+            "unit": "allocations"
+          },
+          {
+            "name": "relist - peak_bytes",
+            "value": 99797302,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - total_allocated",
+            "value": 174518628,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - alloc_count",
+            "value": 1189035,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_without_modify - peak_bytes",
+            "value": 141298836,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - total_allocated",
+            "value": 205865000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - alloc_count",
+            "value": 1298020,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_with_modify - peak_bytes",
+            "value": 134853452,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - total_allocated",
+            "value": 162895000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - alloc_count",
+            "value": 1058021,
+            "unit": "allocations"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "doxxx93@gmail.com",
+            "name": "doxxx",
+            "username": "doxxx93"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "660c438cbf8335347f4647116998ea2934f8529f",
+          "message": "Show missing feature requirements on kube-client items in docs (#2141)\n\n* Show the ws feature requirement on ws-only kube-client re-exports\n\nAttachedProcess, TerminalSize, Portforwarder and UpgradeConnectionError were\ndocumented as needing only the client feature on docs.rs, in kube-client,\nin kube, or both.\n\nSame-crate inlined re-exports only pick up doc(cfg) from the pub use, so\nannotate those. The kube facade only sees a plain #[cfg] on the item\ndefinition (docs.rs passes --cfg docsrs to rustdoc, not to rustc for\ndependencies), so gate the items themselves rather than only their module.\n\nSigned-off-by: doxxx93 <doxxx93@gmail.com>\n\n* Export Ephemeral without the ws feature\n\nThe trait and the Api ephemeral container methods it bounds are not ws-gated,\nonly its re-export was. Move it to the ungated re-export so it can be named\nwithout ws, and so kube and kube-client docs agree it needs only client.\n\nSigned-off-by: doxxx93 <doxxx93@gmail.com>\n\n* Show the oauth and ws feature requirement on OAuthError and Api::portforward\n\nOAuthError lived in an oauth-gated module without an item-level cfg, so the\nkube re-export showed client only. The portforward Api impl and the Portforward\nimpl for Pod lacked the doc(cfg) that the attach and exec impls carry, so\nkube-client showed no ws banner on Api::portforward.\n\nSigned-off-by: doxxx93 <doxxx93@gmail.com>\n\n---------\n\nSigned-off-by: doxxx93 <doxxx93@gmail.com>",
+          "timestamp": "2026-11-05T16:34:22Z",
+          "tree_id": "c6ffa07950ade283b8fee69e6b907935e4d5de09",
+          "url": "https://github.com/kube-rs/kube/commit/660c438cbf8335347f4647116998ea2934f8529f"
+        },
+        "date": 1793896544924,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
