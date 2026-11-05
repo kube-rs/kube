@@ -10,7 +10,7 @@ use kube_core::{
     request::Request,
 };
 use serde::{Serialize, de::DeserializeOwned};
-use std::fmt::Debug;
+use std::{fmt::Debug, sync::Arc};
 
 /// A marker trait to indicate cluster-wide operations are available
 trait ClusterScope {}
@@ -380,6 +380,153 @@ impl Client {
         self.request::<ObjectList<K>>(req).await
     }
 }
+
+#[derive(Clone)]
+pub(super) struct ImpersonationHeaders {
+    user: http::HeaderValue,
+    uid: Option<http::HeaderValue>,
+    groups: Vec<http::HeaderValue>,
+    extra: Vec<(http::HeaderName, http::HeaderValue)>,
+}
+
+impl ImpersonationHeaders {
+    pub fn new(user: http::HeaderValue) -> Self {
+        Self {
+            user,
+            uid: None,
+            groups: Vec::default(),
+            extra: Vec::default(),
+        }
+    }
+
+    /// Append impersonation headers to the given [`http::Request`].
+    pub fn apply<B>(&self, request: &mut http::Request<B>) {
+        const IMPERSONATE_USER: http::HeaderName = http::HeaderName::from_static("impersonate-user");
+        const IMPERSONATE_UID: http::HeaderName = http::HeaderName::from_static("impersonate-uid");
+        const IMPERSONATE_GROUP: http::HeaderName = http::HeaderName::from_static("impersonate-group");
+
+        let headers = request.headers_mut();
+
+        headers.append(IMPERSONATE_USER, self.user.clone());
+
+        if let Some(uid) = &self.uid {
+            headers.append(IMPERSONATE_UID, uid.clone());
+        }
+        for group in self.groups.iter() {
+            headers.append(IMPERSONATE_GROUP, group.clone());
+        }
+        for (extra_key, extra_val) in self.extra.iter() {
+            headers.append(extra_key.clone(), extra_val.clone());
+        }
+    }
+}
+
+/// Impersonation builder API for the `unstable-client` feature
+///
+/// This provides an efficient builder API for setting impersonation headers on a [`Client`]
+/// without having to completely recreate a client starting from its [`crate::Config`] or
+/// having wrap the client in a custom [`tower::Service`], which unnecessarily passes every
+/// request through two [`tower::buffer::Buffer`]s.
+impl Client {
+    /// Make this client [impersonate] the given Kubernetes user. Setting this resets
+    /// all other impersonation information.
+    ///
+    /// If set, `user` must be a valid header value. If it is not, the method returns an error,
+    /// consuming the client. Clone it beforehand if it might still be needed.
+    ///
+    /// # Notes
+    ///
+    /// - Impersonation information is propagated to future clones of this client.
+    ///
+    /// - Be aware that when building a client a [`Config`], user impersonation configured via
+    ///   [`AuthInfo`] is injected by the [`ExtraHeadersLayer`] that makes up this client's
+    ///   [`tower::Service`]. As such, the headers will be duplicated as there is no way for this
+    ///   builder method to override them. Hence you should avoid using these methods if configuring
+    ///   impersonation via `AuthInfo`.
+    ///
+    /// [impersonate]: https://kubernetes.io/docs/reference/access-authn-authz/user-impersonation/
+    /// [`Config`]: crate::Config
+    /// [`AuthInfo`]: crate::config::AuthInfo
+    /// [`ExtraHeadersLayer`]: crate::client::middleware::ExtraHeadersLayer
+    pub fn with_impersonate_user(mut self, user: Option<&str>) -> Result<Self> {
+        let Some(user) = user else {
+            self.impersonation_headers = None;
+            return Ok(self);
+        };
+        let user = http::HeaderValue::from_str(user)
+            .map_err(http::Error::from)
+            .map_err(Error::HttpError)?;
+
+        self.impersonation_headers = Some(Arc::new(ImpersonationHeaders::new(user)));
+        Ok(self)
+    }
+
+    /// Specify a unique identifier that represents the user being impersonated by this [`Client`].
+    ///
+    /// Requires a user being impersonated via [`Client::with_impersonate_user`] and `uid` to be
+    /// a valid header value. If these conditions are not met, the method returns an error,
+    /// consuming the client. Clone it beforehand if it might still be needed.
+    pub fn with_impersonate_uid(mut self, uid: &str) -> Result<Self> {
+        let uid = http::HeaderValue::from_str(uid)
+            .map_err(http::Error::from)
+            .map_err(Error::HttpError)?;
+
+        match &mut self.impersonation_headers {
+            Some(h) => Arc::make_mut(h).uid = Some(uid),
+            None => return Err(crate::Error::ImpersonatedUserNotSet),
+        };
+
+        Ok(self)
+    }
+
+    /// Specify groups to act as when impersonating a user.
+    ///
+    /// Requires a user being impersonated via [`Client::with_impersonate_user`] and each group to be
+    /// a valid header value. If these conditions are not met, the method returns an error,
+    /// consuming the client. Clone it beforehand if it might still be needed.
+    pub fn with_impersonate_groups<'a>(mut self, groups: impl IntoIterator<Item = &'a str>) -> Result<Self> {
+        let impersonation = match &mut self.impersonation_headers {
+            Some(h) => Arc::make_mut(h),
+            None => return Err(crate::Error::ImpersonatedUserNotSet),
+        };
+
+        for group in groups.into_iter() {
+            let group = http::HeaderValue::from_str(group)
+                .map_err(http::Error::from)
+                .map_err(Error::HttpError)?;
+            impersonation.groups.push(group)
+        }
+
+        Ok(self)
+    }
+
+    /// Specify extra fields to associate with the user being impersonated.
+    ///
+    /// Requires a user being impersonated via [`Client::with_impersonate_user`] and each pair to be
+    /// a valid header name and value, respectively. If these conditions are not met, the method
+    /// returns an error, consuming the client. Clone it beforehand if it might still be needed.
+    pub fn with_impersonate_extra<'a>(
+        mut self,
+        extra: impl IntoIterator<Item = (&'a str, &'a str)>,
+    ) -> Result<Self> {
+        let impersonation = match &mut self.impersonation_headers {
+            Some(h) => Arc::make_mut(h),
+            None => return Err(crate::Error::ImpersonatedUserNotSet),
+        };
+
+        for (extra_key, extra_value) in extra.into_iter() {
+            let name = super::config_ext::impersonate_extra_header_name(extra_key)?;
+            let value = http::HeaderValue::from_str(extra_value)
+                .map_err(http::Error::from)
+                .map_err(Error::HttpError)?;
+
+            impersonation.extra.push((name, value));
+        }
+
+        Ok(self)
+    }
+}
+
 
 #[cfg(test)]
 mod test {

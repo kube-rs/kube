@@ -566,7 +566,7 @@ impl Config {
 ///
 /// Percent-escapes extra keys so that they are valid header names, using the same percent-escape
 /// set as the Go client (illegal header name bytes and '%').
-fn impersonate_extra_header_name(key: &str) -> Result<HeaderName> {
+pub(super) fn impersonate_extra_header_name(key: &str) -> Result<HeaderName> {
     // Source: https://github.com/kubernetes/kubernetes/blob/8f5bbad3e20a347aaae13afd78cc955e642c68e4/staging/src/k8s.io/client-go/transport/round_trippers.go#L714
     // Note that we don't remove '%' here, since we do want to escape it.
     const NEEDS_ESCAPE: percent_encoding::AsciiSet = percent_encoding::NON_ALPHANUMERIC
