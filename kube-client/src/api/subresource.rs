@@ -763,9 +763,11 @@ fn portforward_path() {
 pub trait Portforward {}
 
 #[cfg(feature = "ws")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
 impl Portforward for k8s_openapi::api::core::v1::Pod {}
 
 #[cfg(feature = "ws")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
 impl<K> Api<K>
 where
     K: Clone + DeserializeOwned + Portforward,
