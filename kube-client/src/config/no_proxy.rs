@@ -226,9 +226,9 @@ impl Host {
             Host::Name(target_name) => match matcher {
                 NoProxyMatcher::Host { name, port, exact } => {
                     if *exact {
-                        target_name == name && target_port == *port
+                        target_name == name && port.is_none_or(|p| target_port == Some(p))
                     } else {
-                        target_name.ends_with(name) && target_port == *port
+                        target_name.ends_with(name) && port.is_none_or(|p| target_port == Some(p))
                     }
                 }
                 _ => false,
@@ -377,5 +377,24 @@ mod tests {
     #[case("1.2.3.4", false)]
     fn host(#[case] input: &str, #[case] matches: bool) {
         assert_match("*.example.org, .example.com, kube.rs, localhost", input, matches);
+    }
+
+    // A matcher without a port must still match targets whose port comes from the scheme
+    #[rstest]
+    // A matcher without a port matches any port
+    #[case("kube.rs", "https://kube.rs", true)]
+    #[case("kube.rs", "http://kube.rs", true)]
+    #[case("kube.rs", "https://other.kube.rs", false)]
+    #[case("kube.rs", "https://kube.rs:6443", true)]
+    #[case(".example.com", "https://api.example.com:6443", true)]
+    #[case("10.2.2.5", "https://10.2.2.5:6443", true)]
+    // A matcher with a port only matches that port
+    #[case("kube.rs:443", "https://kube.rs", true)]
+    #[case(".example.com:443", "https://api.example.com", true)]
+    #[case("kube.rs:6443", "https://kube.rs:6443", true)]
+    #[case("kube.rs:6443", "https://kube.rs", false)]
+    #[case(".example.com:443", "https://api.example.com:6443", false)]
+    fn host_with_scheme(#[case] no_proxy: &str, #[case] target: &str, #[case] matches: bool) {
+        assert_match(no_proxy, target, matches);
     }
 }

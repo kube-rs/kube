@@ -1,5 +1,5 @@
 #[cfg(any(feature = "http-proxy", feature = "socks5"))]
-use crate::config::no_proxy::NoProxy;
+use crate::config::{NoProxyError, no_proxy::NoProxy};
 
 use crate::{
     config::{
@@ -135,32 +135,44 @@ impl ConfigLoader {
         }
     }
 
-    pub fn proxy_url(&self) -> Result<Option<http::Uri>, KubeconfigError> {
-        if let Some(proxy) = nonempty(self.cluster.proxy_url.clone())
+    /// The proxy to reach the apiserver at `cluster_url` through, if any.
+    pub fn proxy_url(&self, cluster_url: &http::Uri) -> Result<Option<http::Uri>, KubeconfigError> {
+        let proxy = nonempty(self.cluster.proxy_url.clone())
             .or_else(|| nonempty(std::env::var("HTTPS_PROXY").ok()))
             .or_else(|| nonempty(std::env::var("https_proxy").ok()))
+            .map(|proxy| proxy.parse::<http::Uri>().map_err(KubeconfigError::ParseProxyUrl))
+            .transpose()?;
+
+        #[cfg(any(feature = "http-proxy", feature = "socks5"))]
         {
-            let uri = proxy
-                .parse::<http::Uri>()
-                .map_err(KubeconfigError::ParseProxyUrl)?;
-
-            #[cfg(any(feature = "http-proxy", feature = "socks5"))]
-            {
-                let no_proxy = NoProxy::from_env().map_err(KubeconfigError::ParseNoProxy)?;
-
-                match no_proxy {
-                    Some(no_proxy) if no_proxy.matches(&uri).map_err(KubeconfigError::ParseNoProxy)? => {
-                        Ok(None)
-                    }
-                    _ => Ok(Some(uri)),
-                }
-            }
-
-            #[cfg(not(any(feature = "http-proxy", feature = "socks5")))]
-            Ok(Some(uri))
-        } else {
-            Ok(None)
+            Self::apply_no_proxy(proxy, cluster_url, NoProxy::from_env)
         }
+
+        #[cfg(not(any(feature = "http-proxy", feature = "socks5")))]
+        {
+            let _ = cluster_url; // NO_PROXY is only honored with a proxy feature
+            Ok(proxy)
+        }
+    }
+
+    /// Drops `proxy` if `NO_PROXY` exempts `cluster_url`. Only reads `NO_PROXY` when a proxy is configured.
+    #[cfg(any(feature = "http-proxy", feature = "socks5"))]
+    fn apply_no_proxy(
+        proxy: Option<http::Uri>,
+        cluster_url: &http::Uri,
+        load_no_proxy: impl FnOnce() -> Result<Option<NoProxy>, NoProxyError>,
+    ) -> Result<Option<http::Uri>, KubeconfigError> {
+        let Some(proxy) = proxy else {
+            return Ok(None);
+        };
+        if let Some(no_proxy) = load_no_proxy().map_err(KubeconfigError::ParseNoProxy)?
+            && no_proxy
+                .matches(cluster_url)
+                .map_err(KubeconfigError::ParseNoProxy)?
+        {
+            return Ok(None);
+        }
+        Ok(Some(proxy))
     }
 }
 
@@ -169,5 +181,59 @@ impl TryFrom<Kubeconfig> for ConfigLoader {
 
     fn try_from(kubeconfig: Kubeconfig) -> Result<Self, KubeconfigError> {
         Self::load_from_kubeconfig(kubeconfig, None, None, None)
+    }
+}
+
+#[cfg(all(test, any(feature = "http-proxy", feature = "socks5")))]
+mod tests {
+    use rstest::rstest;
+
+    use super::*;
+
+    // NO_PROXY is matched against the apiserver, never against the proxy itself
+    #[rstest]
+    #[case("10.2.2.5", false)]
+    #[case("10.0.0.0/8", false)]
+    #[case("localhost, 10.2.2.5", false)]
+    #[case("proxy.corporate.com", true)]
+    #[case("proxy.corporate.com:80", true)]
+    #[case("1.2.3.4", true)]
+    fn no_proxy_matches_cluster_url(#[case] no_proxy: &str, #[case] proxied: bool) {
+        let proxy_url = http::Uri::from_static("http://proxy.corporate.com:80");
+        let cluster_url = http::Uri::from_static("https://10.2.2.5:6443");
+
+        let proxy = ConfigLoader::apply_no_proxy(Some(proxy_url.clone()), &cluster_url, || {
+            no_proxy.parse::<NoProxy>().map(Some)
+        })
+        .expect("valid proxy and NO_PROXY configuration");
+        assert_eq!(proxy, proxied.then_some(proxy_url), "NO_PROXY={no_proxy}");
+    }
+
+    #[test]
+    fn no_proxy_is_not_read_without_proxy() {
+        let cluster_url = http::Uri::from_static("https://kube.rs");
+        let proxy = ConfigLoader::apply_no_proxy(None, &cluster_url, || {
+            panic!("NO_PROXY must not be read without a proxy")
+        })
+        .expect("no proxy requires no NO_PROXY configuration");
+        assert_eq!(proxy, None);
+    }
+
+    #[test]
+    fn absent_no_proxy_preserves_proxy() {
+        let proxy_url = http::Uri::from_static("http://proxy.corporate.com:80");
+        let cluster_url = http::Uri::from_static("https://kube.rs");
+        let proxy = ConfigLoader::apply_no_proxy(Some(proxy_url.clone()), &cluster_url, || Ok(None))
+            .expect("absent NO_PROXY is valid");
+        assert_eq!(proxy, Some(proxy_url));
+    }
+
+    #[test]
+    fn malformed_no_proxy_is_reported_with_proxy() {
+        let proxy_url = http::Uri::from_static("http://proxy.corporate.com:80");
+        let cluster_url = http::Uri::from_static("https://kube.rs");
+        let result =
+            ConfigLoader::apply_no_proxy(Some(proxy_url), &cluster_url, || ",".parse::<NoProxy>().map(Some));
+        assert!(matches!(result, Err(KubeconfigError::ParseNoProxy(_))));
     }
 }

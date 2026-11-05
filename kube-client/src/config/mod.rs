@@ -356,6 +356,8 @@ impl Config {
             root_cert = Some(ca_bundle);
         }
 
+        let proxy_url = loader.proxy_url(&cluster_url)?;
+
         Ok(Self {
             cluster_url,
             default_namespace,
@@ -367,7 +369,7 @@ impl Config {
             reset_reader_on_write: false,
             accept_invalid_certs,
             disable_compression,
-            proxy_url: loader.proxy_url()?,
+            proxy_url,
             auth_info: loader.user,
             tls_server_name: loader.cluster.tls_server_name,
             headers: Vec::new(),
