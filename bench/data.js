@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793896252033,
+  "lastUpdate": 1793896319393,
   "repoUrl": "https://github.com/kube-rs/kube",
   "entries": {
     "Benchmark": [
@@ -10121,6 +10121,105 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/kube-rs/kube/commit/4edd4d600822bf42e2b078683e3dba4fa7a6bde4"
         },
         "date": 1793896250812,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "init_listwatch - peak_bytes",
+            "value": 55194619,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - total_allocated",
+            "value": 76715088,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - alloc_count",
+            "value": 578023,
+            "unit": "allocations"
+          },
+          {
+            "name": "steady_state - peak_bytes",
+            "value": 71381202,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - total_allocated",
+            "value": 109519220,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - alloc_count",
+            "value": 799021,
+            "unit": "allocations"
+          },
+          {
+            "name": "relist - peak_bytes",
+            "value": 99797302,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - total_allocated",
+            "value": 174518628,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - alloc_count",
+            "value": 1189035,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_without_modify - peak_bytes",
+            "value": 141298836,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - total_allocated",
+            "value": 205865000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - alloc_count",
+            "value": 1298020,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_with_modify - peak_bytes",
+            "value": 134853452,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - total_allocated",
+            "value": 162895000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - alloc_count",
+            "value": 1058021,
+            "unit": "allocations"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "info@orangecms.org",
+            "name": "Jiji Freya Daniel Maslowski",
+            "username": "orangecms"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "12a544c83b18efbcd2e5d706998813b38b0cc210",
+          "message": "fix parse error messages for LabelSelectorRequirement into Expression (#2143)\n\nThe second 'In' looks like a copy-paste error, fixed to mitigate confusion.\n\nMake clear that an expression operator might also be missing, because the\ndeserializer in k8s-openapi would turn it into an empty string:\n<https://github.com/Arnavion/k8s-openapi/blob/ec1be51e4ca5fbb3254ef91d978f1b97fab004b5/src/v1_37/apimachinery/pkg/apis/meta/v1/label_selector_requirement.rs#L70>\n\nSigned-off-by: Jiji Freya Daniel Maslowski <info@orangecms.org>",
+          "timestamp": "2026-11-05T16:30:34Z",
+          "tree_id": "0715de746d3287fe7b46d7eaba608343c3e5327a",
+          "url": "https://github.com/kube-rs/kube/commit/12a544c83b18efbcd2e5d706998813b38b0cc210"
+        },
+        "date": 1793896318028,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
