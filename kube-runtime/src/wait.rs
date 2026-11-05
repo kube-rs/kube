@@ -167,7 +167,7 @@ pub mod conditions {
         api::{
             apps::v1::Deployment,
             batch::v1::Job,
-            core::v1::{Pod, Service},
+            core::v1::{Container, ContainerStatus, Pod, Service},
             networking::v1::Ingress,
         },
         apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition,
@@ -230,11 +230,27 @@ pub mod conditions {
         }
     }
 
+    fn container_resources_match(container: &Container, container_statuses: &[ContainerStatus]) -> bool {
+        container_statuses
+            .iter()
+            .find(|status| status.name == container.name)
+            .is_some_and(|status| {
+                let spec_resources = container.resources.as_ref();
+                let status_resources = status.resources.as_ref();
+                let requests_match = spec_resources.and_then(|resources| resources.requests.as_ref())
+                    == status_resources.and_then(|resources| resources.requests.as_ref());
+                let limits_match = spec_resources.and_then(|resources| resources.limits.as_ref())
+                    == status_resources.and_then(|resources| resources.limits.as_ref());
+
+                requests_match && limits_match
+            })
+    }
+
     /// An await condition for `Pod` that returns `true` once an in-place resize operation has completed
     ///
-    /// A resize is considered complete when, for every container in `spec.containers`,
-    /// the corresponding entry in `status.containerStatuses` reports the same `resources`
-    /// (both `requests` and `limits`).
+    /// A resize is considered complete when every regular container and every restartable init
+    /// container has matching `resources` in its corresponding status (both `requests` and
+    /// `limits`).
     ///
     /// This avoids a race condition where checking only for the absence of
     /// `PodResizePending`/`PodResizeInProgress` conditions could return `true` before the
@@ -253,22 +269,21 @@ pub mod conditions {
                 && let Some(spec) = &pod.spec
                 && let Some(container_statuses) = &status.container_statuses
             {
-                return spec.containers.iter().all(|container| {
-                    container_statuses
-                        .iter()
-                        .find(|cs| cs.name == container.name)
-                        .is_some_and(|cs| {
-                            let spec_resources = container.resources.as_ref();
-                            let status_resources = cs.resources.as_ref();
+                let containers_ready = spec
+                    .containers
+                    .iter()
+                    .all(|container| container_resources_match(container, container_statuses));
 
-                            let requests_match = spec_resources.and_then(|r| r.requests.as_ref())
-                                == status_resources.and_then(|r| r.requests.as_ref());
-                            let limits_match = spec_resources.and_then(|r| r.limits.as_ref())
-                                == status_resources.and_then(|r| r.limits.as_ref());
+                let init_container_statuses = status.init_container_statuses.as_deref().unwrap_or_default();
+                let init_containers_ready = spec
+                    .init_containers
+                    .as_deref()
+                    .unwrap_or_default()
+                    .iter()
+                    .filter(|container| container.restart_policy.as_deref() == Some("Always"))
+                    .all(|container| container_resources_match(container, init_container_statuses));
 
-                            requests_match && limits_match
-                        })
-                });
+                return containers_ready && init_containers_ready;
             }
             false
         }
@@ -781,6 +796,139 @@ pub mod conditions {
                   containerStatuses:
                   - name: other
                     image: alpine:3.23
+            "#;
+
+            let p = serde_saphyr::from_str(pod).unwrap();
+            assert!(!is_pod_resized().matches_object(Some(&p)))
+        }
+
+        #[test]
+        /// fail when a restartable init container status is missing
+        fn pod_resize_missing_restartable_init_container_status() {
+            use super::{Condition, is_pod_resized};
+
+            let pod = r#"
+                apiVersion: v1
+                kind: Pod
+                metadata:
+                  name: resize-demo
+                  namespace: default
+                spec:
+                  initContainers:
+                  - name: sidecar
+                    image: nginx:stable-alpine
+                    restartPolicy: Always
+                    resources:
+                      requests:
+                        cpu: "200m"
+                  containers:
+                  - name: app
+                    image: nginx:stable-alpine
+                    resources:
+                      requests:
+                        cpu: "200m"
+                status:
+                  phase: Running
+                  containerStatuses:
+                  - name: app
+                    image: nginx:stable-alpine
+                    resources:
+                      requests:
+                        cpu: "200m"
+            "#;
+
+            let p = serde_saphyr::from_str(pod).unwrap();
+            assert!(!is_pod_resized().matches_object(Some(&p)))
+        }
+
+        #[test]
+        /// pass when a restartable init container has matching resources
+        fn pod_resize_restartable_init_container_complete() {
+            use super::{Condition, is_pod_resized};
+
+            let pod = r#"
+                apiVersion: v1
+                kind: Pod
+                metadata:
+                  name: resize-demo
+                  namespace: default
+                spec:
+                  initContainers:
+                  - name: sidecar
+                    image: nginx:stable-alpine
+                    restartPolicy: Always
+                    resources:
+                      requests:
+                        cpu: "200m"
+                      limits:
+                        cpu: "400m"
+                  containers:
+                  - name: app
+                    image: nginx:stable-alpine
+                    resources:
+                      requests:
+                        cpu: "200m"
+                status:
+                  phase: Running
+                  initContainerStatuses:
+                  - name: sidecar
+                    image: nginx:stable-alpine
+                    resources:
+                      requests:
+                        cpu: "200m"
+                      limits:
+                        cpu: "400m"
+                  containerStatuses:
+                  - name: app
+                    image: nginx:stable-alpine
+                    resources:
+                      requests:
+                        cpu: "200m"
+            "#;
+
+            let p = serde_saphyr::from_str(pod).unwrap();
+            assert!(is_pod_resized().matches_object(Some(&p)))
+        }
+
+        #[test]
+        /// fail when a restartable init container still has different resources
+        fn pod_resize_restartable_init_container_in_progress() {
+            use super::{Condition, is_pod_resized};
+
+            let pod = r#"
+                apiVersion: v1
+                kind: Pod
+                metadata:
+                  name: resize-demo
+                  namespace: default
+                spec:
+                  initContainers:
+                  - name: sidecar
+                    image: nginx:stable-alpine
+                    restartPolicy: Always
+                    resources:
+                      requests:
+                        cpu: "200m"
+                  containers:
+                  - name: app
+                    image: nginx:stable-alpine
+                    resources:
+                      requests:
+                        cpu: "200m"
+                status:
+                  phase: Running
+                  initContainerStatuses:
+                  - name: sidecar
+                    image: nginx:stable-alpine
+                    resources:
+                      requests:
+                        cpu: "100m"
+                  containerStatuses:
+                  - name: app
+                    image: nginx:stable-alpine
+                    resources:
+                      requests:
+                        cpu: "200m"
             "#;
 
             let p = serde_saphyr::from_str(pod).unwrap();
