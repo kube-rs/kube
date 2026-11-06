@@ -109,11 +109,36 @@ where
             watcher::Event::Apply(obj) => {
                 let key = obj.to_object_ref(self.dyntype.clone());
                 let obj = Arc::new(obj.clone());
-                self.store.write().insert(key, obj);
+                let mut store = self.store.write();
+                #[cfg(feature = "unstable-runtime-subscribe")]
+                if self.dispatcher.is_some()
+                    && let Some((stored, _)) = store.get_key_value(&key)
+                    && stored.extra.remaining_lookups.is_some()
+                {
+                    store.remove(&key);
+                }
+                store.insert(key, obj);
             }
             watcher::Event::Delete(obj) => {
                 let key = obj.to_object_ref(self.dyntype.clone());
-                self.store.write().remove(&key);
+                let mut store = self.store.write();
+                #[cfg(not(feature = "unstable-runtime-subscribe"))]
+                store.remove(&key);
+
+                #[cfg(feature = "unstable-runtime-subscribe")]
+                if let Some((original_key, existing)) = store.remove_entry(&key)
+                    && let Some(dispatcher) = &self.dispatcher
+                    && let Some(subscribers) = dispatcher.subscribers()
+                {
+                    if existing.uid().as_deref() == key.extra.uid.as_deref() {
+                        // Re-insert the entry with updated key, as insert on its own doesnt modify the key
+                        let mut key = key;
+                        key.extra.remaining_lookups = Some(subscribers);
+                        store.insert(key, existing);
+                    } else {
+                        store.insert(original_key, existing);
+                    }
+                }
             }
             watcher::Event::Init => {
                 self.buffer = AHashMap::new();
@@ -162,6 +187,19 @@ where
                     for obj_ref in obj_refs {
                         dispatcher.broadcast(obj_ref).await;
                     }
+                }
+
+                #[cfg(feature = "unstable-runtime-subscribe")]
+                watcher::Event::Delete(obj) => {
+                    let obj_ref = {
+                        let obj_ref = obj.to_object_ref(self.dyntype.clone());
+                        let store = self.store.read();
+                        store
+                            .get_key_value(&obj_ref)
+                            .map(|(obj_ref, _)| obj_ref.clone())
+                            .unwrap_or(obj_ref)
+                    };
+                    dispatcher.broadcast(obj_ref).await;
                 }
 
                 _ => {}
@@ -240,6 +278,59 @@ where
             })
             // Clone to let go of the entry lock ASAP
             .cloned()
+    }
+
+    /// Return the cached object for `key`, removing it after its last pending lookup.
+    ///
+    /// Earlier lookups decrement the pending lookup count and leave the object in the cache.
+    #[cfg(feature = "unstable-runtime-subscribe")]
+    #[must_use]
+    pub(crate) fn remove(&self, key: &ObjectRef<K>) -> Option<Arc<K>> {
+        Self::remove_from_store(&mut self.store.write(), key)
+    }
+
+    /// Perform atomic removal from store based on decrement of remaining lookups
+    #[cfg(feature = "unstable-runtime-subscribe")]
+    #[must_use]
+    fn remove_from_store(store: &mut AHashMap<ObjectRef<K>, Arc<K>>, key: &ObjectRef<K>) -> Option<Arc<K>> {
+        store.remove_entry(key).map(|(mut stored_key, obj)| {
+            if key.extra.uid.as_deref() != obj.uid().as_deref() {
+                store.insert(stored_key, obj.clone());
+                return obj;
+            }
+            match stored_key.extra.remaining_lookups {
+                Some(..=1) => (),
+                None => {
+                    store.insert(stored_key, obj.clone());
+                }
+                Some(lookups) => {
+                    stored_key.extra.remaining_lookups = Some(lookups - 1);
+                    store.insert(stored_key, obj.clone());
+                }
+            }
+
+            obj
+        })
+    }
+
+    /// Perform cleanup of retained cache items in the middle of deletion.
+    ///
+    /// This does not guarantee deletion event delivery to all pending subscribers,
+    /// but avoids leaving unconsumed deleted objects in cache, and is consistent
+    /// with handling of apply events always reading latest cache state, potentially
+    /// missing individual edges.
+    #[cfg(feature = "unstable-runtime-subscribe")]
+    pub(crate) fn drop_subscriber(&self) {
+        let mut store = self.store.write();
+        let keys: Vec<ObjectRef<K>> = store
+            .keys()
+            .filter(|k| k.extra.remaining_lookups.is_some())
+            .cloned()
+            .collect();
+
+        for k in keys {
+            let _ = Self::remove_from_store(&mut store, &k);
+        }
     }
 
     /// Return a full snapshot of the current values

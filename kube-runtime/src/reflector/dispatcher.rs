@@ -7,6 +7,7 @@ use std::{fmt::Debug, sync::Arc};
 use educe::Educe;
 use futures::Stream;
 use pin_project::pin_project;
+#[cfg(feature = "unstable-runtime-subscribe")] use pin_project::pinned_drop;
 use std::task::ready;
 
 use crate::reflector::{ObjectRef, Store};
@@ -72,6 +73,12 @@ where
     pub(crate) fn subscribe(&self, reader: Store<K>) -> ReflectHandle<K> {
         ReflectHandle::new(reader, self.dispatch_tx.new_receiver())
     }
+
+    // Return a number of active subscribers to this shared sender.
+    #[cfg(feature = "unstable-runtime-subscribe")]
+    pub(crate) fn subscribers(&self) -> Option<usize> {
+        Some(self.dispatch_tx.receiver_count()).filter(|c| *c > 0)
+    }
 }
 
 /// A handle to a shared stream reader
@@ -88,7 +95,8 @@ where
 /// can still be polled after the root stream has been dropped.
 ///
 /// [`Writer`]: crate::reflector::Writer
-#[pin_project]
+#[cfg_attr(feature = "unstable-runtime-subscribe", pin_project(PinnedDrop))]
+#[cfg_attr(not(feature = "unstable-runtime-subscribe"), pin_project)]
 pub struct ReflectHandle<K>
 where
     K: Lookup + Clone + 'static,
@@ -135,12 +143,31 @@ where
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut this = self.project();
         match ready!(this.rx.as_mut().poll_next(cx)) {
-            Some(obj_ref) => this
-                .reader
-                .get(&obj_ref)
-                .map_or(Poll::Pending, |obj| Poll::Ready(Some(obj))),
+            Some(obj_ref) => {
+                #[cfg(feature = "unstable-runtime-subscribe")]
+                let obj = if obj_ref.extra.remaining_lookups.is_some() {
+                    this.reader.remove(&obj_ref)
+                } else {
+                    this.reader.get(&obj_ref)
+                };
+                #[cfg(not(feature = "unstable-runtime-subscribe"))]
+                let obj = this.reader.get(&obj_ref);
+                obj.map_or(Poll::Pending, |obj| Poll::Ready(Some(obj)))
+            }
             None => Poll::Ready(None),
         }
+    }
+}
+
+#[cfg(feature = "unstable-runtime-subscribe")]
+#[pinned_drop]
+impl<K> PinnedDrop for ReflectHandle<K>
+where
+    K: Lookup + Clone,
+    K::DynamicType: Eq + std::hash::Hash + Clone,
+{
+    fn drop(self: Pin<&mut Self>) {
+        self.reader().drop_subscriber();
     }
 }
 
@@ -149,6 +176,7 @@ where
 pub(crate) mod test {
     use crate::{
         WatchStreamExt,
+        reflector::ObjectRef,
         watcher::{Error, Event},
     };
     use std::{pin::pin, sync::Arc, task::Poll};
@@ -221,10 +249,14 @@ pub(crate) mod test {
         // NOTE: a Delete(_) event will be ignored if the item does not exist in
         // the cache. Same with a Restarted(vec![delete_item])
         let foo = testpod("foo");
+        let mut foo2 = testpod("foo");
+        foo2.metadata.uid = Some("1".to_string());
         let bar = testpod("bar");
         let st = stream::iter(vec![
             Ok(Event::Delete(foo.clone())),
             Ok(Event::Apply(foo.clone())),
+            Ok(Event::Delete(foo2.clone())),
+            Ok(Event::Delete(foo.clone())),
             Err(Error::NoResourceVersion),
             Ok(Event::Init),
             Ok(Event::InitApply(foo.clone())),
@@ -235,8 +267,10 @@ pub(crate) mod test {
         let foo = Arc::new(foo);
         let _bar = Arc::new(bar);
 
-        let (_, writer) = reflector::store_shared(10);
+        let (reader, writer) = reflector::store_shared(10);
         let mut subscriber = pin!(writer.subscribe().unwrap());
+        let mut other_subscriber = Box::pin(writer.subscribe().unwrap());
+        let mut delayed_subscriber = pin!(writer.subscribe().unwrap());
         let mut reflect = pin!(st.reflect_shared(writer));
 
         // Deleted events should be skipped by subscriber.
@@ -244,13 +278,45 @@ pub(crate) mod test {
             poll!(reflect.next()),
             Poll::Ready(Some(Ok(Event::Delete(_))))
         ));
+        assert_eq!(reader.get(&ObjectRef::from_obj(&foo)), None);
         assert_eq!(poll!(subscriber.next()), Poll::Pending);
+        assert_eq!(poll!(other_subscriber.next()), Poll::Pending);
+        assert_eq!(poll!(delayed_subscriber.next()), Poll::Pending);
 
         assert!(matches!(
             poll!(reflect.next()),
             Poll::Ready(Some(Ok(Event::Apply(_))))
         ));
         assert_eq!(poll!(subscriber.next()), Poll::Ready(Some(foo.clone())));
+        assert_eq!(poll!(other_subscriber.next()), Poll::Ready(Some(foo.clone())));
+        assert_eq!(reader.get(&ObjectRef::from_obj(&foo)), Some(foo.clone()));
+
+        // Deleting a different UID with the same name must preserve foo.
+        assert!(matches!(
+            poll!(reflect.next()),
+            Poll::Ready(Some(Ok(Event::Delete(_))))
+        ));
+        assert_eq!(reader.get(&ObjectRef::from_obj(&foo)), Some(foo.clone()));
+        assert_eq!(poll!(subscriber.next()), Poll::Ready(Some(foo.clone())));
+        assert_eq!(poll!(other_subscriber.next()), Poll::Ready(Some(foo.clone())));
+        assert_eq!(reader.get(&ObjectRef::from_obj(&foo)), Some(foo.clone()));
+
+        // Deleting the matching UID removes foo after the last subscriber.
+        assert!(matches!(
+            poll!(reflect.next()),
+            Poll::Ready(Some(Ok(Event::Delete(_))))
+        ));
+        assert_eq!(reader.get(&ObjectRef::from_obj(&foo)), Some(foo.clone()));
+        assert_eq!(poll!(subscriber.next()), Poll::Ready(Some(foo.clone())));
+        assert_eq!(reader.get(&ObjectRef::from_obj(&foo)), Some(foo.clone()));
+        drop(other_subscriber);
+        assert_eq!(reader.get(&ObjectRef::from_obj(&foo)), Some(foo.clone()));
+
+        // The delayed subscriber consumes all queued events from cache with latest state of foo
+        assert_eq!(poll!(delayed_subscriber.next()), Poll::Ready(Some(foo.clone())));
+        assert_eq!(poll!(delayed_subscriber.next()), Poll::Ready(Some(foo.clone())));
+        assert_eq!(poll!(delayed_subscriber.next()), Poll::Ready(Some(foo.clone())));
+        assert_eq!(reader.get(&ObjectRef::from_obj(&foo)), None);
 
         // Errors are not propagated to subscribers.
         assert!(matches!(
@@ -423,6 +489,59 @@ pub(crate) mod test {
 
         assert_eq!(poll!(subscriber.next()), Poll::Ready(None));
         assert_eq!(poll!(subscriber_slow.next()), Poll::Ready(None));
+    }
+
+    #[cfg(feature = "unstable-runtime-subscribe")]
+    #[tokio::test]
+    async fn stale_delete_keeps_reentered_object() {
+        // Same uid comes back, e.g. the object left and re-entered a label selector
+        let mut foo = testpod("foo");
+        foo.metadata.uid = Some("1".into());
+        let st = stream::iter([
+            Ok(Event::Apply(foo.clone())),
+            Ok(Event::Delete(foo.clone())),
+            Ok(Event::Apply(foo.clone())),
+        ]);
+        let (reader, writer) = reflector::store_shared(10);
+        let mut subscriber = pin!(writer.subscribe().unwrap());
+        let mut reflect = pin!(st.reflect_shared(writer));
+        assert!(matches!(poll!(reflect.next()), Poll::Ready(Some(Ok(_)))));
+        assert!(matches!(poll!(reflect.next()), Poll::Ready(Some(Ok(_)))));
+        assert!(matches!(poll!(reflect.next()), Poll::Ready(Some(Ok(_)))));
+
+        // The subscriber catches up after all three events
+        assert!(matches!(poll!(subscriber.next()), Poll::Ready(Some(_))));
+        assert!(matches!(poll!(subscriber.next()), Poll::Ready(Some(_))));
+
+        // Reading the stale delete must not remove the live object
+        assert!(reader.get(&ObjectRef::from_obj(&foo)).is_some());
+        assert!(matches!(poll!(subscriber.next()), Poll::Ready(Some(_))));
+    }
+
+    #[tokio::test]
+    async fn stale_delete_keeps_relisted_object() {
+        let mut foo = testpod("foo");
+        foo.metadata.uid = Some("1".into());
+        let st = stream::iter([
+            Ok(Event::Apply(foo.clone())),
+            Ok(Event::Delete(foo.clone())),
+            Ok(Event::Init),
+            Ok(Event::InitApply(foo.clone())),
+            Ok(Event::InitDone),
+        ]);
+        let (reader, writer) = reflector::store_shared(10);
+        let mut subscriber = pin!(writer.subscribe().unwrap());
+        let mut reflect = pin!(st.reflect_shared(writer));
+        for _ in 0..5 {
+            assert!(matches!(poll!(reflect.next()), Poll::Ready(Some(Ok(_)))));
+        }
+
+        for _ in 0..2 {
+            assert!(matches!(poll!(subscriber.next()), Poll::Ready(Some(_))));
+        }
+        // Reading the stale delete must not remove the relisted object
+        assert!(reader.get(&ObjectRef::from_obj(&foo)).is_some());
+        assert!(matches!(poll!(subscriber.next()), Poll::Ready(Some(_))));
     }
 
     // TODO (matei): tests around cloning subscribers once a watch stream has already
