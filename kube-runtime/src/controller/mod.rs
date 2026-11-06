@@ -796,7 +796,7 @@ where
     ///
     /// This includes the core watch, as well as auxiliary watches introduced by [`Self::owns`] and [`Self::watches`].
     ///
-    /// The [`default_backoff`](crate::watcher::default_backoff) follows client-go conventions,
+    /// The [`DefaultBackoff`] follows client-go conventions,
     /// but can be overridden by calling this method.
     #[must_use]
     pub fn trigger_backoff(mut self, backoff: impl Backoff + 'static) -> Self {

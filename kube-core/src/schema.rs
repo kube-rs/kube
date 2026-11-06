@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet, btree_map::Entry};
 
-/// schemars [`Visitor`] that rewrites a [`Schema`] to conform to Kubernetes' "structural schema" rules
+/// schemars [`Transform`] that rewrites a [`Schema`](schemars::Schema) to conform to Kubernetes' "structural schema" rules
 ///
 /// The following two transformations are applied
 ///  * Rewrite enums from `oneOf` to `object`s with multiple variants ([schemars#84](https://github.com/GREsau/schemars/issues/84))
@@ -25,7 +25,7 @@ use std::collections::{BTreeMap, BTreeSet, btree_map::Entry};
 ///
 /// # Panics
 ///
-/// The [`Visitor`] functions may panic if the transform could not be applied. For example,
+/// The [`Transform`] functions may panic if the transform could not be applied. For example,
 /// there must not be any overlapping properties between `oneOf` branches.
 #[derive(Debug, Clone)]
 pub struct StructuralSchemaRewriter;

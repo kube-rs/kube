@@ -684,7 +684,7 @@ impl AuthInfo {
 
 /// Connection information for auth plugins that have `provideClusterInfo` enabled.
 ///
-/// This is a copy of [`kube::config::Cluster`] with certificate_authority passed as bytes without the path.
+/// This is a copy of [`Cluster`] with certificate_authority passed as bytes without the path.
 /// Taken from [clientauthentication/types.go#Cluster](https://github.com/kubernetes/client-go/blob/477cb782cf024bc70b7239f0dca91e5774811950/pkg/apis/clientauthentication/types.go#L73-L129)
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 #[serde(rename_all = "kebab-case")]

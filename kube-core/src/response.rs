@@ -5,8 +5,8 @@ use thiserror::Error;
 /// A Kubernetes status object
 ///
 /// This struct is returned by the Kubernetes API on failures,
-/// and bubbles up to users inside a [`kube::Error::Api`] variant
-/// when client requests fail in [`kube::Client`].
+/// and bubbles up to users inside a [`kube::Error::Api`](https://docs.rs/kube/*/kube/enum.Error.html#variant.Api) variant
+/// when client requests fail in [`kube::Client`](https://docs.rs/kube/*/kube/struct.Client.html).
 ///
 /// To match on specific error cases, you can;
 ///
