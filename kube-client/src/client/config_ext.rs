@@ -91,7 +91,7 @@ pub trait ConfigExt: private::Sealed {
     #[cfg(feature = "rustls-tls")]
     fn rustls_client_config(&self) -> Result<rustls::ClientConfig>;
 
-    /// Create [`hyper_openssl::HttpsConnector`] based on config.
+    /// Create [`hyper_openssl::client::legacy::HttpsConnector`] based on config.
     /// # Example
     ///
     /// ```rust
@@ -107,7 +107,7 @@ pub trait ConfigExt: private::Sealed {
     fn openssl_https_connector(&self)
     -> Result<hyper_openssl::client::legacy::HttpsConnector<HttpConnector>>;
 
-    /// Create [`hyper_openssl::HttpsConnector`] based on config and `connector`.
+    /// Create [`hyper_openssl::client::legacy::HttpsConnector`] based on config and `connector`.
     /// # Example
     ///
     /// ```rust

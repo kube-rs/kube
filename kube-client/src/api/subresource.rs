@@ -619,7 +619,7 @@ fn evict_path() {
 
 /// Marker trait for objects that can be evicted
 ///
-/// See [`Api::evic`] for usage
+/// See [`Api::evict`] for usage
 pub trait Evict {}
 
 impl Evict for k8s_openapi::api::core::v1::Pod {}

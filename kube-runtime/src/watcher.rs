@@ -94,8 +94,8 @@ pub enum Event<K> {
     /// This can be used as a signal to replace buffered store contents atomically.
     /// No more `InitApply` events will happen until the next `Init` event.
     ///
-    /// Any objects that were previously [`Applied`](Event::Applied) but are not listed in any of
-    /// the `InitApply` events should be assumed to have been [`Deleted`](Event::Deleted).
+    /// Any objects that were previously [`Applied`](Event::Apply) but are not listed in any of
+    /// the `InitApply` events should be assumed to have been [`Deleted`](Event::Delete).
     InitDone,
 }
 
@@ -819,7 +819,7 @@ where
 ///
 /// The stream will attempt to be recovered on the next poll after an [`Err`] is returned.
 /// This will normally happen immediately, but you can use [`StreamBackoff`](crate::utils::StreamBackoff)
-/// to introduce an artificial delay. [`default_backoff`] returns a suitable default set of parameters.
+/// to introduce an artificial delay. [`DefaultBackoff::default`] returns a suitable default set of parameters.
 ///
 /// If the watch connection is interrupted, then `watcher` will attempt to restart the watch using the last
 /// [resource version](https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes)
@@ -893,7 +893,7 @@ where
 ///
 /// The stream will attempt to be recovered on the next poll after an [`Err`] is returned.
 /// This will normally happen immediately, but you can use [`StreamBackoff`](crate::utils::StreamBackoff)
-/// to introduce an artificial delay. [`default_backoff`] returns a suitable default set of parameters.
+/// to introduce an artificial delay. [`DefaultBackoff::default`] returns a suitable default set of parameters.
 ///
 /// If the watch connection is interrupted, then `watcher` will attempt to restart the watch using the last
 /// [resource version](https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes)
