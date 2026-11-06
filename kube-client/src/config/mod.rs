@@ -15,8 +15,7 @@ use thiserror::Error;
 mod file_config;
 mod file_loader;
 mod incluster_config;
-#[cfg(any(feature = "http-proxy", feature = "socks5"))]
-mod no_proxy;
+#[cfg(any(feature = "http-proxy", feature = "socks5"))] mod no_proxy;
 
 use file_loader::ConfigLoader;
 pub use file_loader::KubeConfigOptions;
