@@ -659,14 +659,19 @@ mod test {
     use std::pin::pin;
     use tower_test::mock;
 
-    async fn delete_opt_with_response(code: StatusCode, body: String) -> crate::Result<Option<Either<Pod, Status>>> {
+    async fn delete_opt_with_response(
+        code: StatusCode,
+        body: String,
+    ) -> crate::Result<Option<Either<Pod, Status>>> {
         let (mock_service, handle) = mock::pair::<Request<Body>, Response<Body>>();
         let spawned = tokio::spawn(async move {
             let mut handle = pin!(handle);
             let (request, send) = handle.next_request().await.expect("service not called");
             assert_eq!(request.method(), Method::DELETE);
             assert_eq!(request.uri().path(), "/api/v1/namespaces/default/pods/test");
-            let response = Response::builder().status(code).body(Body::from(body.into_bytes()));
+            let response = Response::builder()
+                .status(code)
+                .body(Body::from(body.into_bytes()));
             send.send_response(response.unwrap());
         });
         let pods: Api<Pod> = Api::default_namespaced(Client::new(mock_service, "default"));

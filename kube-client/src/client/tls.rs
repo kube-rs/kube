@@ -7,8 +7,7 @@ pub mod rustls_tls {
     };
 
     // Only the webpki-roots fallback uses this; the default platform-verifier path does not.
-    #[cfg(feature = "webpki-roots")]
-    use hyper_rustls::ConfigBuilderExt;
+    #[cfg(feature = "webpki-roots")] use hyper_rustls::ConfigBuilderExt;
     use rustls::{
         self, ClientConfig, DigitallySignedStruct, RootCertStore,
         client::{

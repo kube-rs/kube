@@ -33,6 +33,7 @@
 use std::time::Duration;
 
 use http::{Request, Response, StatusCode};
+use tokio::time::Instant;
 use tower::{
     BoxError,
     retry::{
@@ -41,7 +42,6 @@ use tower::{
     },
     util::rng::HasherRng,
 };
-use tokio::time::Instant;
 
 use super::Body;
 
@@ -234,7 +234,10 @@ mod tests {
             .header("Retry-After", secs)
             .body(())
             .unwrap());
-        policy.retry(&mut req, &mut res).expect("429 is retried").deadline()
+        policy
+            .retry(&mut req, &mut res)
+            .expect("429 is retried")
+            .deadline()
     }
 
     #[tokio::test(start_paused = true)]

@@ -2,8 +2,7 @@
 
 use crate::{Client, Result};
 pub use kube_core::discovery::{ApiCapabilities, ApiResource, Scope, verbs};
-use kube_core::gvk::GroupVersionKind;
-use kube_core::{DynamicObject, TypeMeta};
+use kube_core::{DynamicObject, TypeMeta, gvk::GroupVersionKind};
 use std::collections::HashMap;
 mod apigroup;
 pub mod oneshot;
@@ -354,7 +353,9 @@ mod tests {
             metadata: Default::default(),
             data: Default::default(),
         };
-        let (ar, _caps) = discovery.resolve_object(&obj).expect("object with types resolves");
+        let (ar, _caps) = discovery
+            .resolve_object(&obj)
+            .expect("object with types resolves");
         assert_eq!(ar.kind, "Deployment");
         assert_eq!(ar.api_version, "apps/v1");
     }
