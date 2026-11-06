@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793896546425,
+  "lastUpdate": 1793953243563,
   "repoUrl": "https://github.com/kube-rs/kube",
   "entries": {
     "Benchmark": [
@@ -10319,6 +10319,105 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/kube-rs/kube/commit/660c438cbf8335347f4647116998ea2934f8529f"
         },
         "date": 1793896544924,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "init_listwatch - peak_bytes",
+            "value": 55194619,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - total_allocated",
+            "value": 76715088,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - alloc_count",
+            "value": 578023,
+            "unit": "allocations"
+          },
+          {
+            "name": "steady_state - peak_bytes",
+            "value": 71381202,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - total_allocated",
+            "value": 109519220,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - alloc_count",
+            "value": 799021,
+            "unit": "allocations"
+          },
+          {
+            "name": "relist - peak_bytes",
+            "value": 99797302,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - total_allocated",
+            "value": 174518628,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - alloc_count",
+            "value": 1189035,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_without_modify - peak_bytes",
+            "value": 141298836,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - total_allocated",
+            "value": 205865000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - alloc_count",
+            "value": 1298020,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_with_modify - peak_bytes",
+            "value": 134853452,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - total_allocated",
+            "value": 162895000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - alloc_count",
+            "value": 1058021,
+            "unit": "allocations"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "doxxx93@gmail.com",
+            "name": "doxxx",
+            "username": "doxxx93"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "21494befcc2b81acfaa1c64becc55d979baaaf64",
+          "message": "Make kube-client modules visible to rustfmt (#2145)\n\n* Make kube-client modules visible to rustfmt\n\nDeclare feature-gated modules outside the cfg macros so cargo fmt can follow their source files. Preserve the macros' cfg and doc(cfg) attributes on every declaration and keep the re-exports and Result alias in the macros.\n\nSigned-off-by: doxxx93 <doxxx93@gmail.com>\n\n* Format kube-client modules with nightly rustfmt\n\nSigned-off-by: doxxx93 <doxxx93@gmail.com>\n\n---------\n\nSigned-off-by: doxxx93 <doxxx93@gmail.com>",
+          "timestamp": "2026-11-06T17:19:37+09:00",
+          "tree_id": "c7ef87c78a83a5fce2fb8829e9a776b816d980ee",
+          "url": "https://github.com/kube-rs/kube/commit/21494befcc2b81acfaa1c64becc55d979baaaf64"
+        },
+        "date": 1793953242091,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
