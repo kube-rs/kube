@@ -163,6 +163,8 @@ impl<K, F: Fn(Option<&K>) -> bool> Condition<K> for F {
 /// Common conditions to wait for
 pub mod conditions {
     pub use super::Condition;
+    use std::collections::BTreeMap;
+
     use k8s_openapi::{
         api::{
             apps::v1::Deployment,
@@ -171,6 +173,7 @@ pub mod conditions {
             networking::v1::Ingress,
         },
         apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition,
+        apimachinery::pkg::api::resource::Quantity,
     };
     use kube_client::Resource;
 
@@ -230,6 +233,81 @@ pub mod conditions {
         }
     }
 
+    // Kubernetes quantities have at most three decimal places and a maximum value that fits in
+    // i64. Scaling them to millis therefore fits in i128 and gives us one exact representation.
+    fn quantity_in_millis(quantity: &Quantity) -> Option<i128> {
+        let number_end = quantity
+            .0
+            .find(|character: char| !character.is_ascii_digit() && !matches!(character, '.' | '+' | '-'))
+            .unwrap_or(quantity.0.len());
+        let (number, suffix) = quantity.0.split_at(number_end);
+        let fractional_digits = match number.split_once('.') {
+            Some((_, fraction)) if !fraction.contains('.') => i32::try_from(fraction.len()).ok()?,
+            Some(_) => return None,
+            None => 0,
+        };
+        let mut mantissa = number.replace('.', "").parse::<i128>().ok()?;
+        let (decimal_exponent, binary_multiplier) = match suffix {
+            "" => (0, 1),
+            "m" => (-3, 1),
+            "k" | "K" => (3, 1),
+            "M" => (6, 1),
+            "G" => (9, 1),
+            "T" => (12, 1),
+            "P" => (15, 1),
+            "E" => (18, 1),
+            "Ki" => (0, 1_i128 << 10),
+            "Mi" => (0, 1_i128 << 20),
+            "Gi" => (0, 1_i128 << 30),
+            "Ti" => (0, 1_i128 << 40),
+            "Pi" => (0, 1_i128 << 50),
+            "Ei" => (0, 1_i128 << 60),
+            _ => {
+                let exponent = suffix.strip_prefix(['e', 'E'])?.parse::<i32>().ok()?;
+                (exponent, 1)
+            }
+        };
+
+        mantissa = mantissa.checked_mul(binary_multiplier)?;
+        if mantissa == 0 {
+            return Some(0);
+        }
+        let scale = decimal_exponent.checked_add(3)?.checked_sub(fractional_digits)?;
+
+        if scale >= 0 {
+            mantissa.checked_mul(10_i128.checked_pow(scale.unsigned_abs())?)
+        } else {
+            let divisor = 10_i128.checked_pow(scale.unsigned_abs())?;
+            (mantissa % divisor == 0).then_some(mantissa / divisor)
+        }
+    }
+
+    fn quantities_match(left: &Quantity, right: &Quantity) -> bool {
+        left == right
+            || matches!(
+                (quantity_in_millis(left), quantity_in_millis(right)),
+                (Some(left), Some(right)) if left == right
+            )
+    }
+
+    fn resource_maps_match(
+        spec: Option<&BTreeMap<String, Quantity>>,
+        status: Option<&BTreeMap<String, Quantity>>,
+    ) -> bool {
+        match (spec, status) {
+            (None, None) => true,
+            (Some(spec), Some(status)) => {
+                spec.len() == status.len()
+                    && spec.iter().all(|(name, quantity)| {
+                        status
+                            .get(name)
+                            .is_some_and(|actual| quantities_match(quantity, actual))
+                    })
+            }
+            _ => false,
+        }
+    }
+
     fn container_resources_match(container: &Container, container_statuses: &[ContainerStatus]) -> bool {
         container_statuses
             .iter()
@@ -237,10 +315,14 @@ pub mod conditions {
             .is_some_and(|status| {
                 let spec_resources = container.resources.as_ref();
                 let status_resources = status.resources.as_ref();
-                let requests_match = spec_resources.and_then(|resources| resources.requests.as_ref())
-                    == status_resources.and_then(|resources| resources.requests.as_ref());
-                let limits_match = spec_resources.and_then(|resources| resources.limits.as_ref())
-                    == status_resources.and_then(|resources| resources.limits.as_ref());
+                let requests_match = resource_maps_match(
+                    spec_resources.and_then(|resources| resources.requests.as_ref()),
+                    status_resources.and_then(|resources| resources.requests.as_ref()),
+                );
+                let limits_match = resource_maps_match(
+                    spec_resources.and_then(|resources| resources.limits.as_ref()),
+                    status_resources.and_then(|resources| resources.limits.as_ref()),
+                );
 
                 requests_match && limits_match
             })
@@ -261,6 +343,9 @@ pub mod conditions {
     /// Note: if the resize is rejected as `Infeasible` (e.g. exceeds node capacity),
     /// spec and status will never converge and this condition will never return `true`.
     /// Always wrap with [`tokio::time::timeout`].
+    ///
+    /// Resource quantities with fractional bytes, such as `0.1Gi`, may not converge if the
+    /// kubelet rounds the applied value. Avoid fractional byte values when resizing memory.
     #[must_use]
     pub fn is_pod_resized() -> impl Condition<Pod> {
         |obj: Option<&Pod>| {
@@ -624,6 +709,28 @@ pub mod conditions {
         }
 
         #[test]
+        fn pod_resize_equivalent_quantities_match() {
+            use k8s_openapi::apimachinery::pkg::api::resource::Quantity;
+
+            use super::quantities_match;
+
+            let quantity = |value: &str| Quantity(value.to_string());
+
+            for (left, right) in [
+                ("268435456", "256Mi"),
+                ("1e0", "1"),
+                ("0.2", "200m"),
+                ("1024", "1Ki"),
+                ("1e3", "1k"),
+                ("0.1Gi", "107374182.4"),
+            ] {
+                assert!(quantities_match(&quantity(left), &quantity(right)));
+            }
+            assert!(!quantities_match(&quantity("268435455"), &quantity("256Mi")));
+            assert!(!quantities_match(&quantity("0.1Gi"), &quantity("107374183")));
+        }
+
+        #[test]
         /// pass when spec and status resources match (resize complete)
         fn pod_resized_complete() {
             use super::{Condition, is_pod_resized};
@@ -657,6 +764,42 @@ pub mod conditions {
                       limits:
                         cpu: "400m"
                         memory: "512Mi"
+            "#;
+
+            let p = serde_saphyr::from_str(pod).unwrap();
+            assert!(is_pod_resized().matches_object(Some(&p)))
+        }
+
+        #[test]
+        /// pass when spec and status resources use equivalent quantity formats
+        fn pod_resized_equivalent_quantity_formats() {
+            use super::{Condition, is_pod_resized};
+
+            let pod = r#"
+                apiVersion: v1
+                kind: Pod
+                metadata:
+                  name: resize-demo
+                  namespace: default
+                spec:
+                  containers:
+                  - name: app
+                    image: nginx:stable-alpine
+                    resources:
+                      requests:
+                        cpu: "1e0"
+                      limits:
+                        memory: "268435456"
+                status:
+                  phase: Running
+                  containerStatuses:
+                  - name: app
+                    image: nginx:stable-alpine
+                    resources:
+                      requests:
+                        cpu: "1"
+                      limits:
+                        memory: "256Mi"
             "#;
 
             let p = serde_saphyr::from_str(pod).unwrap();
