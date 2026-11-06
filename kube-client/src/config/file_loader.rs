@@ -137,12 +137,8 @@ impl ConfigLoader {
 
     /// The proxy to reach the apiserver at `cluster_url` through, if any.
     pub fn proxy_url(&self, cluster_url: &http::Uri) -> Result<Option<http::Uri>, KubeconfigError> {
-        // An explicit kubeconfig proxy-url ignores NO_PROXY, like client-go
-        if let Some(proxy) = nonempty(self.cluster.proxy_url.clone()) {
-            return proxy.parse().map(Some).map_err(KubeconfigError::ParseProxyUrl);
-        }
-
-        let proxy = nonempty(std::env::var("HTTPS_PROXY").ok())
+        let proxy = nonempty(self.cluster.proxy_url.clone())
+            .or_else(|| nonempty(std::env::var("HTTPS_PROXY").ok()))
             .or_else(|| nonempty(std::env::var("https_proxy").ok()))
             .map(|proxy| proxy.parse::<http::Uri>().map_err(KubeconfigError::ParseProxyUrl))
             .transpose()?;
@@ -239,25 +235,5 @@ mod tests {
         let result =
             ConfigLoader::apply_no_proxy(Some(proxy_url), &cluster_url, || ",".parse::<NoProxy>().map(Some));
         assert!(matches!(result, Err(KubeconfigError::ParseNoProxy(_))));
-    }
-
-    #[test]
-    fn kubeconfig_proxy_url_is_used_as_is() {
-        let loader = ConfigLoader {
-            current_context: Context::default(),
-            cluster: Cluster {
-                proxy_url: Some("http://proxy.corporate.com:80".into()),
-                ..Cluster::default()
-            },
-            user: AuthInfo::default(),
-        };
-        let cluster_url = http::Uri::from_static("https://10.2.2.5:6443");
-        let proxy = loader
-            .proxy_url(&cluster_url)
-            .expect("valid kubeconfig proxy-url");
-        assert_eq!(
-            proxy,
-            Some(http::Uri::from_static("http://proxy.corporate.com:80"))
-        );
     }
 }
