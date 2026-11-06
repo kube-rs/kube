@@ -37,7 +37,7 @@ pub enum Error {
 /// [`NoProxy::matches`] checks if a target URI matches its configuration.
 #[derive(Debug)]
 pub enum NoProxy {
-    /// Every proxy configured via env var of kube config will be ignored.
+    /// Every proxy configured via env var or kube config will be ignored.
     Wildcard,
 
     /// Only a selected list of targets is ignored.
