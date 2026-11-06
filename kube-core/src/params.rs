@@ -310,6 +310,91 @@ impl ValidationDirective {
     }
 }
 
+/// A shard hash range with an inclusive start and exclusive end.
+///
+/// Bounds use `u128` so the exclusive end can represent `2^64`, just past the largest `u64` hash.
+pub type ShardRange = std::ops::Range<u128>;
+
+/// The object field used to determine its shard.
+#[derive(Clone, Debug, PartialEq)]
+pub enum ShardFieldSelector {
+    /// Shard by object UID (`metadata.uid`).
+    UID,
+    /// Shard by object namespace (`metadata.namespace`).
+    Namespace,
+}
+
+/// A shard selector that still needs at least one valid range.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Incomplete;
+
+/// A shard selector with a field selector and at least one valid range.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Complete;
+
+/// Selects shards by a field and one or more non-empty ranges.
+///
+/// Add a range to complete the selector before using it in watch parameters.
+///
+/// ```
+/// use kube::core::params::{ShardFieldSelector, ShardSelector, WatchParams};
+///
+/// // Split the complete 64-bit hash space into two adjacent ranges.
+/// let midpoint = 0b1_u128 << 63;
+/// let hash_space_end = 0b1_u128 << 64;
+/// let selector = ShardSelector::new(ShardFieldSelector::UID)
+///     .range(0b0..midpoint)?
+///     .range(midpoint..hash_space_end)?;
+/// let wp = WatchParams::default().shard_selector(selector);
+/// # Ok::<(), kube::core::request::Error>(())
+/// ```
+///
+/// An incomplete selector cannot be used in watch parameters:
+///
+/// ```compile_fail
+/// use kube::core::params::{ShardFieldSelector, ShardSelector, WatchParams};
+///
+/// let selector = ShardSelector::new(ShardFieldSelector::UID);
+/// let wp = WatchParams::default().shard_selector(selector);
+/// ```
+#[derive(Clone, Debug, PartialEq)]
+pub struct ShardSelector<State = Incomplete> {
+    field_selector: ShardFieldSelector,
+    ranges: Vec<ShardRange>,
+    state: std::marker::PhantomData<State>,
+}
+
+impl ShardSelector<Incomplete> {
+    /// Start a shard selector with the field used to determine shards.
+    #[must_use]
+    pub fn new(field_selector: ShardFieldSelector) -> Self {
+        Self {
+            field_selector,
+            ranges: vec![],
+            state: std::marker::PhantomData,
+        }
+    }
+}
+
+impl<State> ShardSelector<State> {
+    /// Add a range, completing the selector if this is its first range.
+    ///
+    /// Returns an error if the range is empty or extends beyond the u64 hash space.
+    pub fn range(mut self, range: ShardRange) -> Result<ShardSelector<Complete>, Error> {
+        if range.is_empty() || range.end > (1_u128 << 64) {
+            return Err(Error::Validation(
+                "A shard range must have a start less than its end, with an end no greater than 2^64".into(),
+            ));
+        }
+        self.ranges.push(range);
+        Ok(ShardSelector {
+            field_selector: self.field_selector,
+            ranges: self.ranges,
+            state: std::marker::PhantomData,
+        })
+    }
+}
+
 /// Common query parameters used in watch calls on collections
 #[derive(Clone, Debug, PartialEq)]
 pub struct WatchParams {
@@ -364,6 +449,10 @@ pub struct WatchParams {
     /// - `resourceVersionMatch` set to any other value or unset
     ///   Invalid error is returned.
     pub send_initial_events: bool,
+
+    /// Kubernetes 1.36 Sharded List/Watch
+    /// https://kubernetes.io/docs/reference/using-api/api-concepts/#sharded-list-and-watch
+    pub shard_selector: Option<ShardSelector<Complete>>,
 }
 
 impl WatchParams {
@@ -395,6 +484,24 @@ impl WatchParams {
             qp.append_pair("sendInitialEvents", "true");
             qp.append_pair("resourceVersionMatch", "NotOlderThan");
         }
+        if let Some(selector) = &self.shard_selector {
+            let field = match &selector.field_selector {
+                ShardFieldSelector::UID => "object.metadata.uid",
+                ShardFieldSelector::Namespace => "object.metadata.namespace",
+            };
+            let ranges = selector
+                .ranges
+                .iter()
+                .map(|range| {
+                    format!(
+                        "shardRange({field}, '0x{:016x}', '0x{:016x}')",
+                        range.start, range.end
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join(" || ");
+            qp.append_pair("shardSelector", &ranges);
+        }
     }
 }
 
@@ -409,6 +516,9 @@ impl Default for WatchParams {
             field_selector: None,
             timeout: None,
             send_initial_events: false,
+            // alpha since 1.36 but feature gated, i.e., disabled by default
+            // 1.38 intends to move this into beta
+            shard_selector: None,
         }
     }
 }
@@ -423,6 +533,13 @@ impl Default for WatchParams {
 ///     .labels("kubernetes.io/lifecycle=spot");
 /// ```
 impl WatchParams {
+    /// Configure the shard selector using at least one valid shard range.
+    #[must_use]
+    pub fn shard_selector(mut self, selector: ShardSelector<Complete>) -> Self {
+        self.shard_selector = Some(selector);
+        self
+    }
+
     /// Configure the timeout for watch calls
     ///
     /// This limits the duration of the call, regardless of any activity or inactivity.
@@ -883,7 +1000,37 @@ where
 mod test {
     use crate::{Expression, Selector, params::WatchParams};
 
-    use super::{DeleteParams, ListParams, PatchParams};
+    use super::{Complete, DeleteParams, ListParams, PatchParams, ShardFieldSelector, ShardSelector};
+
+    #[test]
+    fn shard_selector_rejects_invalid_ranges() {
+        for range in [
+            0..0,
+            10..10,
+            std::ops::Range { start: 10, end: 5 },
+            0..((1_u128 << 64) + 1),
+        ] {
+            let selector = ShardSelector::new(ShardFieldSelector::UID);
+            assert!(selector.clone().range(range.clone()).is_err());
+            assert!(selector.range(0..10).unwrap().range(range).is_err());
+        }
+    }
+
+    #[test]
+    fn shard_selector_completes_and_preserves_ranges() {
+        for field in [ShardFieldSelector::UID, ShardFieldSelector::Namespace] {
+            let selector: ShardSelector<Complete> = ShardSelector::new(field.clone())
+                .range(0..1)
+                .unwrap()
+                .range(1..(1_u128 << 64))
+                .unwrap();
+            let wp = WatchParams::default().shard_selector(selector);
+            let selector = wp.shard_selector.unwrap();
+            assert_eq!(selector.field_selector, field);
+            assert_eq!(selector.ranges, vec![0..1, 1..(1_u128 << 64)]);
+        }
+    }
+
     #[test]
     fn delete_param_serialize() {
         let mut dp = DeleteParams::default();
@@ -949,6 +1096,45 @@ mod test {
         let wp = WatchParams::default().labels_from(&selector);
         let labels = wp.label_selector.unwrap();
         assert_eq!(labels, "env in (development,sandbox)");
+    }
+
+    #[test]
+    fn watch_shard_selector_populates_query_parameter() {
+        let midpoint = 1_u128 << 63;
+        let hash_space_end = 1_u128 << 64;
+        let selector = ShardSelector::new(ShardFieldSelector::UID)
+            .range(0..midpoint)
+            .unwrap()
+            .range(midpoint..hash_space_end)
+            .unwrap();
+        let wp = WatchParams::default().shard_selector(selector);
+        let mut qp = form_urlencoded::Serializer::new(String::new());
+        wp.populate_qp(&mut qp);
+        let query = qp.finish();
+        let shard_selector = form_urlencoded::parse(query.as_bytes())
+            .find(|(key, _)| key == "shardSelector")
+            .unwrap()
+            .1;
+        assert_eq!(
+            shard_selector,
+            "shardRange(object.metadata.uid, '0x0000000000000000', '0x8000000000000000') || shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')"
+        );
+
+        let selector = ShardSelector::new(ShardFieldSelector::Namespace)
+            .range(0..1)
+            .unwrap();
+        let wp = WatchParams::default().shard_selector(selector);
+        let mut qp = form_urlencoded::Serializer::new(String::new());
+        wp.populate_qp(&mut qp);
+        let query = qp.finish();
+        let shard_selector = form_urlencoded::parse(query.as_bytes())
+            .find(|(key, _)| key == "shardSelector")
+            .unwrap()
+            .1;
+        assert_eq!(
+            shard_selector,
+            "shardRange(object.metadata.namespace, '0x0000000000000000', '0x0000000000000001')"
+        );
     }
 }
 
