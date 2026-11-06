@@ -236,4 +236,72 @@ mod tests {
             ConfigLoader::apply_no_proxy(Some(proxy_url), &cluster_url, || ",".parse::<NoProxy>().map(Some));
         assert!(matches!(result, Err(KubeconfigError::ParseNoProxy(_))));
     }
+
+    const PROXY: &str = "http://proxy.corporate.com:80";
+    const CHILD_KUBECONFIG_PROXY: &str = "KUBE_TEST_PROXY_URL_KUBECONFIG";
+    const CHILD_EXPECT: &str = "KUBE_TEST_PROXY_URL_EXPECT";
+
+    // The env can only be set safely for a child process, so this reruns `config_proxy_url_child` in one
+    #[rstest]
+    #[case(Some(PROXY), None, None, true)]
+    #[case(Some(PROXY), None, Some("10.2.2.5"), false)]
+    #[case(Some(PROXY), None, Some("proxy.corporate.com:80"), true)]
+    #[case(Some(PROXY), None, Some("*"), false)]
+    #[case(None, Some(PROXY), None, true)]
+    #[case(None, Some(PROXY), Some("10.2.2.5"), false)]
+    fn config_proxy_url(
+        #[case] kubeconfig_proxy: Option<&str>,
+        #[case] https_proxy: Option<&str>,
+        #[case] no_proxy: Option<&str>,
+        #[case] proxied: bool,
+    ) {
+        let mut child = std::process::Command::new(std::env::current_exe().unwrap());
+        child.args(["--exact", "config::file_loader::tests::config_proxy_url_child"]);
+        for var in [
+            "HTTPS_PROXY",
+            "https_proxy",
+            "NO_PROXY",
+            "no_proxy",
+            CHILD_KUBECONFIG_PROXY,
+        ] {
+            child.env_remove(var);
+        }
+        if let Some(proxy) = kubeconfig_proxy {
+            child.env(CHILD_KUBECONFIG_PROXY, proxy);
+        }
+        if let Some(proxy) = https_proxy {
+            child.env("HTTPS_PROXY", proxy);
+        }
+        if let Some(no_proxy) = no_proxy {
+            child.env("NO_PROXY", no_proxy);
+        }
+        child.env(CHILD_EXPECT, if proxied { PROXY } else { "" });
+        let output = child.output().unwrap();
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(output.status.success() && stdout.contains("1 passed"), "{stdout}");
+    }
+
+    // Does nothing unless started by `config_proxy_url`
+    #[tokio::test]
+    async fn config_proxy_url_child() {
+        let Ok(expect) = std::env::var(CHILD_EXPECT) else {
+            return;
+        };
+        let proxy_line = std::env::var(CHILD_KUBECONFIG_PROXY)
+            .map(|proxy| format!("    proxy-url: {proxy}\n"))
+            .unwrap_or_default();
+        let kubeconfig = Kubeconfig::from_yaml(&format!(
+            "clusters:\n- name: c\n  cluster:\n    server: https://10.2.2.5:6443\n{proxy_line}\
+             contexts:\n- name: c\n  context: {{ cluster: c, user: u }}\n\
+             users:\n- name: u\n  user: {{}}\ncurrent-context: c\n"
+        ))
+        .unwrap();
+        let config = crate::Config::from_custom_kubeconfig(kubeconfig, &Default::default())
+            .await
+            .unwrap();
+        assert_eq!(
+            config.proxy_url,
+            nonempty(Some(expect)).map(|p| p.parse().unwrap())
+        );
+    }
 }
