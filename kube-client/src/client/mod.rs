@@ -32,6 +32,7 @@ use crate::{Config, Error, Result, api::WatchEvent, config::Kubeconfig};
 mod auth;
 mod body;
 mod builder;
+pub(crate) mod managed_fields;
 pub use kube_core::discovery::v2::{
     APIGroupDiscovery, APIGroupDiscoveryList, APIResourceDiscovery, APISubresourceDiscovery,
     APIVersionDiscovery, GroupVersionKind as DiscoveryGroupVersionKind,
@@ -87,6 +88,10 @@ pub struct Client {
     inner: Buffer<Request<Body>, BoxFuture<'static, Result<Response<Body>, BoxError>>>,
     default_ns: String,
     valid_until: Option<Timestamp>,
+    // Opt-in to KEP-5958 Accept negotiation, set by Api::without_managed_fields.
+    // Applied by request, request_status, and request_events (including watch streams).
+    // Direct calls to send, request_text, and request_stream do not apply it.
+    pub(crate) managed_fields: bool,
 }
 
 /// Represents a WebSocket connection.
@@ -165,6 +170,7 @@ impl Client {
             inner: Buffer::new(service, 1024),
             default_ns: default_namespace.into(),
             valid_until: None,
+            managed_fields: false,
         }
     }
 
@@ -278,10 +284,11 @@ impl Client {
 
     /// Perform a raw HTTP request against the API and deserialize the response
     /// as JSON to some known type.
-    pub async fn request<T>(&self, request: Request<Vec<u8>>) -> Result<T>
+    pub async fn request<T>(&self, mut request: Request<Vec<u8>>) -> Result<T>
     where
         T: DeserializeOwned,
     {
+        managed_fields::prepare(&mut request, self.managed_fields);
         let text = self.request_text(request).await?;
 
         serde_json::from_str(&text).map_err(|e| {
@@ -319,10 +326,11 @@ impl Client {
 
     /// Perform a raw HTTP request against the API and get back either an object
     /// deserialized as JSON or a [`Status`] Object.
-    pub async fn request_status<T>(&self, request: Request<Vec<u8>>) -> Result<Either<T, Status>>
+    pub async fn request_status<T>(&self, mut request: Request<Vec<u8>>) -> Result<Either<T, Status>>
     where
         T: DeserializeOwned,
     {
+        managed_fields::prepare(&mut request, self.managed_fields);
         let text = self.request_text(request).await?;
         // It needs to be JSON:
         let v: Value = serde_json::from_str(&text).map_err(Error::SerdeError)?;
@@ -356,6 +364,7 @@ impl Client {
             .headers_mut()
             .entry(http::header::ACCEPT_ENCODING)
             .or_insert(http::HeaderValue::from_static("identity"));
+        managed_fields::prepare(&mut request, self.managed_fields);
         let res = self.send(request.map(Body::from)).await?;
         let res = handle_api_errors(res).await?;
         // trace!("Streaming from {} -> {}", res.url(), res.status().as_str());
