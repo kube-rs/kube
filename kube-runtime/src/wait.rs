@@ -332,11 +332,11 @@ pub mod conditions {
     ///
     /// A resize is considered complete when every regular container and every restartable init
     /// container has matching `resources` in its corresponding status (both `requests` and
-    /// `limits`).
+    /// `limits`), and neither `PodResizePending` nor `PodResizeInProgress` is present.
     ///
-    /// This avoids a race condition where checking only for the absence of
-    /// `PodResizePending`/`PodResizeInProgress` conditions could return `true` before the
-    /// kubelet has even started processing the resize.
+    /// Comparing resources prevents an early success before the kubelet creates resize conditions.
+    /// Requiring resize conditions to be absent prevents success when desired resources are changed
+    /// back while a resize is still in progress.
     ///
     /// See: <https://kubernetes.io/docs/tasks/configure-pod-container/resize-container-resources/#pod-resize-status>
     ///
@@ -354,6 +354,19 @@ pub mod conditions {
                 && let Some(spec) = &pod.spec
                 && let Some(container_statuses) = &status.container_statuses
             {
+                let has_resize_condition = status.conditions.as_deref().is_some_and(|conditions| {
+                    conditions.iter().any(|condition| {
+                        matches!(
+                            condition.type_.as_str(),
+                            "PodResizePending" | "PodResizeInProgress"
+                        )
+                    })
+                });
+
+                if has_resize_condition {
+                    return false;
+                }
+
                 let containers_ready = spec
                     .containers
                     .iter()
@@ -768,6 +781,69 @@ pub mod conditions {
 
             let p = serde_saphyr::from_str(pod).unwrap();
             assert!(is_pod_resized().matches_object(Some(&p)))
+        }
+
+        #[cfg(test)]
+        fn pod_with_matching_resources_and_condition(condition_type: &str, status: &str) -> super::Pod {
+            let pod = format!(
+                r#"
+                apiVersion: v1
+                kind: Pod
+                metadata:
+                  name: resize-demo
+                  namespace: default
+                spec:
+                  containers:
+                  - name: app
+                    image: alpine:3.23
+                    resources:
+                      requests:
+                        cpu: "200m"
+                        memory: "256Mi"
+                      limits:
+                        cpu: "400m"
+                        memory: "512Mi"
+                status:
+                  conditions:
+                  - type: {condition_type}
+                    status: "{status}"
+                  containerStatuses:
+                  - name: app
+                    image: alpine:3.23
+                    resources:
+                      requests:
+                        cpu: "200m"
+                        memory: "256Mi"
+                      limits:
+                        cpu: "400m"
+                        memory: "512Mi"
+                "#
+            );
+
+            serde_saphyr::from_str(&pod).unwrap()
+        }
+
+        #[test]
+        /// fail while a resize condition is present, even when resources match
+        fn pod_resize_condition_present() {
+            use super::{Condition, is_pod_resized};
+
+            for (condition_type, status) in [("PodResizePending", "False"), ("PodResizeInProgress", "True")] {
+                let p = pod_with_matching_resources_and_condition(condition_type, status);
+                assert!(
+                    !is_pod_resized().matches_object(Some(&p)),
+                    "{condition_type} with status {status} must block resize completion"
+                );
+            }
+        }
+
+        #[test]
+        /// pass when resources match and only unrelated conditions are present
+        fn pod_resize_unrelated_condition() {
+            use super::{Condition, is_pod_resized};
+
+            let p = pod_with_matching_resources_and_condition("Ready", "True");
+            assert!(is_pod_resized().matches_object(Some(&p)));
         }
 
         #[test]
