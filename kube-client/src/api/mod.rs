@@ -376,7 +376,8 @@ where
 }
 
 impl<K> From<Api<K>> for Client {
-    fn from(api: Api<K>) -> Self {
+    fn from(mut api: Api<K>) -> Self {
+        api.client.managed_fields = false;
         api.client
     }
 }
@@ -386,8 +387,8 @@ impl<K> Api<K> {
     ///
     /// Requests server-side omission. Servers without support may still return managed fields.
     /// Applies to lists, watches, write responses, and resource subresources;
-    /// request bodies are unchanged. Clones and watchers inherit this policy.
-    /// Converting this API into a [`Client`] also retains the policy for typed JSON requests.
+    /// request bodies are unchanged. Clones and watchers inherit this flag and behaviour.
+    /// Converting this API into a [`Client`] resets the flag to `false`.
     /// Do not enable this when your application needs field ownership information.
     ///
     /// ```no_run
