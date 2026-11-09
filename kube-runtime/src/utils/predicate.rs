@@ -299,11 +299,11 @@ where
 /// No predicate guarantees delivery of every deletion: events can be missed while a
 /// watcher is unavailable. Reconcilers should check current desired and actual state,
 /// and use a recovery mechanism such as periodic requeues when missed triggers matter.
-/// Use [finalizers](crate::finalizer::finalizer) for cleanup that must complete before
+/// Use [finalizers](crate::finalizer::finalizer_requeue) for cleanup that must complete before
 /// deletion. The initial deletion marking bumps a positive generation, so a generation-only
 /// predicate lets that update through to start cleanup. It can still suppress the final
 /// delete event and the update that adds the finalizer, since adding a finalizer leaves
-/// generation unchanged. See the [finalizer documentation](crate::finalizer::finalizer).
+/// generation unchanged. See the [finalizer documentation](crate::finalizer::finalizer_requeue).
 ///
 /// Functional rewrite of the [controller-runtime/predicate module](https://github.com/kubernetes-sigs/controller-runtime/blob/main/pkg/predicate/predicate.go).
 ///

@@ -72,29 +72,87 @@ impl FinalizerState {
     }
 }
 
+/// Like [`finalizer_requeue`], but removes the finalizer whenever [`Event::Cleanup`] succeeds.
+///
+/// This ignores the [`Action`] returned by [`Event::Cleanup`] when deciding whether to remove the finalizer.
+/// Requeueing cleanup with [`Action::requeue`] does not wait for it: the finalizer is removed immediately,
+/// so the object is usually deleted before the requeued cleanup runs. The only way to keep the finalizer
+/// is to return an error.
+///
+/// # Errors
+///
+/// As for [`finalizer_requeue`].
+#[deprecated(
+    since = "5.1.0",
+    note = "use `finalizer_requeue`, which keeps the finalizer when cleanup requeues"
+)]
+pub async fn finalizer<K, ReconcileFut>(
+    api: &Api<K>,
+    finalizer_name: &str,
+    obj: Arc<K>,
+    reconcile: impl FnOnce(Event<K>) -> ReconcileFut,
+) -> Result<Action, Error<ReconcileFut::Error>>
+where
+    K: Resource + Clone + DeserializeOwned + Serialize + Debug,
+    ReconcileFut: TryFuture<Ok = Action>,
+    ReconcileFut::Error: StdError + 'static,
+{
+    run_finalizer(api, finalizer_name, obj, reconcile, false).await
+}
+
 /// Reconcile an object in a way that requires cleanup before an object can be deleted.
 ///
 /// It does this by managing a [`ObjectMeta::finalizers`] entry,
 /// which prevents the object from being deleted before the cleanup is done.
 ///
-/// In typical usage, if you use `finalizer` then it should be the only top-level "action"
+/// In typical usage, if you use `finalizer_requeue` then it should be the only top-level "action"
 /// in your [`applier`](crate::applier)/[`Controller`](crate::Controller)'s `reconcile` function.
 ///
 /// # Expected Flow
 ///
 /// 1. User creates object
 /// 2. Reconciler sees object
-/// 3. `finalizer` adds `finalizer_name` to [`ObjectMeta::finalizers`]
+/// 3. `finalizer_requeue` adds `finalizer_name` to [`ObjectMeta::finalizers`]
 /// 4. Reconciler sees updated object
-/// 5. `finalizer` runs [`Event::Apply`]
+/// 5. `finalizer_requeue` runs [`Event::Apply`]
 /// 6. User updates object
 /// 7. Reconciler sees updated object
-/// 8. `finalizer` runs [`Event::Apply`]
+/// 8. `finalizer_requeue` runs [`Event::Apply`]
 /// 9. User deletes object
 /// 10. Reconciler sees deleting object
-/// 11. `finalizer` runs [`Event::Cleanup`]
-/// 12. `finalizer` removes `finalizer_name` from [`ObjectMeta::finalizers`]
+/// 11. `finalizer_requeue` runs [`Event::Cleanup`]
+/// 12. `finalizer_requeue` removes `finalizer_name` from [`ObjectMeta::finalizers`],
+///     unless [`Event::Cleanup`] requeued (see below)
 /// 13. Kubernetes sees that all [`ObjectMeta::finalizers`] are gone and finally deletes the object
+///
+/// # Requeueing cleanup
+///
+/// If [`Event::Cleanup`] returns an [`Action`] that requeues, the finalizer is kept and cleanup is run
+/// again after that delay. Use this to wait for cleanup that is still in progress without reporting an error.
+/// The finalizer is only removed once [`Event::Cleanup`] returns [`Action::await_change`].
+///
+/// ```no_run
+/// # use std::{sync::Arc, time::Duration};
+/// # use k8s_openapi::api::core::v1::ConfigMap;
+/// # use kube::Api;
+/// # use kube::runtime::{controller::Action, finalizer::{Error, Event, finalizer_requeue}};
+/// async fn reconcile(api: &Api<ConfigMap>, obj: Arc<ConfigMap>) -> Result<Action, Error<std::io::Error>> {
+///     finalizer_requeue(api, "example.com/cleanup", obj, |event| async {
+///         match event {
+///             Event::Apply(_obj) => Ok(Action::requeue(Duration::from_secs(300))),
+///             Event::Cleanup(_obj) => {
+///                 let still_deleting = true; // e.g. poll an external system
+///                 Ok(if still_deleting {
+///                     Action::requeue(Duration::from_secs(1800))
+///                 } else {
+///                     Action::await_change()
+///                 })
+///             }
+///         }
+///     })
+///     .await
+/// }
+/// ```
 ///
 /// # Guarantees
 ///
@@ -130,11 +188,26 @@ impl FinalizerState {
 /// network errors, lacking permissions, or because another `finalizer` was updated in the meantime on the same object.
 ///
 /// [`ObjectMeta::finalizers`]: kube_client::api::ObjectMeta#structfield.finalizers
-pub async fn finalizer<K, ReconcileFut>(
+pub async fn finalizer_requeue<K, ReconcileFut>(
     api: &Api<K>,
     finalizer_name: &str,
     obj: Arc<K>,
     reconcile: impl FnOnce(Event<K>) -> ReconcileFut,
+) -> Result<Action, Error<ReconcileFut::Error>>
+where
+    K: Resource + Clone + DeserializeOwned + Serialize + Debug,
+    ReconcileFut: TryFuture<Ok = Action>,
+    ReconcileFut::Error: StdError + 'static,
+{
+    run_finalizer(api, finalizer_name, obj, reconcile, true).await
+}
+
+async fn run_finalizer<K, ReconcileFut>(
+    api: &Api<K>,
+    finalizer_name: &str,
+    obj: Arc<K>,
+    reconcile: impl FnOnce(Event<K>) -> ReconcileFut,
+    requeue_keeps_finalizer: bool,
 ) -> Result<Action, Error<ReconcileFut::Error>>
 where
     K: Resource + Clone + DeserializeOwned + Serialize + Debug,
@@ -158,28 +231,11 @@ where
                 .await
                 // Short-circuit, so that we keep the finalizer if cleanup fails
                 .map_err(Error::CleanupFailed)?;
+            if requeue_keeps_finalizer && action != Action::await_change() {
+                return Ok(action);
+            }
             // Cleanup was successful, remove the finalizer so that deletion can continue
-            let finalizer_path = format!("/metadata/finalizers/{finalizer_i}");
-            api.patch::<K>(
-                &name,
-                &PatchParams::default(),
-                &Patch::Json(json_patch::Patch(vec![
-                    // All finalizers run concurrently and we use an integer index
-                    // `Test` ensures that we fail instead of deleting someone else's finalizer
-                    // (in which case a new `Cleanup` event will be sent)
-                    PatchOperation::Test(TestOperation {
-                        path: PointerBuf::from_str(finalizer_path.as_str())
-                            .map_err(|_err| Error::InvalidFinalizer)?,
-                        value: finalizer_name.into(),
-                    }),
-                    PatchOperation::Remove(RemoveOperation {
-                        path: PointerBuf::from_str(finalizer_path.as_str())
-                            .map_err(|_err| Error::InvalidFinalizer)?,
-                    }),
-                ])),
-            )
-            .await
-            .map_err(Error::RemoveFinalizer)?;
+            remove_finalizer(api, finalizer_name, &name, finalizer_i).await?;
             Ok(action)
         }
         FinalizerState {
@@ -187,43 +243,7 @@ where
             is_deleting: false,
         } => {
             // Finalizer must be added before it's safe to run an `Apply` reconciliation
-            let patch = json_patch::Patch(if obj.finalizers().is_empty() {
-                vec![
-                    PatchOperation::Test(TestOperation {
-                        path: PointerBuf::from_str("/metadata/finalizers")
-                            .map_err(|_err| Error::InvalidFinalizer)?,
-                        value: serde_json::Value::Null,
-                    }),
-                    PatchOperation::Add(AddOperation {
-                        path: PointerBuf::from_str("/metadata/finalizers")
-                            .map_err(|_err| Error::InvalidFinalizer)?,
-                        value: vec![finalizer_name].into(),
-                    }),
-                ]
-            } else {
-                vec![
-                    // Kubernetes doesn't automatically deduplicate finalizers (see
-                    // https://github.com/kube-rs/kube/issues/964#issuecomment-1197311254),
-                    // so we need to fail and retry if anyone else has added the finalizer in the meantime
-                    PatchOperation::Test(TestOperation {
-                        path: PointerBuf::from_str("/metadata/finalizers")
-                            .map_err(|_err| Error::InvalidFinalizer)?,
-                        value: obj.finalizers().into(),
-                    }),
-                    PatchOperation::Add(AddOperation {
-                        path: PointerBuf::from_str("/metadata/finalizers/-")
-                            .map_err(|_err| Error::InvalidFinalizer)?,
-                        value: finalizer_name.into(),
-                    }),
-                ]
-            });
-            api.patch::<K>(
-                obj.meta().name.as_deref().ok_or(Error::UnnamedObject)?,
-                &PatchParams::default(),
-                &Patch::Json(patch),
-            )
-            .await
-            .map_err(Error::AddFinalizer)?;
+            add_finalizer(api, finalizer_name, &*obj).await?;
             // No point applying here, since the patch will cause a new reconciliation
             Ok(Action::await_change())
         }
@@ -257,4 +277,204 @@ pub enum Event<K> {
     /// - Another finalizer was removed in the meantime
     /// - The grinch's heart grows a size or two
     Cleanup(Arc<K>),
+}
+
+/// Adds `finalizer_name` to `obj`'s finalizers.
+async fn add_finalizer<K, E>(api: &Api<K>, finalizer_name: &str, obj: &K) -> Result<(), Error<E>>
+where
+    K: Resource + Clone + DeserializeOwned + Serialize + Debug,
+    E: StdError + 'static,
+{
+    let patch = json_patch::Patch(if obj.finalizers().is_empty() {
+        vec![
+            PatchOperation::Test(TestOperation {
+                path: PointerBuf::from_str("/metadata/finalizers").map_err(|_err| Error::InvalidFinalizer)?,
+                value: serde_json::Value::Null,
+            }),
+            PatchOperation::Add(AddOperation {
+                path: PointerBuf::from_str("/metadata/finalizers").map_err(|_err| Error::InvalidFinalizer)?,
+                value: vec![finalizer_name].into(),
+            }),
+        ]
+    } else {
+        vec![
+            // Kubernetes doesn't automatically deduplicate finalizers (see
+            // https://github.com/kube-rs/kube/issues/964#issuecomment-1197311254),
+            // so we need to fail and retry if anyone else has added the finalizer in the meantime
+            PatchOperation::Test(TestOperation {
+                path: PointerBuf::from_str("/metadata/finalizers").map_err(|_err| Error::InvalidFinalizer)?,
+                value: obj.finalizers().into(),
+            }),
+            PatchOperation::Add(AddOperation {
+                path: PointerBuf::from_str("/metadata/finalizers/-")
+                    .map_err(|_err| Error::InvalidFinalizer)?,
+                value: finalizer_name.into(),
+            }),
+        ]
+    });
+    api.patch::<K>(
+        obj.meta().name.as_deref().ok_or(Error::UnnamedObject)?,
+        &PatchParams::default(),
+        &Patch::Json(patch),
+    )
+    .await
+    .map_err(Error::AddFinalizer)?;
+    Ok(())
+}
+
+/// Removes `finalizer_name`, found at `finalizer_index`, from the object named `name`.
+async fn remove_finalizer<K, E>(
+    api: &Api<K>,
+    finalizer_name: &str,
+    name: &str,
+    finalizer_index: usize,
+) -> Result<(), Error<E>>
+where
+    K: Resource + Clone + DeserializeOwned + Serialize + Debug,
+    E: StdError + 'static,
+{
+    let finalizer_path = format!("/metadata/finalizers/{finalizer_index}");
+    api.patch::<K>(
+        name,
+        &PatchParams::default(),
+        &Patch::Json(json_patch::Patch(vec![
+            // All finalizers run concurrently and we use an integer index
+            // `Test` ensures that we fail instead of deleting someone else's finalizer
+            // (in which case a new `Cleanup` event will be sent)
+            PatchOperation::Test(TestOperation {
+                path: PointerBuf::from_str(finalizer_path.as_str())
+                    .map_err(|_err| Error::InvalidFinalizer)?,
+                value: finalizer_name.into(),
+            }),
+            PatchOperation::Remove(RemoveOperation {
+                path: PointerBuf::from_str(finalizer_path.as_str())
+                    .map_err(|_err| Error::InvalidFinalizer)?,
+            }),
+        ])),
+    )
+    .await
+    .map_err(Error::RemoveFinalizer)?;
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Event, finalizer_requeue};
+    use crate::controller::Action;
+    use http::{Request, Response};
+    use http_body_util::BodyExt;
+    use k8s_openapi::api::core::v1::ConfigMap;
+    use kube_client::{Api, Client, client::Body};
+    use std::{convert::Infallible, pin::pin, sync::Arc, time::Duration};
+    use tower_test::mock;
+
+    const FINALIZER: &str = "test/finalizer";
+
+    /// Runs `finalizer_requeue`, applying with a one minute requeue and cleaning up with `cleanup`.
+    async fn run(api: &Api<ConfigMap>, obj: ConfigMap, cleanup: Action) -> Action {
+        finalizer_requeue(api, FINALIZER, Arc::new(obj), |event| async move {
+            Ok::<_, Infallible>(match event {
+                Event::Apply(_) => Action::requeue(Duration::from_secs(60)),
+                Event::Cleanup(_) => cleanup,
+            })
+        })
+        .await
+        .unwrap()
+    }
+
+    fn cm(metadata: &serde_json::Value) -> ConfigMap {
+        serde_json::from_value(serde_json::json!({
+            "apiVersion": "v1",
+            "kind": "ConfigMap",
+            "metadata": metadata,
+        }))
+        .unwrap()
+    }
+
+    fn deleting_cm() -> ConfigMap {
+        cm(&serde_json::json!({
+            "name": "test",
+            "namespace": "default",
+            "deletionTimestamp": "2024-01-01T00:00:00Z",
+            "finalizers": ["other/finalizer", FINALIZER],
+        }))
+    }
+
+    /// An API on which any request fails.
+    fn api_without_requests() -> Api<ConfigMap> {
+        let (mock_service, _handle) = mock::pair::<Request<Body>, Response<Body>>();
+        Api::default_namespaced(Client::new(mock_service, "default"))
+    }
+
+    /// An API whose mock server expects a single JSON patch with the given body.
+    fn api_expecting_patch(expected: serde_json::Value) -> (Api<ConfigMap>, tokio::task::JoinHandle<()>) {
+        let (mock_service, handle) = mock::pair::<Request<Body>, Response<Body>>();
+        let server = tokio::spawn(async move {
+            let mut handle = pin!(handle);
+            let (request, send) = handle.next_request().await.expect("expected a patch");
+            assert_eq!(request.method(), http::Method::PATCH);
+            assert_eq!(request.uri().path(), "/api/v1/namespaces/default/configmaps/test");
+            let body = request.into_body().collect().await.unwrap().to_bytes();
+            assert_eq!(
+                serde_json::from_slice::<serde_json::Value>(&body).unwrap(),
+                expected
+            );
+            let response = cm(&serde_json::json!({ "name": "test", "namespace": "default" }));
+            send.send_response(Response::new(Body::from(serde_json::to_vec(&response).unwrap())));
+        });
+        (
+            Api::default_namespaced(Client::new(mock_service, "default")),
+            server,
+        )
+    }
+
+    #[tokio::test]
+    async fn adds_missing_finalizer_without_applying() {
+        let (api, server) = api_expecting_patch(serde_json::json!([
+            { "op": "test", "path": "/metadata/finalizers", "value": ["other/finalizer"] },
+            { "op": "add", "path": "/metadata/finalizers/-", "value": FINALIZER },
+        ]));
+        let obj = cm(&serde_json::json!({
+            "name": "test",
+            "namespace": "default",
+            "finalizers": ["other/finalizer"],
+        }));
+        assert_eq!(
+            run(&api, obj, Action::await_change()).await,
+            Action::await_change()
+        );
+        server.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn apply_passes_action_through() {
+        let obj =
+            cm(&serde_json::json!({ "name": "test", "namespace": "default", "finalizers": [FINALIZER] }));
+        assert_eq!(
+            run(&api_without_requests(), obj, Action::await_change()).await,
+            Action::requeue(Duration::from_secs(60))
+        );
+    }
+
+    #[tokio::test]
+    async fn cleanup_requeue_keeps_finalizer() {
+        let cleanup = Action::requeue(Duration::from_secs(300));
+        assert_eq!(
+            run(&api_without_requests(), deleting_cm(), cleanup).await,
+            Action::requeue(Duration::from_secs(300))
+        );
+    }
+
+    #[tokio::test]
+    async fn cleanup_done_removes_finalizer() {
+        let (api, server) = api_expecting_patch(serde_json::json!([
+            { "op": "test", "path": "/metadata/finalizers/1", "value": FINALIZER },
+            { "op": "remove", "path": "/metadata/finalizers/1" },
+        ]));
+        assert_eq!(
+            run(&api, deleting_cm(), Action::await_change()).await,
+            Action::await_change()
+        );
+        server.await.unwrap();
+    }
 }

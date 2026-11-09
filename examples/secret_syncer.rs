@@ -9,7 +9,7 @@ use kube::{
     api::{Api, DeleteParams, ObjectMeta, Patch, PatchParams, Resource},
     runtime::{
         controller::{Action, Controller},
-        finalizer::{Event, finalizer},
+        finalizer::{Event, finalizer_requeue},
         watcher,
     },
 };
@@ -80,7 +80,7 @@ async fn main() -> anyhow::Result<()> {
             let cms: Api<ConfigMap> = Api::namespaced(client.clone(), ns);
             let secrets: Api<Secret> = Api::namespaced(client.clone(), ns);
             async move {
-                finalizer(
+                finalizer_requeue(
                     &cms,
                     "configmap-secret-syncer.nullable.se/cleanup",
                     cm,

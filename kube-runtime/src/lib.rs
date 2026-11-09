@@ -32,7 +32,8 @@ pub mod wait;
 pub mod watcher;
 
 pub use controller::{Config, Controller, applier};
-pub use finalizer::finalizer;
+#[allow(deprecated)] pub use finalizer::finalizer;
+pub use finalizer::finalizer_requeue;
 pub use reflector::reflector;
 pub use scheduler::scheduler;
 pub use utils::WatchStreamExt;

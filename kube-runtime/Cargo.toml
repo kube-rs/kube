@@ -51,6 +51,9 @@ kube = { path = "../kube", features = ["derive", "client", "runtime"] }
 serde_json.workspace = true
 serde-saphyr.workspace = true
 tokio = { workspace = true, features = ["full", "test-util"] }
+http.workspace = true
+http-body-util.workspace = true
+tower-test.workspace = true
 rand.workspace = true
 schemars.workspace = true
 tracing-subscriber.workspace = true

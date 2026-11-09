@@ -74,7 +74,7 @@ pub enum Event<K> {
     ///
     /// NOTE: This should not be used for managing persistent state elsewhere, since
     /// events may be lost if the watcher is unavailable. Use
-    /// [finalizers](crate::finalizer::finalizer) instead.
+    /// [finalizers](crate::finalizer::finalizer_requeue) instead.
     Delete(K),
     /// The watch stream was restarted.
     ///
