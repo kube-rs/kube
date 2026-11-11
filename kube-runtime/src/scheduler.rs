@@ -297,7 +297,7 @@ pub fn debounced_scheduler<T: Eq + Hash + Clone, S: Stream<Item = ScheduleReques
 // (See <https://github.com/kube-rs/kube/issues/1772>.)
 // We limit all scheduled durations to 6 months to stay well clear of that limit.
 pub(crate) fn max_schedule_time() -> Instant {
-    Instant::now() + Duration::from_secs(86400 * 30 * 6)
+    Instant::now() + Duration::from_hours(24 * 30 * 6)
 }
 
 #[cfg(test)]
@@ -377,7 +377,7 @@ mod tests {
 
     #[tokio::test]
     async fn scheduler_pending_message_should_not_block_head_of_line() {
-        let mut scheduler = Box::pin(scheduler(
+        let mut scheduler = pin!(scheduler(
             stream::iter(vec![
                 ScheduleRequest {
                     message: 1,

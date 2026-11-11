@@ -128,36 +128,30 @@ mod test {
 
         // Create TokenRequest
         let tokenrequest = serviceaccounts
-            .create_token_request(
-                serviceaccount_name,
-                &PostParams::default(),
-                &TokenRequest {
-                    metadata: Default::default(),
-                    spec: Some(TokenRequestSpec {
-                        audiences: Some(audiences.clone()),
-                        bound_object_ref: None,
-                        expiration_seconds: None,
-                    }),
-                    status: None,
-                },
-            )
+            .create_token_request(serviceaccount_name, &PostParams::default(), &TokenRequest {
+                metadata: Default::default(),
+                spec: Some(TokenRequestSpec {
+                    audiences: Some(audiences.clone()),
+                    bound_object_ref: None,
+                    expiration_seconds: None,
+                    attestations: None,
+                }),
+                status: None,
+            })
             .await?;
         let token = tokenrequest.status.unwrap().token.unwrap();
         assert!(!token.is_empty());
 
         // Check created token is valid with TokenReview
         let tokenreview = tokenreviews
-            .create(
-                &PostParams::default(),
-                &TokenReview {
-                    metadata: Default::default(),
-                    spec: TokenReviewSpec {
-                        audiences: Some(audiences.clone()),
-                        token,
-                    },
-                    status: None,
+            .create(&PostParams::default(), &TokenReview {
+                metadata: Default::default(),
+                spec: TokenReviewSpec {
+                    audiences: Some(audiences.clone()),
+                    token,
                 },
-            )
+                status: None,
+            })
             .await?;
         let tokenreviewstatus = tokenreview.status.unwrap();
         assert_eq!(tokenreviewstatus.audiences, Some(audiences));

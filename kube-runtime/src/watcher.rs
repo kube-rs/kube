@@ -67,8 +67,14 @@ pub enum Event<K> {
     Apply(K),
     /// An object was deleted
     ///
+    /// The object need not have `metadata.deletionTimestamp` set or a changed
+    /// `metadata.generation`. After decoding with
+    /// [`touched_objects`](crate::WatchStreamExt::touched_objects), predicates based on
+    /// unchanged fields can suppress it. See [predicate deletion handling](crate::predicates).
+    ///
     /// NOTE: This should not be used for managing persistent state elsewhere, since
-    /// events may be lost if the watcher is unavailable. Use Finalizers instead.
+    /// events may be lost if the watcher is unavailable. Use
+    /// [finalizers](crate::finalizer::finalizer) instead.
     Delete(K),
     /// The watch stream was restarted.
     ///
@@ -88,8 +94,8 @@ pub enum Event<K> {
     /// This can be used as a signal to replace buffered store contents atomically.
     /// No more `InitApply` events will happen until the next `Init` event.
     ///
-    /// Any objects that were previously [`Applied`](Event::Applied) but are not listed in any of
-    /// the `InitApply` events should be assumed to have been [`Deleted`](Event::Deleted).
+    /// Any objects that were previously [`Applied`](Event::Apply) but are not listed in any of
+    /// the `InitApply` events should be assumed to have been [`Deleted`](Event::Delete).
     InitDone,
 }
 
@@ -524,17 +530,25 @@ async fn next_with_idle_timeout<S, T>(stream: &mut S, timeout: Option<u32>) -> O
 where
     S: Stream<Item = T> + Unpin,
 {
+    with_idle_timeout(stream.next(), timeout).await.flatten()
+}
+
+/// Await `fut` with the same idle timeout, returning `None` on expiry.
+///
+/// Also wraps the watch call, which can stall before a stream exists,
+/// e.g. on an error response whose body never completes.
+async fn with_idle_timeout<F: Future>(fut: F, timeout: Option<u32>) -> Option<F::Output> {
     if timeout == Some(0) {
-        return stream.next().await;
+        return Some(fut.await);
     }
 
     let idle_timeout = Duration::from_secs(u64::from(timeout.unwrap_or(290))) + WATCH_IDLE_TIMEOUT_MARGIN;
-    match tokio::time::timeout(idle_timeout, stream.next()).await {
-        Ok(item) => item,
+    match tokio::time::timeout(idle_timeout, fut).await {
+        Ok(output) => Some(output),
         Err(_elapsed) => {
             debug!(
                 timeout_secs = idle_timeout.as_secs(),
-                "watch stream idle timeout, reconnecting"
+                "watch idle timeout, reconnecting"
             );
             None
         }
@@ -563,9 +577,14 @@ where
                 last_bookmark: None,
             }),
             InitialListStrategy::StreamingList => {
-                match api.watch(&wc.to_watch_params(WatchPhase::Initial), "0").await {
-                    Ok(stream) => (None, State::InitialWatch { stream }),
-                    Err(err) => {
+                match with_idle_timeout(
+                    api.watch(&wc.to_watch_params(WatchPhase::Initial), "0"),
+                    wc.timeout,
+                )
+                .await
+                {
+                    Some(Ok(stream)) => (Some(Ok(Event::Init)), State::InitialWatch { stream }),
+                    Some(Err(err)) => {
                         if std::matches!(err, ClientErr::Api(ref status) if status.is_forbidden()) {
                             warn!("watch initlist error with 403: {err:?}");
                         } else {
@@ -573,6 +592,7 @@ where
                         }
                         (Some(Err(Error::WatchStartFailed(err))), State::default())
                     }
+                    None => (None, State::default()),
                 }
             }
         },
@@ -670,15 +690,17 @@ where
             }
         }
         State::InitListed { resource_version } => {
-            match api
-                .watch(&wc.to_watch_params(WatchPhase::Resumed), &resource_version)
-                .await
+            match with_idle_timeout(
+                api.watch(&wc.to_watch_params(WatchPhase::Resumed), &resource_version),
+                wc.timeout,
+            )
+            .await
             {
-                Ok(stream) => (None, State::Watching {
+                Some(Ok(stream)) => (None, State::Watching {
                     resource_version,
                     stream,
                 }),
-                Err(err) => {
+                Some(Err(err)) => {
                     if std::matches!(err, ClientErr::Api(ref status) if status.is_forbidden()) {
                         warn!("watch initlist error with 403: {err:?}");
                     } else {
@@ -688,6 +710,7 @@ where
                         resource_version,
                     })
                 }
+                None => (None, State::InitListed { resource_version }),
             }
         }
         State::Watching {
@@ -813,7 +836,7 @@ where
 ///
 /// The stream will attempt to be recovered on the next poll after an [`Err`] is returned.
 /// This will normally happen immediately, but you can use [`StreamBackoff`](crate::utils::StreamBackoff)
-/// to introduce an artificial delay. [`default_backoff`] returns a suitable default set of parameters.
+/// to introduce an artificial delay. [`DefaultBackoff::default`] returns a suitable default set of parameters.
 ///
 /// If the watch connection is interrupted, then `watcher` will attempt to restart the watch using the last
 /// [resource version](https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes)
@@ -887,7 +910,7 @@ where
 ///
 /// The stream will attempt to be recovered on the next poll after an [`Err`] is returned.
 /// This will normally happen immediately, but you can use [`StreamBackoff`](crate::utils::StreamBackoff)
-/// to introduce an artificial delay. [`default_backoff`] returns a suitable default set of parameters.
+/// to introduce an artificial delay. [`DefaultBackoff::default`] returns a suitable default set of parameters.
 ///
 /// If the watch connection is interrupted, then `watcher` will attempt to restart the watch using the last
 /// [resource version](https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes)
@@ -1046,22 +1069,30 @@ impl Backoff for DefaultBackoff {
 mod tests {
     use std::{collections::BTreeMap, time::Duration};
 
-    use futures::StreamExt;
+    use futures::{StreamExt, TryStreamExt, stream::BoxStream};
+    use http::{Request, Response, StatusCode, header::CONTENT_LENGTH};
+    use http_body_util::{BodyExt, StreamBody};
     use k8s_openapi::{api::core::v1::ConfigMap, apimachinery::pkg::apis::meta::v1::ObjectMeta};
     use kube_client::{
-        api::{TypeMeta, WatchEvent, WatchParams},
+        Api, Client,
+        api::{ListParams, TypeMeta, WatchEvent, WatchParams},
+        client::Body,
         core::{
-            Status,
+            ObjectList, Status,
             watch::{Bookmark, BookmarkMeta},
         },
     };
 
-    use crate::watcher::{
-        ApiMode, Config, ExponentialBackoff, State, WatchPhase, next_with_idle_timeout, step,
-        stub_watcher::{
-            Recording, Sequence, SequenceStep, TestMode, error_indicates_graceful_watch_seq_exhaustion,
+    use crate::{
+        WatchStreamExt,
+        watcher::{
+            ApiMode, Config, Error, ExponentialBackoff, State, WatchPhase, next_with_idle_timeout, step,
+            step_trampolined,
+            stub_watcher::{
+                Recording, Sequence, SequenceStep, TestMode, error_indicates_graceful_watch_seq_exhaustion,
+            },
+            watcher, watcher_inner,
         },
-        watcher_inner,
     };
 
     use super::stub_watcher::ResultPage;
@@ -1176,6 +1207,7 @@ mod tests {
         let mut stream = std::pin::pin!(watcher_inner(api.clone(), config));
 
         for expected in [
+            "Init",
             "InitApply(a)",
             "InitApply(b)",
             "InitApply(c)",
@@ -1278,6 +1310,7 @@ mod tests {
             .fields("metadata.name!=ignored");
         let mut state = State::default();
         for expected in [
+            "Init",
             "InitApply(a)",
             "InitApply(b)",
             "InitApply(c)",
@@ -1320,6 +1353,155 @@ mod tests {
                     Some("metadata.name!=ignored")
                 );
                 assert!(!resumed_params.send_initial_events);
+            }
+            _ => panic!("unexpected API call sequence {records:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn streaming_list_initial_stream_eof_before_bookmark_drops_partial_objects() {
+        let api = TestMode::new(vec![], vec![
+            Sequence::new(vec![SequenceStep::List(
+                vec![
+                    Ok(WatchEvent::Added(config_map("a", "1"))),
+                    Ok(WatchEvent::Added(config_map("b", "2"))),
+                ]
+                .into(),
+            )]),
+            Sequence::new(vec![SequenceStep::List(
+                vec![
+                    Ok(WatchEvent::Added(config_map("a", "1"))),
+                    Ok(WatchEvent::Bookmark(Bookmark {
+                        types: TypeMeta::resource::<ConfigMap>(),
+                        metadata: BookmarkMeta {
+                            resource_version: "1".to_string(),
+                            annotations: BTreeMap::from_iter(vec![(
+                                "k8s.io/initial-events-end".into(),
+                                "true".into(),
+                            )]),
+                        },
+                    })),
+                ]
+                .into(),
+            )]),
+        ]);
+
+        let config = Config::default().streaming_lists();
+        let (reader, mut writer) = crate::reflector::store::<ConfigMap>();
+        let mut state = State::default();
+        for expected in [
+            "Init",
+            "InitApply(a)",
+            "InitApply(b)",
+            "Init",
+            "InitApply(a)",
+            "InitDone",
+        ] {
+            let (event, next) = step(&api, &config, state).await;
+            state = next;
+            let event = event.unwrap();
+            assert_eq!(event.to_string(), expected);
+            writer.apply_watcher_event(&event);
+        }
+
+        let mut names: Vec<_> = reader
+            .state()
+            .iter()
+            .filter_map(|cm| cm.metadata.name.clone())
+            .collect();
+        names.sort();
+        assert_eq!(names, ["a".to_string()]);
+
+        let records = api.get_recordings();
+        match &records[..] {
+            [
+                Recording::Watch(first, first_version),
+                Recording::Watch(second, second_version),
+            ] => {
+                assert_eq!(first_version, "0");
+                assert!(first.send_initial_events);
+                assert_eq!(second_version, "0");
+                assert!(second.send_initial_events);
+            }
+            _ => panic!("unexpected API call sequence {records:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn streaming_list_initial_watch_410_before_bookmark_drops_partial_objects() {
+        let mut gone = Box::new(Status::default());
+        gone.code = 410;
+        gone.message = "expired".to_string();
+        gone.reason = "Expired".to_string();
+        let api = TestMode::new(vec![], vec![
+            Sequence::new(vec![SequenceStep::List(
+                vec![
+                    Ok(WatchEvent::Added(config_map("a", "1"))),
+                    Ok(WatchEvent::Added(config_map("b", "2"))),
+                    Ok(WatchEvent::Error(gone)),
+                ]
+                .into(),
+            )]),
+            Sequence::new(vec![SequenceStep::List(
+                vec![
+                    Ok(WatchEvent::Added(config_map("a", "1"))),
+                    Ok(WatchEvent::Bookmark(Bookmark {
+                        types: TypeMeta::resource::<ConfigMap>(),
+                        metadata: BookmarkMeta {
+                            resource_version: "1".to_string(),
+                            annotations: BTreeMap::from_iter(vec![(
+                                "k8s.io/initial-events-end".into(),
+                                "true".into(),
+                            )]),
+                        },
+                    })),
+                ]
+                .into(),
+            )]),
+        ]);
+
+        let config = Config::default().streaming_lists();
+        let (reader, mut writer) = crate::reflector::store::<ConfigMap>();
+        let mut state = State::default();
+        for expected in [
+            "Init",
+            "InitApply(a)",
+            "InitApply(b)",
+            "error returned by apiserver during watch: expired: Expired",
+            "Init",
+            "InitApply(a)",
+            "InitDone",
+        ] {
+            let (event, next) = step(&api, &config, state).await;
+            state = next;
+            let repr = match &event {
+                Ok(event) => event.to_string(),
+                Err(err) => err.to_string(),
+            };
+            assert_eq!(repr, expected);
+            if let Ok(event) = &event {
+                writer.apply_watcher_event(event);
+            }
+        }
+
+        let mut names: Vec<_> = reader
+            .state()
+            .iter()
+            .filter_map(|cm| cm.metadata.name.clone())
+            .collect();
+        names.sort();
+        assert_eq!(names, ["a".to_string()]);
+
+        let records = api.get_recordings();
+        match &records[..] {
+            [
+                Recording::Watch(first, first_version),
+                Recording::Watch(second, second_version),
+            ] => {
+                assert_eq!(first_version, "0");
+                assert!(first.send_initial_events);
+                assert_eq!(second_version, "0");
+                assert!(second.send_initial_events);
             }
             _ => panic!("unexpected API call sequence {records:?}"),
         }
@@ -1506,5 +1688,148 @@ mod tests {
         let mut stream = futures::stream::empty::<i32>();
         let result = next_with_idle_timeout(&mut stream, Some(290)).await;
         assert_eq!(result, None);
+    }
+
+    /// Never answers, like an error response whose body stalls
+    struct StalledWatchCall;
+
+    impl ApiMode for StalledWatchCall {
+        type Value = ConfigMap;
+
+        async fn list(&self, _lp: &ListParams) -> kube_client::Result<ObjectList<ConfigMap>> {
+            futures::future::pending().await
+        }
+
+        async fn watch(
+            &self,
+            _wp: &WatchParams,
+            _version: &str,
+        ) -> kube_client::Result<BoxStream<'static, kube_client::Result<WatchEvent<ConfigMap>>>> {
+            futures::future::pending().await
+        }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn idle_timeout_retries_stalled_watch_call() {
+        // timeout(1) plus the 5s margin, so an unbounded watch call trips the outer 7s limit
+        let config = Config::default().timeout(1);
+        let limit = Duration::from_secs(7);
+        let state = State::InitListed {
+            resource_version: "1".into(),
+        };
+        let start = tokio::time::Instant::now();
+        let (event, state) = tokio::time::timeout(limit, step_trampolined(&StalledWatchCall, &config, state))
+            .await
+            .expect("stalled resumed watch call should hit the idle timeout");
+        assert_eq!(start.elapsed(), Duration::from_secs(6));
+        assert!(event.is_none());
+        assert!(matches!(state, State::InitListed { resource_version } if resource_version == "1"));
+
+        let config = config.streaming_lists();
+        let start = tokio::time::Instant::now();
+        let (event, state) =
+            tokio::time::timeout(limit, step_trampolined(&StalledWatchCall, &config, State::Empty))
+                .await
+                .expect("stalled initial watch call should hit the idle timeout");
+        assert_eq!(start.elapsed(), Duration::from_secs(6));
+        assert!(event.is_none());
+        assert!(matches!(state, State::Empty));
+    }
+
+    /// Serves an empty LIST, then a watch rejected with HTTP 500 whose pretty-printed `Status`
+    /// body is held back by `error_body_delay` (forever when `None`), then watches with one event.
+    fn stalled_error_client(error_body_delay: Option<Duration>) -> Client {
+        let mut watches = 0;
+        let service = tower::service_fn(move |request: Request<Body>| {
+            let (status, body) = if request.uri().query().unwrap_or_default().contains("watch=true") {
+                watches += 1;
+                if watches == 1 {
+                    let rejection = serde_json::json!({
+                        "kind": "Status",
+                        "apiVersion": "v1",
+                        "status": "Failure",
+                        "message": "watch rejected",
+                        "reason": "InternalError",
+                        "code": 500,
+                    });
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        serde_json::to_vec_pretty(&rejection).unwrap(),
+                    )
+                } else {
+                    let event = WatchEvent::Added(config_map("a", "11"));
+                    (StatusCode::OK, serde_json::to_vec(&event).unwrap())
+                }
+            } else {
+                let list = serde_json::json!({
+                    "kind": "ConfigMapList",
+                    "apiVersion": "v1",
+                    "metadata": { "resourceVersion": "10" },
+                    "items": [],
+                });
+                (StatusCode::OK, serde_json::to_vec(&list).unwrap())
+            };
+            let stall = status.is_server_error();
+            let length = body.len();
+            let frames = Body::from(body).into_stream().then(move |frame| async move {
+                if stall {
+                    match error_body_delay {
+                        Some(delay) => tokio::time::sleep(delay).await,
+                        None => futures::future::pending().await,
+                    }
+                }
+                frame
+            });
+            std::future::ready(Ok::<_, std::convert::Infallible>(
+                Response::builder()
+                    .status(status)
+                    .header(CONTENT_LENGTH, length)
+                    .body(StreamBody::new(frames))
+                    .unwrap(),
+            ))
+        });
+        Client::new(service, "default")
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn watcher_recovers_from_stalled_error_body() {
+        let api = Api::<ConfigMap>::default_namespaced(stalled_error_client(None));
+        let start = tokio::time::Instant::now();
+        // try_collect stops at the first Err, like the try_for_each pipelines in the docs
+        let applied = watcher(api, Config::default().timeout(1))
+            .applied_objects()
+            .default_backoff()
+            .take(1)
+            .try_collect::<Vec<_>>();
+        let applied = tokio::time::timeout(Duration::from_secs(7), applied)
+            .await
+            .expect("stalled error body should hit the 6s idle timeout")
+            .expect("watcher should reconnect without surfacing an error");
+        assert_eq!(applied[0].metadata.name.as_deref(), Some("a"));
+        assert_eq!(start.elapsed(), Duration::from_secs(6));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn watcher_keeps_slow_error_body_as_api_error() {
+        // completes inside the 6s idle timeout, and with the idle timeout disabled
+        for (timeout, delay) in [(1, 1), (0, 7)] {
+            let delay = Duration::from_secs(delay);
+            let api = Api::<ConfigMap>::default_namespaced(stalled_error_client(Some(delay)));
+            let start = tokio::time::Instant::now();
+            let collected = watcher(api, Config::default().timeout(timeout))
+                .applied_objects()
+                .take(1)
+                .try_collect::<Vec<_>>();
+            let err = tokio::time::timeout(delay + Duration::from_secs(1), collected)
+                .await
+                .expect("error body should arrive after its delay")
+                .unwrap_err();
+            assert!(
+                matches!(&err, Error::WatchStartFailed(kube_client::Error::Api(status))
+                    if status.code == 500 && status.message == "watch rejected"),
+                "got {err:?}"
+            );
+            assert_eq!(start.elapsed(), delay);
+        }
     }
 }

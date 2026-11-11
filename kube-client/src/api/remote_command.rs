@@ -26,6 +26,8 @@ type TerminalSizeReceiver = mpsc::Receiver<TerminalSize>;
 type TerminalSizeSender = mpsc::Sender<TerminalSize>;
 
 /// TerminalSize define the size of a terminal
+// also gated here (not just the module) so rustdoc shows the ws requirement on `kube` re-exports
+#[cfg(feature = "ws")]
 #[derive(Debug, Serialize, Deserialize)]
 #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
 #[serde(rename_all = "PascalCase")]
@@ -102,6 +104,8 @@ const MAX_BUF_SIZE: usize = 1024;
 ///
 /// [`attach`]: crate::Api::attach
 /// [`exec`]: crate::Api::exec
+// also gated here (not just the module) so rustdoc shows the ws requirement on `kube` re-exports
+#[cfg(feature = "ws")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
 pub struct AttachedProcess {
     has_stdin: bool,

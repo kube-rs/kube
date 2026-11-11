@@ -78,7 +78,6 @@ hyper-util = { workspace = true, features = [
     "tracing",
 ] }
 thiserror.workspace = true
-backon.workspace = true
 clap = { version = "4.0", default-features = false, features = [
     "std",
     "cargo",
@@ -91,6 +90,10 @@ crossterm = "0.29.0"
 [[example]]
 name = "configmapgen_controller"
 path = "configmapgen_controller.rs"
+
+[[example]]
+name = "owner_finalizer_demo"
+path = "owner_finalizer_demo.rs"
 
 [[example]]
 name = "shared_stream_controllers"

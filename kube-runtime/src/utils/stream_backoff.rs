@@ -8,10 +8,10 @@ use crate::utils::Backoff;
 
 /// Applies a [`Backoff`] policy to a [`Stream`]
 ///
-/// After any [`Err`] is emitted, the stream is paused for [`Backoff::next_backoff`]. The
+/// After any [`Err`] is emitted, the stream is paused for [`Iterator::next`]. The
 /// [`Backoff`] is [`reset`](`Backoff::reset`) on any [`Ok`] value.
 ///
-/// If [`Backoff::next_backoff`] returns [`None`] then the backing stream is given up on, and closed.
+/// If [`Iterator::next`] returns [`None`] then the backing stream is given up on, and closed.
 #[pin_project]
 pub struct StreamBackoff<S, B> {
     #[pin]

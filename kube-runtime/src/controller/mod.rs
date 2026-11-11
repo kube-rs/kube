@@ -716,7 +716,7 @@ where
     ///     .expect("subscribers can only be created from shared stores");
     /// let deploys = watcher(api, watcher::Config::default())
     ///     .default_backoff()
-    ///     .reflect(writer)
+    ///     .reflect_shared(writer)
     ///     .applied_objects()
     ///     .for_each(|ev| async move {
     ///         match ev {
@@ -796,7 +796,7 @@ where
     ///
     /// This includes the core watch, as well as auxiliary watches introduced by [`Self::owns`] and [`Self::watches`].
     ///
-    /// The [`default_backoff`](crate::watcher::default_backoff) follows client-go conventions,
+    /// The [`DefaultBackoff`] follows client-go conventions,
     /// but can be overridden by calling this method.
     #[must_use]
     pub fn trigger_backoff(mut self, backoff: impl Backoff + 'static) -> Self {
@@ -876,7 +876,8 @@ where
     /// # async fn doc(client: kube::Client) {
     /// let sts_stream = metadata_watcher(Api::<StatefulSet>::all(client.clone()), watcher::Config::default())
     ///     .touched_objects()
-    ///     .predicate_filter(predicates::generation, Default::default());
+    ///     // Retain observed deletions so the owner can recreate missing children.
+    ///     .predicate_filter(predicates::resource_version, Default::default());
     ///
     /// Controller::new(Api::<CustomResource>::all(client), watcher::Config::default())
     ///     .owns_stream(sts_stream)
@@ -885,6 +886,10 @@ where
     ///     .await;
     /// # }
     /// ```
+    ///
+    /// A generation predicate can suppress deletion triggers because deletion need not
+    /// change generation. Resource-version filtering also passes status-only updates.
+    /// See [predicate deletion handling](crate::predicates) for details.
     #[cfg(feature = "unstable-runtime-stream-control")]
     #[must_use]
     pub fn owns_stream<Child: Resource<DynamicType = ()> + Send + 'static>(
@@ -960,7 +965,7 @@ where
     ///     .expect("subscribers can only be created from shared stores");
     /// let pods = watcher(pod_api, watcher::Config::default())
     ///     .default_backoff()
-    ///     .reflect(writer)
+    ///     .reflect_shared(writer)
     ///     .applied_objects()
     ///     .for_each(|ev| async move {
     ///         match ev {
@@ -1142,7 +1147,8 @@ where
     /// let cr: Api<CustomResource> = Api::all(client.clone());
     /// let daemons = watcher(api, watcher::Config::default())
     ///     .touched_objects()
-    ///     .predicate_filter(predicates::generation, Default::default());
+    ///     // Retain observed deletions as triggers for the mapped objects.
+    ///     .predicate_filter(predicates::resource_version, Default::default());
     ///
     /// Controller::new(cr, watcher::Config::default())
     ///     .watches_stream(daemons, mapper)
@@ -1151,6 +1157,10 @@ where
     ///     .await;
     /// # }
     /// ```
+    ///
+    /// A generation predicate can suppress deletion triggers because deletion need not
+    /// change generation. Resource-version filtering also passes status-only updates.
+    /// See [predicate deletion handling](crate::predicates) for details.
     #[cfg(feature = "unstable-runtime-stream-control")]
     #[must_use]
     pub fn watches_stream<Other, I>(
@@ -1224,7 +1234,7 @@ where
     ///     .subscribe()
     ///     .expect("subscribers can only be created from shared stores");
     /// let daemons = watcher(api, watcher::Config::default())
-    ///     .reflect(writer)
+    ///     .reflect_shared(writer)
     ///     .touched_objects()
     ///     .for_each(|ev| async move {
     ///         match ev {

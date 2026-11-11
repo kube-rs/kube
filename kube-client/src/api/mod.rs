@@ -4,17 +4,19 @@ mod core_methods;
 #[cfg(feature = "ws")] mod remote_command;
 use std::fmt::Debug;
 
-#[cfg(feature = "ws")] pub use remote_command::{AttachedProcess, TerminalSize};
-#[cfg(feature = "ws")] mod portforward;
-#[cfg(feature = "ws")] pub use portforward::Portforwarder;
-
-mod subresource;
-#[cfg_attr(docsrs, doc(cfg(feature = "k8s_if_ge_1_33")))]
-pub use subresource::Resize;
 #[cfg(feature = "ws")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
-pub use subresource::{Attach, AttachParams, Ephemeral, Execute, Portforward};
-pub use subresource::{Evict, EvictParams, Log, LogParams, ScaleSpec, ScaleStatus};
+pub use remote_command::{AttachedProcess, TerminalSize};
+#[cfg(feature = "ws")] mod portforward;
+#[cfg(feature = "ws")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
+pub use portforward::Portforwarder;
+
+mod subresource;
+#[cfg(feature = "ws")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
+pub use subresource::{Attach, AttachParams, Execute, Portforward};
+pub use subresource::{Ephemeral, Evict, EvictParams, Log, LogParams, Resize, ScaleSpec, ScaleStatus};
 
 mod util;
 
@@ -459,7 +461,9 @@ mod test {
 
         // a non-core group has a longer prefix to splice into
         assert_eq!(
-            dynamic(&deploy, &Scope::Namespaced).constrain("ns1").resource_url(),
+            dynamic(&deploy, &Scope::Namespaced)
+                .constrain("ns1")
+                .resource_url(),
             "/apis/apps/v1/namespaces/ns1/deployments"
         );
 

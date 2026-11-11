@@ -31,13 +31,13 @@ pub enum Error {
     #[error("configured proxy {proxy_url:?} uses an unsupported protocol")]
     ProxyProtocolUnsupported {
         /// The URL of the proxy.
-        proxy_url: Uri,
+        proxy_url: Box<Uri>,
     },
     /// Returned when the configured proxy uses a protocol that requires a Cargo feature that is currently disabled
     #[error("configured proxy {proxy_url:?} requires the disabled feature {protocol_feature:?}")]
     ProxyProtocolDisabled {
         /// The URL of the proxy.
-        proxy_url: Uri,
+        proxy_url: Box<Uri>,
         /// The Cargo feature that the proxy protocol requires.
         protocol_feature: &'static str,
     },

@@ -52,19 +52,17 @@ pub enum Error {
     AuthExecStart(#[source] std::io::Error),
 
     /// Failed to run auth exec command
-    #[error("auth exec command '{cmd}' failed with status {status}: {out:?}")]
+    #[error("auth exec command '{cmd}' failed with status {}: {out:?}", .out.status)]
     AuthExecRun {
         /// The failed command
         cmd: String,
-        /// The exit status or exit code of the failed command
-        status: std::process::ExitStatus,
-        /// Stdout/Stderr of the failed command
-        out: std::process::Output,
+        /// Exit status and stdout/stderr of the failed command
+        out: Box<std::process::Output>,
     },
 
     /// Failed to parse auth exec output
     #[error("failed to parse auth exec output: {0}")]
-    AuthExecParse(#[source] serde_saphyr::Error),
+    AuthExecParse(#[source] Box<serde_saphyr::Error>),
 
     /// Fail to serialize input
     #[error("failed to serialize input: {0}")]
@@ -456,8 +454,7 @@ fn token_from_gcp_provider(provider: &AuthProviderConfig) -> Result<ProviderToke
         if !output.status.success() {
             return Err(Error::AuthExecRun {
                 cmd: format!("{cmd} {params}"),
-                status: output.status,
-                out: output,
+                out: Box::new(output),
             });
         }
 
@@ -635,8 +632,7 @@ fn auth_exec(auth: &ExecConfig) -> Result<ExecCredential, Error> {
     if !out.status.success() {
         return Err(Error::AuthExecRun {
             cmd: format!("{cmd:?}"),
-            status: out.status,
-            out,
+            out: Box::new(out),
         });
     }
     parse_exec_credentials(&out.stdout)
@@ -646,7 +642,7 @@ fn auth_exec(auth: &ExecConfig) -> Result<ExecCredential, Error> {
 /// YAML-tolerant codec, so some plugins emit YAML. `serde_saphyr` handles both because
 /// YAML 1.2 is a superset of JSON.
 fn parse_exec_credentials(stdout: &[u8]) -> Result<ExecCredential, Error> {
-    serde_saphyr::from_slice(stdout).map_err(Error::AuthExecParse)
+    serde_saphyr::from_slice(stdout).map_err(|e| Error::AuthExecParse(Box::new(e)))
 }
 
 #[cfg(test)]

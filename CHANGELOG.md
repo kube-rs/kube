@@ -5,11 +5,119 @@
 <!-- next-header -->
 UNRELEASED
 ===================
- * see https://github.com/kube-rs/kube/compare/4.2.0...main
+ * see https://github.com/kube-rs/kube/compare/5.0.0...main
+
+[5.0.0](https://github.com/kube-rs/kube/releases/tag/5.0.0) / 2026-11-01
+===================
+<!-- Release notes generated using configuration in .github/release.yml at 5.0.0 -->
+
+## New Major
+As per the release schedule to match up with the [latest Kubernetes Garhwal release](https://kubernetes.io/blog/2026/08/26/kubernetes-v1-37-release/).
+Lots of fixes and improvements. Thanks to everyone who contributed!
+
+## Kubernetes `v1_37` support via `k8s-openapi` [0.29](https://github.com/Arnavion/k8s-openapi/releases/tag/v0.29.0)
+
+Please [upgrade k8s-openapi along with kube](https://kube.rs/upgrading/) to avoid conflicts.
+
+## Semver Breaking Upgrades
+Upgrades to several other important libraries that we couldn't do until the major. These include
+`tower-http@0.7`, `serde-saphyr@2`, `syn@3`, `base64@0.23` , `pem@4`,
+
+## Important Additions
+A new [`Api::dynamic`](https://docs.rs/kube/latest/kube/struct.Api.html#method.dynamic) ctor [has been added](https://github.com/kube-rs/kube/pull/2067) as well as `Api::constrain`[* methods](https://docs.rs/kube/latest/kube/struct.Api.html?search=constrain) to change an `Api`'s namespace. Simplifies `Api` handling when dealing with [discovery](https://docs.rs/kube/latest/kube/discovery/index.html);
+
+```rust
+// before
+let api: Api<DynamicObject> = if caps.scope == Scope::Cluster {
+    Api::all_with(client.clone(), &ar)
+} else {
+    Api::default_namespaced_with(client.clone(), &ar)
+};
+// after
+let api: Api<DynamicObject> = Api::dynamic(client.clone(), &ar, &caps.scope).constrain_default();
+```
+
+- [`#[kube(no_spec)]`](https://docs.rs/kube/latest/kube/derive.CustomResource.html#kubeno_spec) to support non-standard crs without a `.spec`; https://github.com/kube-rs/kube/pull/2071
+- A [`DynamicObject`](https://docs.rs/kube/latest/kube/api/struct.DynamicObject.html) can now be used to perform a [`discovery::resolve_object`](https://docs.rs/kube/latest/kube/struct.Discovery.html#method.resolve_object) lookup; https://github.com/kube-rs/kube/pull/2031
+
+Custom client [can now use a customizable executor](https://github.com/kube-rs/kube/pull/2103) to deal with different lifestyle semantics of spans. Really hairy issue propagated through multiple repos.
+
+## Fixes
+Many fixes this release worth checking below. Of particular importance;
+
+### Watcher Fixes
+Two important ones; [EOF recovery](https://github.com/kube-rs/kube/pull/2084) + [missing init](https://github.com/kube-rs/kube/pull/2118) for the new (not-yet-default) [`StreamingList`](https://docs.rs/kube/latest/kube/runtime/watcher/enum.InitialListStrategy.html) watch mode. Watcher also allows [longer watches now](https://github.com/kube-rs/kube/pull/2069).
+
+### Errors + Docs
+Many smaller fixes to improve error handling; their [accuracy](https://github.com/kube-rs/kube/pull/2062), management of the [Error size](https://github.com/kube-rs/kube/pull/2096),  and [what to print](https://github.com/kube-rs/kube/pull/2070).
+
+Notable new docs on [advanced finalizer pitfalls](https://github.com/kube-rs/kube/pull/2092).
+
+### Internals
+As usual there's a lot of ongoing work that improves internal ergonomics and maintainability that is  [normally hidden](https://github.com/kube-rs/kube/milestone/55?closed=1&q=state%3Aclosed+milestone-number%3A55+archived%3Afalse+sort%3Amilestone_prio-desc+label%3Achangelog-exclude) from the changelog.
+
+In particular this release, a special thank you to @daemonfire300 for the new [test suite for advanced watcher specifics](https://github.com/kube-rs/kube/pull/2022), which allows us to test more complicated watcher edge cases (including one of the fixes above).
+
+
+
+## What's Changed
+### Added
+* Derive ordering for label selector expressions by @meowjesty in https://github.com/kube-rs/kube/pull/2058
+* Expose concrete types in functions that return `impl AsyncRead/AsyncWrite` by @MintSoup in https://github.com/kube-rs/kube/pull/2059
+* resolve an Api's ApiResource directly from a DynamicObject/TypeMeta via Discovery by @jessemin in https://github.com/kube-rs/kube/pull/2031
+* derive: add `no_spec` attribute for CRDs without top-level spec (#1763) by @antcybersec in https://github.com/kube-rs/kube/pull/2071
+* Extend Api with a kubectl style namespace constraint by @doxxx93 in https://github.com/kube-rs/kube/pull/2067
+* client: Add support for NO_PROXY/no_proxy by @Techassi in https://github.com/kube-rs/kube/pull/2075
+* runtime: move controller trigger functions to dedicated module and unify stream bounds by @antcybersec in https://github.com/kube-rs/kube/pull/2076
+* feat(client): allow customizable `hyper::rt::Executor` by @cratelyn in https://github.com/kube-rs/kube/pull/2103
+* Expose `hyper-timeout`'s `reset_reader_on_write` config by @ggevay in https://github.com/kube-rs/kube/pull/2111
+### Changed
+* Update serde-saphyr requirement from 0.0.29 to 1.3.0 by @jszwedko in https://github.com/kube-rs/kube/pull/2086
+* Surface upgrade HTTP errors as Error::Api by @SebTardif in https://github.com/kube-rs/kube/pull/1984
+* Box large error payloads to keep kube::Error under 128 bytes by @doxxx93 in https://github.com/kube-rs/kube/pull/2096
+* Chore(deps): Update serde-saphyr requirement from 1.0.0 to 2.0.0 by @dependabot[bot] in https://github.com/kube-rs/kube/pull/2114
+* Chore(deps): Update base64 requirement from 0.22.1 to 0.23.1 by @dependabot[bot] in https://github.com/kube-rs/kube/pull/2108
+* Chore(deps): Update pem requirement from 3.0.1 to 4.0.0 by @dependabot[bot] in https://github.com/kube-rs/kube/pull/2107
+* Chore(deps): Update tokio-tungstenite requirement from 0.29.0 to 0.30.0 by @dependabot[bot] in https://github.com/kube-rs/kube/pull/2038
+* Chore(deps): Update tower-http requirement from 0.6.4 to 0.7.0 by @dependabot[bot] in https://github.com/kube-rs/kube/pull/2019
+* Drop redundant status field from AuthError::AuthExecRun by @doxxx93 in https://github.com/kube-rs/kube/pull/2099
+* update k8s-openapi to 0.29 by @clux in https://github.com/kube-rs/kube/pull/2120
+### Deprecated
+* Deprecate ListParams::timeout by @doxxx93 in https://github.com/kube-rs/kube/pull/2093
+### Removed
+* Remove deprecated alias for EventFlatten by @clux in https://github.com/kube-rs/kube/pull/2124
+### Fixed
+* Allow PredicateFilter to work with dynamic objects by @kwohlfahrt in https://github.com/kube-rs/kube/pull/2054
+* Handle API errors in watch responses by @doxxx93 in https://github.com/kube-rs/kube/pull/2062
+* Opt watch streams out of gzip compression by @doxxx93 in https://github.com/kube-rs/kube/pull/2080
+* Percent-decode proxy userinfo before Basic auth encoding by @zap0xfce2 in https://github.com/kube-rs/kube/pull/2078
+* core: allow watch timeouts above five minutes by @centerionware in https://github.com/kube-rs/kube/pull/2069
+* fix(runtime): honor zero watch timeout without idle watchdog by @centerionware in https://github.com/kube-rs/kube/pull/2068
+* client: log non-JSON error bodies at debug, not warn by @antcybersec in https://github.com/kube-rs/kube/pull/2070
+* Recover watch streams after nested unexpected EOF by @mvanhorn in https://github.com/kube-rs/kube/pull/2084
+* Fix Retry-After overflow panic in the default retry policy by @doxxx93 in https://github.com/kube-rs/kube/pull/2097
+* Document predicate pitfalls around deletes and finalizers by @daemonfire300 in https://github.com/kube-rs/kube/pull/2092
+* fix: emit Event::Init when a StreamingList initial watch opens by @mvanhorn in https://github.com/kube-rs/kube/pull/2118
+* fix(config): populate missing impersonation headers by @tremwil in https://github.com/kube-rs/kube/pull/2116
+
+
+* @kwohlfahrt made their first contribution in https://github.com/kube-rs/kube/pull/2054
+* @MintSoup made their first contribution in https://github.com/kube-rs/kube/pull/2059
+* @jessemin made their first contribution in https://github.com/kube-rs/kube/pull/2031
+* @daemonfire300 made their first contribution in https://github.com/kube-rs/kube/pull/2022
+* @antcybersec made their first contribution in https://github.com/kube-rs/kube/pull/2071
+* @zap0xfce2 made their first contribution in https://github.com/kube-rs/kube/pull/2078
+* @jszwedko made their first contribution in https://github.com/kube-rs/kube/pull/2086
+* @centerionware made their first contribution in https://github.com/kube-rs/kube/pull/2069
+* @mvanhorn made their first contribution in https://github.com/kube-rs/kube/pull/2084
+* @ggevay made their first contribution in https://github.com/kube-rs/kube/pull/2111
+* @tremwil made their first contribution in https://github.com/kube-rs/kube/pull/2116
+
+**Full Changelog**: https://github.com/kube-rs/kube/compare/4.2.0...5.0.0
 
 4.2.0 / 2026-07-22
 ===================
- * see https://github.com/kube-rs/kube/compare/4.0.0...main
+ * see https://github.com/kube-rs/kube/compare/5.0.0...main
 
 [4.0.0](https://github.com/kube-rs/kube/releases/tag/4.0.0) / 2026-06-16
 ===================
@@ -123,7 +231,7 @@ Better timeout and retry handling to better deal with flaky network conditions, 
 
 4.0.0 / 2026-06-16
 ===================
- * see https://github.com/kube-rs/kube/compare/4.0.0...main
+ * see https://github.com/kube-rs/kube/compare/5.0.0...main
 
 [3.1.0](https://github.com/kube-rs/kube/releases/tag/3.1.0) / 2026-03-17
 ===================
@@ -155,7 +263,7 @@ Maintenance release with fixes for schemas/validation, client exec blocking and 
 
 3.1.0 / 2026-03-17
 ===================
- * see https://github.com/kube-rs/kube/compare/4.0.0...main
+ * see https://github.com/kube-rs/kube/compare/5.0.0...main
 
 [3.0.1](https://github.com/kube-rs/kube/releases/tag/3.0.1) / 2026-01-30
 ===================

@@ -11,8 +11,7 @@ use either::{Either, Left, Right};
 use futures::{AsyncBufRead, StreamExt, TryStream, TryStreamExt, future::BoxFuture};
 use http::{self, Request, Response};
 use http_body_util::BodyExt;
-#[cfg(feature = "ws")]
-use hyper_util::rt::TokioIo;
+#[cfg(feature = "ws")] use hyper_util::rt::TokioIo;
 use jiff::Timestamp;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1 as k8s_meta_v1;
 use kube_core::{discovery::v2::ACCEPT_AGGREGATED_DISCOVERY_V2, response::Status};
@@ -49,15 +48,12 @@ pub use config_ext::ConfigExt;
 pub mod middleware;
 pub mod retry;
 
-#[cfg(any(feature = "rustls-tls", feature = "openssl-tls"))]
-mod tls;
+#[cfg(any(feature = "rustls-tls", feature = "openssl-tls"))] mod tls;
 
 #[cfg(feature = "openssl-tls")]
 pub use tls::openssl_tls::Error as OpensslTlsError;
-#[cfg(feature = "rustls-tls")]
-pub use tls::rustls_tls::Error as RustlsTlsError;
-#[cfg(feature = "ws")]
-mod upgrade;
+#[cfg(feature = "rustls-tls")] pub use tls::rustls_tls::Error as RustlsTlsError;
+#[cfg(feature = "ws")] mod upgrade;
 
 #[cfg(feature = "oauth")]
 #[cfg_attr(docsrs, doc(cfg(feature = "oauth")))]
@@ -68,6 +64,7 @@ pub use auth::OAuthError;
 pub use auth::oidc_errors;
 
 #[cfg(feature = "ws")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
 pub use upgrade::UpgradeConnectionError;
 
 #[cfg(feature = "kubelet-debug")]
@@ -258,6 +255,9 @@ impl Client {
         upgrade::StreamProtocol::add_to_headers(&mut parts.headers)?;
 
         let res = self.send(Request::from_parts(parts, Body::from(body))).await?;
+        // 4xx/5xx bodies are `metav1.Status`. Surface them as `Error::Api`
+        // before the upgrade check, which only understands 101.
+        let res = handle_api_errors(res).await?;
         let protocol = upgrade::verify_response(&res, &key).map_err(Error::UpgradeConnection)?;
         match hyper::upgrade::on(res).await {
             Ok(upgraded) => Ok(Connection {
@@ -304,12 +304,16 @@ impl Client {
     ///
     /// The response can be processed using [`AsyncReadExt`](futures::AsyncReadExt)
     /// and [`AsyncBufReadExt`](futures::AsyncBufReadExt).
+    ///
+    /// Reads fail with an [`std::io::Error`] of kind
+    /// [`UnexpectedEof`](std::io::ErrorKind::UnexpectedEof) if the connection
+    /// is dropped before the response is complete.
+    /// Long-lived streams, such as followed logs, can check for it and resume the request.
     pub async fn request_stream(&self, request: Request<Vec<u8>>) -> Result<impl AsyncBufRead + use<>> {
         let res = self.send(request.map(Body::from)).await?;
         let res = handle_api_errors(res).await?;
-        // Map the error, since we want to convert this into an `AsyncBufReader` using
-        // `into_async_read` which specifies `std::io::Error` as the stream's error type.
-        let body = res.into_body().into_data_stream().map_err(std::io::Error::other);
+        // `into_async_read` requires `std::io::Error` as the stream's error type.
+        let body = res.into_body().into_data_stream().map_err(body_error_to_io);
         Ok(body.into_async_read())
     }
 
@@ -358,17 +362,7 @@ impl Client {
         tracing::trace!("headers: {:?}", res.headers());
 
         let frames = FramedRead::new(
-            StreamReader::new(res.into_body().into_data_stream().map_err(|e| {
-                // Resumable watch termination. TLS stacks nest an `io::Error`
-                // of kind `UnexpectedEof`. Chunk decoders still report
-                // "unexpected EOF during chunk" in the error text. Classify
-                // either case by keeping the original error as the source.
-                let chunk_eof = e.to_string().contains("unexpected EOF during chunk");
-                if error_chain_contains_unexpected_eof(&e) || chunk_eof {
-                    return std::io::Error::new(std::io::ErrorKind::UnexpectedEof, e);
-                }
-                std::io::Error::other(e)
-            })),
+            StreamReader::new(res.into_body().into_data_stream().map_err(body_error_to_io)),
             LinesCodec::new(),
         );
 
@@ -546,6 +540,21 @@ impl Client {
     }
 }
 
+// Converts a response body error into the `std::io::Error` that streaming
+// readers expect, keeping the original error as the source.
+//
+// A connection dropped mid-response becomes `UnexpectedEof`, so long-lived
+// streams (watches, followed logs) can tell it apart and resume. TLS stacks
+// nest an `io::Error` of kind `UnexpectedEof`, while chunk decoders only
+// report "unexpected EOF during chunk" in the error text, so check both.
+fn body_error_to_io(err: Error) -> std::io::Error {
+    let chunk_eof = err.to_string().contains("unexpected EOF during chunk");
+    if error_chain_contains_unexpected_eof(&err) || chunk_eof {
+        return std::io::Error::new(std::io::ErrorKind::UnexpectedEof, err);
+    }
+    std::io::Error::other(err)
+}
+
 // `err` or an error reached through `std::error::Error::source` is an
 // `std::io::Error` of kind `UnexpectedEof`.
 fn error_chain_contains_unexpected_eof(err: &(dyn std::error::Error + 'static)) -> bool {
@@ -627,13 +636,13 @@ mod tests {
 
     use crate::{
         Api, Client, Error, Result,
-        api::WatchEvent,
+        api::{LogParams, WatchEvent},
         client::Body,
         config::{AuthInfo, Cluster, Context, Kubeconfig, NamedAuthInfo, NamedCluster, NamedContext},
     };
 
     use bytes::Bytes;
-    use futures::{Stream, StreamExt};
+    use futures::{AsyncBufReadExt, Stream, StreamExt};
     use http::{Request, Response};
     use http_body::Frame;
     use http_body_util::StreamBody;
@@ -724,22 +733,18 @@ mod tests {
                 request.headers().get(http::header::ACCEPT).unwrap(),
                 "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1"
             );
-            let pod_meta: PartialObjectMeta<Pod> =
-                serde_json::from_value(serde_json::json!({
-                    "apiVersion": "meta.k8s.io/v1",
-                    "kind": "PartialObjectMetadata",
-                    "metadata": {
-                        "name": "test",
-                    },
-                }))
-                .unwrap();
-            send.send_response(Response::new(Body::from(
-                serde_json::to_vec(&pod_meta).unwrap(),
-            )));
+            let pod_meta: PartialObjectMeta<Pod> = serde_json::from_value(serde_json::json!({
+                "apiVersion": "meta.k8s.io/v1",
+                "kind": "PartialObjectMetadata",
+                "metadata": {
+                    "name": "test",
+                },
+            }))
+            .unwrap();
+            send.send_response(Response::new(Body::from(serde_json::to_vec(&pod_meta).unwrap())));
         });
 
-        let pods: Api<PartialObjectMeta<Pod>> =
-            Api::default_namespaced(Client::new(mock_service, "default"));
+        let pods: Api<PartialObjectMeta<Pod>> = Api::default_namespaced(Client::new(mock_service, "default"));
         let pod = pods.get("test").await.unwrap();
         assert_eq!(pod.metadata.name, Some("test".to_string()));
         spawned.await.unwrap();
@@ -766,8 +771,7 @@ mod tests {
             )));
         });
 
-        let pods: Api<PartialObjectMeta<Pod>> =
-            Api::default_namespaced(Client::new(mock_service, "default"));
+        let pods: Api<PartialObjectMeta<Pod>> = Api::default_namespaced(Client::new(mock_service, "default"));
         let list = pods.list(&Default::default()).await.unwrap();
         assert_eq!(list.items.len(), 0);
         spawned.await.unwrap();
@@ -796,8 +800,7 @@ mod tests {
             )));
         });
 
-        let pods: Api<PartialObjectMeta<Pod>> =
-            Api::default_namespaced(Client::new(mock_service, "default"));
+        let pods: Api<PartialObjectMeta<Pod>> = Api::default_namespaced(Client::new(mock_service, "default"));
         let patch = Patch::Merge(serde_json::json!({ "metadata": { "labels": { "a": "b" } } }));
         let pod = pods.patch("test", &PatchParams::default(), &patch).await.unwrap();
         assert_eq!(pod.metadata.name, Some("test".to_string()));
@@ -818,8 +821,7 @@ mod tests {
             send.send_response(Response::new(Body::from(vec![])));
         });
 
-        let pods: Api<PartialObjectMeta<Pod>> =
-            Api::default_namespaced(Client::new(mock_service, "default"));
+        let pods: Api<PartialObjectMeta<Pod>> = Api::default_namespaced(Client::new(mock_service, "default"));
         let _ = pods.watch(&Default::default(), "0").await;
         spawned.await.unwrap();
     }
@@ -966,7 +968,11 @@ mod tests {
 
     #[tokio::test]
     async fn watch_clean_termination_delivers_every_event() {
-        let payload = format!("{}{}", pod_event_frame_str("ADDED", "1"), pod_event_frame_str("MODIFIED", "2"));
+        let payload = format!(
+            "{}{}",
+            pod_event_frame_str("ADDED", "1"),
+            pod_event_frame_str("MODIFIED", "2")
+        );
         let body = body_from_chunks::<std::io::Error>(vec![Ok(Bytes::from(payload))]);
         let (spawned, stream) = open_watch(body).await;
         let mut stream = pin!(stream);
@@ -979,10 +985,7 @@ mod tests {
 
     #[tokio::test]
     async fn watch_chunk_decoder_eof_text_ends_stream() {
-        let body = body_from_chunks(vec![
-            Ok(pod_event_frame("ADDED", "44")),
-            Err(ChunkDecoderEof),
-        ]);
+        let body = body_from_chunks(vec![Ok(pod_event_frame("ADDED", "44")), Err(ChunkDecoderEof)]);
         let (spawned, stream) = open_watch(body).await;
         let mut stream = pin!(stream);
 
@@ -993,9 +996,8 @@ mod tests {
 
     #[tokio::test]
     async fn watch_malformed_json_is_serde_error() {
-        let body = body_from_chunks::<std::io::Error>(vec![Ok(Bytes::from(
-            "{\"type\":\"ADDED\",\"object\":}\n",
-        ))]);
+        let body =
+            body_from_chunks::<std::io::Error>(vec![Ok(Bytes::from("{\"type\":\"ADDED\",\"object\":}\n"))]);
         let (spawned, stream) = open_watch(body).await;
         let mut stream = pin!(stream);
 
@@ -1022,7 +1024,9 @@ mod tests {
         let io_err = expect_read_events(next_event(&mut stream).await);
         assert_eq!(io_err.kind(), ErrorKind::Other);
         let retained = io_err.get_ref().expect("original body error is the source");
-        let body_err = retained.downcast_ref::<Error>().expect("source is the body error");
+        let body_err = retained
+            .downcast_ref::<Error>()
+            .expect("source is the body error");
         assert!(
             chain_has_io_kind(body_err, ErrorKind::ConnectionReset),
             "original source chain dropped ConnectionReset: {body_err:?}"
@@ -1054,7 +1058,9 @@ mod tests {
         let io_err = expect_read_events(next_event(&mut stream).await);
         assert_eq!(io_err.kind(), ErrorKind::Other);
         let retained = io_err.get_ref().expect("original body error is the source");
-        let body_err = retained.downcast_ref::<Error>().expect("source is the body error");
+        let body_err = retained
+            .downcast_ref::<Error>()
+            .expect("source is the body error");
         assert!(
             chain_has_message(body_err, "close_notify"),
             "fixture must mention close_notify, got {body_err}"
@@ -1089,6 +1095,158 @@ mod tests {
         .to_string()
     }
 
+    #[tokio::test]
+    async fn log_stream_direct_unexpected_eof_is_eof_error() {
+        let body = body_from_chunks(vec![
+            Ok(Bytes::from("line one\n")),
+            Err(std::io::Error::new(ErrorKind::UnexpectedEof, "connection closed")),
+        ]);
+        let (spawned, logs) = open_log_stream(body).await;
+        let mut lines = pin!(logs.lines());
+
+        expect_log_line(next_log_line(&mut lines).await, "line one");
+        let io_err = expect_log_error(next_log_line(&mut lines).await);
+        assert_eq!(io_err.kind(), ErrorKind::UnexpectedEof, "{io_err:?}");
+        let body_err = retained_body_error(&io_err);
+        assert!(
+            chain_has_io_kind(body_err, ErrorKind::UnexpectedEof),
+            "{body_err:?}"
+        );
+        spawned.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn log_stream_wrapped_unexpected_eof_is_eof_error() {
+        let body = body_from_chunks(vec![
+            Ok(Bytes::from("line one\n")),
+            Err(nested_io(
+                &["outer transport interruption", "inner transport interruption"],
+                std::io::Error::new(ErrorKind::UnexpectedEof, "connection closed"),
+            )),
+        ]);
+        let (spawned, logs) = open_log_stream(body).await;
+        let mut lines = pin!(logs.lines());
+
+        expect_log_line(next_log_line(&mut lines).await, "line one");
+        let io_err = expect_log_error(next_log_line(&mut lines).await);
+        assert_eq!(io_err.kind(), ErrorKind::UnexpectedEof, "{io_err:?}");
+        let body_err = retained_body_error(&io_err);
+        assert!(
+            chain_has_message(body_err, "inner transport interruption"),
+            "{body_err:?}"
+        );
+        spawned.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn log_stream_chunk_decoder_eof_text_is_eof_error() {
+        let body = body_from_chunks(vec![Ok(Bytes::from("line one\n")), Err(ChunkDecoderEof)]);
+        let (spawned, logs) = open_log_stream(body).await;
+        let mut lines = pin!(logs.lines());
+
+        expect_log_line(next_log_line(&mut lines).await, "line one");
+        let io_err = expect_log_error(next_log_line(&mut lines).await);
+        assert_eq!(io_err.kind(), ErrorKind::UnexpectedEof, "{io_err:?}");
+        let body_err = retained_body_error(&io_err);
+        assert!(
+            chain_has_message(body_err, "unexpected EOF during chunk size line"),
+            "{body_err:?}"
+        );
+        spawned.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn log_stream_nested_non_eof_io_error_is_other() {
+        let body = body_from_chunks(vec![
+            Ok(Bytes::from("line one\n")),
+            Err(nested_io(
+                &["outer transport interruption", "inner transport interruption"],
+                std::io::Error::new(ErrorKind::ConnectionReset, "socket reset"),
+            )),
+        ]);
+        let (spawned, logs) = open_log_stream(body).await;
+        let mut lines = pin!(logs.lines());
+
+        expect_log_line(next_log_line(&mut lines).await, "line one");
+        let io_err = expect_log_error(next_log_line(&mut lines).await);
+        assert_eq!(io_err.kind(), ErrorKind::Other, "{io_err:?}");
+        let body_err = retained_body_error(&io_err);
+        assert!(
+            chain_has_io_kind(body_err, ErrorKind::ConnectionReset),
+            "original source chain dropped ConnectionReset: {body_err:?}"
+        );
+        spawned.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn log_stream_clean_end_delivers_every_line() {
+        let body = body_from_chunks::<std::io::Error>(vec![
+            Ok(Bytes::from("line one\nline ")),
+            Ok(Bytes::from("two\n")),
+        ]);
+        let (spawned, logs) = open_log_stream(body).await;
+        let mut lines = pin!(logs.lines());
+
+        expect_log_line(next_log_line(&mut lines).await, "line one");
+        expect_log_line(next_log_line(&mut lines).await, "line two");
+        let end = next_log_line(&mut lines).await;
+        assert!(end.is_none(), "expected the log stream to end, got {end:?}");
+        spawned.await.unwrap();
+    }
+
+    /// `Api::log_stream` calls `Client::request_stream`.
+    async fn open_log_stream(body: Body) -> (tokio::task::JoinHandle<()>, impl futures::AsyncBufRead) {
+        let (mock_service, handle) = mock::pair::<Request<Body>, Response<Body>>();
+        let spawned = tokio::spawn(async move {
+            let mut handle = pin!(handle);
+            let (request, send) = handle.next_request().await.expect("service not called");
+            assert!(
+                request.uri().path().ends_with("/pods/test/log"),
+                "expected the pod log path, got {}",
+                request.uri()
+            );
+            send.send_response(Response::new(body));
+        });
+        let pods: Api<Pod> = Api::default_namespaced(Client::new(mock_service, "default"));
+        let lp = LogParams {
+            follow: true,
+            ..LogParams::default()
+        };
+        let logs = pods.log_stream("test", &lp).await.expect("log stream response");
+        (spawned, logs)
+    }
+
+    async fn next_log_line<S>(lines: &mut S) -> Option<std::io::Result<String>>
+    where
+        S: Stream<Item = std::io::Result<String>> + Unpin,
+    {
+        tokio::time::timeout(WATCH_POLL_TIMEOUT, lines.next())
+            .await
+            .expect("log stream stalled")
+    }
+
+    fn expect_log_line(item: Option<std::io::Result<String>>, expected: &str) {
+        match item {
+            Some(Ok(line)) => assert_eq!(line, expected),
+            other => panic!("expected log line {expected:?}, got {other:?}"),
+        }
+    }
+
+    fn expect_log_error(item: Option<std::io::Result<String>>) -> std::io::Error {
+        match item {
+            Some(Err(err)) => err,
+            other => panic!("expected a log stream error, got {other:?}"),
+        }
+    }
+
+    fn retained_body_error(io_err: &std::io::Error) -> &Error {
+        io_err
+            .get_ref()
+            .expect("original body error is the source")
+            .downcast_ref::<Error>()
+            .expect("source is the body error")
+    }
+
     fn pod_event_frame_str(action: &str, resource_version: &str) -> String {
         format!("{}\n", pod_event_json(action, resource_version))
     }
@@ -1106,7 +1264,12 @@ mod tests {
     }
 
     /// `Api::watch` calls `Client::request_events`.
-    async fn open_watch(body: Body) -> (tokio::task::JoinHandle<()>, impl Stream<Item = Result<WatchEvent<Pod>>>) {
+    async fn open_watch(
+        body: Body,
+    ) -> (
+        tokio::task::JoinHandle<()>,
+        impl Stream<Item = Result<WatchEvent<Pod>>>,
+    ) {
         let (mock_service, handle) = mock::pair::<Request<Body>, Response<Body>>();
         let spawned = tokio::spawn(async move {
             let mut handle = pin!(handle);
@@ -1119,7 +1282,10 @@ mod tests {
             send.send_response(Response::new(body));
         });
         let pods: Api<Pod> = Api::default_namespaced(Client::new(mock_service, "default"));
-        let stream = pods.watch(&Default::default(), "0").await.expect("watch response");
+        let stream = pods
+            .watch(&Default::default(), "0")
+            .await
+            .expect("watch response");
         (spawned, stream)
     }
 
@@ -1241,4 +1407,44 @@ mod tests {
     }
 
     impl std::error::Error for ChunkDecoderEof {}
+
+    #[cfg(feature = "ws")]
+    #[tokio::test]
+    async fn connect_returns_api_error_for_forbidden_status() {
+        let (mock_service, handle) = mock::pair::<Request<Body>, Response<Body>>();
+        let spawned = tokio::spawn(async move {
+            let mut handle = pin!(handle);
+            let (_request, send) = handle.next_request().await.expect("service not called");
+            let body = serde_json::json!({
+                "status": "Failure",
+                "message": "pods \"my-pod\" is forbidden: User \"system:serviceaccount:default:my-sa\" cannot create resource \"pods/exec\"",
+                "reason": "Forbidden",
+                "code": 403
+            });
+            send.send_response(
+                Response::builder()
+                    .status(403)
+                    .body(Body::from(serde_json::to_vec(&body).unwrap()))
+                    .unwrap(),
+            );
+        });
+
+        let client = Client::new(mock_service, "default");
+        let request = Request::builder()
+            .uri("/api/v1/namespaces/default/pods/my-pod/exec")
+            .body(Vec::new())
+            .unwrap();
+        let err = match client.connect(request).await {
+            Err(err) => err,
+            Ok(_) => panic!("403 is an API error"),
+        };
+        match err {
+            Error::Api(status) => {
+                assert_eq!(status.code, 403);
+                assert!(status.message.contains("forbidden"), "{}", status.message);
+            }
+            other => panic!("expected Api error, got {other}"),
+        }
+        spawned.await.unwrap();
+    }
 }
