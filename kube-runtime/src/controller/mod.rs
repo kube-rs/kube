@@ -716,7 +716,7 @@ where
     ///     .expect("subscribers can only be created from shared stores");
     /// let deploys = watcher(api, watcher::Config::default())
     ///     .default_backoff()
-    ///     .reflect(writer)
+    ///     .reflect_shared(writer)
     ///     .applied_objects()
     ///     .for_each(|ev| async move {
     ///         match ev {
@@ -965,7 +965,7 @@ where
     ///     .expect("subscribers can only be created from shared stores");
     /// let pods = watcher(pod_api, watcher::Config::default())
     ///     .default_backoff()
-    ///     .reflect(writer)
+    ///     .reflect_shared(writer)
     ///     .applied_objects()
     ///     .for_each(|ev| async move {
     ///         match ev {
@@ -1234,7 +1234,7 @@ where
     ///     .subscribe()
     ///     .expect("subscribers can only be created from shared stores");
     /// let daemons = watcher(api, watcher::Config::default())
-    ///     .reflect(writer)
+    ///     .reflect_shared(writer)
     ///     .touched_objects()
     ///     .for_each(|ev| async move {
     ///         match ev {
