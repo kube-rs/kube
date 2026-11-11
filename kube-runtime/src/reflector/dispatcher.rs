@@ -97,7 +97,7 @@ where
 /// [`Writer`]: crate::reflector::store::Writer
 #[cfg_attr(
     feature = "unstable-runtime-subscribe",
-    doc = r#"
+    doc = r"
 
 ## Warning
 
@@ -110,7 +110,7 @@ deleted object before all subscribers read it. Similarly, deleting and recreatin
 an object with the same name may cause subscribers to receive the new object
 instead, missing the old object entirely and potentially leaving its owner
 without a reconciliation trigger.
-"#
+"
 )]
 #[cfg_attr(feature = "unstable-runtime-subscribe", pin_project(PinnedDrop))]
 #[cfg_attr(not(feature = "unstable-runtime-subscribe"), pin_project)]
