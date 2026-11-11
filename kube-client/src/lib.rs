@@ -93,11 +93,17 @@ macro_rules! cfg_error {
     }
 }
 
-cfg_client! {
-    pub mod api;
-    pub mod discovery;
-    pub mod client;
+#[cfg_attr(docsrs, doc(cfg(feature = "client")))]
+#[cfg(feature = "client")]
+pub mod api;
+#[cfg_attr(docsrs, doc(cfg(feature = "client")))]
+#[cfg(feature = "client")]
+pub mod client;
+#[cfg_attr(docsrs, doc(cfg(feature = "client")))]
+#[cfg(feature = "client")]
+pub mod discovery;
 
+cfg_client! {
     #[doc(inline)]
     pub use api::Api;
     #[doc(inline)]
@@ -106,14 +112,20 @@ cfg_client! {
     pub use discovery::Discovery;
 }
 
+#[cfg_attr(docsrs, doc(cfg(feature = "config")))]
+#[cfg(feature = "config")]
+pub mod config;
+
 cfg_config! {
-    pub mod config;
     #[doc(inline)]
     pub use config::Config;
 }
 
+#[cfg_attr(docsrs, doc(cfg(any(feature = "config", feature = "client"))))]
+#[cfg(any(feature = "config", feature = "client"))]
+pub mod error;
+
 cfg_error! {
-    pub mod error;
     #[doc(inline)] pub use error::Error;
     /// Convenient alias for `Result<T, Error>`
     pub type Result<T, E = Error> = std::result::Result<T, E>;

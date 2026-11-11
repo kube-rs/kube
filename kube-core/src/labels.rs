@@ -308,11 +308,12 @@ impl TryFrom<LabelSelectorRequirement> for Expression {
             "NotIn" => match values {
                 Some(values) => Ok(Expression::NotIn(key, values)),
                 None => Err(ParseExpressionError(
-                    "Expected values for In operator, got none".into(),
+                    "Expected values for NotIn operator, got none".into(),
                 )),
             },
             "Exists" => Ok(Expression::Exists(key)),
             "DoesNotExist" => Ok(Expression::DoesNotExist(key)),
+            "" => Err(ParseExpressionError("Missing expression operator".into())),
             _ => Err(ParseExpressionError("Invalid expression operator".into())),
         }
     }

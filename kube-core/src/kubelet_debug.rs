@@ -4,7 +4,7 @@ use crate::{
     request::Error,
     subresource::{AttachParams, LogParams},
 };
-use jiff::Unit;
+use jiff::{RoundMode, TimestampRound, Unit};
 use std::fmt::Debug;
 
 /// Struct that hold all required parameters to call specific pod methods from node
@@ -147,7 +147,11 @@ impl Request {
             // or b.) a rounding increment is configured (which we don't set) that does not fit into 86400 seconds (a day)
             // without any remainder.
             // `jiff::Timestamp` provides RFC3339 via `Display`, docs: https://docs.rs/jiff/latest/jiff/struct.Timestamp.html#impl-Display-for-Timestamp
-            qp.append_pair("sinceTime", &st.round(Unit::Second).unwrap().to_string());
+            // Round down like client-go; rounding up would skip lines logged later in the same second.
+            let floor = TimestampRound::new()
+                .smallest(Unit::Second)
+                .mode(RoundMode::Floor);
+            qp.append_pair("sinceTime", &st.round(floor).unwrap().to_string());
         }
 
         if let Some(tl) = &lp.tail_lines {
@@ -229,6 +233,28 @@ mod test {
         assert_eq!(
             req.uri(),
             "/containerLogs/some-namespace/some-name/some-container?&follow=true&tailLines=10&timestamps=true"
+        );
+    }
+
+    #[test]
+    fn node_logs_since_time_rounds_down() {
+        let lp = LogParams {
+            since_time: Some("2023-10-19T13:14:26.7Z".parse().unwrap()),
+            ..Default::default()
+        };
+        let req = Request::kubelet_node_logs(
+            &KubeletDebugParams {
+                name: "some-name",
+                namespace: "some-namespace",
+                pod_uid: None,
+            },
+            "some-container",
+            &lp,
+        )
+        .unwrap();
+        assert_eq!(
+            req.uri(),
+            "/containerLogs/some-namespace/some-name/some-container?&sinceTime=2023-10-19T13%3A14%3A26Z"
         );
     }
 

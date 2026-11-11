@@ -1,7 +1,7 @@
 # kube-rs
 
 [![Crates.io](https://img.shields.io/crates/v/kube.svg)](https://crates.io/crates/kube)
-[![Rust 1.89](https://img.shields.io/badge/MSRV-1.89-dea584.svg)](https://github.com/rust-lang/rust/releases/tag/1.89.0)
+[![Rust 1.95](https://img.shields.io/badge/MSRV-1.95-dea584.svg)](https://github.com/rust-lang/rust/releases/tag/1.95.0)
 [![Tested against Kubernetes v1.33 and above](https://img.shields.io/badge/MK8SV-v1.33-326ce5.svg)](https://kube.rs/kubernetes-version)
 [![Best Practices](https://bestpractices.coreinfrastructure.org/projects/5413/badge)](https://bestpractices.coreinfrastructure.org/projects/5413)
 [![Discord chat](https://img.shields.io/discord/500028886025895936.svg?logo=discord&style=plastic)](https://discord.gg/tokio)
@@ -16,8 +16,8 @@ Select a version of `kube` along matching versions of [k8s-openapi](https://gith
 
 ```toml
 [dependencies]
-kube = { version = "4.2.0", features = ["runtime", "derive"] }
-k8s-openapi = { version = "0.28.0", features = ["latest", "schemars"] }
+kube = { version = "5.0.0", features = ["runtime", "derive"] }
+k8s-openapi = { version = "0.29.0", features = ["latest", "schemars"] }
 schemars = { version = "1" }
 ```
 
@@ -158,13 +158,13 @@ Uses [rustls](https://github.com/rustls/rustls) with `ring` provider (default) o
 To switch [rustls providers](https://docs.rs/rustls/latest/rustls/crypto/struct.CryptoProvider.html), turn off `default-features` and enable the `aws-lc-rs` feature:
 
 ```toml
-kube = { version = "4.2.0", default-features = false, features = ["client", "rustls-tls", "aws-lc-rs"] }
+kube = { version = "5.0.0", default-features = false, features = ["client", "rustls-tls", "aws-lc-rs"] }
 ```
 
 To switch to `openssl`, turn off `default-features`, and enable the `openssl-tls` feature:
 
 ```toml
-kube = { version = "4.2.0", default-features = false, features = ["client", "openssl-tls"] }
+kube = { version = "5.0.0", default-features = false, features = ["client", "openssl-tls"] }
 ```
 
 This will pull in `openssl` and `hyper-openssl`. If `default-features` is left enabled, you will pull in two TLS stacks, and the default will remain as `rustls`.

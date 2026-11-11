@@ -16,10 +16,8 @@ pub use kube_core::subresource::AttachParams;
 
 pub use k8s_openapi::api::autoscaling::v1::{Scale, ScaleSpec, ScaleStatus};
 
-#[cfg(feature = "ws")]
-use crate::api::portforward::Portforwarder;
-#[cfg(feature = "ws")]
-use crate::api::remote_command::AttachedProcess;
+#[cfg(feature = "ws")] use crate::api::portforward::Portforwarder;
+#[cfg(feature = "ws")] use crate::api::remote_command::AttachedProcess;
 
 /// Methods for [scale subresource](https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/#scale-subresource).
 impl<K> Api<K>
@@ -621,7 +619,7 @@ fn evict_path() {
 
 /// Marker trait for objects that can be evicted
 ///
-/// See [`Api::evic`] for usage
+/// See [`Api::evict`] for usage
 pub trait Evict {}
 
 impl Evict for k8s_openapi::api::core::v1::Pod {}
@@ -763,9 +761,11 @@ fn portforward_path() {
 pub trait Portforward {}
 
 #[cfg(feature = "ws")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
 impl Portforward for k8s_openapi::api::core::v1::Pod {}
 
 #[cfg(feature = "ws")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
 impl<K> Api<K>
 where
     K: Clone + DeserializeOwned + Portforward,

@@ -15,8 +15,7 @@ use thiserror::Error;
 mod file_config;
 mod file_loader;
 mod incluster_config;
-#[cfg(any(feature = "http-proxy", feature = "socks5"))]
-mod no_proxy;
+#[cfg(any(feature = "http-proxy", feature = "socks5"))] mod no_proxy;
 
 use file_loader::ConfigLoader;
 pub use file_loader::KubeConfigOptions;
@@ -356,6 +355,8 @@ impl Config {
             root_cert = Some(ca_bundle);
         }
 
+        let proxy_url = loader.proxy_url(&cluster_url)?;
+
         Ok(Self {
             cluster_url,
             default_namespace,
@@ -367,7 +368,7 @@ impl Config {
             reset_reader_on_write: false,
             accept_invalid_certs,
             disable_compression,
-            proxy_url: loader.proxy_url()?,
+            proxy_url,
             auth_info: loader.user,
             tls_server_name: loader.cluster.tls_server_name,
             headers: Vec::new(),

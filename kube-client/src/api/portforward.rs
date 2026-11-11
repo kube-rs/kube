@@ -83,6 +83,9 @@ enum Message {
 /// Provides `AsyncRead + AsyncWrite` for each port and **does not** bind to local ports.  Error
 /// channel for each port is only written by the server when there's an exception and
 /// the port cannot be used (didn't initialize or can't be used anymore).
+// also gated here (not just the module) so rustdoc shows the ws requirement on `kube` re-exports
+#[cfg(feature = "ws")]
+#[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
 pub struct Portforwarder {
     ports: HashMap<u16, DuplexStream>,
     errors: HashMap<u16, ErrorReceiver>,

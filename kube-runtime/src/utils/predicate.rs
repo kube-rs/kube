@@ -306,6 +306,12 @@ where
 /// generation unchanged. See the [finalizer documentation](crate::finalizer::finalizer).
 ///
 /// Functional rewrite of the [controller-runtime/predicate module](https://github.com/kubernetes-sigs/controller-runtime/blob/main/pkg/predicate/predicate.go).
+///
+/// [`generation`]: predicates::generation
+/// [`resource_version`]: predicates::resource_version
+/// [`labels`]: predicates::labels
+/// [`annotations`]: predicates::annotations
+/// [`finalizers`]: predicates::finalizers
 pub mod predicates {
     use super::hash;
     use kube_client::{Resource, ResourceExt};

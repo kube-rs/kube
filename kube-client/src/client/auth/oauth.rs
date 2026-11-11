@@ -10,6 +10,8 @@ use crate::client::Body;
 
 #[derive(Error, Debug)]
 /// Possible errors when requesting token with OAuth
+// also gated here (not just the module) so rustdoc shows the oauth requirement on `kube` re-exports
+#[cfg(feature = "oauth")]
 pub enum Error {
     /// Default provider appears to be configured, but was invalid
     #[error("default provider is configured but invalid: {0}")]
