@@ -95,6 +95,22 @@ where
 /// can still be polled after the root stream has been dropped.
 ///
 /// [`Writer`]: crate::reflector::store::Writer
+#[cfg_attr(
+    feature = "unstable-runtime-subscribe",
+    doc = r#"
+
+## Warning
+
+Dynamically adding or removing subscribers while the root stream is running
+is experimental and may cause issues. Create all subscribers before polling 
+the root stream and keep them alive until it terminates.
+
+Even with a fixed set of subscribers, an empty relist can discard a pending
+deleted object before all subscribers read it. Similarly, deleting and recreating
+an object with the same name may cause subscribers to receive the new object
+instead, missing the old object entirely and potentially leaving its owner
+without a reconciliation trigger.
+"#)]
 #[cfg_attr(feature = "unstable-runtime-subscribe", pin_project(PinnedDrop))]
 #[cfg_attr(not(feature = "unstable-runtime-subscribe"), pin_project)]
 pub struct ReflectHandle<K>
