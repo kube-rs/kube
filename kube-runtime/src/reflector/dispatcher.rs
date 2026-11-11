@@ -50,8 +50,7 @@ where
         // Create a broadcast (tx, rx) pair
         let (mut dispatch_tx, dispatch_rx) = async_broadcast::broadcast(buf_size);
         // The tx half will not wait for any receivers to be active before
-        // broadcasting events. If no receivers are active, events will be
-        // buffered.
+        // broadcasting events. If no receivers are active, events are dropped.
         dispatch_tx.set_await_active(false);
         Self {
             dispatch_tx,
