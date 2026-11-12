@@ -5,6 +5,10 @@
 <!-- next-header -->
 UNRELEASED
 ===================
+ * see https://github.com/kube-rs/kube/compare/5.1.0...main
+
+5.1.0 / 2026-11-12
+===================
  * see https://github.com/kube-rs/kube/compare/5.0.0...main
 
 [5.0.0](https://github.com/kube-rs/kube/releases/tag/5.0.0) / 2026-11-01
