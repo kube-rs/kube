@@ -7,9 +7,40 @@ UNRELEASED
 ===================
  * see https://github.com/kube-rs/kube/compare/5.1.0...main
 
+[5.1.0](https://github.com/kube-rs/kube/releases/tag/5.1.0) / 2026-11-12
+===================
+<!-- Release notes generated using configuration in .github/release.yml at 5.1.0 -->
+
+## What's Changed
+Maintenance release.
+
+### Added
+* kube-core: add generic owner-reference and finalizer helpers by @p-alik in https://github.com/kube-rs/kube/pull/2048
+* kube-client: introduce delete_opt by @p-alik in https://github.com/kube-rs/kube/pull/2137
+* Wait for pod resize by @hugoponthieu in https://github.com/kube-rs/kube/pull/1922
+### Changed
+* bump msrv to 1.95 by @clux in https://github.com/kube-rs/kube/pull/2134
+### Fixed
+* kube-client: report dropped log stream connections as UnexpectedEof by @p-alik in https://github.com/kube-rs/kube/pull/2127
+* Round down LogParams::since_time to the second by @doxxx93 in https://github.com/kube-rs/kube/pull/2136
+* Fall back to the status code when Status::reason is not a known reason by @doxxx93 in https://github.com/kube-rs/kube/pull/2139
+* fix parse error messages for LabelSelectorRequirement into Expression by @orangecms in https://github.com/kube-rs/kube/pull/2143
+* Make kube-client modules visible to rustfmt by @doxxx93 in https://github.com/kube-rs/kube/pull/2145
+* Match NO_PROXY against the apiserver instead of the proxy by @doxxx93 in https://github.com/kube-rs/kube/pull/2144
+* Bound watch startup with the watcher idle timeout by @doxxx93 in https://github.com/kube-rs/kube/pull/2149
+* Merge untagged enums of unit enums into a single structural enum by @doxxx93 in https://github.com/kube-rs/kube/pull/2098
+* Propagate delete events in shared streams by @Danil-Grigorev in https://github.com/kube-rs/kube/pull/1673
+* fix: correct eviction deleteOptions key by @kykosic in https://github.com/kube-rs/kube/pull/2152
+
+
+* @p-alik made their first contribution in https://github.com/kube-rs/kube/pull/2048
+* @kykosic made their first contribution in https://github.com/kube-rs/kube/pull/2152
+
+**Full Changelog**: https://github.com/kube-rs/kube/compare/5.0.0...5.1.0
+
 5.1.0 / 2026-11-12
 ===================
- * see https://github.com/kube-rs/kube/compare/5.0.0...main
+ * see https://github.com/kube-rs/kube/compare/5.1.0...main
 
 [5.0.0](https://github.com/kube-rs/kube/releases/tag/5.0.0) / 2026-11-01
 ===================
@@ -121,7 +152,7 @@ In particular this release, a special thank you to @daemonfire300 for the new [t
 
 4.2.0 / 2026-07-22
 ===================
- * see https://github.com/kube-rs/kube/compare/5.0.0...main
+ * see https://github.com/kube-rs/kube/compare/5.1.0...main
 
 [4.0.0](https://github.com/kube-rs/kube/releases/tag/4.0.0) / 2026-06-16
 ===================
@@ -235,7 +266,7 @@ Better timeout and retry handling to better deal with flaky network conditions, 
 
 4.0.0 / 2026-06-16
 ===================
- * see https://github.com/kube-rs/kube/compare/5.0.0...main
+ * see https://github.com/kube-rs/kube/compare/5.1.0...main
 
 [3.1.0](https://github.com/kube-rs/kube/releases/tag/3.1.0) / 2026-03-17
 ===================
@@ -267,7 +298,7 @@ Maintenance release with fixes for schemas/validation, client exec blocking and 
 
 3.1.0 / 2026-03-17
 ===================
- * see https://github.com/kube-rs/kube/compare/5.0.0...main
+ * see https://github.com/kube-rs/kube/compare/5.1.0...main
 
 [3.0.1](https://github.com/kube-rs/kube/releases/tag/3.0.1) / 2026-01-30
 ===================
