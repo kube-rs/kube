@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794439540984,
+  "lastUpdate": 1794481967986,
   "repoUrl": "https://github.com/kube-rs/kube",
   "entries": {
     "Benchmark": [
@@ -11111,6 +11111,105 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/kube-rs/kube/commit/91a67c884ba39f8b16ad85e15272b48a25e120d8"
         },
         "date": 1794439537982,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "init_listwatch - peak_bytes",
+            "value": 55194619,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - total_allocated",
+            "value": 76715088,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - alloc_count",
+            "value": 578023,
+            "unit": "allocations"
+          },
+          {
+            "name": "steady_state - peak_bytes",
+            "value": 71381202,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - total_allocated",
+            "value": 109519220,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - alloc_count",
+            "value": 799021,
+            "unit": "allocations"
+          },
+          {
+            "name": "relist - peak_bytes",
+            "value": 99797302,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - total_allocated",
+            "value": 174518628,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - alloc_count",
+            "value": 1189035,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_without_modify - peak_bytes",
+            "value": 141298836,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - total_allocated",
+            "value": 205865000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - alloc_count",
+            "value": 1298020,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_with_modify - peak_bytes",
+            "value": 134853452,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - total_allocated",
+            "value": 162895000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - alloc_count",
+            "value": 1058021,
+            "unit": "allocations"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "kylekosic@gmail.com",
+            "name": "Kyle Kosic",
+            "username": "kykosic"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d207fbc1b5ba9cfbb718d2651bae22131b153d6c",
+          "message": "fix: correct eviction deleteOptions key (#2152)\n\nfix(kube-core): send eviction deleteOptions under its API field name\n\nRequest::evict built the Eviction body with the key `delete_options`.\nThe Eviction API field is `deleteOptions`, so the apiserver dropped it\nas an unknown field and every eviction ignored its preconditions,\ngracePeriodSeconds, dryRun and propagationPolicy. With a UID\nprecondition, a controller holding a stale view could evict a\nrecreated pod of the same name.\n\nRename the key and add a test that asserts the serialized body.\n\nSigned-off-by: Kyle Kosic <kyle@river.ai>",
+          "timestamp": "2026-11-12T11:11:52Z",
+          "tree_id": "f5e25e1bcbab0a19649cfdea3ab247da6917699b",
+          "url": "https://github.com/kube-rs/kube/commit/d207fbc1b5ba9cfbb718d2651bae22131b153d6c"
+        },
+        "date": 1794481966863,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
