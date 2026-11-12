@@ -47,6 +47,9 @@ async-stream.workspace = true
 hostname.workspace = true
 
 [dev-dependencies]
+http.workspace = true
+http-body-util.workspace = true
+tower.workspace = true
 kube = { path = "../kube", features = ["derive", "client", "runtime"] }
 serde_json.workspace = true
 serde-saphyr.workspace = true
