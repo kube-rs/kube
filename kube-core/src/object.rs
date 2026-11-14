@@ -39,6 +39,50 @@ where
     pub items: Vec<T>,
 }
 
+impl<T> Default for ObjectList<T>
+where
+    T: Clone + Resource<DynamicType = ()>,
+{
+    fn default() -> Self {
+        Self {
+            types: TypeMeta::list::<T>(),
+            metadata: Default::default(),
+            items: Default::default(),
+        }
+    }
+}
+
+impl<T> ObjectList<T>
+where
+    T: Clone + Resource<DynamicType = ()>,
+{
+    /// Creates a list with the given items, type metadata for `T`, and default list metadata.
+    pub fn with_items(items: Vec<T>) -> Self {
+        // NOTE(juf): Added as helper for watcher test. Need to reason/check how much this is now
+        // part of the public interface, i.e., this should probably not be exposed to regular
+        // kube-rs consumers. But have to think about it.
+        Self {
+            types: TypeMeta::list::<T>(),
+            metadata: Default::default(),
+            items,
+        }
+    }
+
+    /// Sets the list metadata's resource version.
+    pub fn metadata_version(mut self, v: String) -> Self {
+        // NOTE(juf): same as NOTE above
+        self.metadata.resource_version = Some(v);
+        self
+    }
+
+    /// Sets the list metadata's continuation token for pagination.
+    pub fn r#continue(mut self, token: String) -> Self {
+        // NOTE(juf): same as NOTE above
+        self.metadata.continue_ = Some(token);
+        self
+    }
+}
+
 fn deserialize_v1_list_as_default<'de, D>(deserializer: D) -> Result<TypeMeta, D::Error>
 where
     D: Deserializer<'de>,

@@ -13,7 +13,12 @@ pub(crate) fn prepare(request: &mut Request<Vec<u8>>, drop_managed_fields: bool)
         .get(ACCEPT)
         .and_then(|v| v.to_str().ok())
         .unwrap_or("application/json");
-    let value = format!("{accept};drop=metadata.managedFields, {accept}");
+    let preferred = accept
+        .split(',')
+        .map(|clause| format!("{};drop=metadata.managedFields", clause.trim()))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let value = format!("{preferred}, {accept}");
     request
         .headers_mut()
         .insert(ACCEPT, value.parse().expect("valid generated Accept header"));

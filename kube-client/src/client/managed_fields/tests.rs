@@ -12,6 +12,33 @@ use serde_json::{Value, json};
 
 const DROP_ACCEPT: &str = "application/json;drop=metadata.managedFields, application/json";
 
+#[test]
+fn drop_gets_added_to_each_accept_and_keeps_original_as_fallback() {
+    let accept = "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1, application/json";
+    let mut request = Request::get("/").header(ACCEPT, accept).body(vec![]).unwrap();
+    prepare(&mut request, true);
+    assert_eq!(
+        request.headers()[ACCEPT],
+        format!(
+            "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1;drop=metadata.managedFields, application/json;drop=metadata.managedFields, {accept}"
+        )
+    );
+}
+
+#[tokio::test]
+async fn converting_to_client_clears_opt_out_for_discovery_and_other_apis() {
+    use kube_core::discovery::v2::ACCEPT_AGGREGATED_DISCOVERY_V2;
+
+    let client = responding_client(json!({"items": []}), Some(ACCEPT_AGGREGATED_DISCOVERY_V2.into()));
+    let api = Api::<Pod>::all(client).without_managed_fields();
+    Client::from(api).list_api_groups_aggregated().await.unwrap();
+
+    let client = responding_client(pod_with_managed_fields(), None);
+    let api = Api::<Pod>::all(client).without_managed_fields();
+    let other = Api::<Pod>::namespaced(Client::from(api), "other");
+    other.get("probe").await.unwrap();
+}
+
 fn pod_with_managed_fields() -> Value {
     json!({"apiVersion":"v1", "kind":"Pod", "metadata":{"name":"probe",
         "managedFields":[{"manager":"test", "operation":"Update", "apiVersion":"v1"}]},

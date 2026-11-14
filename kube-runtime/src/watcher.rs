@@ -1055,7 +1055,7 @@ mod tests {
     use futures::StreamExt;
     use k8s_openapi::{api::core::v1::ConfigMap, apimachinery::pkg::apis::meta::v1::ObjectMeta};
     use kube_client::{
-        api::{TypeMeta, WatchEvent, WatchParams},
+        api::{ObjectList, TypeMeta, WatchEvent, WatchParams},
         core::{
             Status,
             watch::{Bookmark, BookmarkMeta},
@@ -1081,6 +1081,97 @@ mod tests {
             },
             ..ConfigMap::default()
         }
+    }
+
+    #[tokio::test]
+    async fn drop_managed_fields_behaviour_gets_propagated_through_watcher_cycles() {
+        // Purpose of this test is to test [`kube_client/src/managed_fields`] on a higher
+        // abstraction level.
+        use http::{Request, Response, header::ACCEPT};
+        use kube_client::{Api, Client, client::Body};
+        use std::sync::{
+            Arc,
+            atomic::{AtomicUsize, Ordering},
+        };
+
+        let calls = Arc::new(AtomicUsize::new(0));
+        let recorded = calls.clone();
+        let service = tower::service_fn(move |request: Request<Body>| {
+            assert_eq!(
+                request.headers()[ACCEPT],
+                "application/json;drop=metadata.managedFields, application/json"
+            );
+            assert_eq!(request.uri().path(), "/api/v1/configmaps");
+            let query = request.uri().query().unwrap();
+            let response = match recorded.fetch_add(1, Ordering::SeqCst) {
+                0 => {
+                    assert!(query.contains("limit=1"));
+                    assert!(!query.contains("continue="));
+                    let list = ObjectList::<ConfigMap>::with_items(vec![config_map("a", "10")])
+                        .metadata_version("10".to_string())
+                        .r#continue("next-page".to_string());
+                    serde_json::to_value(list)
+                }
+                1 => {
+                    assert!(query.contains("continue=next-page"));
+                    let list = ObjectList::<ConfigMap>::with_items(vec![config_map("b", "10")])
+                        .metadata_version("10".to_string());
+                    serde_json::to_value(list)
+                }
+                2 => {
+                    assert!(query.contains("watch=true"));
+                    assert!(query.contains("resourceVersion=10"));
+                    serde_json::to_value(WatchEvent::<ConfigMap>::Error(Box::new(Status {
+                        code: 410,
+                        reason: "Expired".to_string(),
+                        message: "expired resource version".to_string(),
+                        ..Status::default()
+                    })))
+                }
+                3 => {
+                    assert!(query.contains("limit=1"));
+                    assert!(!query.contains("continue="));
+                    assert!(!query.contains("watch=true"));
+                    let list = ObjectList::<ConfigMap>::with_items(vec![config_map("c", "20")])
+                        .metadata_version("20".to_string());
+                    serde_json::to_value(list)
+                }
+                4 => {
+                    assert!(query.contains("watch=true"));
+                    assert!(query.contains("resourceVersion=20"));
+                    serde_json::to_value(WatchEvent::Added(config_map("d", "21")))
+                }
+                _ => panic!("unexpected request: {}", request.uri()),
+            }
+            .unwrap();
+            async move {
+                Ok::<_, tower::BoxError>(Response::new(Body::from(format!("{response}\n").into_bytes())))
+            }
+        });
+        let api = Api::<ConfigMap>::all(Client::new(service, "default")).without_managed_fields();
+        let mut stream = std::pin::pin!(super::watcher(api.clone(), Config::default().page_size(1)));
+        for expected in [
+            "Init",
+            "InitApply(a)",
+            "InitApply(b)",
+            "InitDone",
+            "Expired",
+            "Init",
+            "InitApply(c)",
+            "InitDone",
+            "Apply(d)",
+        ] {
+            let event = tokio::time::timeout(Duration::from_secs(1), stream.next())
+                .await
+                .unwrap()
+                .unwrap();
+            if expected == "Expired" {
+                assert!(matches!(event, Err(super::Error::WatchError(status)) if status.code == 410));
+            } else {
+                assert_eq!(event.unwrap().to_string(), expected);
+            }
+        }
+        assert_eq!(calls.load(Ordering::SeqCst), 5);
     }
 
     #[tokio::test(start_paused = true)]
