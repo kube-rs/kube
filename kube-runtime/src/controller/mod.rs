@@ -88,6 +88,25 @@ pub enum Error<ReconcilerErr: 'static, QueueErr: 'static> {
     RunnerError(#[source] RunnerError),
 }
 
+/// How to handle finalizer removal when `Event::Cleanup` succeeds.
+///
+/// By default, in the kube-rs implementation, `finalizer()` removes the finalizer when cleanup succeeds.
+/// In many other controller implementations, finalizer removal is explicit.
+#[derive(Debug, Clone, Copy, Default, Eq, PartialEq)]
+pub(crate) enum FinalizerPolicy {
+    /// Remove the finalizer after `Event::Cleanup` succeeds for the object by default.
+    #[default]
+    Remove,
+    /// Skip removing the finalizer when `Event::Cleanup` succeeds for the object.
+    /// This allows the controller to defer finalizer removal until certain conditions are met or a timeout occurs.
+    Skip {
+        /// Maximum duration to wait before forcibly removing the finalizer.
+        ///
+        /// This compares against `metadata.deletionTimestamp` statelessly.
+        max_delete_duration: Option<Duration>,
+    },
+}
+
 /// Results of the reconciliation attempt
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Action {
@@ -95,10 +114,18 @@ pub struct Action {
     ///
     /// For example, use this to query external systems for updates, expire time-limited resources, or
     /// (in your `error_policy`) retry after errors.
-    requeue_after: Option<Duration>,
+    pub(crate) requeue_after: Option<Duration>,
+    /// Policy for handling finalizer removal when `Event::Cleanup` succeeds.
+    pub(crate) finalizer_policy: FinalizerPolicy,
 }
 
 impl Action {
+    /// Constant defaults for an Action
+    const BASE: Self = Self {
+        requeue_after: None,
+        finalizer_policy: FinalizerPolicy::Remove,
+    };
+
     /// Action to the reconciliation at this time even if no external watch triggers hit
     ///
     /// This is the best-practice action that ensures eventual consistency of your controller
@@ -109,6 +136,7 @@ impl Action {
     pub const fn requeue(duration: Duration) -> Self {
         Self {
             requeue_after: Some(duration),
+            ..Self::BASE
         }
     }
 
@@ -122,7 +150,45 @@ impl Action {
     /// frequent changes to the underlying object, or some other hook to retain eventual consistency.
     #[must_use]
     pub const fn await_change() -> Self {
-        Self { requeue_after: None }
+        Self {
+            requeue_after: None,
+            ..Self::BASE
+        }
+    }
+
+    /// Skip removing the finalizer for this reconciliation.
+    ///
+    /// This only takes effect when returned from `Event::Cleanup` within
+    /// the `finalizer` helper.
+    ///
+    /// This is useful when you want to requeue the object without cleaning up the finalizer.
+    /// This can potentially leave a finalizer around indefinitely.
+    /// Use `Self::keep_finalizer_for` if you want to limit how long the finalizer is kept around.
+    #[must_use]
+    pub const fn keep_finalizer(self) -> Self {
+        Self {
+            finalizer_policy: FinalizerPolicy::Skip {
+                max_delete_duration: None,
+            },
+            ..self
+        }
+    }
+
+    /// Skip removing the finalizer for up to a max amount of time.
+    ///
+    /// This only takes effect when returned from `Event::Cleanup` within
+    /// the `finalizer` helper.
+    ///
+    /// This ensures that the finalizer is not kept around indefinitely.
+    /// This uses metadata.deletionTimestamp as the base time.
+    #[must_use]
+    pub const fn keep_finalizer_for(self, duration: Duration) -> Self {
+        Self {
+            finalizer_policy: FinalizerPolicy::Skip {
+                max_delete_duration: Some(duration),
+            },
+            ..self
+        }
     }
 }
 

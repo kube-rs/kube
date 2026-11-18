@@ -1,5 +1,5 @@
 //! Finalizer helper for [`Controller`](crate::Controller) reconcilers
-use crate::controller::Action;
+use crate::controller::{Action, FinalizerPolicy};
 use futures::{TryFuture, TryFutureExt};
 use json_patch::{AddOperation, PatchOperation, RemoveOperation, TestOperation, jsonptr::PointerBuf};
 use kube_client::{
@@ -7,9 +7,11 @@ use kube_client::{
     api::{Patch, PatchParams},
 };
 
+use k8s_openapi::{apimachinery::pkg::apis::meta::v1::Time, jiff::Timestamp};
 use serde::{Serialize, de::DeserializeOwned};
-use std::{error::Error as StdError, fmt::Debug, str::FromStr, sync::Arc};
+use std::{error::Error as StdError, fmt::Debug, str::FromStr, sync::Arc, time::Duration};
 use thiserror::Error;
+use tracing::warn;
 
 /// Errors from the finalizer helper
 ///
@@ -68,6 +70,57 @@ impl FinalizerState {
                 .find(|(_, fin)| *fin == finalizer_name)
                 .map(|(i, _)| i),
             is_deleting: obj.meta().deletion_timestamp.is_some(),
+        }
+    }
+}
+
+/// What to do with the finalizer after a successful `Cleanup`.
+#[derive(Debug, PartialEq, Eq)]
+enum FinalizerRemovalDecision {
+    /// Remove it (the default policy).
+    Remove,
+    /// Keep it; `requeue_after` indicates how long to wait before reconsidering removal.
+    Keep { requeue_after: Option<Duration> },
+    /// Skip was requested, but max deletion duration has elapsed, forcing removal.
+    ForceRemove,
+}
+
+/// Whether the finalizer should be kept after a successful `Cleanup`, per the finalizer policy.
+///
+/// Logs a warning when max deletion duration has elapsed and removal is forced.
+fn remove_finalizer_decision(
+    action: &Action,
+    deletion_timestamp: Option<&Time>,
+    now: Timestamp,
+) -> FinalizerRemovalDecision {
+    match action.finalizer_policy {
+        FinalizerPolicy::Remove => FinalizerRemovalDecision::Remove,
+        FinalizerPolicy::Skip {
+            max_delete_duration: None,
+        } => FinalizerRemovalDecision::Keep {
+            requeue_after: action.requeue_after,
+        },
+        FinalizerPolicy::Skip {
+            max_delete_duration: Some(max),
+        } => {
+            // Always Some while deleting; treat missing/negative (clock skew) as 0 elapsed.
+            let elapsed = deletion_timestamp
+                .and_then(|t| Duration::try_from(now.duration_since(t.0)).ok())
+                .unwrap_or_default();
+            match max.checked_sub(elapsed) {
+                // Wake up by the deadline even if the reconciler asked for a later (or no) requeue.
+                Some(remaining) if !remaining.is_zero() => FinalizerRemovalDecision::Keep {
+                    requeue_after: Some(action.requeue_after.map_or(remaining, |r| r.min(remaining))),
+                },
+                _ => {
+                    warn!(
+                        ?elapsed,
+                        ?max,
+                        "finalizer held past max deletion duration; forcing removal"
+                    );
+                    FinalizerRemovalDecision::ForceRemove
+                }
+            }
         }
     }
 }
@@ -154,10 +207,20 @@ where
         } => {
             // Cleanup reconciliation must succeed before it's safe to remove the finalizer
             let name = obj.meta().name.clone().ok_or(Error::UnnamedObject)?;
+            let deletion_timestamp = obj.meta().deletion_timestamp.clone();
             let action = TryFutureExt::into_future(reconcile(Event::Cleanup(obj)))
                 .await
                 // Short-circuit, so that we keep the finalizer if cleanup fails
                 .map_err(Error::CleanupFailed)?;
+            match remove_finalizer_decision(&action, deletion_timestamp.as_ref(), Timestamp::now()) {
+                FinalizerRemovalDecision::Remove | FinalizerRemovalDecision::ForceRemove => {}
+                FinalizerRemovalDecision::Keep { requeue_after } => {
+                    return Ok(Action {
+                        requeue_after,
+                        ..action
+                    });
+                }
+            }
             // Cleanup was successful, remove the finalizer so that deletion can continue
             let finalizer_path = format!("/metadata/finalizers/{finalizer_i}");
             api.patch::<K>(
@@ -257,4 +320,120 @@ pub enum Event<K> {
     /// - Another finalizer was removed in the meantime
     /// - The grinch's heart grows a size or two
     Cleanup(Arc<K>),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{FinalizerRemovalDecision, remove_finalizer_decision};
+    use crate::controller::Action;
+    use k8s_openapi::{
+        apimachinery::pkg::apis::meta::v1::Time,
+        jiff::{SignedDuration, Timestamp},
+    };
+    use std::time::Duration;
+
+    const MAX: Duration = Duration::from_mins(10);
+    const SHORT_REQUEUE: Duration = Duration::from_secs(30);
+    const LONG_REQUEUE: Duration = Duration::from_hours(1);
+
+    fn now() -> Timestamp {
+        Timestamp::from_second(1_700_000_000).unwrap()
+    }
+
+    /// Decide for an object whose deletion started `deleted_ago` before `now()`
+    ///
+    /// A negative `deleted_ago` puts the deletion timestamp in the future (clock skew).
+    fn decide(action: &Action, deleted_ago: Option<SignedDuration>) -> FinalizerRemovalDecision {
+        let deletion_timestamp = deleted_ago.map(|ago| Time(now() - ago));
+        remove_finalizer_decision(action, deletion_timestamp.as_ref(), now())
+    }
+
+    fn keep(requeue_after: Option<Duration>) -> FinalizerRemovalDecision {
+        FinalizerRemovalDecision::Keep { requeue_after }
+    }
+
+    #[test]
+    fn default_policy_removes() {
+        for action in [Action::requeue(SHORT_REQUEUE), Action::await_change()] {
+            assert_eq!(
+                decide(&action, Some(SignedDuration::from_mins(1))),
+                FinalizerRemovalDecision::Remove
+            );
+        }
+    }
+
+    #[test]
+    fn indefinite_skip_keeps_with_user_requeue() {
+        // Even long after deletion started, there is no deadline to enforce
+        let deleted_ago = Some(SignedDuration::from_hours(24 * 7));
+        let action = Action::requeue(SHORT_REQUEUE).keep_finalizer();
+        assert_eq!(decide(&action, deleted_ago), keep(Some(SHORT_REQUEUE)));
+        let action = Action::await_change().keep_finalizer();
+        assert_eq!(decide(&action, deleted_ago), keep(None));
+    }
+
+    #[test]
+    fn bounded_skip_keeps_shorter_user_requeue() {
+        let action = Action::requeue(SHORT_REQUEUE).keep_finalizer_for(MAX);
+        assert_eq!(
+            decide(&action, Some(SignedDuration::from_mins(4))),
+            keep(Some(SHORT_REQUEUE))
+        );
+    }
+
+    #[test]
+    fn bounded_skip_clamps_requeue_to_deadline() {
+        let deleted_ago = Some(SignedDuration::from_mins(4));
+        let remaining = Some(Duration::from_mins(6));
+        // A later requeue is pulled in to the deadline
+        let action = Action::requeue(LONG_REQUEUE).keep_finalizer_for(MAX);
+        assert_eq!(decide(&action, deleted_ago), keep(remaining));
+        // No requeue at all still wakes up at the deadline
+        let action = Action::await_change().keep_finalizer_for(MAX);
+        assert_eq!(decide(&action, deleted_ago), keep(remaining));
+    }
+
+    #[test]
+    fn bounded_skip_keeps_until_just_before_deadline() {
+        let action = Action::requeue(LONG_REQUEUE).keep_finalizer_for(MAX);
+        let just_before = SignedDuration::from_mins(10) - SignedDuration::from_millis(1);
+        assert_eq!(
+            decide(&action, Some(just_before)),
+            keep(Some(Duration::from_millis(1)))
+        );
+    }
+
+    #[test]
+    fn bounded_skip_force_removes_at_deadline() {
+        let action = Action::requeue(SHORT_REQUEUE).keep_finalizer_for(MAX);
+        assert_eq!(
+            decide(&action, Some(SignedDuration::from_mins(10))),
+            FinalizerRemovalDecision::ForceRemove
+        );
+    }
+
+    #[test]
+    fn bounded_skip_force_removes_past_deadline() {
+        let action = Action::requeue(SHORT_REQUEUE).keep_finalizer_for(MAX);
+        assert_eq!(
+            decide(&action, Some(SignedDuration::from_hours(1))),
+            FinalizerRemovalDecision::ForceRemove
+        );
+    }
+
+    #[test]
+    fn bounded_skip_treats_future_deletion_timestamp_as_just_deleted() {
+        // Clock skew: the apiserver's deletionTimestamp is ahead of our clock
+        let action = Action::requeue(LONG_REQUEUE).keep_finalizer_for(MAX);
+        assert_eq!(
+            decide(&action, Some(SignedDuration::from_mins(-5))),
+            keep(Some(MAX))
+        );
+    }
+
+    #[test]
+    fn bounded_skip_treats_missing_deletion_timestamp_as_just_deleted() {
+        let action = Action::await_change().keep_finalizer_for(MAX);
+        assert_eq!(decide(&action, None), keep(Some(MAX)));
+    }
 }
