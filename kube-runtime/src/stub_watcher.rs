@@ -187,7 +187,7 @@ impl<K: Unpin> futures::Stream for TestStream<K> {
         // If it is pending (`std::task::Pending`), the macro neatly yields back to the executor for us and the call to
         // poll(cx) assumes the the sleep has registered its waker into our cx (context), therefore
         // waking (polling) the stream at the appropriate moment again.
-        // If it is ready (`std::task:Read(())`) immeadiately we want to continue consuming the next
+        // If it is ready (`std::task:Read(())`) immediately we want to continue consuming the next
         // item in our sequence
         loop {
             if let Some(sleep) = this.waiting.as_mut() {
