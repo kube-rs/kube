@@ -8,8 +8,8 @@ use serde::{Deserialize, Serialize};
 // no `x-kubernetes-validations`, making the generated method validate nothing).
 #[derive(CustomResource, Serialize, Deserialize, Debug, Clone, JsonSchema)]
 #[kube(group = "clux.dev", version = "v1", kind = "Foo", schema = "manual", cel)]
-// Implement `JsonSchema` for `Foo` so only the error above is reported; the follow-up
-// E0277 points into schemars and its rendering changes between rustc versions.
+// `schema = "manual"` still needs `Foo: JsonSchema` for the generated `crd()`; derive it so the
+// snapshot only holds the cel error above, not an E0277 whose rendering changes across rustc versions.
 #[kube(derive = "JsonSchema")]
 struct FooSpec {
     foo: String,
