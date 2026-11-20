@@ -62,7 +62,7 @@ openssl = { workspace = true, optional = true }
 rustls = { workspace = true, optional = true }
 rustls-platform-verifier = { workspace = true, optional = true }
 bytes = { workspace = true, optional = true }
-tokio = { workspace = true, features = ["time", "signal", "sync", "rt"], optional = true }
+tokio = { workspace = true, features = ["time", "sync", "rt"], optional = true }
 kube-core = { path = "../kube-core", version = "=5.1.0" }
 jsonpath-rust = { workspace = true, optional = true }
 tokio-util = { workspace = true, features = ["io", "codec"], optional = true }
