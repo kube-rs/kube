@@ -230,7 +230,9 @@ where
         }
 
         match config.proxy_url.as_ref() {
-            Some(proxy_url) if proxy_url.scheme_str() == Some("socks5") => {
+            // SocksV5 sends hostnames to the proxy by default, so socks5 already resolves DNS
+            // remotely like socks5h. Go's net/http treats the two schemes the same way.
+            Some(proxy_url) if matches!(proxy_url.scheme_str(), Some("socks5" | "socks5h")) => {
                 #[cfg(feature = "socks5")]
                 {
                     let connector = hyper_util::client::legacy::connect::proxy::SocksV5::new(
@@ -437,7 +439,29 @@ where
 
 #[cfg(test)]
 mod tests {
-    #[cfg(feature = "gzip")] use super::*;
+    use super::*;
+
+    #[test]
+    fn socks5h_proxy_is_handled_like_socks5() {
+        let mut config = Config::new("http://kube.invalid".parse().unwrap());
+        for scheme in ["socks5", "socks5h"] {
+            config.proxy_url = Some(format!("{scheme}://127.0.0.1:1080").parse().unwrap());
+            let result = ClientBuilder::try_from(config.clone());
+            #[cfg(feature = "socks5")]
+            assert!(result.is_ok(), "{scheme}: {:?}", result.err());
+            #[cfg(not(feature = "socks5"))]
+            assert!(
+                matches!(
+                    result,
+                    Err(Error::ProxyProtocolDisabled {
+                        protocol_feature: "kube/socks5",
+                        ..
+                    })
+                ),
+                "{scheme}"
+            );
+        }
+    }
 
     #[cfg(all(feature = "gzip", feature = "rustls-tls"))]
     #[tokio::test]
