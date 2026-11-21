@@ -1,4 +1,6 @@
 //! A reader/writer split store for reflectors
+#[cfg(feature = "unstable-runtime-subscribe")]
+use super::object_ref::{SubscriberId, fresh_subscriber_id};
 use super::{Lookup, ObjectRef, dispatcher::Dispatcher};
 #[cfg(feature = "unstable-runtime-subscribe")]
 use crate::reflector::ReflectHandle;
@@ -12,7 +14,8 @@ use kube_client::{
     ResourceExt,
     core::{Selector, SelectorExt},
 };
-use parking_lot::RwLock;
+use parking_lot::{Mutex, RwLock};
+#[cfg(feature = "unstable-runtime-subscribe")] use std::collections::BTreeSet;
 use std::{fmt::Debug, hash::Hash, sync::Arc};
 use thiserror::Error;
 
@@ -33,6 +36,8 @@ where
     ready_tx: Option<delayed_init::Initializer<()>>,
     ready_rx: Arc<DelayedInit<()>>,
     dispatcher: Option<Dispatcher<K>>,
+    #[cfg(feature = "unstable-runtime-subscribe")]
+    subscribers: Arc<Mutex<BTreeSet<SubscriberId>>>,
 }
 
 impl<K: 'static + Lookup + Clone> Writer<K>
@@ -52,6 +57,8 @@ where
             ready_tx: Some(ready_tx),
             ready_rx: Arc::new(ready_rx),
             dispatcher: None,
+            #[cfg(feature = "unstable-runtime-subscribe")]
+            subscribers: Default::default(),
         }
     }
 
@@ -74,6 +81,7 @@ where
             ready_tx: Some(ready_tx),
             ready_rx: Arc::new(ready_rx),
             dispatcher: Some(Dispatcher::new(buf_size)),
+            subscribers: Default::default(),
         }
     }
 
@@ -86,6 +94,8 @@ where
         Store {
             store: self.store.clone(),
             ready_rx: self.ready_rx.clone(),
+            #[cfg(feature = "unstable-runtime-subscribe")]
+            subscribers: self.subscribers.clone(),
         }
     }
 
@@ -103,6 +113,13 @@ where
             .map(|dispatcher| dispatcher.subscribe(self.as_reader()))
     }
 
+    /// Return the current subscriber IDs, or `None` if there are no subscribers
+    #[cfg(feature = "unstable-runtime-subscribe")]
+    pub(crate) fn subscriber_ids(&self) -> Option<BTreeSet<SubscriberId>> {
+        let set = self.subscribers.lock().clone();
+        (!set.is_empty()).then_some(set)
+    }
+
     /// Applies a single watcher event to the store
     pub fn apply_watcher_event(&mut self, event: &watcher::Event<K>) {
         match event {
@@ -113,7 +130,7 @@ where
                 #[cfg(feature = "unstable-runtime-subscribe")]
                 if self.dispatcher.is_some()
                     && let Some((stored, _)) = store.get_key_value(&key)
-                    && stored.extra.remaining_lookups.is_some()
+                    && stored.extra.pending_lookups.is_some()
                 {
                     store.remove(&key);
                 }
@@ -127,13 +144,12 @@ where
 
                 #[cfg(feature = "unstable-runtime-subscribe")]
                 if let Some((original_key, existing)) = store.remove_entry(&key)
-                    && let Some(dispatcher) = &self.dispatcher
-                    && let Some(subscribers) = dispatcher.subscribers()
+                    && let Some(ids) = self.subscriber_ids()
                 {
                     if existing.uid().as_deref() == key.extra.uid.as_deref() {
                         // Re-insert the entry with updated key, as insert on its own doesnt modify the key
                         let mut key = key;
-                        key.extra.remaining_lookups = Some(subscribers);
+                        key.extra.pending_lookups = Some(ids);
                         store.insert(key, existing);
                     } else {
                         store.insert(original_key, existing);
@@ -230,8 +246,11 @@ pub struct Store<K: 'static + Lookup>
 where
     K::DynamicType: Hash + Eq,
 {
+    #[allow(clippy::struct_field_names)]
     store: Cache<K>,
     ready_rx: Arc<DelayedInit<()>>,
+    #[cfg(feature = "unstable-runtime-subscribe")]
+    subscribers: Arc<Mutex<BTreeSet<SubscriberId>>>,
 }
 
 /// The error returned by `Store::wait_until_ready`
@@ -252,6 +271,14 @@ where
     /// Returns an error if the [`Writer`] was dropped before any value was written.
     pub async fn wait_until_ready(&self) -> Result<(), WriterDropped> {
         self.ready_rx.get().await.map_err(WriterDropped)
+    }
+
+    /// Register a new subscriber and return its ID
+    #[cfg(feature = "unstable-runtime-subscribe")]
+    pub(crate) fn add_subscriber(&self) -> SubscriberId {
+        let id = fresh_subscriber_id();
+        self.subscribers.lock().insert(id);
+        id
     }
 
     /// Retrieve a `clone()` of the entry referred to by `key`, if it is in the cache.
@@ -280,56 +307,55 @@ where
             .cloned()
     }
 
-    /// Return the cached object for `key`, removing it after its last pending lookup.
-    ///
-    /// Earlier lookups decrement the pending lookup count and leave the object in the cache.
+    /// Return the cached object for `key`, removing it once the given subscriber
+    /// acknowledges its pending lookup.
     #[cfg(feature = "unstable-runtime-subscribe")]
     #[must_use]
-    pub(crate) fn remove(&self, key: &ObjectRef<K>) -> Option<Arc<K>> {
-        Self::remove_from_store(&mut self.store.write(), key)
+    pub(crate) fn remove(&self, key: &ObjectRef<K>, id: SubscriberId) -> Option<Arc<K>> {
+        Self::remove_from_store(&mut self.store.write(), key, id)
     }
 
-    /// Perform atomic removal from store based on decrement of remaining lookups
+    /// Perform atomic removal from store based on the subscriber set
     #[cfg(feature = "unstable-runtime-subscribe")]
     #[must_use]
-    fn remove_from_store(store: &mut AHashMap<ObjectRef<K>, Arc<K>>, key: &ObjectRef<K>) -> Option<Arc<K>> {
-        store.remove_entry(key).map(|(mut stored_key, obj)| {
-            if key.extra.uid.as_deref() != obj.uid().as_deref() {
-                store.insert(stored_key, obj.clone());
-                return obj;
-            }
-            match stored_key.extra.remaining_lookups {
-                Some(..=1) => (),
-                None => {
-                    store.insert(stored_key, obj.clone());
-                }
-                Some(lookups) => {
-                    stored_key.extra.remaining_lookups = Some(lookups - 1);
-                    store.insert(stored_key, obj.clone());
-                }
-            }
+    fn remove_from_store(
+        store: &mut AHashMap<ObjectRef<K>, Arc<K>>,
+        key: &ObjectRef<K>,
+        id: SubscriberId,
+    ) -> Option<Arc<K>> {
+        let (mut stored_key, obj) = store.remove_entry(key)?;
 
-            obj
-        })
+        if key.extra.uid.as_deref() != obj.uid().as_deref()
+            || stored_key.extra.pending_lookups.as_mut().is_none_or(|set| {
+                set.remove(&id);
+                !set.is_empty()
+            })
+        {
+            store.insert(stored_key, obj.clone());
+        }
+
+        Some(obj)
     }
 
     /// Perform cleanup of retained cache items in the middle of deletion.
     ///
-    /// This does not guarantee deletion event delivery to all pending subscribers,
+    /// This does not guarantee deletion event delivery to the dropped subscriber
+    /// (or to subscribers added after the delete),
     /// but avoids leaving unconsumed deleted objects in cache, and is consistent
     /// with handling of apply events always reading latest cache state, potentially
     /// missing individual edges.
     #[cfg(feature = "unstable-runtime-subscribe")]
-    pub(crate) fn drop_subscriber(&self) {
+    pub(crate) fn drop_subscriber(&self, id: SubscriberId) {
+        self.subscribers.lock().remove(&id);
         let mut store = self.store.write();
         let keys: Vec<ObjectRef<K>> = store
             .keys()
-            .filter(|k| k.extra.remaining_lookups.is_some())
+            .filter(|k| k.extra.pending_lookups.as_ref().is_some_and(|s| s.contains(&id)))
             .cloned()
             .collect();
 
         for k in keys {
-            let _ = Self::remove_from_store(&mut store, &k);
+            let _ = Self::remove_from_store(&mut store, &k, id);
         }
     }
 

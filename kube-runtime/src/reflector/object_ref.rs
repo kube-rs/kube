@@ -10,6 +10,23 @@ use std::{
     fmt::{Debug, Display},
     hash::Hash,
 };
+#[cfg(feature = "unstable-runtime-subscribe")]
+use std::{
+    collections::BTreeSet,
+    sync::atomic::{AtomicU64, Ordering},
+};
+
+/// Identifier for a subscriber of a reflector.
+#[cfg(feature = "unstable-runtime-subscribe")]
+pub(crate) type SubscriberId = u64;
+
+#[cfg(feature = "unstable-runtime-subscribe")]
+static NEXT_SUBSCRIBER_ID: AtomicU64 = AtomicU64::new(1);
+
+#[cfg(feature = "unstable-runtime-subscribe")]
+pub(crate) fn fresh_subscriber_id() -> SubscriberId {
+    NEXT_SUBSCRIBER_ID.fetch_add(1, Ordering::Relaxed)
+}
 
 /// Minimal lookup behaviour needed by a [reflector store](super::Store).
 ///
@@ -58,7 +75,7 @@ pub trait Lookup {
                 resource_version: self.resource_version().map(Cow::into_owned),
                 uid: self.uid().map(Cow::into_owned),
                 #[cfg(feature = "unstable-runtime-subscribe")]
-                remaining_lookups: None,
+                pending_lookups: None,
             },
         }
     }
@@ -159,9 +176,9 @@ pub struct Extra {
     pub resource_version: Option<String>,
     /// The uid of the object
     pub uid: Option<String>,
-    /// Number of remaining cache lookups on this reference
+    /// Subscriber IDs pending a lookup on this reference
     #[cfg(feature = "unstable-runtime-subscribe")]
-    pub remaining_lookups: Option<usize>,
+    pub pending_lookups: Option<BTreeSet<SubscriberId>>,
 }
 
 impl<K: Lookup> ObjectRef<K>
@@ -238,7 +255,7 @@ impl<K: Lookup> ObjectRef<K> {
                     resource_version: None,
                     uid: Some(owner.uid.clone()),
                     #[cfg(feature = "unstable-runtime-subscribe")]
-                    remaining_lookups: None,
+                    pending_lookups: None,
                 },
             })
         } else {
@@ -369,7 +386,7 @@ mod tests {
                 resource_version: Some("123".to_string()),
                 uid: Some("638ffacd-f666-4402-ba10-7848c66ef576".to_string()),
                 #[cfg(feature = "unstable-runtime-subscribe")]
-                remaining_lookups: None,
+                pending_lookups: None,
             },
             ..minimal.clone()
         };

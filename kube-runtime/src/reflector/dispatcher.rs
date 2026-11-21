@@ -10,6 +10,8 @@ use pin_project::pin_project;
 #[cfg(feature = "unstable-runtime-subscribe")] use pin_project::pinned_drop;
 use std::task::ready;
 
+#[cfg(feature = "unstable-runtime-subscribe")]
+use crate::reflector::object_ref::SubscriberId;
 use crate::reflector::{ObjectRef, Store};
 use async_broadcast::{InactiveReceiver, Receiver, Sender};
 
@@ -72,12 +74,6 @@ where
     pub(crate) fn subscribe(&self, reader: Store<K>) -> ReflectHandle<K> {
         ReflectHandle::new(reader, self.dispatch_tx.new_receiver())
     }
-
-    // Return a number of active subscribers to this shared sender.
-    #[cfg(feature = "unstable-runtime-subscribe")]
-    pub(crate) fn subscribers(&self) -> Option<usize> {
-        Some(self.dispatch_tx.receiver_count()).filter(|c| *c > 0)
-    }
 }
 
 /// A handle to a shared stream reader
@@ -100,9 +96,11 @@ where
 
 ## Warning
 
-Dynamically adding or removing subscribers while the root stream is running
-is experimental and may cause issues. Create all subscribers before polling 
-the root stream and keep them alive until it terminates.
+Subscribers can be added or removed while the root stream is running, but
+the semantics are not fully replay-safe: a subscriber added mid-stream receives no
+replay of already-deleted or pending entries, and a dropped subscriber never receives
+pending delete events. Prefer creating all subscribers before polling the root stream
+and keeping them alive until it terminates.
 
 Even with a fixed set of subscribers, an empty relist can discard a pending
 deleted object before all subscribers read it. Similarly, deleting and recreating
@@ -121,6 +119,8 @@ where
     #[pin]
     rx: Receiver<ObjectRef<K>>,
     reader: Store<K>,
+    #[cfg(feature = "unstable-runtime-subscribe")]
+    id: SubscriberId,
 }
 
 impl<K> Clone for ReflectHandle<K>
@@ -139,6 +139,11 @@ where
     K::DynamicType: Eq + std::hash::Hash + Clone,
 {
     pub(super) fn new(reader: Store<K>, rx: Receiver<ObjectRef<K>>) -> ReflectHandle<K> {
+        #[cfg(feature = "unstable-runtime-subscribe")]
+        let id = reader.add_subscriber();
+        #[cfg(feature = "unstable-runtime-subscribe")]
+        return Self { rx, reader, id };
+        #[cfg(not(feature = "unstable-runtime-subscribe"))]
         Self { rx, reader }
     }
 
@@ -162,8 +167,8 @@ where
             match ready!(this.rx.as_mut().poll_next(cx)) {
                 Some(obj_ref) => {
                     #[cfg(feature = "unstable-runtime-subscribe")]
-                    let obj = if obj_ref.extra.remaining_lookups.is_some() {
-                        this.reader.remove(&obj_ref)
+                    let obj = if obj_ref.extra.pending_lookups.is_some() {
+                        this.reader.remove(&obj_ref, *this.id)
                     } else {
                         this.reader.get(&obj_ref)
                     };
@@ -188,7 +193,7 @@ where
     K::DynamicType: Eq + std::hash::Hash + Clone,
 {
     fn drop(self: Pin<&mut Self>) {
-        self.reader().drop_subscriber();
+        self.reader().drop_subscriber(self.id);
     }
 }
 
