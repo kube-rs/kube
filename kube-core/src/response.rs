@@ -5,8 +5,8 @@ use thiserror::Error;
 /// A Kubernetes status object
 ///
 /// This struct is returned by the Kubernetes API on failures,
-/// and bubbles up to users inside a [`kube::Error::Api`] variant
-/// when client requests fail in [`kube::Client`].
+/// and bubbles up to users inside a [`kube::Error::Api`](https://docs.rs/kube/*/kube/enum.Error.html#variant.Api) variant
+/// when client requests fail in [`kube::Client`](https://docs.rs/kube/*/kube/struct.Client.html).
 ///
 /// To match on specific error cases, you can;
 ///
@@ -149,7 +149,7 @@ impl Status {
     // See for example
     // https://github.com/kubernetes/apimachinery/blob/v0.35.0/pkg/api/errors/errors.go#L529
     fn reason_or_code(&self, reason: &str, code: u16) -> bool {
-        self.reason == reason || (!reason::is_known(reason) && self.code == code)
+        self.reason == reason || (!reason::is_known(&self.reason) && self.code == code)
     }
 }
 
@@ -543,5 +543,29 @@ mod test {
             s.metadata.unwrap().continue_.as_deref(),
             Some("<NEW_CONTINUE_TOKEN>")
         );
+    }
+
+    #[test]
+    fn reason_or_code_falls_back_to_code_for_unknown_reason() {
+        // empty reason: fall back to code
+        assert!(Status::failure("", "").with_code(404).is_not_found());
+        // unknown reason (e.g. a rebuilt non-JSON error body): fall back to code
+        let rebuilt = Status::failure("404 page not found", "Failed to parse error data").with_code(404);
+        assert!(rebuilt.is_not_found());
+        assert!(Status::failure("", "SomethingElse").with_code(409).is_conflict());
+        assert!(Status::failure("", "").with_code(403).is_forbidden());
+        assert!(Status::failure("", "").with_code(422).is_invalid());
+        // a different known reason wins over the code
+        assert!(!Status::failure("", reason::GONE).with_code(404).is_not_found());
+        assert!(
+            !Status::failure("", reason::ALREADY_EXISTS)
+                .with_code(409)
+                .is_conflict()
+        );
+        // matching reason wins regardless of code
+        assert!(Status::failure("", reason::NOT_FOUND).is_not_found());
+        assert!(Status::failure("", reason::CONFLICT).with_code(500).is_conflict());
+        // unknown reason with a different code
+        assert!(!Status::failure("", "").with_code(500).is_not_found());
     }
 }

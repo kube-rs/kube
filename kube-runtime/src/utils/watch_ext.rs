@@ -219,7 +219,7 @@ pub trait WatchStreamExt: Stream {
     /// Returns the stream unmodified, but passes every [`watcher::Event`]
     /// through a [`Writer`]. This populates a [`Store`] as the stream is
     /// polled. When the [`watcher::Event`] is not an error or a
-    /// [`watcher::Event::Deleted`] then its inner object will also be
+    /// [`watcher::Event::Delete`] then its inner object will also be
     /// propagated to subscribers.
     ///
     /// Subscribers can be created by calling [`subscribe()`] on a [`Writer`].
@@ -240,7 +240,7 @@ pub trait WatchStreamExt: Stream {
     /// [`Store`]: crate::reflector::Store
     /// [`subscribe()`]: crate::reflector::store::Writer::subscribe()
     /// [`Stream`]: futures::stream::Stream
-    /// [`ReflectHandle`]: crate::reflector::dispatcher::ReflectHandle
+    /// [`ReflectHandle`]: crate::reflector::ReflectHandle
     /// ## Usage
     /// ```no_run
     /// # use futures::StreamExt;

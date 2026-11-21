@@ -27,13 +27,13 @@ workspace = true
 
 [dependencies]
 futures = { workspace = true, features = ["async-await"] }
-kube-client = { path = "../kube-client", version = "=5.0.0", default-features = false, features = ["jsonpatch", "client"] }
+kube-client = { path = "../kube-client", version = "=5.1.0", default-features = false, features = ["jsonpatch", "client"] }
 educe = { workspace = true, features = ["Clone", "Debug", "Hash", "PartialEq"] }
 serde.workspace = true
 ahash.workspace = true
 parking_lot.workspace = true
 pin-project.workspace = true
-tokio = { workspace = true, features = ["time"] }
+tokio = { workspace = true, features = ["signal", "time"] }
 tokio-util = { workspace = true, features = ["time"] }
 tracing.workspace = true
 json-patch.workspace = true
@@ -47,6 +47,9 @@ async-stream.workspace = true
 hostname.workspace = true
 
 [dev-dependencies]
+http.workspace = true
+http-body-util.workspace = true
+tower.workspace = true
 kube = { path = "../kube", features = ["derive", "client", "runtime"] }
 serde_json.workspace = true
 serde-saphyr.workspace = true

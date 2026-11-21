@@ -17,7 +17,7 @@ fmt:
   cargo +nightly fmt --all
 
 doc:
-  RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --all-features --no-deps --open
+  RUSTDOCFLAGS="--cfg docsrs -D rustdoc::broken_intra_doc_links" cargo +nightly doc --all-features --no-deps --workspace --exclude e2e --exclude kube-examples --open
 
 deny:
   # might require rm Cargo.lock first to match CI

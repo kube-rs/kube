@@ -258,7 +258,7 @@ mod resource;
 ///
 /// ## `#[kube(validation = Rule::new("self == oldSelf").message("field is immutable"))]`
 /// Inject a top level CEL validation rule for the top level generated struct.
-/// This attribute is for resources deriving [`KubeSchema`] instead of [`schemars::JsonSchema`].
+/// This attribute is for resources deriving [`KubeSchema`] instead of [`schemars::JsonSchema`](https://docs.rs/schemars/*/schemars/trait.JsonSchema.html).
 ///
 /// ## Example with all properties
 ///

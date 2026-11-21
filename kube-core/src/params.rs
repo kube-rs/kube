@@ -879,6 +879,30 @@ where
         false => s.serialize_none(),
     }
 }
+
+/// Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.
+#[derive(Default, Clone, Serialize, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct Preconditions {
+    /// Specifies the target ResourceVersion
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resource_version: Option<String>,
+    /// Specifies the target UID
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub uid: Option<String>,
+}
+
+/// Propagation policy when deleting single objects
+#[derive(Clone, Debug, Serialize, PartialEq)]
+pub enum PropagationPolicy {
+    /// Orphan dependents
+    Orphan,
+    /// Allow the garbage collector to delete the dependents in the background
+    Background,
+    /// A cascading policy that deletes all dependents in the foreground
+    Foreground,
+}
+
 #[cfg(test)]
 mod test {
     use crate::{Expression, Selector, params::WatchParams};
@@ -950,27 +974,4 @@ mod test {
         let labels = wp.label_selector.unwrap();
         assert_eq!(labels, "env in (development,sandbox)");
     }
-}
-
-/// Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.
-#[derive(Default, Clone, Serialize, Debug, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub struct Preconditions {
-    /// Specifies the target ResourceVersion
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub resource_version: Option<String>,
-    /// Specifies the target UID
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub uid: Option<String>,
-}
-
-/// Propagation policy when deleting single objects
-#[derive(Clone, Debug, Serialize, PartialEq)]
-pub enum PropagationPolicy {
-    /// Orphan dependents
-    Orphan,
-    /// Allow the garbage collector to delete the dependents in the background
-    Background,
-    /// A cascading policy that deletes all dependents in the foreground
-    Foreground,
 }

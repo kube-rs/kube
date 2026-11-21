@@ -8,7 +8,7 @@ use std::fmt::Debug;
 
 /// Methods to access debug endpoints directly on `kubelet`
 ///
-/// These provide analogous methods to the `Pod` api methods for [`Execute`](crate::api::Exec), [`Attach`](crate::api::Attach), and [`Portforward`](crate::api::Portforward).
+/// These provide analogous methods to the `Pod` api methods for [`Execute`](crate::api::Execute), [`Attach`](crate::api::Attach), and [`Portforward`](crate::api::Portforward).
 /// Service account must have `nodes/proxy` access, and
 /// the debug handlers must be enabled either via `--enable-debugging-handlers ` or in the [kubelet config](https://kubernetes.io/docs/reference/config-api/kubelet-config.v1beta1/#kubelet-config-k8s-io-v1beta1-KubeletConfiguration).
 /// See the [kubelet source](https://github.com/kubernetes/kubernetes/blob/b3926d137cd2964cd3a04088ded30845910547b1/pkg/kubelet/server/server.go#L454), and [kubelet reference](https://kubernetes.io/docs/reference/command-line-tools-reference/kubelet/) for more info.

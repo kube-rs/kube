@@ -60,14 +60,8 @@ async fn apply(cm: Arc<ConfigMap>, secrets: &kube::Api<Secret>) -> Result<Action
 async fn cleanup(cm: Arc<ConfigMap>, secrets: &kube::Api<Secret>) -> Result<Action> {
     info!("Cleaning up {:?}", cm);
     secrets
-        .delete(&secret_name_for_configmap(&cm)?, &DeleteParams::default())
+        .delete_opt(&secret_name_for_configmap(&cm)?, &DeleteParams::default())
         .await
-        .map(|_| ())
-        .or_else(|err| match err {
-            // Object is already deleted
-            kube::Error::Api(status) if status.is_not_found() => Ok(()),
-            err => Err(err),
-        })
         .map_err(Error::DeleteSecret)?;
     Ok(Action::await_change())
 }

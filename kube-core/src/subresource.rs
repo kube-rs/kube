@@ -121,7 +121,7 @@ impl Request {
         let urlstr = qp.finish();
         // eviction body parameters are awkward, need metadata with name
         let data = serde_json::to_vec(&serde_json::json!({
-            "delete_options": ep.delete_options,
+            "deleteOptions": ep.delete_options,
             "metadata": { "name": name }
         }))
         .map_err(Error::SerializeBody)?;
@@ -424,7 +424,30 @@ mod test {
     use k8s::core::v1 as corev1;
     use k8s_openapi::api as k8s;
 
-    use crate::subresource::LogParams;
+    use crate::{
+        params::{DeleteParams, Preconditions},
+        subresource::{EvictParams, LogParams},
+    };
+
+    #[test]
+    fn evict_body_carries_delete_options() {
+        let url = corev1::Pod::url_path(&(), Some("ns"));
+        let ep = EvictParams {
+            delete_options: Some(DeleteParams {
+                preconditions: Some(Preconditions {
+                    uid: Some("u1".into()),
+                    resource_version: None,
+                }),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let req = Request::new(url).evict("mypod", &ep).unwrap();
+        let body: serde_json::Value = serde_json::from_slice(req.body()).unwrap();
+        assert_eq!(body["deleteOptions"]["preconditions"]["uid"], "u1");
+        assert_eq!(body["metadata"]["name"], "mypod");
+        assert!(body.get("delete_options").is_none());
+    }
 
     #[test]
     fn logs_all_params() {

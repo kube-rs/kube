@@ -177,7 +177,7 @@ pub trait HasStatus {
 /// A standard Kubernetes object with `.spec` and `.status`.
 ///
 /// This is a convenience struct provided for serialization/deserialization.
-/// It is slightly stricter than ['DynamicObject`] in that it enforces the spec/status convention,
+/// It is slightly stricter than [`DynamicObject`](crate::DynamicObject) in that it enforces the spec/status convention,
 /// and as such will not in general work with all api-discovered resources.
 ///
 /// This can be used to tie existing resources to smaller, local struct variants to optimize for memory use.

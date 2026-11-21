@@ -651,9 +651,7 @@ impl AuthInfo {
         match (client_cert, client_key) {
             (None, None) => Ok(None),
 
-            (Some(_), None) => Err(KubeconfigError::LoadClientKey(
-                LoadDataError::NoBase64DataOrFile,
-            )),
+            (Some(_), None) => Err(KubeconfigError::LoadClientKey(LoadDataError::NoBase64DataOrFile)),
 
             (None, Some(_)) => Err(KubeconfigError::LoadClientCertificate(
                 LoadDataError::NoBase64DataOrFile,
@@ -662,7 +660,7 @@ impl AuthInfo {
             (Some(cert), Some(mut key)) => {
                 key.extend_from_slice(&cert);
                 Ok(Some(key))
-            },
+            }
         }
     }
 
@@ -686,7 +684,7 @@ impl AuthInfo {
 
 /// Connection information for auth plugins that have `provideClusterInfo` enabled.
 ///
-/// This is a copy of [`kube::config::Cluster`] with certificate_authority passed as bytes without the path.
+/// This is a copy of [`Cluster`] with certificate_authority passed as bytes without the path.
 /// Taken from [clientauthentication/types.go#Cluster](https://github.com/kubernetes/client-go/blob/477cb782cf024bc70b7239f0dca91e5774811950/pkg/apis/clientauthentication/types.go#L73-L129)
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 #[serde(rename_all = "kebab-case")]
@@ -963,10 +961,10 @@ users:
             Some(["group1".to_string(), "group2".to_string()].as_slice())
         );
         let extra = auth_info.impersonate_user_extra.as_ref().unwrap();
-        assert_eq!(
-            extra.get("scopes").unwrap(),
-            &vec!["read".to_string(), "write".to_string()]
-        );
+        assert_eq!(extra.get("scopes").unwrap(), &vec![
+            "read".to_string(),
+            "write".to_string()
+        ]);
         let auth_ext = auth_info.extensions.as_ref().unwrap();
         assert_eq!(auth_ext[0].name, "authinfo_ext");
 
