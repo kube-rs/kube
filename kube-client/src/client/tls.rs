@@ -3,8 +3,9 @@ pub mod rustls_tls {
     use std::{
         path::PathBuf,
         sync::{Arc, RwLock},
-        time::{Duration, Instant},
+        time::Duration,
     };
+    use tokio::time::Instant;
 
     // Only the webpki-roots fallback uses this; the default platform-verifier path does not.
     #[cfg(feature = "webpki-roots")] use hyper_rustls::ConfigBuilderExt;

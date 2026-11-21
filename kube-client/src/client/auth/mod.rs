@@ -648,7 +648,8 @@ fn parse_exec_credentials(stdout: &[u8]) -> Result<ExecCredential, Error> {
 #[cfg(test)]
 mod test {
     use crate::config::Kubeconfig;
-    use std::time::{Duration, Instant};
+    use std::time::Duration;
+    use tokio::time::Instant;
 
     use super::*;
 
