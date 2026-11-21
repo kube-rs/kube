@@ -186,7 +186,8 @@ pub struct Config {
     pub auth_info: AuthInfo,
     /// Whether to disable compression (would only have an effect when the `gzip` feature is enabled)
     pub disable_compression: bool,
-    /// Optional proxy URL. Proxy support requires the `socks5` feature.
+    /// Optional proxy URL. `http` and `https` proxies require the `http-proxy` feature,
+    /// `socks5` and `socks5h` proxies require the `socks5` feature.
     pub proxy_url: Option<http::Uri>,
     /// If set, apiserver certificate will be validated to contain this string
     ///
