@@ -224,6 +224,16 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
 
     // Enable schema generation by default as in v1 it is mandatory.
     let schema_mode = schema_mode.unwrap_or(SchemaMode::Derived);
+    // `#[kube(cel)]` needs a derived schema: a manual schema is not forced through `KubeSchema`,
+    // so it would carry no `x-kubernetes-validations` and the generated methods would silently
+    // validate nothing. Reject it before generating anything, like the other attribute errors.
+    if cel && !schema_mode.derive() {
+        return syn::Error::new(
+            Span::call_site(),
+            r#"#[kube(cel)] requires a derived schema; it cannot be combined with `schema = "manual"`"#,
+        )
+        .to_compile_error();
+    }
     // We exclude fields `apiVersion`, `kind`, and `metadata` from our schema because
     // these are validated by the API server implicitly. Also, we can't generate the
     // schema for `metadata` (`ObjectMeta`) because it doesn't implement `JsonSchema`.
@@ -564,33 +574,24 @@ pub(crate) fn derive(input: proc_macro2::TokenStream) -> proc_macro2::TokenStrea
     // Requires the downstream crate to enable `kube/cel` (the generated code references
     // `#kube_core::cel`). The bodies just delegate to `kube_core::cel::validate_cel{,_update}`, which
     // own the schema extraction + validation so they are compiled once in kube-core rather than
-    // re-expanded at every derive site. Gated on a derived schema: a manual schema is not forced
-    // through `KubeSchema`, so it would carry no `x-kubernetes-validations` and the methods would
-    // silently validate nothing — reject that combination at compile time instead.
+    // re-expanded at every derive site. `cel` with `schema = "manual"` was already rejected above,
+    // so the schema is derived here.
     let impl_validate_cel = if cel {
-        if schema_mode.derive() {
-            quote! {
-                impl #rootident {
-                    /// Validate this resource against its CEL creation rules (`x-kubernetes-validations`)
-                    /// client-side, without an apiserver. `Ok(())` if all rules pass, otherwise the
-                    /// aggregated failures.
-                    pub fn validate_cel(&self) -> ::core::result::Result<(), #kube_core::cel::ValidationErrors> {
-                        #kube_core::cel::validate_cel(self)
-                    }
-
-                    /// Validate this resource against its CEL transition rules (rules using `oldSelf`)
-                    /// client-side, comparing against the `old` state. `Ok(())` if all rules pass,
-                    /// otherwise the aggregated failures.
-                    pub fn validate_cel_update(&self, old: &Self) -> ::core::result::Result<(), #kube_core::cel::ValidationErrors> {
-                        #kube_core::cel::validate_cel_update(self, old)
-                    }
+        quote! {
+            impl #rootident {
+                /// Validate this resource against its CEL creation rules (`x-kubernetes-validations`)
+                /// client-side, without an apiserver. `Ok(())` if all rules pass, otherwise the
+                /// aggregated failures.
+                pub fn validate_cel(&self) -> ::core::result::Result<(), #kube_core::cel::ValidationErrors> {
+                    #kube_core::cel::validate_cel(self)
                 }
-            }
-        } else {
-            quote! {
-                ::core::compile_error!(
-                    "#[kube(cel)] requires a derived schema; it cannot be combined with `schema = \"manual\"`"
-                );
+
+                /// Validate this resource against its CEL transition rules (rules using `oldSelf`)
+                /// client-side, comparing against the `old` state. `Ok(())` if all rules pass,
+                /// otherwise the aggregated failures.
+                pub fn validate_cel_update(&self, old: &Self) -> ::core::result::Result<(), #kube_core::cel::ValidationErrors> {
+                    #kube_core::cel::validate_cel_update(self, old)
+                }
             }
         }
     } else {
