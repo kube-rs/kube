@@ -117,7 +117,7 @@ pub struct FooSpec {
 /// A part of our custom resource
 #[derive(KubeSchema, Serialize, Deserialize, Default, Debug, PartialEq, Eq, Clone)]
 pub struct FooSubSpec {
-    /// Heterogenous CEL rule set
+    /// Heterogeneous CEL rule set
     #[x_kube(validation = "self != 'not legal'", validation = Rule::new("self != 'not that'"))]
     #[x_kube(validation = ("self != 'also not that'", "some pretty good reason"))]
     field: String,

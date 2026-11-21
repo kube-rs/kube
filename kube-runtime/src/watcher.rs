@@ -1145,7 +1145,7 @@ mod tests {
                         // Details here: https://kubernetes.io/docs/reference/using-api/api-concepts/#streaming-lists
                         // Should only be sent when requested via allowWatchBookmarks=true
                         // Since TestMode does not contain any real logic and  is not dynamically
-                        // progammable, this is up to the test
+                        // programmable, this is up to the test
                         // author to return or not for now.
                         Ok(WatchEvent::Bookmark(Bookmark {
                             types: TypeMeta::resource::<ConfigMap>(),
@@ -1278,7 +1278,7 @@ mod tests {
                     // Details here: https://kubernetes.io/docs/reference/using-api/api-concepts/#streaming-lists
                     // Should only be sent when requested via allowWatchBookmarks=true
                     // Since TestMode does not contain any real logic and  is not dynamically
-                    // progammable, this is up to the test
+                    // programmable, this is up to the test
                     // author to return or not for now.
                     Ok(WatchEvent::Bookmark(Bookmark {
                         types: TypeMeta::resource::<ConfigMap>(),

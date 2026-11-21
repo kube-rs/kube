@@ -288,7 +288,7 @@ impl AttachedProcess {
     }
 }
 
-// theses values come from here: https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/apimachinery/pkg/util/remotecommand/constants.go#L57
+// these values come from here: https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/apimachinery/pkg/util/remotecommand/constants.go#L57
 const STDIN_CHANNEL: u8 = 0;
 const STDOUT_CHANNEL: u8 = 1;
 const STDERR_CHANNEL: u8 = 2;
