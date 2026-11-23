@@ -44,6 +44,8 @@ hashbrown.workspace = true
 k8s-openapi.workspace = true
 async-broadcast.workspace = true
 async-stream.workspace = true
+
+[target.'cfg(any(unix, windows))'.dependencies]
 hostname.workspace = true
 
 [dev-dependencies]
