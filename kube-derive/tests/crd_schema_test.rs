@@ -615,6 +615,68 @@ enum BreakfastOrString {
     Other(String),
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, JsonSchema)]
+#[serde(untagged)]
+enum ConstrainedBreakfast {
+    Item(BreakfastItem),
+    Other(#[schemars(length(max = 5))] String),
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, JsonSchema)]
+#[serde(untagged)]
+enum ConstrainedCount {
+    Small(#[schemars(range(min = 1, max = 10))] u32),
+    Large(#[schemars(range(min = 100))] u32),
+}
+
+#[derive(kube_derive::CustomResource, Serialize, Deserialize, Debug, Clone, JsonSchema)]
+#[kube(group = "clux.dev", version = "v1", kind = "ConstrainedTest")]
+struct ConstrainedTestSpec {
+    constrained: ConstrainedBreakfast,
+    optional_constrained: Option<ConstrainedBreakfast>,
+    count: ConstrainedCount,
+}
+
+#[test]
+fn untagged_constrained_scalar_any_of_hoists_type() {
+    use kube::CustomResourceExt;
+
+    let crd = serde_json::to_value(ConstrainedTest::crd()).unwrap();
+    let props = &crd["spec"]["versions"][0]["schema"]["openAPIV3Schema"]["properties"]["spec"]["properties"];
+
+    assert_eq!(
+        props["constrained"],
+        serde_json::json!({
+            "type": "string",
+            "anyOf": [
+                { "enum": ["Spam", "Eggs"] },
+                { "maxLength": 5 }
+            ]
+        })
+    );
+    assert_eq!(
+        props["optional_constrained"],
+        serde_json::json!({
+            "type": "string",
+            "nullable": true,
+            "anyOf": [
+                { "enum": ["Spam", "Eggs"] },
+                { "maxLength": 5 }
+            ]
+        })
+    );
+    assert_eq!(
+        props["count"],
+        serde_json::json!({
+            "type": "integer",
+            "anyOf": [
+                { "format": "uint32", "minimum": 1.0, "maximum": 10.0 },
+                { "format": "uint32", "minimum": 100.0 }
+            ]
+        })
+    );
+}
+
 #[derive(CustomResource, Serialize, Deserialize, Debug, Clone, JsonSchema)]
 #[kube(group = "clux.dev", version = "v1", kind = "BreakfastTest")]
 struct BreakfastTestSpec {
