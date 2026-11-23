@@ -1,3 +1,5 @@
+#[cfg(feature = "unstable-runtime-subscribe")]
+use super::subscriber::SubscriberId;
 use educe::Educe;
 use k8s_openapi::{api::core::v1::ObjectReference, apimachinery::pkg::apis::meta::v1::OwnerReference};
 #[cfg(doc)] use kube_client::core::ObjectMeta;
@@ -5,15 +7,12 @@ use kube_client::{
     api::{DynamicObject, Resource},
     core::api_version_from_group_version,
 };
+#[cfg(feature = "unstable-runtime-subscribe")] use std::collections::BTreeSet;
 use std::{
     borrow::Cow,
     fmt::{Debug, Display},
     hash::Hash,
 };
-#[cfg(feature = "unstable-runtime-subscribe")]
-use super::subscriber::SubscriberId;
-#[cfg(feature = "unstable-runtime-subscribe")]
-use std::collections::BTreeSet;
 
 /// Minimal lookup behaviour needed by a [reflector store](super::Store).
 ///

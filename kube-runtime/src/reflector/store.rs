@@ -14,8 +14,8 @@ use kube_client::{
     ResourceExt,
     core::{Selector, SelectorExt},
 };
-use parking_lot::RwLock;
 #[cfg(feature = "unstable-runtime-subscribe")] use parking_lot::Mutex;
+use parking_lot::RwLock;
 #[cfg(feature = "unstable-runtime-subscribe")] use std::collections::BTreeSet;
 use std::{fmt::Debug, hash::Hash, sync::Arc};
 use thiserror::Error;
