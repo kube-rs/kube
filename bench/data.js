@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795432368745,
+  "lastUpdate": 1795439200127,
   "repoUrl": "https://github.com/kube-rs/kube",
   "entries": {
     "Benchmark": [
@@ -11705,6 +11705,105 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/kube-rs/kube/commit/df9ea51bc71c7de240919b1e0cfb9ec1bcab265d"
         },
         "date": 1795432367234,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "init_listwatch - peak_bytes",
+            "value": 55194619,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - total_allocated",
+            "value": 76715088,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - alloc_count",
+            "value": 578023,
+            "unit": "allocations"
+          },
+          {
+            "name": "steady_state - peak_bytes",
+            "value": 71381202,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - total_allocated",
+            "value": 109519220,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - alloc_count",
+            "value": 799021,
+            "unit": "allocations"
+          },
+          {
+            "name": "relist - peak_bytes",
+            "value": 99797302,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - total_allocated",
+            "value": 174518628,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - alloc_count",
+            "value": 1189035,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_without_modify - peak_bytes",
+            "value": 141298836,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - total_allocated",
+            "value": 205865000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - alloc_count",
+            "value": 1298020,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_with_modify - peak_bytes",
+            "value": 134853452,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - total_allocated",
+            "value": 162895000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - alloc_count",
+            "value": 1058021,
+            "unit": "allocations"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "doxxx93@gmail.com",
+            "name": "doxxx",
+            "username": "doxxx93"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d8fa058eda75f3883b02c75614d940c0998c824b",
+          "message": "Skip removed objects in ReflectHandle instead of stalling (#2151)\n\n* Skip removed objects in ReflectHandle instead of stalling\n\nWhen a received ObjectRef no longer resolved in the store, poll_next\nreturned Pending without a registered waker, so the handle stopped\nreading. Its unread refs then filled the shared buffer and blocked the\nroot reflector. Skip such refs and poll the receiver again.\n\nSigned-off-by: doxxx93 <doxxx93@gmail.com>\n\n* Correct the Dispatcher comment on events without active receivers\n\nWith await_active(false), async-broadcast returns an error when only the\ninactive receiver exists, and broadcast ignores it, so the event is\ndropped rather than buffered.\n\nSigned-off-by: doxxx93 <doxxx93@gmail.com>\n\n---------\n\nSigned-off-by: doxxx93 <doxxx93@gmail.com>",
+          "timestamp": "2026-11-23T13:05:48Z",
+          "tree_id": "238a2149819474b9c8acc348bbb25361a68e7417",
+          "url": "https://github.com/kube-rs/kube/commit/d8fa058eda75f3883b02c75614d940c0998c824b"
+        },
+        "date": 1795439199017,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
