@@ -3,6 +3,9 @@ disallowed-macros = [
   "futures::ready",             # use instead `std::task::ready`
   "futures::pin_mut",           # use instead `std::pin::pin`
 ]
+disallowed-types = [
+  "std::time::Instant",         # use instead `tokio::time::Instant` (mockable via `tokio::time::pause`)
+]
 disallowed-methods = [
   "futures::future::ready",     # use instead `std::future::ready`
 ]
