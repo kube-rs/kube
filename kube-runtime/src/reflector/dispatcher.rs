@@ -11,7 +11,7 @@ use pin_project::pin_project;
 use std::task::ready;
 
 #[cfg(feature = "unstable-runtime-subscribe")]
-use crate::reflector::object_ref::SubscriberId;
+use crate::reflector::subscriber::SubscriberId;
 use crate::reflector::{ObjectRef, Store};
 use async_broadcast::{InactiveReceiver, Receiver, Sender};
 

@@ -11,22 +11,9 @@ use std::{
     hash::Hash,
 };
 #[cfg(feature = "unstable-runtime-subscribe")]
-use std::{
-    collections::BTreeSet,
-    sync::atomic::{AtomicU64, Ordering},
-};
-
-/// Identifier for a subscriber of a reflector.
+use super::subscriber::SubscriberId;
 #[cfg(feature = "unstable-runtime-subscribe")]
-pub(crate) type SubscriberId = u64;
-
-#[cfg(feature = "unstable-runtime-subscribe")]
-static NEXT_SUBSCRIBER_ID: AtomicU64 = AtomicU64::new(1);
-
-#[cfg(feature = "unstable-runtime-subscribe")]
-pub(crate) fn fresh_subscriber_id() -> SubscriberId {
-    NEXT_SUBSCRIBER_ID.fetch_add(1, Ordering::Relaxed)
-}
+use std::collections::BTreeSet;
 
 /// Minimal lookup behaviour needed by a [reflector store](super::Store).
 ///

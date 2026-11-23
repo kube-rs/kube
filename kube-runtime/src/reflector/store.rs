@@ -1,6 +1,6 @@
 //! A reader/writer split store for reflectors
 #[cfg(feature = "unstable-runtime-subscribe")]
-use super::object_ref::{SubscriberId, fresh_subscriber_id};
+use super::subscriber::{SubscriberId, fresh_subscriber_id};
 use super::{Lookup, ObjectRef, dispatcher::Dispatcher};
 #[cfg(feature = "unstable-runtime-subscribe")]
 use crate::reflector::ReflectHandle;
@@ -14,7 +14,8 @@ use kube_client::{
     ResourceExt,
     core::{Selector, SelectorExt},
 };
-use parking_lot::{Mutex, RwLock};
+use parking_lot::RwLock;
+#[cfg(feature = "unstable-runtime-subscribe")] use parking_lot::Mutex;
 #[cfg(feature = "unstable-runtime-subscribe")] use std::collections::BTreeSet;
 use std::{fmt::Debug, hash::Hash, sync::Arc};
 use thiserror::Error;
