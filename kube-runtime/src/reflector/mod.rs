@@ -3,8 +3,7 @@
 mod dispatcher;
 mod object_ref;
 pub mod store;
-#[cfg(feature = "unstable-runtime-subscribe")]
-mod subscriber;
+#[cfg(feature = "unstable-runtime-subscribe")] mod subscriber;
 
 pub use self::{
     dispatcher::ReflectHandle,
