@@ -50,8 +50,7 @@ where
         // Create a broadcast (tx, rx) pair
         let (mut dispatch_tx, dispatch_rx) = async_broadcast::broadcast(buf_size);
         // The tx half will not wait for any receivers to be active before
-        // broadcasting events. If no receivers are active, events will be
-        // buffered.
+        // broadcasting events. If no receivers are active, events are dropped.
         dispatch_tx.set_await_active(false);
         Self {
             dispatch_tx,
@@ -159,19 +158,24 @@ where
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut this = self.project();
-        match ready!(this.rx.as_mut().poll_next(cx)) {
-            Some(obj_ref) => {
-                #[cfg(feature = "unstable-runtime-subscribe")]
-                let obj = if obj_ref.extra.remaining_lookups.is_some() {
-                    this.reader.remove(&obj_ref)
-                } else {
-                    this.reader.get(&obj_ref)
-                };
-                #[cfg(not(feature = "unstable-runtime-subscribe"))]
-                let obj = this.reader.get(&obj_ref);
-                obj.map_or(Poll::Pending, |obj| Poll::Ready(Some(obj)))
+        loop {
+            match ready!(this.rx.as_mut().poll_next(cx)) {
+                Some(obj_ref) => {
+                    #[cfg(feature = "unstable-runtime-subscribe")]
+                    let obj = if obj_ref.extra.remaining_lookups.is_some() {
+                        this.reader.remove(&obj_ref)
+                    } else {
+                        this.reader.get(&obj_ref)
+                    };
+                    #[cfg(not(feature = "unstable-runtime-subscribe"))]
+                    let obj = this.reader.get(&obj_ref);
+                    // Skip refs whose object has since been removed from the store
+                    if let Some(obj) = obj {
+                        return Poll::Ready(Some(obj));
+                    }
+                }
+                None => return Poll::Ready(None),
             }
-            None => Poll::Ready(None),
         }
     }
 }
@@ -196,16 +200,48 @@ pub(crate) mod test {
         reflector::ObjectRef,
         watcher::{Error, Event},
     };
-    use std::{pin::pin, sync::Arc, task::Poll};
+    use std::{
+        pin::pin,
+        sync::{
+            Arc,
+            atomic::{AtomicUsize, Ordering},
+        },
+        task::{Context, Poll, Wake, Waker},
+        time::Duration,
+    };
 
-    use crate::reflector;
-    use futures::{StreamExt, poll, stream};
+    use crate::reflector::{self, store::Writer};
+    use futures::{Stream, StreamExt, poll, stream};
     use k8s_openapi::api::core::v1::Pod;
 
     fn testpod(name: &str) -> Pod {
         let mut pod = Pod::default();
         pod.metadata.name = Some(name.to_string());
         pod
+    }
+
+    async fn apply_and_dispatch(writer: &mut Writer<Pod>, event: Event<Pod>) {
+        writer.apply_watcher_event(&event);
+        writer.dispatch_event(&event).await;
+    }
+
+    // Replaces the store contents without dispatching, as a relist does for
+    // objects that went away while the watch was down.
+    fn relist(writer: &mut Writer<Pod>, pods: impl IntoIterator<Item = Pod>) {
+        writer.apply_watcher_event(&Event::Init);
+        for pod in pods {
+            writer.apply_watcher_event(&Event::InitApply(pod));
+        }
+        writer.apply_watcher_event(&Event::InitDone);
+    }
+
+    #[derive(Default)]
+    struct WakeCounter(AtomicUsize);
+
+    impl Wake for WakeCounter {
+        fn wake(self: Arc<Self>) {
+            self.0.fetch_add(1, Ordering::SeqCst);
+        }
     }
 
     #[tokio::test]
@@ -506,6 +542,103 @@ pub(crate) mod test {
 
         assert_eq!(poll!(subscriber.next()), Poll::Ready(None));
         assert_eq!(poll!(subscriber_slow.next()), Poll::Ready(None));
+    }
+
+    #[tokio::test]
+    async fn readers_wake_after_removed_object() {
+        // A reader that receives the ref of an object no longer in the store
+        // must still be woken by the next event.
+        let mut writer = Writer::<Pod>::new_shared(10, ());
+        let mut subscriber = pin!(writer.subscribe().unwrap());
+        let counter = Arc::new(WakeCounter::default());
+        let waker = Waker::from(counter.clone());
+        let mut cx = Context::from_waker(&waker);
+
+        apply_and_dispatch(&mut writer, Event::Apply(testpod("foo"))).await;
+        relist(&mut writer, []);
+        assert_eq!(subscriber.as_mut().poll_next(&mut cx), Poll::Pending);
+
+        apply_and_dispatch(&mut writer, Event::Apply(testpod("bar"))).await;
+        assert_ne!(counter.0.load(Ordering::SeqCst), 0);
+        assert_eq!(
+            subscriber.as_mut().poll_next(&mut cx),
+            Poll::Ready(Some(Arc::new(testpod("bar"))))
+        );
+    }
+
+    #[tokio::test]
+    async fn readers_skip_removed_objects() {
+        let mut writer = Writer::<Pod>::new_shared(10, ());
+        let mut subscriber = pin!(writer.subscribe().unwrap());
+
+        apply_and_dispatch(&mut writer, Event::Apply(testpod("foo"))).await;
+        apply_and_dispatch(&mut writer, Event::Apply(testpod("bar"))).await;
+        apply_and_dispatch(&mut writer, Event::Apply(testpod("baz"))).await;
+        relist(&mut writer, [testpod("baz")]);
+
+        assert_eq!(
+            poll!(subscriber.next()),
+            Poll::Ready(Some(Arc::new(testpod("baz"))))
+        );
+    }
+
+    #[tokio::test]
+    async fn readers_end_after_removed_object() {
+        let mut writer = Writer::<Pod>::new_shared(10, ());
+        let mut subscriber = pin!(writer.subscribe().unwrap());
+
+        apply_and_dispatch(&mut writer, Event::Apply(testpod("foo"))).await;
+        relist(&mut writer, []);
+        drop(writer);
+
+        assert_eq!(poll!(subscriber.next()), Poll::Ready(None));
+    }
+
+    #[tokio::test]
+    async fn readers_wake_on_close_after_removed_object() {
+        let mut writer = Writer::<Pod>::new_shared(10, ());
+        let mut subscriber = pin!(writer.subscribe().unwrap());
+        let counter = Arc::new(WakeCounter::default());
+        let waker = Waker::from(counter.clone());
+        let mut cx = Context::from_waker(&waker);
+
+        apply_and_dispatch(&mut writer, Event::Apply(testpod("foo"))).await;
+        relist(&mut writer, []);
+        assert_eq!(subscriber.as_mut().poll_next(&mut cx), Poll::Pending);
+
+        drop(writer);
+        assert_ne!(counter.0.load(Ordering::SeqCst), 0);
+        assert_eq!(subscriber.as_mut().poll_next(&mut cx), Poll::Ready(None));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn removed_object_does_not_block_root() {
+        // A reader running in its own task that lags by one event when an
+        // object is applied and deleted must keep reading. Otherwise its unread
+        // events fill the buffer and the root stream blocks.
+        let mut events = vec![
+            Ok(Event::Apply(testpod("foo"))),
+            Ok(Event::Init),
+            Ok(Event::InitDone),
+        ];
+        events.extend((0..6).map(|i| Ok(Event::Apply(testpod(&format!("pod-{i}"))))));
+
+        let (reader, writer) = reflector::store_shared(2);
+        let subscriber = writer.subscribe().unwrap();
+        let mut reflect = Box::pin(stream::iter(events).reflect_shared(writer));
+
+        assert!(matches!(reflect.next().await, Some(Ok(Event::Apply(_)))));
+        assert!(matches!(reflect.next().await, Some(Ok(Event::Init))));
+        assert!(matches!(reflect.next().await, Some(Ok(Event::InitDone))));
+        let seen = tokio::spawn(subscriber.count());
+
+        let root = tokio::time::timeout(Duration::from_secs(1), reflect.as_mut().count()).await;
+        assert_eq!(root.ok(), Some(6), "root stream blocked");
+        assert_eq!(reader.len(), 6);
+
+        drop(reflect);
+        let seen = tokio::time::timeout(Duration::from_secs(1), seen).await;
+        assert_eq!(seen.ok().map(Result::unwrap), Some(6));
     }
 
     #[cfg(feature = "unstable-runtime-subscribe")]
