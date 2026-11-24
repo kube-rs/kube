@@ -4,8 +4,8 @@
 
 We provide security updates for the two most recent minor versions released on `crates.io`.
 
-For example, if `0.70.1` is the most recent stable version, we will address security updates for `0.69` and later.
-Once `0.71.1` is released, we will no longer provide updates for `0.69` releases.
+For example, if `5.1.0` is the most recent stable version, we will address security updates for the lastest `4.X` and later.
+Once `6.0` is released, we will no longer provide updates for `4.X` releases.
 
 ## Reporting a Vulnerability
 
