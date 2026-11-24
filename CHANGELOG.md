@@ -7,9 +7,31 @@ UNRELEASED
 ===================
  * see https://github.com/kube-rs/kube/compare/5.2.0...main
 
+[5.2.0](https://github.com/kube-rs/kube/releases/tag/5.2.0) / 2026-11-24
+===================
+<!-- Release notes generated using configuration in .github/release.yml at 5.2.0 -->
+
+## What's Changed
+Fixes a [vulnerability](https://github.com/kube-rs/kube/security/advisories/GHSA-hm5x-4x3m-4w8m) on `openssl-tls` where OpenSSL's default roots were trusted alongside the configured cluster CA.
+
+### Added
+* Accept socks5h proxy URLs by @doxxx93 in https://github.com/kube-rs/kube/pull/2153
+### Removed
+* disable hostname crate on unsupported targets by @verokarhu in https://github.com/kube-rs/kube/pull/2166
+* disable tokio signal on platforms that are not supported by it by @verokarhu in https://github.com/kube-rs/kube/pull/2168
+* scope hyper-rustls's native-tokio feature to oauth and oidc by @verokarhu in https://github.com/kube-rs/kube/pull/2163
+### Fixed
+* move tokio's signal feature to kube-runtime by @verokarhu in https://github.com/kube-rs/kube/pull/2161
+* Use tokio::time::Instant for the predicate filter TTL by @doxxx93 in https://github.com/kube-rs/kube/pull/2140
+* Skip removed objects in ReflectHandle instead of stalling by @doxxx93 in https://github.com/kube-rs/kube/pull/2151
+* attach id for ReflectHandle to eliminate drop clash chance by @Danil-Grigorev in https://github.com/kube-rs/kube/pull/2162
+
+
+**Full Changelog**: https://github.com/kube-rs/kube/compare/5.1.0...5.2.0
+
 5.2.0 / 2026-11-24
 ===================
- * see https://github.com/kube-rs/kube/compare/5.1.0...main
+ * see https://github.com/kube-rs/kube/compare/5.2.0...main
 
 [5.1.0](https://github.com/kube-rs/kube/releases/tag/5.1.0) / 2026-11-12
 ===================
@@ -44,7 +66,7 @@ Maintenance release.
 
 5.1.0 / 2026-11-12
 ===================
- * see https://github.com/kube-rs/kube/compare/5.1.0...main
+ * see https://github.com/kube-rs/kube/compare/5.2.0...main
 
 [5.0.0](https://github.com/kube-rs/kube/releases/tag/5.0.0) / 2026-11-01
 ===================
@@ -156,7 +178,7 @@ In particular this release, a special thank you to @daemonfire300 for the new [t
 
 4.2.0 / 2026-07-22
 ===================
- * see https://github.com/kube-rs/kube/compare/5.1.0...main
+ * see https://github.com/kube-rs/kube/compare/5.2.0...main
 
 [4.0.0](https://github.com/kube-rs/kube/releases/tag/4.0.0) / 2026-06-16
 ===================
@@ -270,7 +292,7 @@ Better timeout and retry handling to better deal with flaky network conditions, 
 
 4.0.0 / 2026-06-16
 ===================
- * see https://github.com/kube-rs/kube/compare/5.1.0...main
+ * see https://github.com/kube-rs/kube/compare/5.2.0...main
 
 [3.1.0](https://github.com/kube-rs/kube/releases/tag/3.1.0) / 2026-03-17
 ===================
@@ -302,7 +324,7 @@ Maintenance release with fixes for schemas/validation, client exec blocking and 
 
 3.1.0 / 2026-03-17
 ===================
- * see https://github.com/kube-rs/kube/compare/5.1.0...main
+ * see https://github.com/kube-rs/kube/compare/5.2.0...main
 
 [3.0.1](https://github.com/kube-rs/kube/releases/tag/3.0.1) / 2026-01-30
 ===================
