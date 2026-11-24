@@ -157,7 +157,12 @@ impl From<String> for Reporter {
 
 impl From<&str> for Reporter {
     fn from(es: &str) -> Self {
+        // The hostname crate only supports [Windows and Unix](https://github.com/djc/hostname#supported-platforms) targets.
+        // This prevents compiling for wasm32-wasip3.
+        #[cfg(any(unix, windows))]
         let instance = hostname::get().ok().and_then(|h| h.into_string().ok());
+        #[cfg(not(any(unix, windows)))]
+        let instance = None;
         Self {
             controller: es.into(),
             instance,
