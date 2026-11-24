@@ -480,4 +480,68 @@ mod tests {
         drop(sched_tx);
         assert_eq!(poll!(runner.as_mut()), Poll::Pending);
     }
+
+    #[tokio::test(start_paused = true)]
+    async fn runner_should_not_starve_items_held_by_max_concurrent_executions() {
+        // Demand (~45 runs/s) is well above capacity (20 runs/s), so items keep
+        // piling up in the scheduler's pending set while both slots are busy.
+        const ITEMS: u32 = 50;
+        const CONCURRENCY: u16 = 2;
+        const WORK: Duration = Duration::from_millis(100);
+        const REQUEUE: Duration = Duration::from_secs(1);
+        const RUN_FOR: Duration = Duration::from_secs(60);
+
+        let (sched_tx, sched_rx) = mpsc::unbounded();
+        let start = Instant::now();
+        for i in 0..ITEMS {
+            sched_tx
+                .unbounded_send(ScheduleRequest {
+                    message: i,
+                    run_at: start,
+                })
+                .unwrap();
+        }
+        let runs = Arc::new(Mutex::new(HashMap::<u32, Vec<Instant>>::new()));
+        let runner = Runner::new(scheduler(sched_rx), CONCURRENCY, {
+            let runs = runs.clone();
+            let sched_tx = sched_tx.clone();
+            move |&msg: &u32| {
+                runs.lock().unwrap().entry(msg).or_default().push(Instant::now());
+                let sched_tx = sched_tx.clone();
+                Box::pin(async move {
+                    sleep(WORK).await;
+                    sched_tx
+                        .unbounded_send(ScheduleRequest {
+                            message: msg,
+                            run_at: Instant::now() + REQUEUE,
+                        })
+                        .unwrap();
+                })
+            }
+        });
+        assert!(timeout(RUN_FOR, runner.for_each(|_| async {})).await.is_err());
+
+        // With FIFO pending, an item waits behind at most every other item, so the gap
+        // between two runs of the same item is at most ITEMS / CONCURRENCY * WORK (2.5s)
+        // plus its own WORK and REQUEUE. Allow twice that.
+        let max_gap = (WORK * (ITEMS / u32::from(CONCURRENCY)) + WORK + REQUEUE) * 2;
+        let end = Instant::now();
+        let runs = runs.lock().unwrap();
+        for i in 0..ITEMS {
+            let times = runs.get(&i).map(Vec::as_slice).unwrap_or_default();
+            let worst_gap = std::iter::once(start)
+                .chain(times.iter().copied())
+                .chain(std::iter::once(end))
+                .collect::<Vec<_>>()
+                .windows(2)
+                .map(|w| w[1] - w[0])
+                .max()
+                .unwrap();
+            assert!(
+                worst_gap <= max_gap,
+                "item {i} ran {} times, worst wait {worst_gap:?} > {max_gap:?}",
+                times.len()
+            );
+        }
+    }
 }

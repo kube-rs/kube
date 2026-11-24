@@ -4,7 +4,7 @@ use futures::{Stream, StreamExt, stream::Fuse};
 use hashbrown::{HashMap, hash_map::RawEntryMut};
 use pin_project::pin_project;
 use std::{
-    collections::HashSet,
+    collections::{HashSet, VecDeque},
     hash::Hash,
     pin::Pin,
     task::{Context, Poll},
@@ -47,7 +47,15 @@ pub struct Scheduler<T, R> {
     /// `scheduled` is considered to hold the "canonical" representation of the message.
     scheduled: HashMap<T, ScheduledEntry>,
     /// Messages that are scheduled to have happened, but have been held using `hold_unless`.
+    ///
+    /// Only used for membership checks, so it holds the copies that came out of `queue`.
+    /// See `pending_order` for the canonical messages and the order they are released in.
     pending: HashSet<T>,
+    /// The canonical messages in `pending`, in the order they became pending.
+    ///
+    /// `hold_unless` takes the oldest takeable message first, so that a consumer that is
+    /// constantly at capacity cannot starve messages that happen to hash late.
+    pending_order: VecDeque<T>,
     /// Incoming queue of scheduling requests.
     #[pin]
     requests: Fuse<R>,
@@ -65,6 +73,7 @@ impl<T, R: Stream> Scheduler<T, R> {
             queue: DelayQueue::new(),
             scheduled: HashMap::new(),
             pending: HashSet::new(),
+            pending_order: VecDeque::new(),
             requests: requests.fuse(),
             debounce,
         }
@@ -117,21 +126,23 @@ impl<T: Hash + Eq + Clone, R> SchedulerProj<'_, T, R> {
         cx: &mut Context<'_>,
         can_take_message: impl Fn(&T) -> bool,
     ) -> Poll<T> {
-        if let Some(msg) = self.pending.iter().find(|msg| can_take_message(*msg)).cloned() {
-            return Poll::Ready(self.pending.take(&msg).unwrap());
+        if let Some(i) = self.pending_order.iter().position(&can_take_message) {
+            let msg = self.pending_order.remove(i).unwrap();
+            self.pending.remove(&msg);
+            return Poll::Ready(msg);
         }
 
         loop {
             match self.queue.poll_expired(cx) {
                 Poll::Ready(Some(msg)) => {
-                    let msg = msg.into_inner();
-                    let (msg, _) = self.scheduled.remove_entry(&msg).expect(
+                    let queued_msg = msg.into_inner();
+                    let (msg, _) = self.scheduled.remove_entry(&queued_msg).expect(
                         "Expired message was popped from the Scheduler queue, but was not in the metadata map",
                     );
                     if can_take_message(&msg) {
                         break Poll::Ready(msg);
                     }
-                    self.pending.insert(msg);
+                    self.push_pending(msg, queued_msg);
                 }
                 Poll::Ready(None) | Poll::Pending => break Poll::Pending,
             }
@@ -141,12 +152,18 @@ impl<T: Hash + Eq + Clone, R> SchedulerProj<'_, T, R> {
     /// Attempt to retrieve a message from queue and mark it as pending.
     pub fn pop_queue_message_into_pending(&mut self, cx: &mut Context<'_>) {
         while let Poll::Ready(Some(msg)) = self.queue.poll_expired(cx) {
-            let msg = msg.into_inner();
-            self.scheduled.remove_entry(&msg).expect(
+            let queued_msg = msg.into_inner();
+            let (msg, _) = self.scheduled.remove_entry(&queued_msg).expect(
                 "Expired message was popped from the Scheduler queue, but was not in the metadata map",
             );
-            self.pending.insert(msg);
+            self.push_pending(msg, queued_msg);
         }
+    }
+
+    /// `msg` is the canonical message from `scheduled`, `queued_msg` is its copy from `queue`.
+    fn push_pending(&mut self, msg: T, queued_msg: T) {
+        self.pending_order.push_back(msg);
+        self.pending.insert(queued_msg);
     }
 }
 
@@ -537,6 +554,70 @@ mod tests {
             .on_complete(sleep(Duration::from_secs(5))),
         );
         assert_eq!(scheduler.map(|msg| msg.0).collect::<Vec<_>>().await, vec![1]);
+    }
+
+    #[tokio::test]
+    async fn scheduler_should_release_held_message_with_soonest_version() {
+        pause();
+
+        let now = Instant::now();
+        let (mut sched_tx, sched_rx) = mpsc::unbounded::<ScheduleRequest<SingletonMessage>>();
+        let mut scheduler = pin!(scheduler(sched_rx));
+        for (payload, run_at) in [
+            (1, now + Duration::from_secs(10)),
+            (2, now + Duration::from_secs(2)),
+        ] {
+            sched_tx
+                .send(ScheduleRequest {
+                    message: SingletonMessage(payload),
+                    run_at,
+                })
+                .await
+                .unwrap();
+        }
+        assert!(poll!(scheduler.as_mut().hold().next()).is_pending());
+        advance(Duration::from_secs(3)).await;
+        // Expires while held, so it goes through `hold`'s path into pending
+        assert!(poll!(scheduler.as_mut().hold().next()).is_pending());
+        assert_eq!(
+            unwrap_poll(poll!(scheduler.as_mut().hold_unless(|_| true).next()))
+                .unwrap()
+                .0,
+            2
+        );
+    }
+
+    /// Message type that is always considered equal to itself, and whose clones lose the payload
+    #[derive(Educe, Eq, Debug)]
+    #[educe(PartialEq, Hash)]
+    struct LossyCloneMessage(#[educe(PartialEq(ignore), Hash(ignore))] u8);
+
+    impl Clone for LossyCloneMessage {
+        fn clone(&self) -> Self {
+            Self(0)
+        }
+    }
+
+    #[tokio::test]
+    async fn scheduler_should_release_pending_message_as_scheduled() {
+        pause();
+
+        let (mut sched_tx, sched_rx) = mpsc::unbounded();
+        let mut scheduler = pin!(scheduler(sched_rx));
+        sched_tx
+            .send(ScheduleRequest {
+                message: LossyCloneMessage(1),
+                run_at: Instant::now(),
+            })
+            .await
+            .unwrap();
+        assert!(poll!(scheduler.as_mut().hold_unless(|_| false).next()).is_pending());
+        assert_eq!(
+            unwrap_poll(poll!(scheduler.as_mut().hold_unless(|_| true).next()))
+                .unwrap()
+                .0,
+            1
+        );
     }
 
     #[tokio::test]
