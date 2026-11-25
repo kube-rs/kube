@@ -803,30 +803,24 @@ status:
         ));
     }
 
+    /// Assert an `AuthExecRun` error names only `program` and none of `markers`.
+    #[cfg(unix)]
+    fn assert_program_only(err: &Error, program: &str, markers: &[&str]) {
+        for text in [err.to_string(), format!("{err:?}")] {
+            for marker in markers {
+                assert!(!text.contains(marker), "{marker} leaked: {text}");
+            }
+        }
+        assert!(
+            matches!(err, Error::AuthExecRun { cmd, .. } if cmd == program),
+            "{err:?}"
+        );
+    }
+
     #[test]
     #[cfg(unix)]
-    fn exec_run_error_omits_env_and_args() {
-        fn assert_program_only(err: &Error, program: &str, markers: &[&str]) {
-            for text in [err.to_string(), format!("{err:?}")] {
-                for marker in markers {
-                    assert!(!text.contains(marker), "{marker} leaked: {text}");
-                }
-            }
-            assert!(
-                matches!(err, Error::AuthExecRun { cmd, .. } if cmd == program),
-                "{err:?}"
-            );
-        }
-
-        // gcp auth-provider cmd-path: cmd-args
-        let gcp_arg_marker = "gcp-arg-marker-31ad";
-        let provider = gcp_auth_info("false", gcp_arg_marker).auth_provider.unwrap();
-        let Err(err) = token_from_gcp_provider(&provider) else {
-            panic!("`false` should fail");
-        };
-        assert_program_only(&err, "false", &[gcp_arg_marker]);
-
-        // exec plugin: kubeconfig env, KUBERNETES_EXEC_INFO and args
+    fn exec_run_error_names_only_program() {
+        // kubeconfig env, KUBERNETES_EXEC_INFO (cluster extension) and args
         let env_marker = "env-marker-4f1c";
         let arg_marker = "arg-marker-9b2e";
         let ext_marker = "ext-marker-77d0";
@@ -853,6 +847,17 @@ status:
 
         let err = auth_exec(&auth).unwrap_err();
         assert_program_only(&err, "sh", &[env_marker, arg_marker, ext_marker]);
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn gcp_cmd_error_names_only_program() {
+        let arg_marker = "gcp-arg-marker-31ad";
+        let provider = gcp_auth_info("false", arg_marker).auth_provider.unwrap();
+        let Err(err) = token_from_gcp_provider(&provider) else {
+            panic!("`false` should fail");
+        };
+        assert_program_only(&err, "false", &[arg_marker]);
     }
 
     #[test]
