@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795636514087,
+  "lastUpdate": 1795644374047,
   "repoUrl": "https://github.com/kube-rs/kube",
   "entries": {
     "Benchmark": [
@@ -12497,6 +12497,105 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/kube-rs/kube/commit/1579115091cb2a69800ad323736aa2db3ec9dfbf"
         },
         "date": 1795636512868,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "init_listwatch - peak_bytes",
+            "value": 55194619,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - total_allocated",
+            "value": 76715088,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - alloc_count",
+            "value": 578023,
+            "unit": "allocations"
+          },
+          {
+            "name": "steady_state - peak_bytes",
+            "value": 71381202,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - total_allocated",
+            "value": 109519220,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - alloc_count",
+            "value": 799021,
+            "unit": "allocations"
+          },
+          {
+            "name": "relist - peak_bytes",
+            "value": 99797302,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - total_allocated",
+            "value": 174518628,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - alloc_count",
+            "value": 1189035,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_without_modify - peak_bytes",
+            "value": 141298836,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - total_allocated",
+            "value": 205865000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - alloc_count",
+            "value": 1298020,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_with_modify - peak_bytes",
+            "value": 134853452,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - total_allocated",
+            "value": 162895000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - alloc_count",
+            "value": 1058021,
+            "unit": "allocations"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "doxxx93@gmail.com",
+            "name": "doxxx",
+            "username": "doxxx93"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "1de148cca436a266c9e2b90336b68e14cf58413f",
+          "message": "Keep exec plugin env and args out of AuthExecRun errors (#2172)\n\n* Keep exec plugin env and args out of AuthExecRun errors\n\nAuthExecRun.cmd for exec plugins was built with Command's Debug output,\nwhich on Unix prints every variable set with env()/envs() as\nKEY=\"value\". A failing exec plugin therefore put the kubeconfig exec env\nvalues and KUBERNETES_EXEC_INFO (cluster CA data, extension config) into\nthe error's Display and Debug, and from there into logs. The gcp\nauth-provider cmd-path error included cmd-args the same way.\n\nName only the configured program in both places, as client-go does for\nexec plugins. Args are left out since some plugins take tokens as\narguments.\n\nSigned-off-by: doxxx93 <doxxx93@gmail.com>\n\n* Split the AuthExecRun regression test per call site\n\nOne test per site, so a regression in one does not hide the other.\n\nSigned-off-by: doxxx93 <doxxx93@gmail.com>\n\n---------\n\nSigned-off-by: doxxx93 <doxxx93@gmail.com>\nCo-authored-by: Eirik A <sszynrae@gmail.com>",
+          "timestamp": "2026-11-25T22:05:21Z",
+          "tree_id": "737053781909d3975c7d8564a70d2bc40fdf1e1c",
+          "url": "https://github.com/kube-rs/kube/commit/1de148cca436a266c9e2b90336b68e14cf58413f"
+        },
+        "date": 1795644372509,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
