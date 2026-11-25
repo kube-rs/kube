@@ -587,37 +587,39 @@ mod tests {
         );
     }
 
-    /// Message type that is always considered equal to itself, and whose clones lose the payload
-    #[derive(Educe, Eq, Debug)]
-    #[educe(PartialEq, Hash)]
-    struct LossyCloneMessage(#[educe(PartialEq(ignore), Hash(ignore))] u8);
-
-    impl Clone for LossyCloneMessage {
-        fn clone(&self) -> Self {
-            Self(0)
-        }
-    }
-
     #[tokio::test]
-    async fn scheduler_should_release_pending_message_as_scheduled() {
+    async fn scheduler_should_release_held_messages_oldest_first() {
         pause();
 
-        let (mut sched_tx, sched_rx) = mpsc::unbounded();
+        let now = Instant::now();
+        let (mut sched_tx, sched_rx) = mpsc::unbounded::<ScheduleRequest<u8>>();
         let mut scheduler = pin!(scheduler(sched_rx));
+        for msg in 0..10 {
+            sched_tx
+                .send(ScheduleRequest {
+                    message: msg,
+                    run_at: now + Duration::from_secs(u64::from(msg) + 1),
+                })
+                .await
+                .unwrap();
+        }
+        assert!(poll!(scheduler.as_mut().hold().next()).is_pending());
+        advance(Duration::from_secs(20)).await;
+        assert!(poll!(scheduler.as_mut().hold().next()).is_pending());
+        let mut released = vec![unwrap_poll(poll!(scheduler.as_mut().hold_unless(|_| true).next())).unwrap()];
+        // A message that is requeued while others are pending goes to the back of the line
         sched_tx
             .send(ScheduleRequest {
-                message: LossyCloneMessage(1),
-                run_at: Instant::now(),
+                message: released[0],
+                run_at: now,
             })
             .await
             .unwrap();
-        assert!(poll!(scheduler.as_mut().hold_unless(|_| false).next()).is_pending());
-        assert_eq!(
-            unwrap_poll(poll!(scheduler.as_mut().hold_unless(|_| true).next()))
-                .unwrap()
-                .0,
-            1
-        );
+        assert!(poll!(scheduler.as_mut().hold().next()).is_pending());
+        for _ in 0..10 {
+            released.push(unwrap_poll(poll!(scheduler.as_mut().hold_unless(|_| true).next())).unwrap());
+        }
+        assert_eq!(released, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0]);
     }
 
     #[tokio::test]
