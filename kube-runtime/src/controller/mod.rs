@@ -1476,6 +1476,7 @@ where
     /// NOTE: [`Controller::run`] terminates as soon as a forceful shutdown is requested, but leaves the reconcilers running
     /// in the background while they terminate. This will block [`tokio::runtime::Runtime`] termination until they actually terminate,
     /// unless you run [`std::process::exit`] afterwards.
+    #[cfg(all(any(unix, windows), not(target_os = "emscripten")))]
     #[must_use]
     pub fn shutdown_on_signal(mut self) -> Self {
         async fn shutdown_signal() {
