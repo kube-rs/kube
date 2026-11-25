@@ -709,6 +709,7 @@ fn hoist_any_of_scalar_type(any_of: &mut [Schema], instance_type: &mut Option<Si
     for variant in any_of.iter_mut() {
         if let Schema::Object(variant_obj) = variant {
             variant_obj.instance_type = None;
+            variant_obj.metadata = None;
         }
     }
 }
