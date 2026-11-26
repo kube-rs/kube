@@ -27,13 +27,13 @@ workspace = true
 
 [dependencies]
 futures = { workspace = true, features = ["async-await"] }
-kube-client = { path = "../kube-client", version = "=5.1.0", default-features = false, features = ["jsonpatch", "client"] }
+kube-client = { path = "../kube-client", version = "=5.2.0", default-features = false, features = ["jsonpatch", "client"] }
 educe = { workspace = true, features = ["Clone", "Debug", "Hash", "PartialEq"] }
 serde.workspace = true
 ahash.workspace = true
 parking_lot.workspace = true
 pin-project.workspace = true
-tokio = { workspace = true, features = ["signal", "time"] }
+tokio = { workspace = true, features = ["time"] }
 tokio-util = { workspace = true, features = ["time"] }
 tracing.workspace = true
 json-patch.workspace = true
@@ -44,7 +44,16 @@ hashbrown.workspace = true
 k8s-openapi.workspace = true
 async-broadcast.workspace = true
 async-stream.workspace = true
+
+[target.'cfg(any(unix, windows))'.dependencies]
 hostname.workspace = true
+
+# Tokio's ctrl_c() only has Unix and Windows support.
+# https://github.com/tokio-rs/tokio/blob/tokio-1.54.1/tokio/src/signal/ctrl_c.rs#L1-L4
+# Emscripten identifies as Unix, but Tokio disables signals there.
+# https://github.com/tokio-rs/tokio/blob/tokio-1.54.1/tokio/src/macros/cfg.rs#L437-L448
+[target.'cfg(all(any(unix, windows), not(target_os = "emscripten")))'.dependencies]
+tokio = { workspace = true, features = ["signal"] }
 
 [dev-dependencies]
 http.workspace = true

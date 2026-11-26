@@ -453,7 +453,8 @@ fn token_from_gcp_provider(provider: &AuthProviderConfig) -> Result<ProviderToke
 
         if !output.status.success() {
             return Err(Error::AuthExecRun {
-                cmd: format!("{cmd} {params}"),
+                // Program only, like auth_exec: cmd-args can carry tokens.
+                cmd: cmd.clone(),
                 out: Box::new(output),
             });
         }
@@ -563,10 +564,10 @@ pub struct ExecCredentialStatus {
 }
 
 fn auth_exec(auth: &ExecConfig) -> Result<ExecCredential, Error> {
-    let mut cmd = match &auth.command {
-        Some(cmd) => Command::new(cmd),
-        None => return Err(Error::MissingCommand),
+    let Some(program) = &auth.command else {
+        return Err(Error::MissingCommand);
     };
+    let mut cmd = Command::new(program);
 
     if let Some(args) = &auth.args {
         cmd.args(args);
@@ -631,7 +632,9 @@ fn auth_exec(auth: &ExecConfig) -> Result<ExecCredential, Error> {
     let out = cmd.output().map_err(Error::AuthExecStart)?;
     if !out.status.success() {
         return Err(Error::AuthExecRun {
-            cmd: format!("{cmd:?}"),
+            // Not `{cmd:?}`: Command's Debug prints env values (kubeconfig env, KUBERNETES_EXEC_INFO).
+            // Like client-go, name only the program; args can carry tokens too.
+            cmd: program.clone(),
             out: Box::new(out),
         });
     }
@@ -798,6 +801,63 @@ status:
             parse_exec_credentials(invalid),
             Err(Error::AuthExecParse(_))
         ));
+    }
+
+    /// Assert an `AuthExecRun` error names only `program` and none of `markers`.
+    #[cfg(unix)]
+    fn assert_program_only(err: &Error, program: &str, markers: &[&str]) {
+        for text in [err.to_string(), format!("{err:?}")] {
+            for marker in markers {
+                assert!(!text.contains(marker), "{marker} leaked: {text}");
+            }
+        }
+        assert!(
+            matches!(err, Error::AuthExecRun { cmd, .. } if cmd == program),
+            "{err:?}"
+        );
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn exec_run_error_names_only_program() {
+        // kubeconfig env, KUBERNETES_EXEC_INFO (cluster extension) and args
+        let env_marker = "env-marker-4f1c";
+        let arg_marker = "arg-marker-9b2e";
+        let ext_marker = "ext-marker-77d0";
+        let auth = ExecConfig {
+            api_version: Some("client.authentication.k8s.io/v1".into()),
+            command: Some("sh".into()),
+            args: Some(vec!["-c".into(), "exit 1".into(), arg_marker.into()]),
+            env: Some(vec![
+                [
+                    ("name".to_owned(), "PLUGIN_SECRET".to_owned()),
+                    ("value".to_owned(), env_marker.to_owned()),
+                ]
+                .into(),
+            ]),
+            interactive_mode: Some(ExecInteractiveMode::Never),
+            provide_cluster_info: true,
+            cluster: Some(ExecAuthCluster {
+                server: Some("https://127.0.0.1:6443".into()),
+                config: Some(serde_json::json!({ "marker": ext_marker })),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
+        let err = auth_exec(&auth).unwrap_err();
+        assert_program_only(&err, "sh", &[env_marker, arg_marker, ext_marker]);
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn gcp_cmd_error_names_only_program() {
+        let arg_marker = "gcp-arg-marker-31ad";
+        let provider = gcp_auth_info("false", arg_marker).auth_provider.unwrap();
+        let Err(err) = token_from_gcp_provider(&provider) else {
+            panic!("`false` should fail");
+        };
+        assert_program_only(&err, "false", &[arg_marker]);
     }
 
     #[test]

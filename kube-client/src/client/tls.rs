@@ -381,7 +381,7 @@ pub mod openssl_tls {
     use openssl::{
         pkey::PKey,
         ssl::{SslConnector, SslConnectorBuilder, SslMethod},
-        x509::X509,
+        x509::{X509, store::X509StoreBuilder},
     };
     use thiserror::Error;
 
@@ -465,15 +465,285 @@ pub mod openssl_tls {
         }
 
         if let Some(ders) = root_certs {
+            // SslConnector::builder loaded OpenSSL's default verify paths into the context's store.
+            // Replace that store so only the configured roots are trusted, as in client-go and the
+            // rustls path. Without configured roots, the default store stays.
+            let mut store = X509StoreBuilder::new().map_err(SslConnectorError::CreateBuilder)?;
             for der in ders {
                 let cert = X509::from_der(der).map_err(SslConnectorError::DeserializeRootCertificate)?;
-                builder
-                    .cert_store_mut()
+                store
                     .add_cert(cert)
                     .map_err(SslConnectorError::AddRootCertificate)?;
             }
+            builder.set_cert_store(store.build());
         }
 
         Ok(builder)
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use std::{
+            net::{TcpListener, TcpStream},
+            path::Path,
+            process::Command,
+        };
+
+        use openssl::{
+            asn1::Asn1Time,
+            ec::{EcGroup, EcKey},
+            hash::MessageDigest,
+            nid::Nid,
+            pkey::Private,
+            ssl::{HandshakeError, SslAcceptor, SslAcceptorBuilder, SslVerifyMode},
+            x509::{
+                X509Name, X509VerifyResult,
+                extension::{BasicConstraints, SubjectAlternativeName},
+            },
+        };
+
+        use super::*;
+
+        const SERVER_NAME: &str = "kube.test";
+
+        // Set in the child process to the file the "default" CA is written to. The parent points
+        // SSL_CERT_FILE at the same file.
+        const DEFAULT_CA_FILE_ENV: &str = "KUBE_TEST_OPENSSL_DEFAULT_CA_FILE";
+
+        struct Issued {
+            cert: X509,
+            key: PKey<Private>,
+        }
+
+        // A CA cert, or a leaf with a DNS SAN for SERVER_NAME. Self-signed when `issuer` is None.
+        fn issue(cn: &str, ca: bool, issuer: Option<&Issued>) -> Issued {
+            let group = EcGroup::from_curve_name(Nid::X9_62_PRIME256V1).unwrap();
+            let key = PKey::from_ec_key(EcKey::generate(&group).unwrap()).unwrap();
+
+            let mut name = X509Name::builder().unwrap();
+            name.append_entry_by_text("CN", cn).unwrap();
+            let name = name.build();
+
+            let mut builder = X509::builder().unwrap();
+            builder.set_version(2).unwrap();
+            builder.set_subject_name(&name).unwrap();
+            match issuer {
+                Some(issuer) => builder.set_issuer_name(issuer.cert.subject_name()).unwrap(),
+                None => builder.set_issuer_name(&name).unwrap(),
+            }
+            builder.set_pubkey(&key).unwrap();
+            builder
+                .set_not_before(&Asn1Time::days_from_now(0).unwrap())
+                .unwrap();
+            builder
+                .set_not_after(&Asn1Time::days_from_now(1).unwrap())
+                .unwrap();
+            if ca {
+                builder
+                    .append_extension(BasicConstraints::new().critical().ca().build().unwrap())
+                    .unwrap();
+            } else {
+                let san = SubjectAlternativeName::new()
+                    .dns(SERVER_NAME)
+                    .build(&builder.x509v3_context(None, None))
+                    .unwrap();
+                builder.append_extension(san).unwrap();
+            }
+            let signing_key = issuer.map_or(&key, |issuer| &issuer.key);
+            builder.sign(signing_key, MessageDigest::sha256()).unwrap();
+
+            Issued {
+                cert: builder.build(),
+                key,
+            }
+        }
+
+        fn connector(roots: Option<&[&X509]>, identity: Option<&Vec<u8>>) -> SslConnector {
+            let roots = roots.map(|roots| roots.iter().map(|c| c.to_der().unwrap()).collect::<Vec<_>>());
+            ssl_connector_builder(identity, roots.as_ref()).unwrap().build()
+        }
+
+        fn acceptor(leaf: &Issued, extra_chain: &[&X509]) -> SslAcceptorBuilder {
+            let mut acceptor = SslAcceptor::mozilla_intermediate_v5(SslMethod::tls()).unwrap();
+            acceptor.set_private_key(&leaf.key).unwrap();
+            acceptor.set_certificate(&leaf.cert).unwrap();
+            for cert in extra_chain {
+                acceptor.add_extra_chain_cert((*cert).clone()).unwrap();
+            }
+            acceptor
+        }
+
+        // One handshake on localhost, verifying the server as `domain`. Returns the client's verify
+        // error if it rejected the server certificate, and the server's handshake result.
+        fn handshake(
+            client: &SslConnector,
+            acceptor: SslAcceptor,
+            domain: &str,
+        ) -> (Result<(), X509VerifyResult>, Result<(), String>) {
+            let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+            let addr = listener.local_addr().unwrap();
+            let server = std::thread::spawn(move || {
+                let (stream, _) = listener.accept().unwrap();
+                acceptor.accept(stream).map(drop).map_err(|e| e.to_string())
+            });
+
+            match client.connect(domain, TcpStream::connect(addr).unwrap()) {
+                Ok(stream) => {
+                    // Keep the connection open until the server has finished its side.
+                    let server = server.join().unwrap();
+                    drop(stream);
+                    (Ok(()), server)
+                }
+                Err(HandshakeError::Failure(mid)) => {
+                    let verify = mid.ssl().verify_result();
+                    assert_ne!(
+                        verify,
+                        X509VerifyResult::OK,
+                        "handshake failed for a reason other than verification: {}",
+                        mid.error()
+                    );
+                    drop(mid);
+                    (Err(verify), server.join().unwrap())
+                }
+                Err(e) => panic!("unexpected handshake error: {e}"),
+            }
+        }
+
+        // A server cert from a CA in OpenSSL's default store must be rejected once root certs are
+        // configured, as client-go and the rustls path do. SSL_CERT_FILE is process-global and
+        // unsafe_code is forbidden (no env::set_var), so the test re-runs itself in a child process
+        // with the variable set.
+        #[test]
+        fn default_verify_paths_are_not_trusted_with_root_certs() {
+            if let Some(file) = std::env::var_os(DEFAULT_CA_FILE_ENV) {
+                return check_default_verify_paths(Path::new(&file));
+            }
+            // LibreSSL ignores SSL_CERT_FILE and SSL_CERT_DIR, so its default store can't be redirected.
+            if openssl::version::version().starts_with("LibreSSL") {
+                return;
+            }
+
+            let dir = tempfile::tempdir().unwrap();
+            let file = dir.path().join("default-ca.pem");
+            let test = concat!(
+                module_path!(),
+                "::default_verify_paths_are_not_trusted_with_root_certs"
+            );
+            // libtest names omit the crate name.
+            let test = test.split_once("::").unwrap().1;
+            let output = Command::new(std::env::current_exe().unwrap())
+                .args([test, "--exact", "--test-threads=1"])
+                .env(DEFAULT_CA_FILE_ENV, &file)
+                .env("SSL_CERT_FILE", &file)
+                .env("SSL_CERT_DIR", dir.path())
+                .output()
+                .unwrap();
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            assert!(
+                output.status.success() && stdout.contains("1 passed"),
+                "child test failed:\n{stdout}\n{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
+
+        fn check_default_verify_paths(default_ca_file: &Path) {
+            let default_ca = issue("default-ca", true, None);
+            std::fs::write(default_ca_file, default_ca.cert.to_pem().unwrap()).unwrap();
+            let by_default_ca = issue("server", false, Some(&default_ca));
+            let cluster_ca = issue("cluster-ca", true, None);
+            let by_cluster_ca = issue("server", false, Some(&cluster_ca));
+
+            // No root certs: the default store applies. This also shows SSL_CERT_FILE took effect.
+            let (client, _) = handshake(
+                &connector(None, None),
+                acceptor(&by_default_ca, &[]).build(),
+                SERVER_NAME,
+            );
+            assert!(client.is_ok(), "default store should be used without root certs");
+
+            let pinned = connector(Some(&[&cluster_ca.cert]), None);
+            let (client, _) = handshake(&pinned, acceptor(&by_cluster_ca, &[]).build(), SERVER_NAME);
+            assert!(client.is_ok(), "configured root should be trusted");
+            let (client, _) = handshake(&pinned, acceptor(&by_default_ca, &[]).build(), SERVER_NAME);
+            assert!(
+                client.is_err(),
+                "default store must not be trusted when root certs are configured"
+            );
+
+            // An empty root list trusts nothing rather than falling back to the default store.
+            let (client, _) = handshake(
+                &connector(Some(&[]), None),
+                acceptor(&by_default_ca, &[]).build(),
+                SERVER_NAME,
+            );
+            assert!(
+                client.is_err(),
+                "empty root list must not fall back to the default store"
+            );
+        }
+
+        #[test]
+        fn root_certs_with_intermediates() {
+            let root = issue("root-ca", true, None);
+            let intermediate = issue("intermediate-ca", true, Some(&root));
+            let leaf = issue("server", false, Some(&intermediate));
+
+            // Bundle with root and intermediate; the server sends only its leaf.
+            let bundle = connector(Some(&[&root.cert, &intermediate.cert]), None);
+            let (client, _) = handshake(&bundle, acceptor(&leaf, &[]).build(), SERVER_NAME);
+            assert!(
+                client.is_ok(),
+                "intermediate from the bundle should complete the chain"
+            );
+
+            // Bundle with only the root; the server sends the intermediate.
+            let root_only = connector(Some(&[&root.cert]), None);
+            let (client, _) = handshake(
+                &root_only,
+                acceptor(&leaf, &[&intermediate.cert]).build(),
+                SERVER_NAME,
+            );
+            assert!(
+                client.is_ok(),
+                "intermediate from the server should complete the chain"
+            );
+
+            // Hostname verification is still on.
+            let (client, _) = handshake(
+                &root_only,
+                acceptor(&leaf, &[&intermediate.cert]).build(),
+                "other.test",
+            );
+            assert!(client.is_err(), "hostname mismatch must be rejected");
+        }
+
+        #[test]
+        fn identity_chain_is_sent_with_root_certs() {
+            let server_ca = issue("server-ca", true, None);
+            let server = issue("server", false, Some(&server_ca));
+            let client_root = issue("client-root-ca", true, None);
+            let client_intermediate = issue("client-intermediate-ca", true, Some(&client_root));
+            let client = issue("client", false, Some(&client_intermediate));
+
+            let mut identity = client.cert.to_pem().unwrap();
+            identity.extend(client_intermediate.cert.to_pem().unwrap());
+            identity.extend(client.key.private_key_to_pem_pkcs8().unwrap());
+
+            // The server only knows the client root, so it needs the intermediate from the client.
+            let mut acceptor = acceptor(&server, &[]);
+            acceptor.set_verify(SslVerifyMode::PEER | SslVerifyMode::FAIL_IF_NO_PEER_CERT);
+            acceptor
+                .cert_store_mut()
+                .add_cert(client_root.cert.clone())
+                .unwrap();
+
+            let (client, server) = handshake(
+                &connector(Some(&[&server_ca.cert]), Some(&identity)),
+                acceptor.build(),
+                SERVER_NAME,
+            );
+            assert!(client.is_ok(), "client should trust the server");
+            server.expect("server should verify the client chain through the intermediate");
+        }
     }
 }

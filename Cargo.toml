@@ -14,7 +14,7 @@ members = [
 ]
 
 [workspace.package]
-version = "5.1.0"
+version = "5.2.0"
 authors = [
   "clux <sszynrae@gmail.com>",
   "Natalie Klestrup Röijezon <nat@nullable.se>",
@@ -31,10 +31,10 @@ unsafe_code = "forbid"
 missing_docs = "deny"
 
 [workspace.dependencies]
-ahash = "0.8.7"
+ahash = "0.8.14"
 anyhow = "1.0.71"
 assert-json-diff = "2.0.2"
-async-broadcast = "0.7.0"
+async-broadcast = "0.7.2"
 async-stream = "0.3.5"
 backon = "1.3"
 base64 = "0.23.1"

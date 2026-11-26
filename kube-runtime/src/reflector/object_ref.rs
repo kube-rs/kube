@@ -1,3 +1,5 @@
+#[cfg(feature = "unstable-runtime-subscribe")]
+use super::subscriber::SubscriberId;
 use educe::Educe;
 use k8s_openapi::{api::core::v1::ObjectReference, apimachinery::pkg::apis::meta::v1::OwnerReference};
 #[cfg(doc)] use kube_client::core::ObjectMeta;
@@ -5,6 +7,7 @@ use kube_client::{
     api::{DynamicObject, Resource},
     core::api_version_from_group_version,
 };
+#[cfg(feature = "unstable-runtime-subscribe")] use std::collections::BTreeSet;
 use std::{
     borrow::Cow,
     fmt::{Debug, Display},
@@ -58,7 +61,7 @@ pub trait Lookup {
                 resource_version: self.resource_version().map(Cow::into_owned),
                 uid: self.uid().map(Cow::into_owned),
                 #[cfg(feature = "unstable-runtime-subscribe")]
-                remaining_lookups: None,
+                pending_lookups: None,
             },
         }
     }
@@ -159,9 +162,9 @@ pub struct Extra {
     pub resource_version: Option<String>,
     /// The uid of the object
     pub uid: Option<String>,
-    /// Number of remaining cache lookups on this reference
+    /// Subscriber IDs pending a lookup on this reference
     #[cfg(feature = "unstable-runtime-subscribe")]
-    pub remaining_lookups: Option<usize>,
+    pub pending_lookups: Option<BTreeSet<SubscriberId>>,
 }
 
 impl<K: Lookup> ObjectRef<K>
@@ -238,7 +241,7 @@ impl<K: Lookup> ObjectRef<K> {
                     resource_version: None,
                     uid: Some(owner.uid.clone()),
                     #[cfg(feature = "unstable-runtime-subscribe")]
-                    remaining_lookups: None,
+                    pending_lookups: None,
                 },
             })
         } else {
@@ -369,7 +372,7 @@ mod tests {
                 resource_version: Some("123".to_string()),
                 uid: Some("638ffacd-f666-4402-ba10-7848c66ef576".to_string()),
                 #[cfg(feature = "unstable-runtime-subscribe")]
-                remaining_lookups: None,
+                pending_lookups: None,
             },
             ..minimal.clone()
         };
