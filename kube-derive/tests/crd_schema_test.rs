@@ -615,6 +615,112 @@ enum BreakfastOrString {
     Other(String),
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, JsonSchema)]
+#[serde(untagged)]
+enum ConstrainedBreakfast {
+    Item(BreakfastItem),
+    Other(#[schemars(length(max = 5))] String),
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, JsonSchema)]
+// Note: `#[schemars(range(...))]` only affects the generated OpenAPI schema conditions
+// (enforced by Kubernetes); derived `Deserialize` ignores schemars attributes and tries
+// untagged variants in declaration order.
+#[serde(untagged)]
+enum ConstrainedCount {
+    Small(#[schemars(range(min = 1, max = 10))] u32),
+    Large(#[schemars(range(min = 100))] u32),
+}
+
+#[derive(kube_derive::CustomResource, Serialize, Deserialize, Debug, Clone, JsonSchema)]
+#[kube(group = "clux.dev", version = "v1", kind = "ConstrainedTest")]
+struct ConstrainedTestSpec {
+    constrained: ConstrainedBreakfast,
+    optional_constrained: Option<ConstrainedBreakfast>,
+    count: ConstrainedCount,
+}
+
+#[test]
+fn untagged_constrained_scalar_any_of_hoists_type() {
+    use kube::CustomResourceExt;
+
+    let crd = serde_json::to_value(ConstrainedTest::crd()).unwrap();
+    let props = &crd["spec"]["versions"][0]["schema"]["openAPIV3Schema"]["properties"]["spec"]["properties"];
+
+    assert_eq!(
+        props["constrained"],
+        serde_json::json!({
+            "type": "string",
+            "anyOf": [
+                { "enum": ["Spam", "Eggs"] },
+                { "maxLength": 5 }
+            ]
+        })
+    );
+    assert_eq!(
+        props["optional_constrained"],
+        serde_json::json!({
+            "type": "string",
+            "nullable": true,
+            "anyOf": [
+                { "enum": ["Spam", "Eggs"] },
+                { "maxLength": 5 }
+            ]
+        })
+    );
+    assert_eq!(
+        props["count"],
+        serde_json::json!({
+            "type": "integer",
+            "anyOf": [
+                { "format": "uint32", "minimum": 1.0, "maximum": 10.0 },
+                { "format": "uint32", "minimum": 100.0 }
+            ]
+        })
+    );
+}
+
+/// Documented meal
+#[derive(Serialize, Deserialize, Debug, Clone, JsonSchema)]
+enum DocumentedBreakfastMeal {
+    FullBreakfast,
+    Porridge,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, JsonSchema)]
+#[serde(untagged)]
+enum DocumentedInnerType {
+    /// Documented variant
+    Meal(DocumentedBreakfastMeal),
+    Other(#[schemars(length(max = 5))] String),
+}
+
+#[derive(kube_derive::CustomResource, Serialize, Deserialize, Debug, Clone, JsonSchema)]
+#[kube(group = "clux.dev", version = "v1", kind = "DocInnerTest")]
+struct DocInnerTestSpec {
+    meal: DocumentedInnerType,
+}
+
+#[test]
+fn untagged_documented_enum_clears_branch_description() {
+    use kube::CustomResourceExt;
+
+    let crd = serde_json::to_value(DocInnerTest::crd()).unwrap();
+    let meal =
+        &crd["spec"]["versions"][0]["schema"]["openAPIV3Schema"]["properties"]["spec"]["properties"]["meal"];
+
+    assert_eq!(
+        *meal,
+        serde_json::json!({
+            "type": "string",
+            "anyOf": [
+                { "enum": ["FullBreakfast", "Porridge"] },
+                { "maxLength": 5 }
+            ]
+        })
+    );
+}
+
 #[derive(CustomResource, Serialize, Deserialize, Debug, Clone, JsonSchema)]
 #[kube(group = "clux.dev", version = "v1", kind = "BreakfastTest")]
 struct BreakfastTestSpec {

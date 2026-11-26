@@ -343,6 +343,11 @@ impl Transform for StructuralSchemaRewriter {
             }
 
             if let Some(any_of) = &mut subschemas.any_of {
+                // Untagged enums whose branches all share a single scalar type cannot be merged
+                // into one enum when extra constraints like `maxLength` or `minimum` are present,
+                // so hoist the common scalar `type` onto the parent before stripping branches.
+                hoist_any_of_scalar_type(any_of, &mut schema.instance_type);
+
                 // Untagged enums are serialized using `any_of`
                 // Variant descriptions are not pushed into properties (because they are not for the field).
                 hoist_subschema_properties(any_of, &mut schema.object, &mut schema.instance_type, false);
@@ -655,6 +660,60 @@ fn hoist_subschema_properties(
     }
 }
 
+fn is_scalar_instance_type(instance_type: &InstanceType) -> bool {
+    matches!(
+        instance_type,
+        InstanceType::String | InstanceType::Integer | InstanceType::Number | InstanceType::Boolean
+    )
+}
+
+fn hoist_any_of_scalar_type(any_of: &mut [Schema], instance_type: &mut Option<SingleOrVec<InstanceType>>) {
+    if any_of.is_empty() {
+        return;
+    }
+
+    let mut uniform_type: Option<InstanceType> = None;
+    for variant in any_of.iter() {
+        let Schema::Object(SchemaObject {
+            instance_type: Some(SingleOrVec::Single(variant_ty)),
+            subschemas: None,
+            array: None,
+            object: None,
+            ..
+        }) = variant
+        else {
+            return;
+        };
+
+        if !is_scalar_instance_type(variant_ty) {
+            return;
+        }
+
+        match uniform_type.as_ref() {
+            None => uniform_type = Some(*variant_ty.as_ref()),
+            Some(expected) if expected == variant_ty.as_ref() => {}
+            Some(_) => return,
+        }
+    }
+
+    let Some(uniform_type) = uniform_type else {
+        return;
+    };
+
+    match instance_type {
+        None => *instance_type = Some(SingleOrVec::Single(Box::new(uniform_type))),
+        Some(SingleOrVec::Single(parent_ty)) if parent_ty.as_ref() == &uniform_type => {}
+        Some(_) => return,
+    }
+
+    for variant in any_of.iter_mut() {
+        if let Schema::Object(variant_obj) = variant {
+            variant_obj.instance_type = None;
+            variant_obj.metadata = None;
+        }
+    }
+}
+
 fn only_item<I: Iterator>(mut i: I) -> Option<I::Item> {
     let item = i.next()?;
     if i.next().is_some() {
@@ -731,6 +790,109 @@ mod tests {
             })),
             json!({ "description": "field", "type": "string", "nullable": true })
         );
+    }
+
+    fn rewrite_structural(schema: serde_json::Value) -> serde_json::Value {
+        let mut s: schemars::Schema = serde_json::from_value(schema).unwrap();
+        Transform::transform(&mut StructuralSchemaRewriter, &mut s);
+        s.to_value()
+    }
+
+    #[test]
+    fn rewriter_hoists_uniform_scalar_type_from_any_of() {
+        assert_eq!(
+            rewrite_structural(json!({
+                "anyOf": [
+                    { "type": "string", "enum": ["Spam", "Eggs"] },
+                    { "type": "string", "maxLength": 5 }
+                ]
+            })),
+            json!({
+                "type": "string",
+                "anyOf": [
+                    { "enum": ["Spam", "Eggs"] },
+                    { "maxLength": 5 }
+                ]
+            })
+        );
+
+        assert_eq!(
+            rewrite_structural(json!({
+                "anyOf": [
+                    { "type": "integer", "format": "uint32", "minimum": 1, "maximum": 10 },
+                    { "type": "integer", "format": "uint32", "minimum": 100 }
+                ]
+            })),
+            json!({
+                "type": "integer",
+                "anyOf": [
+                    { "format": "uint32", "minimum": 1, "maximum": 10 },
+                    { "format": "uint32", "minimum": 100 }
+                ]
+            })
+        );
+
+        assert_eq!(
+            rewrite_structural(json!({
+                "anyOf": [
+                    { "type": "string", "maxLength": 5 },
+                    { "type": "string" }
+                ]
+            })),
+            json!({
+                "type": "string",
+                "anyOf": [
+                    { "maxLength": 5 },
+                    {}
+                ]
+            })
+        );
+
+        assert_eq!(
+            rewrite_structural(json!({
+                "type": "number",
+                "anyOf": [
+                    { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+                    { "type": "number", "multipleOf": 5.0 }
+                ]
+            })),
+            json!({
+                "type": "number",
+                "anyOf": [
+                    { "minimum": 0.0, "maximum": 1.0 },
+                    { "multipleOf": 5.0 }
+                ]
+            })
+        );
+    }
+
+    #[test]
+    fn rewriter_does_not_hoist_mismatched_or_non_scalar_any_of() {
+        let mismatched = rewrite_structural(json!({
+            "anyOf": [
+                { "type": "string", "enum": ["Spam", "Eggs"] },
+                { "type": "integer", "minimum": 0 }
+            ]
+        }));
+        assert!(mismatched.get("type").is_none());
+        assert_eq!(mismatched["anyOf"][0]["type"], json!("string"));
+
+        let nullable_null = rewrite_structural(json!({
+            "anyOf": [
+                { "type": "string", "enum": ["Spam", "Eggs"] },
+                { "type": "null" }
+            ]
+        }));
+        assert!(nullable_null.get("type").is_none());
+        assert_eq!(nullable_null["anyOf"][0]["type"], json!("string"));
+
+        let all_null = rewrite_structural(json!({
+            "anyOf": [
+                { "type": "null" },
+                { "type": "null" }
+            ]
+        }));
+        assert!(all_null.get("type").is_none());
     }
 
     #[test]
