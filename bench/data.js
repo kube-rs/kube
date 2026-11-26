@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795644374047,
+  "lastUpdate": 1795654723414,
   "repoUrl": "https://github.com/kube-rs/kube",
   "entries": {
     "Benchmark": [
@@ -12596,6 +12596,105 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/kube-rs/kube/commit/1de148cca436a266c9e2b90336b68e14cf58413f"
         },
         "date": 1795644372509,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "init_listwatch - peak_bytes",
+            "value": 55194619,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - total_allocated",
+            "value": 76715088,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_listwatch - alloc_count",
+            "value": 578023,
+            "unit": "allocations"
+          },
+          {
+            "name": "steady_state - peak_bytes",
+            "value": 71381202,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - total_allocated",
+            "value": 109519220,
+            "unit": "bytes"
+          },
+          {
+            "name": "steady_state - alloc_count",
+            "value": 799021,
+            "unit": "allocations"
+          },
+          {
+            "name": "relist - peak_bytes",
+            "value": 99797302,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - total_allocated",
+            "value": 174518628,
+            "unit": "bytes"
+          },
+          {
+            "name": "relist - alloc_count",
+            "value": 1189035,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_without_modify - peak_bytes",
+            "value": 141298836,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - total_allocated",
+            "value": 205865000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_without_modify - alloc_count",
+            "value": 1298020,
+            "unit": "allocations"
+          },
+          {
+            "name": "init_with_modify - peak_bytes",
+            "value": 134853452,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - total_allocated",
+            "value": 162895000,
+            "unit": "bytes"
+          },
+          {
+            "name": "init_with_modify - alloc_count",
+            "value": 1058021,
+            "unit": "allocations"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "63845775+aloneangel45@users.noreply.github.com",
+            "name": "Aloneangel20",
+            "username": "aloneangel45"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "45bb874b3737d43dca7e4bd61cef85e5614a1f1d",
+          "message": "schema: hoist uniform scalar type from anyOf branches (#2165)\n\n* fix(schema): hoist uniform scalar type from anyOf branches\n\nSigned-off-by: aloneangel45 <aloneangel45@users.noreply.github.com>\n\n* fix(schema): clear metadata on hoisted anyOf branches and add docs\n\nSigned-off-by: aloneangel45 <aloneangel45@users.noreply.github.com>\n\n---------\n\nSigned-off-by: aloneangel45 <aloneangel45@users.noreply.github.com>\nCo-authored-by: aloneangel45 <aloneangel45@users.noreply.github.com>\nCo-authored-by: doxxx <doxxx93@gmail.com>",
+          "timestamp": "2026-11-26T09:58:07+09:00",
+          "tree_id": "97d0dfecf9103bd07fb0088e705573fa55b37359",
+          "url": "https://github.com/kube-rs/kube/commit/45bb874b3737d43dca7e4bd61cef85e5614a1f1d"
+        },
+        "date": 1795654722294,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
