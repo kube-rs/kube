@@ -1,4 +1,6 @@
 //! Request builder type for arbitrary api types
+use std::fmt::Display;
+
 use thiserror::Error;
 
 use crate::params::GetParams;
@@ -82,12 +84,12 @@ impl Request {
     pub fn get(&self, name: &str, gp: &GetParams) -> Result<http::Request<Vec<u8>>, Error> {
         validate_name(name)?;
         let urlstr = if let Some(rv) = &gp.resource_version {
-            let target = format!("{}/{}?", self.url_path, name);
+            let target = format!("{}/{}?", self.url_path, encode(name));
             form_urlencoded::Serializer::new(target)
                 .append_pair("resourceVersion", rv)
                 .finish()
         } else {
-            let target = format!("{}/{}", self.url_path, name);
+            let target = format!("{}/{}", self.url_path, encode(name));
             form_urlencoded::Serializer::new(target).finish()
         };
         let req = http::Request::get(urlstr);
@@ -108,7 +110,7 @@ impl Request {
     /// Delete an instance of a resource
     pub fn delete(&self, name: &str, dp: &DeleteParams) -> Result<http::Request<Vec<u8>>, Error> {
         validate_name(name)?;
-        let target = format!("{}/{}?", self.url_path, name);
+        let target = format!("{}/{}?", self.url_path, encode(name));
         let mut qp = form_urlencoded::Serializer::new(target);
         let urlstr = qp.finish();
         let body = serde_json::to_vec(&dp).map_err(Error::SerializeBody)?;
@@ -153,7 +155,7 @@ impl Request {
     ) -> Result<http::Request<Vec<u8>>, Error> {
         validate_name(name)?;
         pp.validate(patch)?;
-        let target = format!("{}/{}?", self.url_path, name);
+        let target = format!("{}/{}?", self.url_path, encode(name));
         let mut qp = form_urlencoded::Serializer::new(target);
         pp.populate_qp(&mut qp);
         let urlstr = qp.finish();
@@ -175,7 +177,7 @@ impl Request {
         data: Vec<u8>,
     ) -> Result<http::Request<Vec<u8>>, Error> {
         validate_name(name)?;
-        let target = format!("{}/{}?", self.url_path, name);
+        let target = format!("{}/{}?", self.url_path, encode(name));
         let mut qp = form_urlencoded::Serializer::new(target);
         pp.populate_qp(&mut qp);
         let urlstr = qp.finish();
@@ -193,7 +195,7 @@ impl Request {
         name: &str,
     ) -> Result<http::Request<Vec<u8>>, Error> {
         validate_name(name)?;
-        let target = format!("{}/{}/{}", self.url_path, name, subresource_name);
+        let target = format!("{}/{}/{}", self.url_path, encode(name), encode(subresource_name));
         let mut qp = form_urlencoded::Serializer::new(target);
         let urlstr = qp.finish();
         let req = http::Request::get(urlstr);
@@ -209,7 +211,7 @@ impl Request {
         data: Vec<u8>,
     ) -> Result<http::Request<Vec<u8>>, Error> {
         validate_name(name)?;
-        let target = format!("{}/{}/{}?", self.url_path, name, subresource_name);
+        let target = format!("{}/{}/{}?", self.url_path, encode(name), encode(subresource_name));
         let mut qp = form_urlencoded::Serializer::new(target);
         pp.populate_qp(&mut qp);
         let urlstr = qp.finish();
@@ -227,7 +229,7 @@ impl Request {
     ) -> Result<http::Request<Vec<u8>>, Error> {
         validate_name(name)?;
         pp.validate(patch)?;
-        let target = format!("{}/{}/{}?", self.url_path, name, subresource_name);
+        let target = format!("{}/{}/{}?", self.url_path, encode(name), encode(subresource_name));
         let mut qp = form_urlencoded::Serializer::new(target);
         pp.populate_qp(&mut qp);
         let urlstr = qp.finish();
@@ -248,7 +250,7 @@ impl Request {
         data: Vec<u8>,
     ) -> Result<http::Request<Vec<u8>>, Error> {
         validate_name(name)?;
-        let target = format!("{}/{}/{}?", self.url_path, name, subresource_name);
+        let target = format!("{}/{}/{}?", self.url_path, encode(name), encode(subresource_name));
         let mut qp = form_urlencoded::Serializer::new(target);
         pp.populate_qp(&mut qp);
         let urlstr = qp.finish();
@@ -266,12 +268,12 @@ impl Request {
     pub fn get_metadata(&self, name: &str, gp: &GetParams) -> Result<http::Request<Vec<u8>>, Error> {
         validate_name(name)?;
         let urlstr = if let Some(rv) = &gp.resource_version {
-            let target = format!("{}/{}?", self.url_path, name);
+            let target = format!("{}/{}?", self.url_path, encode(name));
             form_urlencoded::Serializer::new(target)
                 .append_pair("resourceVersion", rv)
                 .finish()
         } else {
-            let target = format!("{}/{}", self.url_path, name);
+            let target = format!("{}/{}", self.url_path, encode(name));
             form_urlencoded::Serializer::new(target).finish()
         };
         let req = http::Request::get(urlstr)
@@ -321,7 +323,7 @@ impl Request {
     ) -> Result<http::Request<Vec<u8>>, Error> {
         validate_name(name)?;
         pp.validate(patch)?;
-        let target = format!("{}/{}?", self.url_path, name);
+        let target = format!("{}/{}?", self.url_path, encode(name));
         let mut qp = form_urlencoded::Serializer::new(target);
         pp.populate_qp(&mut qp);
         let urlstr = qp.finish();
@@ -334,12 +336,38 @@ impl Request {
     }
 }
 
-/// Names must not be empty as otherwise API server would interpret a `get` as `list`, or a `delete` as `delete_collection`
-fn validate_name(name: &str) -> Result<(), Error> {
-    if name.is_empty() {
-        return Err(Error::Validation("A non-empty name is required".into()));
+/// Validate a resource name as a URL path segment, following apimachinery's [`IsPathSegmentName`].
+///
+/// Also, names must not be empty as otherwise API server would interpret a `get` as `list`,
+/// or a `delete` as `delete_collection`.
+///
+/// [`IsPathSegmentName`]: https://github.com/kubernetes/apimachinery/blob/v0.37.3/pkg/api/validate/content/path.go#L37
+pub(crate) fn validate_name(name: &str) -> Result<(), Error> {
+    match name {
+        "" => return Err(Error::Validation("A non-empty name is required".into())),
+        "." | ".." => return Err(Error::Validation(format!("Name may not be '{name}'"))),
+        _ => {}
     }
+
+    if let Some(c) = name.chars().find(|c| matches!(c, '/' | '%')) {
+        return Err(Error::Validation(format!("Name may not contain '{c}'")));
+    }
+
     Ok(())
+}
+
+/// Encode the given URL path segment according to percent-encoding rules.
+#[must_use]
+pub(crate) fn encode(segment: &str) -> impl Display {
+    use percent_encoding::{AsciiSet, CONTROLS, utf8_percent_encode};
+
+    // https://github.com/servo/rust-url/blob/ad1c66cbff6e318393d872641e30589ff9687b9c/url/src/parser.rs#L19-L45
+    const QUERY: &AsciiSet = &CONTROLS.add(b' ').add(b'"').add(b'#').add(b'<').add(b'>');
+    const PATH: &AsciiSet = &QUERY.add(b'?').add(b'^').add(b'`').add(b'{').add(b'}');
+    const PATH_SEGMENT: &AsciiSet = &PATH.add(b'/').add(b'%');
+    const SPECIAL_PATH_SEGMENT: &AsciiSet = &PATH_SEGMENT.add(b'\\');
+
+    utf8_percent_encode(segment, SPECIAL_PATH_SEGMENT)
 }
 
 /// Extensive tests for Request of k8s_openapi::Resource structs
@@ -348,7 +376,7 @@ fn validate_name(name: &str) -> Result<(), Error> {
 #[cfg(test)]
 mod test {
     use crate::{
-        params::{GetParams, PostParams, VersionMatch, WatchParams},
+        params::{DeleteParams, GetParams, PostParams, VersionMatch, WatchParams},
         request::{Error, Request},
         resource::Resource,
     };
@@ -461,7 +489,7 @@ mod test {
 
     /// -----------------------------------------------------------------
     /// Tests that the misc mappings are also sensible
-    use crate::params::{DeleteParams, ListParams, Patch, PatchParams};
+    use crate::params::{ListParams, Patch, PatchParams};
 
     #[test]
     fn get_metadata_path() {
@@ -513,6 +541,114 @@ mod test {
         let url = appsv1::Deployment::url_path(&(), Some("ns"));
         let req = Request::new(url).get("", &GetParams::any());
         assert!(matches!(req, Err(Error::Validation(_))));
+    }
+
+    #[test]
+    fn delete_rejects_empty_name() {
+        let r = Request::new(appsv1::Deployment::url_path(&(), Some("ns")));
+        let res = r.delete("", &DeleteParams::default());
+        assert!(matches!(res, Err(Error::Validation(_))));
+    }
+
+    #[test]
+    fn get_metadata_rejects_empty_name() {
+        let r = Request::new(appsv1::Deployment::url_path(&(), Some("ns")));
+        let res = r.get_metadata("", &GetParams::default());
+        assert!(matches!(res, Err(Error::Validation(_))));
+    }
+
+    #[test]
+    fn dot_segment_names_are_rejected() {
+        let r = Request::new(appsv1::Deployment::url_path(&(), Some("ns")));
+        for name in [".", ".."] {
+            assert!(
+                matches!(r.get(name, &GetParams::default()), Err(Error::Validation(_))),
+                "{name}"
+            );
+            assert!(
+                matches!(
+                    r.delete(name, &DeleteParams::default()),
+                    Err(Error::Validation(_))
+                ),
+                "{name}"
+            );
+        }
+    }
+
+    #[test]
+    fn names_that_escape_the_segment_are_rejected() {
+        let r = Request::new(appsv1::Deployment::url_path(&(), Some("ns")));
+        for name in ["a/b", "a%b", "/", "%2e%2e"] {
+            assert!(
+                matches!(r.get(name, &GetParams::default()), Err(Error::Validation(_))),
+                "{name}"
+            );
+        }
+    }
+
+    #[test]
+    fn name_is_encoded_as_a_single_path_segment() {
+        let r = Request::new(appsv1::Deployment::url_path(&(), Some("ns")));
+        let base = "/apis/apps/v1/namespaces/ns/deployments";
+        for (name, encoded) in [
+            ("cfg#x", "cfg%23x"),
+            ("cfg?dryRun=All", "cfg%3FdryRun=All"),
+            ("a b", "a%20b"),
+            ("café", "caf%C3%A9"),
+            ("a\\b", "a%5Cb"),
+        ] {
+            let req = r.get(name, &GetParams::default()).unwrap();
+            assert_eq!(req.uri().path(), format!("{base}/{encoded}"), "{name}");
+            assert_eq!(req.uri().query(), None, "{name}");
+        }
+    }
+
+    #[test]
+    fn name_with_query_chars_does_not_add_query() {
+        let r = Request::new(appsv1::Deployment::url_path(&(), Some("ns")));
+        let req = r.delete("cfg?dryRun=All", &DeleteParams::default()).unwrap();
+        assert!(!req.uri().query().unwrap_or("").contains("dryRun"));
+        assert!(req.uri().path().ends_with("/cfg%3FdryRun=All"));
+    }
+
+    #[test]
+    fn ordinary_names_are_unchanged() {
+        let r = Request::new(appsv1::Deployment::url_path(&(), Some("ns")));
+        for name in ["system:admin", "mycrd.domain.io", "my-name_1", "a.b"] {
+            let req = r.get(name, &GetParams::default()).unwrap();
+            assert_eq!(
+                req.uri(),
+                format!("/apis/apps/v1/namespaces/ns/deployments/{name}").as_str()
+            );
+        }
+    }
+
+    #[test]
+    fn get_subresource_validates_and_encodes_name() {
+        let r = Request::new(appsv1::Deployment::url_path(&(), Some("ns")));
+        assert!(matches!(
+            r.get_subresource("status", ""),
+            Err(Error::Validation(_))
+        ));
+        assert!(matches!(
+            r.get_subresource("status", "a/b"),
+            Err(Error::Validation(_))
+        ));
+        let req = r.get_subresource("status", "cfg#x").unwrap();
+        assert_eq!(
+            req.uri().path(),
+            "/apis/apps/v1/namespaces/ns/deployments/cfg%23x/status"
+        );
+    }
+
+    #[test]
+    fn get_subresource_encodes_subresource_name() {
+        let r = Request::new(appsv1::Deployment::url_path(&(), Some("ns")));
+        let req = r.get_subresource("a/b#c", "x").unwrap();
+        assert_eq!(
+            req.uri().path(),
+            "/apis/apps/v1/namespaces/ns/deployments/x/a%2Fb%23c"
+        );
     }
 
     #[test]

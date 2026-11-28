@@ -8,6 +8,8 @@ use std::{borrow::Cow, collections::BTreeMap};
 
 pub use k8s_openapi::{ClusterResourceScope, NamespaceResourceScope, ResourceScope, SubResourceScope};
 
+use crate::request::encode;
+
 /// Indicates that a [`Resource`] is of an indeterminate dynamic scope.
 pub struct DynamicResourceScope {}
 impl ResourceScope for DynamicResourceScope {}
@@ -92,7 +94,7 @@ pub trait Resource {
     /// Creates a url path for http requests for this resource
     fn url_path(dt: &Self::DynamicType, namespace: Option<&str>) -> String {
         let n = if let Some(ns) = namespace {
-            format!("namespaces/{ns}/")
+            format!("namespaces/{ns}/", ns = encode(ns))
         } else {
             "".into()
         };

@@ -1,7 +1,7 @@
 //! Request builder types and parameters for subresources
 use crate::{
     params::{DeleteParams, PostParams},
-    request::{Error, JSON_MIME, Request},
+    request::{Error, JSON_MIME, Request, encode, validate_name},
 };
 use jiff::{RoundMode, Timestamp, TimestampRound, Unit};
 use std::fmt::Debug;
@@ -45,7 +45,8 @@ pub struct LogParams {
 impl Request {
     /// Get a pod logs
     pub fn logs(&self, name: &str, lp: &LogParams) -> Result<http::Request<Vec<u8>>, Error> {
-        let target = format!("{}/{}/log?", self.url_path, name);
+        validate_name(name)?;
+        let target = format!("{}/{}/log?", self.url_path, encode(name));
         let mut qp = form_urlencoded::Serializer::new(target);
 
         if let Some(container) = &lp.container {
@@ -112,7 +113,8 @@ pub struct EvictParams {
 impl Request {
     /// Create an eviction
     pub fn evict(&self, name: &str, ep: &EvictParams) -> Result<http::Request<Vec<u8>>, Error> {
-        let target = format!("{}/{}/eviction?", self.url_path, name);
+        validate_name(name)?;
+        let target = format!("{}/{}/eviction?", self.url_path, encode(name));
         // This is technically identical to Request::create, but different url
         let pp = &ep.post_options;
         pp.validate()?;
@@ -330,7 +332,8 @@ impl Request {
     pub fn attach(&self, name: &str, ap: &AttachParams) -> Result<http::Request<Vec<u8>>, Error> {
         ap.validate()?;
 
-        let target = format!("{}/{}/attach?", self.url_path, name);
+        validate_name(name)?;
+        let target = format!("{}/{}/attach?", self.url_path, encode(name));
         let mut qp = form_urlencoded::Serializer::new(target);
         ap.append_to_url_serializer(&mut qp);
 
@@ -358,7 +361,8 @@ impl Request {
     {
         ap.validate()?;
 
-        let target = format!("{}/{}/exec?", self.url_path, name);
+        validate_name(name)?;
+        let target = format!("{}/{}/exec?", self.url_path, encode(name));
         let mut qp = form_urlencoded::Serializer::new(target);
         ap.append_to_url_serializer(&mut qp);
 
@@ -400,7 +404,8 @@ impl Request {
             }
         }
 
-        let base_url = format!("{}/{}/portforward?", self.url_path, name);
+        validate_name(name)?;
+        let base_url = format!("{}/{}/portforward?", self.url_path, encode(name));
         let mut qp = form_urlencoded::Serializer::new(base_url);
         qp.append_pair(
             "ports",
@@ -419,11 +424,15 @@ impl Request {
 /// Cheap sanity check to ensure type maps work as expected
 #[cfg(test)]
 mod test {
-    use crate::{request::Request, resource::Resource};
+    use crate::{
+        request::{Error, Request},
+        resource::Resource,
+    };
     use jiff::Timestamp;
     use k8s::core::v1 as corev1;
     use k8s_openapi::api as k8s;
 
+    #[cfg(feature = "ws")] use crate::subresource::AttachParams;
     use crate::{
         params::{DeleteParams, Preconditions},
         subresource::{EvictParams, LogParams},
@@ -447,6 +456,83 @@ mod test {
         assert_eq!(body["deleteOptions"]["preconditions"]["uid"], "u1");
         assert_eq!(body["metadata"]["name"], "mypod");
         assert!(body.get("delete_options").is_none());
+    }
+
+    const BAD_NAMES: [&str; 6] = ["", ".", "..", "a/b", "x/../y", "a%b"];
+
+    #[test]
+    fn logs_rejects_bad_names() {
+        let r = Request::new(corev1::Pod::url_path(&(), Some("ns")));
+        for name in BAD_NAMES {
+            let res = r.logs(name, &LogParams::default());
+            assert!(matches!(res, Err(Error::Validation(_))), "{name:?}");
+        }
+    }
+
+    #[test]
+    fn evict_rejects_bad_names() {
+        let r = Request::new(corev1::Pod::url_path(&(), Some("ns")));
+        for name in BAD_NAMES {
+            let res = r.evict(name, &EvictParams::default());
+            assert!(matches!(res, Err(Error::Validation(_))), "{name:?}");
+        }
+    }
+
+    #[cfg(feature = "ws")]
+    #[test]
+    fn attach_rejects_bad_names() {
+        let r = Request::new(corev1::Pod::url_path(&(), Some("ns")));
+        for name in BAD_NAMES {
+            let res = r.attach(name, &AttachParams::default());
+            assert!(matches!(res, Err(Error::Validation(_))), "{name:?}");
+        }
+    }
+
+    #[cfg(feature = "ws")]
+    #[test]
+    fn exec_rejects_bad_names() {
+        let r = Request::new(corev1::Pod::url_path(&(), Some("ns")));
+        for name in BAD_NAMES {
+            let res = r.exec(name, ["ls"], &AttachParams::default());
+            assert!(matches!(res, Err(Error::Validation(_))), "{name:?}");
+        }
+    }
+
+    #[cfg(feature = "ws")]
+    #[test]
+    fn portforward_rejects_bad_names() {
+        let r = Request::new(corev1::Pod::url_path(&(), Some("ns")));
+        for name in BAD_NAMES {
+            let res = r.portforward(name, &[8080]);
+            assert!(matches!(res, Err(Error::Validation(_))), "{name:?}");
+        }
+    }
+
+    #[test]
+    fn logs_and_evict_encode_names() {
+        let r = Request::new(corev1::Pod::url_path(&(), Some("ns")));
+
+        let req = r.logs("cfg#x", &LogParams::default()).unwrap();
+        assert_eq!(req.uri().path(), "/api/v1/namespaces/ns/pods/cfg%23x/log");
+
+        let req = r.evict("cfg#x", &EvictParams::default()).unwrap();
+        assert_eq!(req.uri().path(), "/api/v1/namespaces/ns/pods/cfg%23x/eviction");
+    }
+
+    #[cfg(feature = "ws")]
+    #[test]
+    fn ws_builders_encode_names() {
+        let r = Request::new(corev1::Pod::url_path(&(), Some("ns")));
+        let ap = AttachParams::default();
+
+        let req = r.attach("cfg#x", &ap).unwrap();
+        assert_eq!(req.uri().path(), "/api/v1/namespaces/ns/pods/cfg%23x/attach");
+
+        let req = r.exec("cfg#x", ["ls"], &ap).unwrap();
+        assert_eq!(req.uri().path(), "/api/v1/namespaces/ns/pods/cfg%23x/exec");
+
+        let req = r.portforward("cfg#x", &[8080]).unwrap();
+        assert_eq!(req.uri().path(), "/api/v1/namespaces/ns/pods/cfg%23x/portforward");
     }
 
     #[test]
